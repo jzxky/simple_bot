@@ -152,7 +152,7 @@
       <div id="bot-config" class="tab-panel">
         <div class="row">
           <label style="flex:1;">Custom Chrome path <span class="muted">(leave blank to auto-detect)</span>
-            <input type="text" id="chrome_path" placeholder="e.g. /usr/bin/google-chrome" value="{{ config.bot_config.chrome_path }}">
+            <input type="text" id="chrome_path" placeholder="e.g. /usr/bin/google-chrome" value="{{ config.get('bot_config', {}).get('chrome_path', '') }}">
           </label>
         </div>
       </div>
