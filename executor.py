@@ -145,11 +145,12 @@ def handle_select_crime(action: Action, state: GameState):
     if not _check_session(state):
         return
 
-    page.check(f"input[type='radio'][value='{crime}']")
+    # Select the radio by name=agcrime and the configured value
+    page.check(f"input[name='agcrime'][value='{crime}']")
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
-    state.add_log(f"Selected crime: {crime}")
+    state.add_log(f"Selected crime: {crime} — awaiting target selection page.")
 
 
 def handle_check_weapon(action: Action, state: GameState):
@@ -227,19 +228,29 @@ def handle_check_weapon(action: Action, state: GameState):
     # Signal crime task to skip by marking no weapon — handled by AggCrimeTask resetting
 
 
+def _get_to_target_page(crime: str, state: GameState):
+    page = browser.page()
+    _nav(CRIME_URL, state)
+    page.check(f"input[name='agcrime'][value='{crime}']")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+
+
 def handle_iterate_crime(action: Action, state: GameState):
     crime = action.params["crime"]
     page = browser.page()
 
+    if not page.query_selector("select"):
+        state.add_log("Target list not found — re-navigating to target page.")
+        _get_to_target_page(crime, state)
+        if not page.query_selector("select"):
+            state.add_log("Could not reach target selection page. Aborting.")
+            return
+
     soup = BeautifulSoup(page.content(), "html.parser")
     select = soup.find("select")
-    if not select:
-        state.add_log("Player list not found — navigating to crime page.")
-        _nav(CRIME_URL, state)
-        return
-
     options = [o["value"] for o in select.find_all("option")
-               if o.get("value") and o["value"] != "Please Select..."]
+               if o.get("value") and o.get_text(strip=True) != "Please Select..."]
 
     for player in options:
         if player == state.own_name:
@@ -259,22 +270,16 @@ def handle_iterate_crime(action: Action, state: GameState):
             amounts = re.findall(r"\$([\d,]+)", msg)
             stolen = int(amounts[0].replace(",", "")) if amounts else 0
             if stolen > 0:
-                state.add_log(f"Stolen: ${stolen:,}")
-                # Store for payback action
                 state._last_crime_victim = player
                 state._last_crime_amount = stolen
+                state.add_log(f"Stolen: ${stolen:,} from {player}")
             return
 
         fail_div = result_soup.find("div", id="fail")
         if fail_div:
             state.add_log(f"Crime failed vs {player}, trying next.")
-            # Navigate back to player list for next attempt
-            # The page should still show the form after fail; if not, re-navigate
-            if not BeautifulSoup(page.content(), "html.parser").find("select"):
-                _nav(CRIME_URL, state)
-                page.check(f"input[type='radio'][value='{crime}']")
-                page.click("input[type='submit'][name='B1']")
-                page.wait_for_load_state("domcontentloaded")
+            if not page.query_selector("select"):
+                _get_to_target_page(crime, state)
             continue
 
     state.add_log("All targets failed or exhausted.")
