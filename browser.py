@@ -27,7 +27,7 @@ def start():
     # Persistent context keeps cookies/storage between runs — Cloudflare trusts it more
     _context = _playwright.chromium.launch_persistent_context(
         PROFILE_DIR,
-        headless=True,
+        headless=False,
         user_agent=MOBILE_UA,
         viewport={"width": 390, "height": 844},  # iPhone 14 dimensions
         device_scale_factor=3,
