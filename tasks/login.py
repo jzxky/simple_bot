@@ -2,12 +2,11 @@
 Handles initial login and automatic session re-login.
 """
 
+import time
 from tasks.base import Task, Action
 from state import GameState
 
-LOGIN_URL = "https://mafiamatrix.com/default.asp"
-LOGGED_IN_URL = "https://mafiamatrix.com/loggedin.asp"
-PLAY_URL = "https://mafiamatrix.com/loggedin.asp?display=play"
+RETRY_INTERVAL = 15  # seconds between login attempts
 
 
 class LoginTask(Task):
@@ -15,9 +14,13 @@ class LoginTask(Task):
         super().__init__(priority=100)
         self.email = email
         self.password = password
+        self._last_attempt: float = 0.0
 
     def can_run(self, state: GameState) -> bool:
-        return not state.logged_in
+        if state.logged_in:
+            return False
+        return time.monotonic() - self._last_attempt >= RETRY_INTERVAL
 
     def run(self, state: GameState):
+        self._last_attempt = time.monotonic()
         return Action("login", email=self.email, password=self.password)

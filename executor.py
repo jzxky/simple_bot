@@ -50,17 +50,25 @@ def _check_session(state: GameState) -> bool:
 
 def handle_login(action: Action, state: GameState):
     page = browser.page()
-    _nav(LOGIN_URL, state)
 
-    soup = BeautifulSoup(page.content(), "html.parser")
-    if not soup.find("form", id="loginForm"):
-        state.add_log("Login form not found.")
+    # If already on the game, mark logged in and return
+    if "default.asp" not in browser.current_url() and browser.current_url() != "about:blank":
+        state.logged_in = True
+        return
+
+    page.goto(LOGIN_URL, wait_until="load")
+
+    try:
+        page.wait_for_selector("form#loginForm", timeout=10000)
+    except Exception:
+        state.add_log("Login form not found — retrying in 10s.")
+        time.sleep(10)
         return
 
     page.fill("input#email", action.params["email"])
     page.fill("input#pass", action.params["password"])
     page.click("button.btn-login")
-    page.wait_for_load_state("domcontentloaded")
+    page.wait_for_load_state("load")
 
     _refresh_state(state)
     soup = BeautifulSoup(page.content(), "html.parser")
@@ -76,7 +84,7 @@ def handle_login(action: Action, state: GameState):
     # Click PLAY NOW if present
     play = soup.find("a", class_="btn-play")
     if play:
-        browser.navigate(PLAY_URL)
+        page.goto(PLAY_URL, wait_until="load")
         _refresh_state(state)
 
     state.logged_in = True
