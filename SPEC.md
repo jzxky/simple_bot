@@ -248,22 +248,8 @@ Parse `<div class="showWeapons">`:
 **Flow:**
 1. Check action timer — if not Ready, skip
 2. Check current city vs home city
-3. If in home city: select configured `comservice` radio option, submit
+3. If in home city: select the last available `comservice` radio option in the list (highest tier), submit
 4. If not in home city: select `csinothercities` value `"hospital"`, submit
-
-**Home city service options:**
-
-| Label | value |
-|---|---|
-| Scraping up gum off pavements | `gum` |
-| Cleaning up tags | `tags` |
-| Gardening in the local park | `weeding` |
-| Pedestrian controller at a local school | `kids` |
-| Delivering pamphlets for your local mayor | `pamphlets` |
-| Delivering groceries to little old ladies | `delivery` |
-| Coaching a little league football club | `football` |
-| Helping police as a suspect in a police line up | `suspect` |
-| Reading books to the elderly in a retirement village | `reading` |
 
 ---
 
@@ -326,9 +312,6 @@ The following use the action timer and follow the same EventDrivenTask pattern. 
     "sub_option": "reading"
   },
   "payback_enabled": true,
-  "community_service": {
-    "home_city_option": "reading"
-  },
   "career_training": {
     "career": "fire"
   }
@@ -364,7 +347,7 @@ The following use the action timer and follow the same EventDrivenTask pattern. 
 |---|---|
 | Community Service | Scraping gum, Cleaning tags, Gardening, Pedestrian controller, Delivering pamphlets, Delivering groceries, Coaching football, Police line up, Reading to elderly |
 | Career Training | Fire Department, Customs, Police |
-| University Training | *(placeholder)* |
+| University Training | Business, Science, Medicine, Engineering, Law |
 | Training Centre | *(placeholder)* |
 | Drug Manufacturing | *(placeholder)* |
 | Dog Trains | *(placeholder)* |
