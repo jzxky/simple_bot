@@ -1,0 +1,6 @@
+.env
+config.json
+__pycache__/
+*.pyc
+site_map/
+venv/

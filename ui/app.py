@@ -26,8 +26,7 @@ def save():
     data = request.get_json()
     c = cfg.load()
 
-    c["credentials"]["email"] = data.get("email", "")
-    c["credentials"]["password"] = data.get("password", "")
+    cfg.save_env(data.get("email", ""), data.get("password", ""))
 
     c["earns"]["enabled"] = data.get("earns_enabled", False)
     c["earns"]["category"] = data.get("earn_category", "Hospital")
