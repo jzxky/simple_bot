@@ -1,5 +1,6 @@
 .env
 config.json
+.browser_profile/
 __pycache__/
 *.pyc
 site_map/
