@@ -277,6 +277,29 @@ def handle_iterate_crime(action: Action, state: GameState):
 
         fail_div = result_soup.find("div", id="fail")
         if fail_div:
+            fail_msg = fail_div.get_text(strip=True)
+            if "weapon" in fail_msg.lower():
+                state.add_log("Weapon required — equipping and retrying.")
+                handle_check_weapon(Action("check_weapon", crime=crime), state)
+                _get_to_target_page(crime, state)
+                if page.query_selector("select"):
+                    page.select_option("select", player)
+                    page.click("input[type='submit'][name='B1']")
+                    page.wait_for_load_state("domcontentloaded")
+                    _refresh_state(state)
+                    result_soup = BeautifulSoup(page.content(), "html.parser")
+                    success_div = result_soup.find("div", id="success")
+                    if success_div:
+                        msg = success_div.get_text(strip=True)
+                        state.add_log(f"Crime success vs {player}: {msg}")
+                        amounts = re.findall(r"\$([\d,]+)", msg)
+                        stolen = int(amounts[0].replace(",", "")) if amounts else 0
+                        if stolen > 0:
+                            state._last_crime_victim = player
+                            state._last_crime_amount = stolen
+                            state.add_log(f"Stolen: ${stolen:,} from {player}")
+                        return
+                continue
             state.add_log(f"Crime failed vs {player}, trying next.")
             if not page.query_selector("select"):
                 _get_to_target_page(crime, state)
