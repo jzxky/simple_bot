@@ -63,7 +63,9 @@ def _run(c: dict):
     executor = ActionExecutor()
 
     try:
+        state.add_log("Starting browser...")
         browser.start()
+        state.add_log("Browser started.")
         sched = _build_scheduler(c)
 
         while not _stop_event.is_set():

@@ -1,5 +1,5 @@
 """
-Playwright browser singleton. All bot tasks share one browser page.
+Patchright browser singleton. All bot tasks share one browser page.
 """
 
 from patchright.sync_api import sync_playwright, Page, Browser, BrowserContext
@@ -18,22 +18,28 @@ _page: Page = None
 def start():
     global _playwright, _browser, _context, _page
     _playwright = sync_playwright().start()
-    _browser = _playwright.chromium.launch(headless=True)
+    _browser = _playwright.chromium.launch(headless=False)
     _context = _browser.new_context(user_agent=MOBILE_UA)
     _page = _context.new_page()
+    print("[browser] Chrome launched.")
 
 
 def stop():
     global _playwright, _browser, _context, _page
-    if _page:
-        _page.close()
-    if _context:
-        _context.close()
-    if _browser:
-        _browser.close()
-    if _playwright:
-        _playwright.stop()
-    _page = _context = _browser = _playwright = None
+    try:
+        if _page:
+            _page.close()
+        if _context:
+            _context.close()
+        if _browser:
+            _browser.close()
+        if _playwright:
+            _playwright.stop()
+    except Exception as e:
+        print(f"[browser] Error during stop: {e}")
+    finally:
+        _page = _context = _browser = _playwright = None
+        print("[browser] Chrome stopped.")
 
 
 def page() -> Page:
