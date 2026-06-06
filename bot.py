@@ -66,10 +66,25 @@ def _run(c: dict):
     state.bot_running = True
     executor = ActionExecutor()
 
+    # Start browser — stop immediately on Chrome not found
     try:
         state.add_log("Starting browser...")
         browser.start()
         state.add_log("Browser started.")
+    except browser.ChromeNotFoundError as e:
+        state.add_log(f"ERROR: {e}")
+        state.add_log("Download Chrome from https://www.google.com/chrome or set a custom path in Bot Config settings.")
+        state.last_error = str(e)
+        state.bot_running = False
+        return
+    except Exception as e:
+        state.add_log(f"Browser failed to start: {e}")
+        state.last_error = str(e)
+        state.bot_running = False
+        return
+
+    # Main loop
+    try:
         sched = _build_scheduler(c)
 
         while not _stop_event.is_set():

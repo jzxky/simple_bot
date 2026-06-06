@@ -154,6 +154,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .placeholder { color: var(--muted); font-style: italic; padding: 10px 0; }
+.muted { color: var(--muted); font-weight: normal; }
 
 /* Controls */
 .controls { display: flex; gap: 10px; margin-bottom: 14px; }
