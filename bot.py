@@ -17,6 +17,7 @@ from tasks.career_training import CareerTrainingTask
 
 _thread: threading.Thread = None
 _stop_event = threading.Event()
+_pause_event = threading.Event()
 state = GameState()
 
 
@@ -69,6 +70,10 @@ def _run(c: dict):
         sched = _build_scheduler(c)
 
         while not _stop_event.is_set():
+            if _pause_event.is_set():
+                time.sleep(1)
+                continue
+
             # Check for session expiry on every tick
             if state.logged_in and "default.asp" in browser.current_url():
                 state.logged_in = False
@@ -105,6 +110,7 @@ def start():
     if _thread and _thread.is_alive():
         return
     _stop_event.clear()
+    _pause_event.clear()
     c = cfg.load()
     _thread = threading.Thread(target=_run, args=(c,), daemon=True)
     _thread.start()
@@ -112,7 +118,22 @@ def start():
 
 def stop():
     _stop_event.set()
+    _pause_event.clear()
+
+
+def pause():
+    _pause_event.set()
+    state.add_log("Bot paused.")
+
+
+def resume():
+    _pause_event.clear()
+    state.add_log("Bot resumed.")
 
 
 def is_running() -> bool:
     return _thread is not None and _thread.is_alive()
+
+
+def is_paused() -> bool:
+    return _pause_event.is_set()

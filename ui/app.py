@@ -52,19 +52,32 @@ def save():
 @app.route("/start", methods=["POST"])
 def start():
     bot.start()
-    return jsonify({"running": True})
+    return jsonify({"running": True, "paused": False})
 
 
 @app.route("/stop", methods=["POST"])
 def stop():
     bot.stop()
-    return jsonify({"running": False})
+    return jsonify({"running": False, "paused": False})
+
+
+@app.route("/pause", methods=["POST"])
+def pause():
+    bot.pause()
+    return jsonify({"running": True, "paused": True})
+
+
+@app.route("/resume", methods=["POST"])
+def resume():
+    bot.resume()
+    return jsonify({"running": True, "paused": False})
 
 
 @app.route("/status")
 def status():
     return jsonify({
         "running": bot.is_running(),
+        "paused": bot.is_paused(),
         "log": bot.state.log[-50:],
         "energy": bot.state.energy,
         "action_ready": bot.state.action_available(),
