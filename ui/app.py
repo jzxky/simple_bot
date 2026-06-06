@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from flask import Flask, render_template, request, jsonify
 import config as cfg
 import bot
-import browser
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -90,10 +89,7 @@ def screenshot():
     if not bot.is_running():
         return jsonify({"error": "Bot is not running."}), 400
     try:
-        page = browser.page()
-        if not page:
-            return jsonify({"error": "Browser not ready."}), 400
-        png = page.screenshot(full_page=True)
+        png = bot.request_screenshot(timeout=10.0)
         data = base64.b64encode(png).decode()
         return jsonify({"image": f"data:image/png;base64,{data}"})
     except Exception as e:
