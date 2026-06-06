@@ -99,11 +99,18 @@ def handle_check_earns(action: Action, state: GameState):
     if not _check_session(state):
         return
 
-    # Enable AUTO mode
-    toggle = page.query_selector("#mm_earn_mode_toggle")
-    if toggle and not toggle.is_checked():
-        toggle.click()
-        time.sleep(0.5)
+    # Enable AUTO mode — check if the auto panel is hidden, if so click the knob to toggle
+    auto_div = page.query_selector("div.mm-earn-mode-auto")
+    if auto_div:
+        style = auto_div.get_attribute("style") or ""
+        if "display: none" in style or "display:none" in style:
+            page.click("span.mm-earn-toggle-knob")
+            page.wait_for_function(
+                "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
+                "return el && !el.style.display.includes('none'); }",
+                timeout=5000
+            )
+            state.add_log("Switched to AUTO earn mode.")
 
     # Read queue count
     soup = BeautifulSoup(page.content(), "html.parser")
