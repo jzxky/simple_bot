@@ -19,6 +19,8 @@ class GameState:
     energy: int = 0
     action_timer_ready: bool = False
     action_timer_end: Optional[datetime] = None
+    agg_pro_active: bool = False
+    agg_pro_end: Optional[datetime] = None
     server_time: Optional[datetime] = None
     logged_in: bool = False
     current_url: str = ""
@@ -85,6 +87,24 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
             s.energy = int(energy_bar.get("aria-valuenow", 0))
         except (ValueError, TypeError):
             s.energy = 0
+
+    # AggPro timer
+    agg_div = soup.find("div", class_="aggprotimer")
+    if agg_div:
+        agg_span = agg_div.find("span", class_="donation_timer")
+        if agg_span:
+            ready_span = agg_span.find("span", style=lambda v: v and "00bb01" in v)
+            if ready_span:
+                s.agg_pro_active = False
+                s.agg_pro_end = None
+            else:
+                s.agg_pro_active = True
+                end_str = agg_span.get("data-date-end", "")
+                if end_str:
+                    try:
+                        s.agg_pro_end = datetime.strptime(end_str.strip(), SERVER_TIME_FMT)
+                    except ValueError:
+                        s.agg_pro_end = None
 
     # Action timer
     timer_span = soup.find("span", class_="donation_timer")

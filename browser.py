@@ -7,11 +7,6 @@ Uses a persistent profile so Cloudflare trusts the session over time.
 import os
 from patchright.sync_api import sync_playwright, Page, BrowserContext
 
-MOBILE_UA = (
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
-    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
-)
-
 PROFILE_DIR = os.path.join(os.path.dirname(__file__), ".browser_profile")
 CF_TIMEOUT = 20000  # ms to wait for Cloudflare challenge to clear
 
@@ -24,15 +19,10 @@ def start():
     global _playwright, _context, _page
     os.makedirs(PROFILE_DIR, exist_ok=True)
     _playwright = sync_playwright().start()
-    # Persistent context keeps cookies/storage between runs — Cloudflare trusts it more
     _context = _playwright.chromium.launch_persistent_context(
         PROFILE_DIR,
         headless=False,
-        user_agent=MOBILE_UA,
-        viewport={"width": 390, "height": 844},  # iPhone 14 dimensions
-        device_scale_factor=3,
-        is_mobile=True,
-        has_touch=True,
+        viewport={"width": 1280, "height": 900},
         locale="en-US",
         timezone_id="America/New_York",
     )
