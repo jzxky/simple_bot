@@ -31,6 +31,9 @@ DEFAULT_CONFIG = {
     "payback_enabled": True,
     "career_training": {
         "career": "fire"
+    },
+    "bot_config": {
+        "chrome_path": ""
     }
 }
 

@@ -8,6 +8,7 @@ the patchright-managed Chromium download.
 
 import os
 import sys
+import config as cfg
 from patchright.sync_api import sync_playwright, Page, BrowserContext
 
 PROFILE_DIR = os.path.join(os.path.dirname(__file__), ".browser_profile")
@@ -37,7 +38,23 @@ _CHROME_PATHS = {
 }
 
 
-def _find_chrome():
+class ChromeNotFoundError(Exception):
+    pass
+
+
+def _find_chrome() -> str:
+    # Check custom path from config first
+    custom = cfg.load().get("bot_config", {}).get("chrome_path", "").strip()
+    if custom:
+        if os.path.isfile(custom):
+            print(f"[browser] Using custom Chrome path: {custom}")
+            return custom
+        raise ChromeNotFoundError(
+            f"Custom Chrome path not found: '{custom}'. "
+            "Please check the path in Bot Config settings."
+        )
+
+    # Auto-detect by OS
     platform = sys.platform
     if platform.startswith("linux"):
         platform = "linux"
@@ -45,8 +62,11 @@ def _find_chrome():
         if os.path.isfile(path):
             print(f"[browser] Using system Chrome: {path}")
             return path
-    print("[browser] System Chrome not found, using patchright Chromium.")
-    return None
+
+    raise ChromeNotFoundError(
+        "Chrome could not be found on your system. "
+        "Please install Google Chrome or set a custom path in Bot Config settings."
+    )
 
 
 def start():

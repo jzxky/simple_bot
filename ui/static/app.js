@@ -86,6 +86,7 @@ function saveConfig() {
     action_type: document.getElementById("action_type").value,
     action_sub: document.getElementById("action_sub").value,
     payback_enabled: document.getElementById("payback_enabled").checked,
+    chrome_path: document.getElementById("chrome_path").value,
   };
 
   fetch("/save", {
