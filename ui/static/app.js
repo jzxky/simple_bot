@@ -100,30 +100,47 @@ function saveConfig() {
 }
 
 let _botRunning = false;
+let _botPaused = false;
 
 function toggleBot() {
   const endpoint = _botRunning ? "/stop" : "/start";
   fetch(endpoint, {method: "POST"})
     .then(r => r.json())
-    .then(d => updateRunningState(d.running));
+    .then(d => updateBotState(d.running, d.paused));
 }
 
-function updateRunningState(running) {
+function togglePause() {
+  const endpoint = _botPaused ? "/resume" : "/pause";
+  fetch(endpoint, {method: "POST"})
+    .then(r => r.json())
+    .then(d => updateBotState(d.running, d.paused));
+}
+
+function updateBotState(running, paused) {
   _botRunning = running;
-  const btn = document.getElementById("toggle-btn");
+  _botPaused = paused;
+
+  const toggleBtn = document.getElementById("toggle-btn");
+  const pauseBtn = document.getElementById("pause-btn");
   const dot = document.getElementById("status-dot");
   const txt = document.getElementById("status-text");
-  btn.textContent = running ? "Stop Bot" : "Start Bot";
-  btn.className = running ? "running" : "";
-  dot.className = "dot " + (running ? "running" : "stopped");
-  txt.textContent = running ? "Running" : "Stopped";
+
+  toggleBtn.textContent = running ? "Stop Bot" : "Start Bot";
+  toggleBtn.className = running ? "running" : "";
+
+  pauseBtn.disabled = !running;
+  pauseBtn.textContent = paused ? "Resume" : "Pause";
+  pauseBtn.className = paused ? "paused" : "";
+
+  dot.className = "dot " + (running ? (paused ? "paused" : "running") : "stopped");
+  txt.textContent = running ? (paused ? "Paused" : "Running") : "Stopped";
 }
 
 function pollStatus() {
   fetch("/status")
     .then(r => r.json())
     .then(d => {
-      updateRunningState(d.running);
+      updateBotState(d.running, d.paused);
       document.getElementById("energy-val").textContent = d.energy;
       document.getElementById("city-val").textContent = d.city || "--";
       document.getElementById("action-val").textContent = d.action_ready ? "Ready" : "Waiting";
@@ -135,6 +152,33 @@ function pollStatus() {
     })
     .catch(() => {})
     .finally(() => setTimeout(pollStatus, 3000));
+}
+
+function takeScreenshot() {
+  const btn = document.getElementById("screenshot-btn");
+  btn.textContent = "Loading...";
+  btn.disabled = true;
+  fetch("/screenshot")
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) {
+        alert("Screenshot failed: " + d.error);
+        return;
+      }
+      const win = window.open("", "_blank");
+      win.document.write(
+        `<html><head><title>Bot Screenshot</title>
+        <style>body{margin:0;background:#111;display:flex;justify-content:center;}
+        img{max-width:100%;height:auto;}</style></head>
+        <body><img src="${d.image}"></body></html>`
+      );
+      win.document.close();
+    })
+    .catch(e => alert("Screenshot error: " + e))
+    .finally(() => {
+      btn.textContent = "Screenshot";
+      btn.disabled = false;
+    });
 }
 
 function escHtml(s) {

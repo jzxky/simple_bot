@@ -172,6 +172,15 @@ button {
 #toggle-btn:hover { background: var(--accent-hover); }
 #toggle-btn.running { background: #555; }
 #toggle-btn.running:hover { background: #444; }
+#pause-btn { background: #7a6000; color: #fff; }
+#pause-btn:hover { background: #5a4500; }
+#pause-btn.paused { background: #2a5a2a; }
+#pause-btn.paused:hover { background: #235023; }
+#pause-btn:disabled { background: #444; color: #777; cursor: default; }
+.dot.paused { background: #f0a500; box-shadow: 0 0 6px #f0a500; }
+#screenshot-btn { background: #2a5a2a; color: #fff; }
+#screenshot-btn:hover { background: #235023; }
+#screenshot-btn:disabled { background: #444; cursor: default; }
 
 /* Log */
 .log-card h2 { margin-bottom: 8px; }

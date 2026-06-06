@@ -4,11 +4,13 @@ Flask web UI for bot configuration and control.
 
 import sys
 import os
+import base64
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, render_template, request, jsonify
 import config as cfg
 import bot
+import browser
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -24,8 +26,7 @@ def save():
     data = request.get_json()
     c = cfg.load()
 
-    c["credentials"]["email"] = data.get("email", "")
-    c["credentials"]["password"] = data.get("password", "")
+    cfg.save_env(data.get("email", ""), data.get("password", ""))
 
     c["earns"]["enabled"] = data.get("earns_enabled", False)
     c["earns"]["category"] = data.get("earn_category", "Hospital")
@@ -50,25 +51,53 @@ def save():
 @app.route("/start", methods=["POST"])
 def start():
     bot.start()
-    return jsonify({"running": True})
+    return jsonify({"running": True, "paused": False})
 
 
 @app.route("/stop", methods=["POST"])
 def stop():
     bot.stop()
-    return jsonify({"running": False})
+    return jsonify({"running": False, "paused": False})
+
+
+@app.route("/pause", methods=["POST"])
+def pause():
+    bot.pause()
+    return jsonify({"running": True, "paused": True})
+
+
+@app.route("/resume", methods=["POST"])
+def resume():
+    bot.resume()
+    return jsonify({"running": True, "paused": False})
 
 
 @app.route("/status")
 def status():
     return jsonify({
         "running": bot.is_running(),
+        "paused": bot.is_paused(),
         "log": bot.state.log[-50:],
         "energy": bot.state.energy,
         "action_ready": bot.state.action_available(),
         "city": bot.state.current_city,
         "error": bot.state.last_error,
     })
+
+
+@app.route("/screenshot")
+def screenshot():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    try:
+        page = browser.page()
+        if not page:
+            return jsonify({"error": "Browser not ready."}), 400
+        png = page.screenshot(full_page=True)
+        data = base64.b64encode(png).decode()
+        return jsonify({"image": f"data:image/png;base64,{data}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 def run():
