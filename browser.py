@@ -18,7 +18,7 @@ _page: Page = None
 def start():
     global _playwright, _browser, _context, _page
     _playwright = sync_playwright().start()
-    _browser = _playwright.chromium.launch(headless=False)
+    _browser = _playwright.chromium.launch(headless=True)
     _context = _browser.new_context(user_agent=MOBILE_UA)
     _page = _context.new_page()
     print("[browser] Chrome launched.")
