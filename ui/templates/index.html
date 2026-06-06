@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MafiaMatrix Bot</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>MafiaMatrix Bot</h1>
+    <div class="status-bar">
+      <span id="status-dot" class="dot stopped"></span>
+      <span id="status-text">Stopped</span>
+      <span class="spacer"></span>
+      <span>Energy: <strong id="energy-val">--</strong>%</span>
+      <span>City: <strong id="city-val">--</strong></span>
+      <span>Action timer: <strong id="action-val">--</strong></span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Credentials -->
+    <section class="card">
+      <h2>Credentials</h2>
+      <div class="row">
+        <label>Email
+          <input type="email" id="email" value="{{ config.credentials.email }}">
+        </label>
+        <label>Password
+          <input type="password" id="password" value="{{ config.credentials.password }}">
+        </label>
+      </div>
+    </section>
+
+    <!-- Earns -->
+    <section class="card">
+      <h2>
+        Earn Selection
+        <label class="toggle-label">
+          <input type="checkbox" id="earns_enabled" {% if config.earns.enabled %}checked{% endif %}>
+          <span class="toggle"></span>
+        </label>
+      </h2>
+      <div class="row">
+        <label>Career
+          <select id="earn_category" onchange="populateEarns()">
+            <option value="Secret"    {% if config.earns.category == 'Secret'    %}selected{% endif %}>Secret</option>
+            <option value="General"   {% if config.earns.category == 'General'   %}selected{% endif %}>General</option>
+            <option value="Hospital"  {% if config.earns.category == 'Hospital'  %}selected{% endif %}>Hospital</option>
+            <option value="Engineering" {% if config.earns.category == 'Engineering' %}selected{% endif %}>Engineering</option>
+            <option value="Bank"      {% if config.earns.category == 'Bank'      %}selected{% endif %}>Bank</option>
+            <option value="Mortician" {% if config.earns.category == 'Mortician' %}selected{% endif %}>Mortician</option>
+            <option value="Law"       {% if config.earns.category == 'Law'       %}selected{% endif %}>Law</option>
+          </select>
+        </label>
+        <label>Earn
+          <select id="earn_type"></select>
+        </label>
+      </div>
+    </section>
+
+    <!-- Aggravated Crimes -->
+    <section class="card">
+      <h2>
+        Aggravated Crimes
+        <label class="toggle-label">
+          <input type="checkbox" id="crimes_enabled" {% if config.aggravated_crimes.enabled %}checked{% endif %}>
+          <span class="toggle"></span>
+        </label>
+      </h2>
+      <div class="row">
+        <label>Primary Crime
+          <select id="primary_crime">
+            {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('hack','Hack Bank Account')] %}
+            <option value="{{ crime }}" {% if config.aggravated_crimes.primary.crime == crime %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Energy Threshold %
+          <input type="number" id="primary_threshold" min="0" max="100" value="{{ config.aggravated_crimes.primary.energy_threshold }}">
+        </label>
+      </div>
+      <div class="row">
+        <label>Fallback Crime
+          <select id="secondary_crime">
+            {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('hack','Hack Bank Account')] %}
+            <option value="{{ crime }}" {% if config.aggravated_crimes.secondary.crime == crime %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Energy Threshold %
+          <input type="number" id="secondary_threshold" min="0" max="100" value="{{ config.aggravated_crimes.secondary.energy_threshold }}">
+        </label>
+      </div>
+    </section>
+
+    <!-- Action Selection -->
+    <section class="card">
+      <h2>
+        Action Selection
+        <label class="toggle-label">
+          <input type="checkbox" id="action_enabled" {% if config.action.enabled %}checked{% endif %}>
+          <span class="toggle"></span>
+        </label>
+      </h2>
+      <div class="row">
+        <label>Action
+          <select id="action_type" onchange="populateActionSub()">
+            <option value="community_service" {% if config.action.type == 'community_service' %}selected{% endif %}>Community Service</option>
+            <option value="career_training"   {% if config.action.type == 'career_training'   %}selected{% endif %}>Career Training</option>
+            <option value="university"        {% if config.action.type == 'university'        %}selected{% endif %}>University Training</option>
+            <option value="training_centre"   {% if config.action.type == 'training_centre'   %}selected{% endif %}>Training Centre</option>
+            <option value="drug_manufacturing"{% if config.action.type == 'drug_manufacturing'%}selected{% endif %}>Drug Manufacturing</option>
+            <option value="dog_trains"        {% if config.action.type == 'dog_trains'        %}selected{% endif %}>Dog Trains</option>
+          </select>
+        </label>
+        <label id="action_sub_label">Sub-option
+          <select id="action_sub"></select>
+        </label>
+      </div>
+    </section>
+
+    <!-- Tabs -->
+    <section class="card tabs-card">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="showTab('agg-settings', this)">Aggravated Crimes</button>
+        <button class="tab-btn" onclick="showTab('business', this)">Business</button>
+        <button class="tab-btn" onclick="showTab('promotion', this)">Promotion</button>
+        <button class="tab-btn" onclick="showTab('casework', this)">Case Work</button>
+        <button class="tab-btn" onclick="showTab('jail', this)">Jail</button>
+      </div>
+
+      <div id="agg-settings" class="tab-panel active">
+        <div class="row">
+          <label class="inline-toggle">
+            Payback enabled
+            <label class="toggle-label">
+              <input type="checkbox" id="payback_enabled" {% if config.payback_enabled %}checked{% endif %}>
+              <span class="toggle"></span>
+            </label>
+          </label>
+        </div>
+      </div>
+      <div id="business"  class="tab-panel"><p class="placeholder">Business settings — coming soon.</p></div>
+      <div id="promotion" class="tab-panel"><p class="placeholder">Promotion settings — coming soon.</p></div>
+      <div id="casework"  class="tab-panel"><p class="placeholder">Case work settings — coming soon.</p></div>
+      <div id="jail"      class="tab-panel"><p class="placeholder">Jail settings — coming soon.</p></div>
+    </section>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button id="save-btn" onclick="saveConfig()">Save</button>
+      <button id="toggle-btn" onclick="toggleBot()">Start Bot</button>
+    </div>
+
+    <!-- Log -->
+    <section class="card log-card">
+      <h2>Activity Log</h2>
+      <div id="log-box"></div>
+    </section>
+  </main>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+  const INITIAL_EARN_TYPE = "{{ config.earns.earn_type }}";
+  const INITIAL_ACTION_SUB = "{{ config.action.sub_option }}";
+  populateEarns(INITIAL_EARN_TYPE);
+  populateActionSub(INITIAL_ACTION_SUB);
+  pollStatus();
+</script>
+</body>
+</html>
