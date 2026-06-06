@@ -68,7 +68,7 @@ def handle_login(action: Action, state: GameState):
     page.fill("input#email", action.params["email"])
     page.fill("input#pass", action.params["password"])
     page.click("button.btn-login")
-    page.wait_for_load_state("load")
+    page.wait_for_load_state("networkidle")
 
     _refresh_state(state)
     soup = BeautifulSoup(page.content(), "html.parser")

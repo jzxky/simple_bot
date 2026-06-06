@@ -4,23 +4,21 @@ Handles initial login and automatic session re-login.
 
 import time
 from tasks.base import Task, Action
-from state import GameState
 
-RETRY_INTERVAL = 15  # seconds between login attempts
+RETRY_INTERVAL = 15
 
 
 class LoginTask(Task):
+    priority = 100
+
     def __init__(self, email: str, password: str):
-        super().__init__(priority=100)
         self.email = email
         self.password = password
         self._last_attempt: float = 0.0
 
-    def can_run(self, state: GameState) -> bool:
-        if state.logged_in:
-            return False
-        return time.monotonic() - self._last_attempt >= RETRY_INTERVAL
+    def can_run(self, state) -> bool:
+        return not state.logged_in and time.monotonic() - self._last_attempt >= RETRY_INTERVAL
 
-    def run(self, state: GameState):
+    def run(self, state, executor):
         self._last_attempt = time.monotonic()
-        return Action("login", email=self.email, password=self.password)
+        executor.execute(Action("login", email=self.email, password=self.password), state)

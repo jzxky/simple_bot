@@ -7,9 +7,10 @@ import time
 import queue
 import config as cfg
 import browser
-from state import GameState, parse_state
+from state import GameState
 from scheduler import Scheduler
 from executor import ActionExecutor
+from tasks.base import Action
 from tasks.login import LoginTask
 from tasks.earns import EarnsTask
 from tasks.agg_crimes import AggCrimeTask
@@ -25,7 +26,7 @@ state = GameState()
 
 
 def _build_scheduler(c: dict) -> Scheduler:
-    sched = Scheduler(tick_interval=2.0)
+    sched = Scheduler()
 
     creds = c.get("credentials", {})
     sched.add(LoginTask(creds.get("email", ""), creds.get("password", "")))
@@ -34,7 +35,7 @@ def _build_scheduler(c: dict) -> Scheduler:
         earn_cfg = c["earns"]
         sched.add(EarnsTask(
             earn_type=earn_cfg.get("earn_type", "surgeon"),
-            interval_minutes=earn_cfg.get("check_interval_minutes", 30)
+            interval_minutes=earn_cfg.get("check_interval_minutes", 30),
         ))
 
     if c.get("aggravated_crimes", {}).get("enabled", False):
@@ -55,7 +56,7 @@ def _build_scheduler(c: dict) -> Scheduler:
         if action_type == "community_service":
             sched.add(CommunityServiceTask())
         elif action_type == "career_training":
-            sched.add(CareerTrainingTask(career=sub or c.get("career_training", {}).get("career", "fire")))
+            sched.add(CareerTrainingTask(career=sub))
 
     return sched
 
@@ -66,7 +67,6 @@ def _run(c: dict):
     state.bot_running = True
     executor = ActionExecutor()
 
-    # Start browser — stop immediately on Chrome not found
     try:
         state.add_log("Starting browser...")
         browser.start()
@@ -83,7 +83,6 @@ def _run(c: dict):
         state.bot_running = False
         return
 
-    # Main loop
     try:
         sched = _build_scheduler(c)
 
@@ -92,11 +91,12 @@ def _run(c: dict):
                 time.sleep(1)
                 continue
 
-            # Check for session expiry on every tick
+            # Detect session expiry on every tick
             if state.logged_in and "default.asp" in browser.current_url():
                 state.logged_in = False
+                state.add_log("Session expired — will re-login.")
 
-            # Handle screenshot requests from the Flask thread
+            # Screenshot requests from the Flask thread
             if not _screenshot_request.empty():
                 try:
                     _screenshot_request.get_nowait()
@@ -107,23 +107,16 @@ def _run(c: dict):
 
             sched.tick(state, executor)
 
-            # Reset one-shot action-timer tasks so they fire again next cycle
-            for task in list(sched._tasks):
-                if task.is_complete and hasattr(task, "condition"):
-                    task.is_complete = False
-                    sched._tasks = [t for t in sched._tasks if not (t.is_complete and not hasattr(t, "condition"))]
-
-            # Handle payback after a successful crime
-            if hasattr(state, "_last_crime_victim") and c.get("payback_enabled", False):
-                from tasks.base import Action
+            # Payback after a successful crime
+            if getattr(state, "_last_crime_victim", None) and c.get("payback_enabled", False):
                 executor.execute(
                     Action("payback", amount=state._last_crime_amount, target=state._last_crime_victim),
-                    state
+                    state,
                 )
                 del state._last_crime_victim
                 del state._last_crime_amount
 
-            time.sleep(sched.tick_interval)
+            time.sleep(2)
 
     except Exception as e:
         state.add_log(f"Bot crashed: {e}")
@@ -167,8 +160,6 @@ def is_paused() -> bool:
 
 
 def request_screenshot(timeout: float = 10.0) -> bytes:
-    """Ask the bot thread to take a screenshot. Blocks until done or timeout."""
-    # Clear any stale results
     while not _screenshot_result.empty():
         _screenshot_result.get_nowait()
     _screenshot_request.put(True)
