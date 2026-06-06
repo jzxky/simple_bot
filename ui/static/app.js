@@ -137,6 +137,33 @@ function pollStatus() {
     .finally(() => setTimeout(pollStatus, 3000));
 }
 
+function takeScreenshot() {
+  const btn = document.getElementById("screenshot-btn");
+  btn.textContent = "Loading...";
+  btn.disabled = true;
+  fetch("/screenshot")
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) {
+        alert("Screenshot failed: " + d.error);
+        return;
+      }
+      const win = window.open("", "_blank");
+      win.document.write(
+        `<html><head><title>Bot Screenshot</title>
+        <style>body{margin:0;background:#111;display:flex;justify-content:center;}
+        img{max-width:100%;height:auto;}</style></head>
+        <body><img src="${d.image}"></body></html>`
+      );
+      win.document.close();
+    })
+    .catch(e => alert("Screenshot error: " + e))
+    .finally(() => {
+      btn.textContent = "Screenshot";
+      btn.disabled = false;
+    });
+}
+
 function escHtml(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }

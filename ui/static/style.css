@@ -172,6 +172,9 @@ button {
 #toggle-btn:hover { background: var(--accent-hover); }
 #toggle-btn.running { background: #555; }
 #toggle-btn.running:hover { background: #444; }
+#screenshot-btn { background: #2a5a2a; color: #fff; }
+#screenshot-btn:hover { background: #235023; }
+#screenshot-btn:disabled { background: #444; cursor: default; }
 
 /* Log */
 .log-card h2 { margin-bottom: 8px; }

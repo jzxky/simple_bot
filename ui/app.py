@@ -4,11 +4,13 @@ Flask web UI for bot configuration and control.
 
 import sys
 import os
+import base64
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, render_template, request, jsonify
 import config as cfg
 import bot
+import browser
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -69,6 +71,21 @@ def status():
         "city": bot.state.current_city,
         "error": bot.state.last_error,
     })
+
+
+@app.route("/screenshot")
+def screenshot():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    try:
+        page = browser.page()
+        if not page:
+            return jsonify({"error": "Browser not ready."}), 400
+        png = page.screenshot(full_page=True)
+        data = base64.b64encode(png).decode()
+        return jsonify({"image": f"data:image/png;base64,{data}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 def run():
