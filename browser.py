@@ -11,7 +11,7 @@ from patchright.sync_api import sync_playwright, Page, BrowserContext
 PROFILE_DIR = os.path.join(paths.data_dir(), ".browser_profile")
 CF_TIMEOUT = 20000
 
-_IPHONE_UA = (
+MOBILE_UA = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) "
     "Version/17.0 Mobile/15E148 Safari/604.1"
@@ -22,21 +22,12 @@ _context: BrowserContext = None
 _page: Page = None
 
 
-from contextlib import contextmanager
+def set_mobile_ua():
+    _page.set_extra_http_headers({"User-Agent": MOBILE_UA})
 
-@contextmanager
-def mobile_ua(p: Page = None):
-    """Override UA via CDP for both HTTP headers and navigator.userAgent."""
-    target = p or _page
-    client = target.context.new_cdp_session(target)
-    client.send("Network.setUserAgentOverride", {"userAgent": _IPHONE_UA})
-    try:
-        yield
-    finally:
-        try:
-            client.send("Network.setUserAgentOverride", {"userAgent": ""})
-        except Exception:
-            pass
+
+def clear_mobile_ua():
+    _page.set_extra_http_headers({})
 
 
 def start():

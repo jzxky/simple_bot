@@ -137,6 +137,22 @@ def handle_check_earns(action: Action, state: GameState):
     state.add_log("Earn queue topped up.")
 
 
+def handle_select_crime(action: Action, state: GameState):
+    crime = action.params["crime"]
+    page = browser.page()
+    browser.set_mobile_ua()
+    _nav(CRIME_URL, state)
+
+    if not _check_session(state):
+        browser.clear_mobile_ua()
+        return
+
+    # Select the radio by name=agcrime and the configured value
+    page.check(f"input[name='agcrime'][value='{crime}']")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log(f"Selected crime: {crime} — awaiting target selection page.")
 
 
 def handle_check_weapon(action: Action, state: GameState):
@@ -222,7 +238,8 @@ def _get_to_target_page(crime: str, state: GameState):
     page.wait_for_load_state("domcontentloaded")
 
 
-def _iterate_targets(crime: str, state: GameState):
+def handle_iterate_crime(action: Action, state: GameState):
+    crime = action.params["crime"]
     page = browser.page()
 
     if not page.query_selector("select"):
@@ -230,6 +247,7 @@ def _iterate_targets(crime: str, state: GameState):
         _get_to_target_page(crime, state)
         if not page.query_selector("select"):
             state.add_log("Could not reach target selection page. Aborting.")
+            browser.clear_mobile_ua()
             return
 
     soup = BeautifulSoup(page.content(), "html.parser")
@@ -258,6 +276,7 @@ def _iterate_targets(crime: str, state: GameState):
                 state._last_crime_victim = player
                 state._last_crime_amount = stolen
                 state.add_log(f"Stolen: ${stolen:,} from {player}")
+            browser.clear_mobile_ua()
             return
 
         fail_div = result_soup.find("div", id="fail")
@@ -283,6 +302,7 @@ def _iterate_targets(crime: str, state: GameState):
                             state._last_crime_victim = player
                             state._last_crime_amount = stolen
                             state.add_log(f"Stolen: ${stolen:,} from {player}")
+                        browser.clear_mobile_ua()
                         return
                 continue
             state.add_log(f"Crime failed vs {player}, trying next.")
@@ -290,23 +310,8 @@ def _iterate_targets(crime: str, state: GameState):
                 _get_to_target_page(crime, state)
             continue
 
+    browser.clear_mobile_ua()
     state.add_log("All targets failed or exhausted.")
-
-
-def handle_do_crime(action: Action, state: GameState):
-    crime = action.params["crime"]
-    page = browser.page()
-
-    with browser.mobile_ua():
-        _nav(CRIME_URL, state)
-        if not _check_session(state):
-            return
-        page.check(f"input[name='agcrime'][value='{crime}']")
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
-        _refresh_state(state)
-        state.add_log(f"Selected crime: {crime}")
-        _iterate_targets(crime, state)
 
 
 def handle_payback(action: Action, state: GameState):
@@ -400,8 +405,9 @@ def handle_career_training(action: Action, state: GameState):
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
-    "do_crime": handle_do_crime,
+    "select_crime": handle_select_crime,
     "check_weapon": handle_check_weapon,
+    "iterate_crime": handle_iterate_crime,
     "payback": handle_payback,
     "do_community_service": handle_community_service,
     "do_career_training": handle_career_training,
