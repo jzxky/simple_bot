@@ -119,33 +119,6 @@
         </label>
       </div>
 
-      <h3>Armed Robbery</h3>
-      <div class="row">
-        <label class="inline-toggle">Agg Private
-          <label class="toggle-label">
-            <input type="checkbox" id="armed_agg_private" {% if config.aggravated_crimes.get('armed', {}).get('agg_private') %}checked{% endif %}>
-            <span class="toggle"></span>
-          </label>
-        </label>
-        <label class="inline-toggle">Agg Drug House
-          <label class="toggle-label">
-            <input type="checkbox" id="armed_agg_drug_house" {% if config.aggravated_crimes.get('armed', {}).get('agg_drug_house') %}checked{% endif %}>
-            <span class="toggle"></span>
-          </label>
-        </label>
-        <label class="inline-toggle">Payback Private
-          <label class="toggle-label">
-            <input type="checkbox" id="armed_payback_private" {% if config.aggravated_crimes.get('armed', {}).get('payback_private') %}checked{% endif %}>
-            <span class="toggle"></span>
-          </label>
-        </label>
-        <label class="inline-toggle">Payback Public
-          <label class="toggle-label">
-            <input type="checkbox" id="armed_payback_public" {% if config.aggravated_crimes.get('armed', {}).get('payback_public') %}checked{% endif %}>
-            <span class="toggle"></span>
-          </label>
-        </label>
-      </div>
     </section>
 
     <!-- Actions -->
@@ -194,6 +167,7 @@
 
     <!-- Tabs -->
     <section class="card tabs-card">
+      <h2>Settings</h2>
       <div class="tab-bar">
         <button class="tab-btn active" onclick="showTab('agg-settings', this)">Aggravated Crimes</button>
         <button class="tab-btn" onclick="showTab('business', this)">Business</button>
@@ -208,6 +182,33 @@
             Payback enabled
             <label class="toggle-label">
               <input type="checkbox" id="payback_enabled" {% if config.payback_enabled %}checked{% endif %}>
+              <span class="toggle"></span>
+            </label>
+          </label>
+        </div>
+        <h3>Armed Robbery</h3>
+        <div class="row">
+          <label class="inline-toggle">Agg Private
+            <label class="toggle-label">
+              <input type="checkbox" id="armed_agg_private" {% if config.aggravated_crimes.get('armed', {}).get('agg_private') %}checked{% endif %}>
+              <span class="toggle"></span>
+            </label>
+          </label>
+          <label class="inline-toggle">Agg Drug House
+            <label class="toggle-label">
+              <input type="checkbox" id="armed_agg_drug_house" {% if config.aggravated_crimes.get('armed', {}).get('agg_drug_house') %}checked{% endif %}>
+              <span class="toggle"></span>
+            </label>
+          </label>
+          <label class="inline-toggle">Payback Private
+            <label class="toggle-label">
+              <input type="checkbox" id="armed_payback_private" {% if config.aggravated_crimes.get('armed', {}).get('payback_private') %}checked{% endif %}>
+              <span class="toggle"></span>
+            </label>
+          </label>
+          <label class="inline-toggle">Payback Public
+            <label class="toggle-label">
+              <input type="checkbox" id="armed_payback_public" {% if config.aggravated_crimes.get('armed', {}).get('payback_public') %}checked{% endif %}>
               <span class="toggle"></span>
             </label>
           </label>
