@@ -385,7 +385,6 @@ def handle_check_weapon(action: Action, state: GameState):
 
 def handle_refresh_state(action: Action, state: GameState):
     _nav(PLAY_URL, state)
-    state.add_log("State refreshed.")
 
 
 def handle_payback(action: Action, state: GameState):
