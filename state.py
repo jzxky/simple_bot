@@ -10,6 +10,8 @@ from datetime import datetime
 from typing import Optional
 from bs4 import BeautifulSoup
 
+SERVER_TIME_FMT = "%m/%d/%Y %I:%M:%S %p"
+
 
 @dataclass
 class GameState:
@@ -58,7 +60,8 @@ class GameState:
         print(entry)
 
 
-SERVER_TIME_FMT = "%m/%d/%Y %I:%M:%S %p"
+def _parse_money(text: str) -> int:
+    return int(re.sub(r'[^0-9]', '', text) or 0)
 
 
 def _parse_money(text: str) -> int:
@@ -228,29 +231,80 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
         except ValueError:
             pass
 
+    # AggPro active — red name background is the definitive signal
+    s.agg_pro_active = bool(soup.find("div", id="display_top", class_="display_red"))
+
+    # nav_right fields — walk display_top labels
+    for top in soup.find_all("div", id="display_top"):
+        label = top.get_text(strip=True)
+        nxt = top.find_next_sibling("div")
+        if not nxt:
+            continue
+        text = nxt.get_text(strip=True)
+        if "Name" in label:
+            pass  # own name parsed via anchor below
+        elif "Rank" in label and "Next" not in label:
+            s.rank = text
+        elif "Occupation" in label:
+            s.occupation = text
+        elif "Clean money" in label:
+            s.clean_money = _parse_money(text)
+        elif "Dirty money" in label:
+            s.dirty_money = _parse_money(text)
+        elif "Location" in label:
+            s.current_city = text
+        elif "Home City" in label:
+            s.home_city = text
+
     # Own name
     display = soup.find("div", id="display")
     if display and display.find("a"):
         s.own_name = display.find("a").get_text(strip=True)
 
-    # Cities — find all display_top labels then read following siblings
-    tops = soup.find_all("div", id="display_top")
-    for top in tops:
-        label = top.get_text(strip=True)
-        nxt = top.find_next_sibling("div")
-        if nxt:
-            if "Location" in label and nxt.get("id") == "display":
-                s.current_city = nxt.get_text(strip=True)
-            elif "Home City" in label and nxt.get("id") == "display_end":
-                s.home_city = nxt.get_text(strip=True)
+    # Health
+    health_div = soup.find("div", id="display_bar")
+    if health_div:
+        hd = health_div.find("div", class_=lambda c: c and any(
+            x in c for x in ("display_green", "display_yellow", "display_orange", "display_red")
+        ))
+        if hd:
+            try:
+                s.health = int(float(hd.get_text(strip=True).replace("%", "")))
+            except (ValueError, TypeError):
+                pass
 
     # Energy
     energy_bar = soup.find("div", class_="progress-bar bg-energy")
     if energy_bar:
         try:
-            s.energy = int(energy_bar.get("aria-valuenow", 0))
+            s.energy = float(energy_bar.get("aria-valuenow", 0))
         except (ValueError, TypeError):
-            s.energy = 0
+            s.energy = 0.0
+
+    # Next rank + rank progress
+    next_rank_span = soup.find("span", class_="next_rank_txt")
+    if next_rank_span:
+        s.next_rank = next_rank_span.get_text(strip=True)
+    rank_bar = soup.find("div", class_="progress-bar bg-rankprogress")
+    if rank_bar:
+        try:
+            s.rank_progress = int(float(rank_bar.get("aria-valuenow", 0)))
+        except (ValueError, TypeError):
+            pass
+
+    # Earns in last 24h
+    earns_bar = soup.find("div", class_="progress-bar bg-earns")
+    if earns_bar:
+        try:
+            s.earns_24h = int(float(earns_bar.get("aria-valuenow", 0)))
+        except (ValueError, TypeError):
+            pass
+
+    # Consumables inventory (from inline JS object)
+    script = soup.find("script", string=re.compile(r"var consumables"))
+    if script:
+        matches = re.findall(r'"(\w+)":\s*(\d+)', script.string)
+        s.consumables = {k: int(v) for k, v in matches}
 
     # All timers from #user_timers_holder
     timers = {}
@@ -282,10 +336,8 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     s.action_timer_ready = action_t.get("ready", False)
     s.action_timer_end = action_t.get("end")
 
-    # Derive aggpro fields from timers dict
-    aggpro_t = timers.get("aggpro", {})
-    s.agg_pro_active = not aggpro_t.get("ready", True)
-    s.agg_pro_end = aggpro_t.get("end")
+    # Derive aggpro end time from timers dict (active state set above from name background)
+    s.agg_pro_end = timers.get("aggpro", {}).get("end")
 
     # Login state
     s.logged_in = "default.asp" not in url or "loggedin" in url
