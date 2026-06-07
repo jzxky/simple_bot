@@ -41,5 +41,4 @@ class AggCrimeTask(Task):
         crime, _ = self._pick_crime(state)
         if not crime:
             return
-        executor.execute(Action("select_crime", crime=crime), state)
-        executor.execute(Action("iterate_crime", crime=crime), state)
+        executor.execute(Action("do_crime", crime=crime), state)

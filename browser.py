@@ -11,23 +11,9 @@ from patchright.sync_api import sync_playwright, Page, BrowserContext
 PROFILE_DIR = os.path.join(paths.data_dir(), ".browser_profile")
 CF_TIMEOUT = 20000
 
-MOBILE_UA = (
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
-    "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-    "Version/17.0 Mobile/15E148 Safari/604.1"
-)
-
 _playwright = None
 _context: BrowserContext = None
 _page: Page = None
-
-
-def set_mobile_ua():
-    _page.set_extra_http_headers({"User-Agent": MOBILE_UA})
-
-
-def clear_mobile_ua():
-    _page.set_extra_http_headers({})
 
 
 def start():
