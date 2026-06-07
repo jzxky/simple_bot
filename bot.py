@@ -96,8 +96,16 @@ def _run(c: dict):
                 time.sleep(1)
                 continue
 
+            # Detect Cloudflare challenge — pause and wait for manual resolution
+            if browser.is_cloudflare_challenge():
+                state.add_log(
+                    "Cloudflare gateway detected — manual takeover required. "
+                    "Complete the challenge in the browser then press Resume."
+                )
+                _pause_event.set()
+
             # Detect session expiry on every tick
-            if state.logged_in and "default.asp" in browser.current_url():
+            if state.logged_in and "default.asp" in browser.current_url() and not browser.is_cloudflare_challenge():
                 state.logged_in = False
                 state.add_log("Session expired — will re-login.")
 
@@ -109,6 +117,9 @@ def _run(c: dict):
                     _screenshot_result.put(png)
                 except Exception as e:
                     _screenshot_result.put(e)
+
+            if _stop_event.is_set():
+                break
 
             sched.tick(state, executor)
 
@@ -126,6 +137,12 @@ def _run(c: dict):
     except Exception as e:
         state.add_log(f"Bot crashed: {e}")
     finally:
+        try:
+            if state.logged_in:
+                state.add_log("Logging out...")
+                browser.navigate("https://mafiamatrix.com/default.asp?action=logout")
+        except Exception:
+            pass
         browser.stop()
         state.bot_running = False
 
