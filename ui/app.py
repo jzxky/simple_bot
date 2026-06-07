@@ -83,14 +83,26 @@ def resume():
 
 @app.route("/status")
 def status():
+    s = bot.state
     return jsonify({
         "running": bot.is_running(),
         "paused": bot.is_paused(),
-        "log": bot.state.log[-50:],
-        "energy": bot.state.energy,
-        "action_ready": bot.state.action_available(),
-        "city": bot.state.current_city,
-        "error": bot.state.last_error,
+        "log": s.log[-50:],
+        "energy": s.energy,
+        "action_ready": s.action_available(),
+        "city": s.current_city,
+        "error": s.last_error,
+        "rank": s.rank,
+        "occupation": s.occupation,
+        "health": s.health,
+        "clean_money": s.clean_money,
+        "dirty_money": s.dirty_money,
+        "next_rank": s.next_rank,
+        "rank_progress": s.rank_progress,
+        "earns_24h": s.earns_24h,
+        "agg_pro_active": s.agg_pro_active,
+        "consumables": s.consumables,
+        "own_name": s.own_name,
     })
 
 
