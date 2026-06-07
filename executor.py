@@ -140,12 +140,15 @@ def handle_check_earns(action: Action, state: GameState):
 def handle_select_crime(action: Action, state: GameState):
     crime = action.params["crime"]
     page = browser.page()
-    browser.set_mobile_ua()
     _nav(CRIME_URL, state)
 
     if not _check_session(state):
-        browser.clear_mobile_ua()
         return
+
+    # Switch to mobile UA after the page has loaded, then reload to get the player dropdown
+    browser.set_mobile_ua()
+    page.reload(wait_until="domcontentloaded")
+    _refresh_state(state)
 
     # Select the radio by name=agcrime and the configured value
     page.check(f"input[name='agcrime'][value='{crime}']")
@@ -232,7 +235,10 @@ def handle_check_weapon(action: Action, state: GameState):
 
 def _get_to_target_page(crime: str, state: GameState):
     page = browser.page()
+    browser.clear_mobile_ua()
     _nav(CRIME_URL, state)
+    browser.set_mobile_ua()
+    page.reload(wait_until="domcontentloaded")
     page.check(f"input[name='agcrime'][value='{crime}']")
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
