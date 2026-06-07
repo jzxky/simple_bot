@@ -184,6 +184,15 @@ def _nav_to_target_input(crime: str, state: GameState) -> bool:
     return bool(page.query_selector("input[type='text']"))
 
 
+def _back_to_target_input(crime: str, state: GameState) -> bool:
+    """Go back one step; fall back to full navigation if text input isn't there."""
+    page = browser.page()
+    page.go_back(wait_until="domcontentloaded")
+    if page.query_selector("input[type='text']"):
+        return True
+    return _nav_to_target_input(crime, state)
+
+
 def handle_do_crime(action: Action, state: GameState):
     crime = action.params["crime"]
     page = browser.page()
@@ -208,7 +217,7 @@ def handle_do_crime(action: Action, state: GameState):
 
     for player in targets:
         if not page.query_selector("input[type='text']"):
-            if not _nav_to_target_input(crime, state):
+            if not _back_to_target_input(crime, state):
                 state.add_log("Lost target input mid-loop. Aborting.")
                 return
 
@@ -237,7 +246,7 @@ def handle_do_crime(action: Action, state: GameState):
             if "weapon" in fail_msg.lower():
                 state.add_log("Weapon required — equipping and retrying.")
                 handle_check_weapon(Action("check_weapon", crime=crime), state)
-                if not _nav_to_target_input(crime, state):
+                if not _back_to_target_input(crime, state):
                     return
                 page.fill("input[type='text']", player)
                 page.click("input[type='submit'][name='B1']")
