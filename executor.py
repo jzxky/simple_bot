@@ -306,7 +306,7 @@ def handle_do_crime(action: Action, state: GameState):
 def handle_check_weapon(action: Action, state: GameState):
     crime = action.params["crime"]
     page = browser.page()
-    page.goto(PROFILE_URL, wait_until="networkidle", timeout=30000)
+    page.goto(PROFILE_URL, wait_until="load", timeout=30000)
     parse_state(page.content(), browser.current_url(), state)
 
     if not _check_session(state):
