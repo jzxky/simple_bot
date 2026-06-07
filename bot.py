@@ -118,6 +118,9 @@ def _run(c: dict):
                 except Exception as e:
                     _screenshot_result.put(e)
 
+            if _stop_event.is_set():
+                break
+
             sched.tick(state, executor)
 
             # Payback after a successful crime
@@ -134,6 +137,12 @@ def _run(c: dict):
     except Exception as e:
         state.add_log(f"Bot crashed: {e}")
     finally:
+        try:
+            if state.logged_in:
+                state.add_log("Logging out...")
+                browser.navigate("https://mafiamatrix.com/default.asp?action=logout")
+        except Exception:
+            pass
         browser.stop()
         state.bot_running = False
 
