@@ -22,6 +22,7 @@ from tasks.refresh import RefreshTask
 _thread: threading.Thread = None
 _stop_event = threading.Event()
 _pause_event = threading.Event()
+_reload_event = threading.Event()
 _screenshot_request: queue.Queue = queue.Queue(maxsize=1)
 _screenshot_result: queue.Queue = queue.Queue(maxsize=1)
 state = GameState()
@@ -119,6 +120,13 @@ def _run(c: dict):
             if _stop_event.is_set():
                 break
 
+            # Reload config and rebuild scheduler if Save was pressed
+            if _reload_event.is_set():
+                _reload_event.clear()
+                c = cfg.load()
+                sched = _build_scheduler(c)
+                state.add_log("Config reloaded.")
+
             sched.tick(state, executor)
 
             # Payback after a successful crime
@@ -177,6 +185,10 @@ def is_running() -> bool:
 
 def is_paused() -> bool:
     return _pause_event.is_set()
+
+
+def request_reload():
+    _reload_event.set()
 
 
 def request_screenshot(timeout: float = 10.0) -> bytes:
