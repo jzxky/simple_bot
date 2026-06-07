@@ -186,6 +186,13 @@
               <span class="toggle"></span>
             </label>
           </label>
+          <label class="inline-toggle">
+            Fall back to second option if no hacking targets
+            <label class="toggle-label">
+              <input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %}>
+              <span class="toggle"></span>
+            </label>
+          </label>
         </div>
         <h3>Armed Robbery</h3>
         <div class="row">

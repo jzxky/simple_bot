@@ -85,6 +85,7 @@ function saveConfig() {
     action_sub: document.getElementById("action_sub").value,
     away_action_enabled: document.getElementById("away_action_enabled").checked,
     away_action_type: document.getElementById("away_action_type").value,
+    fallback_to_away: document.getElementById("fallback_to_away").checked,
     payback_enabled: document.getElementById("payback_enabled").checked,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
