@@ -270,11 +270,8 @@ def handle_do_crime(action: Action, state: GameState):
         if fail_div:
             fail_msg = fail_div.get_text(strip=True)
             if "weapon" in fail_msg.lower():
-                state.add_log("Weapon required — equipping and retrying.")
-                handle_check_weapon(Action("check_weapon", crime=crime), state)
-                if not _back_to_target_input(crime, state):
-                    return
-                page.fill(_TARGET_INPUT, player)
+                state.add_log("Weapon required — weapon check disabled, skipping target.")
+                continue
                 page.click("input[type='submit'][name='B1']")
                 page.wait_for_load_state("domcontentloaded")
                 _refresh_state(state)
