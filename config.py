@@ -28,7 +28,8 @@ DEFAULT_CONFIG = {
             "agg_drug_house": False,
             "payback_private": False,
             "payback_public": False
-        }
+        },
+        "fallback_to_away": False
     },
     "action": {
         "enabled": True,

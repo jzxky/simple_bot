@@ -60,6 +60,7 @@ def _build_scheduler(c: dict) -> Scheduler:
             armed_agg_drug_house=armed.get("agg_drug_house", False),
             armed_payback_private=armed.get("payback_private", False),
             armed_payback_public=armed.get("payback_public", False),
+            fallback_to_away=ac.get("fallback_to_away", False),
         ))
 
     action_cfg = c.get("action", {})
