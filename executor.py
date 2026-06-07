@@ -140,9 +140,11 @@ def handle_check_earns(action: Action, state: GameState):
 def handle_select_crime(action: Action, state: GameState):
     crime = action.params["crime"]
     page = browser.page()
+    browser.set_mobile_ua()
     _nav(CRIME_URL, state)
 
     if not _check_session(state):
+        browser.clear_mobile_ua()
         return
 
     # Select the radio by name=agcrime and the configured value
@@ -245,6 +247,7 @@ def handle_iterate_crime(action: Action, state: GameState):
         _get_to_target_page(crime, state)
         if not page.query_selector("select"):
             state.add_log("Could not reach target selection page. Aborting.")
+            browser.clear_mobile_ua()
             return
 
     soup = BeautifulSoup(page.content(), "html.parser")
@@ -273,6 +276,7 @@ def handle_iterate_crime(action: Action, state: GameState):
                 state._last_crime_victim = player
                 state._last_crime_amount = stolen
                 state.add_log(f"Stolen: ${stolen:,} from {player}")
+            browser.clear_mobile_ua()
             return
 
         fail_div = result_soup.find("div", id="fail")
@@ -298,6 +302,7 @@ def handle_iterate_crime(action: Action, state: GameState):
                             state._last_crime_victim = player
                             state._last_crime_amount = stolen
                             state.add_log(f"Stolen: ${stolen:,} from {player}")
+                        browser.clear_mobile_ua()
                         return
                 continue
             state.add_log(f"Crime failed vs {player}, trying next.")
@@ -305,6 +310,7 @@ def handle_iterate_crime(action: Action, state: GameState):
                 _get_to_target_page(crime, state)
             continue
 
+    browser.clear_mobile_ua()
     state.add_log("All targets failed or exhausted.")
 
 
