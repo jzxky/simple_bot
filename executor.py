@@ -22,6 +22,9 @@ USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
 ONLINE_CRIMES = {"pickpocket", "mugging"}
 RESIDENT_CRIMES = {"hack", "breaking"}
 
+# Typeahead writable input (not the readonly tt-hint shadow field)
+_TARGET_INPUT = "input.tt-input, input[type='text']:not(.tt-hint)"
+
 QUEUE_MIN = 10
 QUEUE_MAX = 200
 
@@ -181,14 +184,14 @@ def _nav_to_target_input(crime: str, state: GameState) -> bool:
     page.check(f"input[name='agcrime'][value='{crime}']")
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
-    return bool(page.query_selector("input[type='text']"))
+    return bool(page.query_selector(_TARGET_INPUT))
 
 
 def _back_to_target_input(crime: str, state: GameState) -> bool:
     """Go back one step; fall back to full navigation if text input isn't there."""
     page = browser.page()
     page.go_back(wait_until="domcontentloaded")
-    if page.query_selector("input[type='text']"):
+    if page.query_selector(_TARGET_INPUT):
         return True
     return _nav_to_target_input(crime, state)
 
@@ -216,12 +219,12 @@ def handle_do_crime(action: Action, state: GameState):
     state.add_log(f"Selected crime: {crime}")
 
     for player in targets:
-        if not page.query_selector("input[type='text']"):
+        if not page.query_selector(_TARGET_INPUT):
             if not _back_to_target_input(crime, state):
                 state.add_log("Lost target input mid-loop. Aborting.")
                 return
 
-        page.fill("input[type='text']", player)
+        page.fill(_TARGET_INPUT, player)
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
@@ -248,7 +251,7 @@ def handle_do_crime(action: Action, state: GameState):
                 handle_check_weapon(Action("check_weapon", crime=crime), state)
                 if not _back_to_target_input(crime, state):
                     return
-                page.fill("input[type='text']", player)
+                page.fill(_TARGET_INPUT, player)
                 page.click("input[type='submit'][name='B1']")
                 page.wait_for_load_state("domcontentloaded")
                 _refresh_state(state)
