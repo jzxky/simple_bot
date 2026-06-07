@@ -4,6 +4,7 @@ Patchright browser singleton. All bot tasks share one browser page.
 Uses a persistent profile so Cloudflare trusts the session over time.
 """
 
+import json
 import os
 import paths
 from patchright.sync_api import sync_playwright, Page, BrowserContext
@@ -16,9 +17,25 @@ _context: BrowserContext = None
 _page: Page = None
 
 
+def _clear_window_placement():
+    """Remove saved window bounds from Chrome profile so --start-maximized takes effect."""
+    prefs_path = os.path.join(PROFILE_DIR, "Default", "Preferences")
+    if not os.path.exists(prefs_path):
+        return
+    try:
+        with open(prefs_path, "r", encoding="utf-8") as f:
+            prefs = json.load(f)
+        if prefs.get("browser", {}).pop("window_placement", None) is not None:
+            with open(prefs_path, "w", encoding="utf-8") as f:
+                json.dump(prefs, f)
+    except Exception:
+        pass
+
+
 def start():
     global _playwright, _context, _page
     os.makedirs(PROFILE_DIR, exist_ok=True)
+    _clear_window_placement()
     _playwright = sync_playwright().start()
     _context = _playwright.chromium.launch_persistent_context(
         PROFILE_DIR,
