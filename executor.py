@@ -356,7 +356,7 @@ def handle_refresh_state(action: Action, state: GameState):
     state.add_log("State refreshed.")
 
 
-
+def handle_payback(action: Action, state: GameState):
     amount = action.params["amount"]
     target = action.params["target"]
     page = browser.page()
