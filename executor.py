@@ -18,6 +18,7 @@ EARN_URL = "https://mafiamatrix.com/income/earn.asp"
 CS_URL = "https://mafiamatrix.com/income/communityservice.asp"
 TRANSFER_URL = "https://mafiamatrix.com/income/bank.asp?option=transfers"
 USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
+BIZ_URL = "https://mafiamatrix.com/business/business.asp"
 
 ONLINE_CRIMES = {"pickpocket", "mugging"}
 RESIDENT_CRIMES = {"hack", "breaking"}
@@ -30,6 +31,23 @@ QUEUE_MAX = 200
 
 MUGGING_WEAPONS = {"Baseball Bat", "Pistol"}
 BODY_PARTS = {"Arms", "Legs", "Eyes", "Brain", "Heart"}
+
+PUBLIC_BUSINESSES = {
+    "Funeral Parlour", "Town Hall", "Hospital", "Fire Station",
+    "Airport", "Construction Company", "Bank"
+}
+
+PUBLIC_JOB_MAP = {
+    "Funeral Parlour": "Funeral Director",
+    "Town Hall": "Mayor",
+    "Hospital": "Hospital Director",
+    "Fire Station": "Fire Chief",
+    "Airport": "Commissioner-General",
+    "Construction Company": "Chief Engineer",
+    "Bank": "Bank Manager",
+}
+
+ARMED_MAX_RETRIES = 12
 
 
 def _refresh_state(state: GameState):
@@ -454,6 +472,149 @@ def handle_career_training(action: Action, state: GameState):
     state.add_log(f"Career training submitted for {career}.")
 
 
+def _do_transfer(recipient: str, amount: int, state: GameState):
+    page = browser.page()
+    _nav(TRANSFER_URL, state)
+    if not _check_session(state):
+        return
+    page.fill("input[name='transferamount']", str(amount))
+    page.fill("input[name='transfername']", recipient)
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log(f"Payback sent: ${amount:,} to {recipient}.")
+
+
+def _payback_public_business(business_name: str, amount: int, state: GameState):
+    job = PUBLIC_JOB_MAP.get(business_name)
+    if not job:
+        state.add_log(f"No job mapping for {business_name}.")
+        return
+    browser.page().goto(USERS_URL, wait_until="domcontentloaded", timeout=15000)
+    try:
+        data = json.loads(browser.page().inner_text("body"))
+    except Exception:
+        state.add_log("Failed to parse users for public business payback.")
+        return
+    recipient = next(
+        (p["userName"] for p in data
+         if p.get("userCity") == state.current_city and p.get("userJob") == job),
+        None,
+    )
+    if not recipient:
+        state.add_log(f"No {job} found in {state.current_city} for payback.")
+        return
+    _do_transfer(recipient, amount, state)
+
+
+def _payback_private_business(business_name: str, amount: int, state: GameState):
+    _nav(BIZ_URL, state)
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    owner = None
+    for row in soup.select("table tr"):
+        cells = row.find_all("td", class_="display_border")
+        if len(cells) >= 2 and cells[0].get_text(strip=True) == business_name:
+            a = cells[1].find("a")
+            if a:
+                owner = a.get_text(strip=True)
+            break
+    if not owner:
+        state.add_log(f"Owner of {business_name} not found (may be Hidden).")
+        return
+    _do_transfer(owner, amount, state)
+
+
+def handle_armed_robbery(action: Action, state: GameState):
+    agg_private = action.params.get("agg_private", False)
+    agg_drug_house = action.params.get("agg_drug_house", False)
+    payback_private = action.params.get("payback_private", False)
+    payback_public = action.params.get("payback_public", False)
+    threshold = action.params.get("threshold", 0)
+
+    page = browser.page()
+
+    # Navigate to agcrime.asp and submit the armed robbery form
+    _nav(CRIME_URL, state)
+    if not _check_session(state):
+        return
+    if threshold and state.energy < threshold:
+        state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — aborting.")
+        return
+    page.check("input[name='agcrime'][value='armed']")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+    for attempt in range(ARMED_MAX_RETRIES):
+        if attempt > 0:
+            time.sleep(5)
+            page.once("dialog", lambda d: d.accept())
+            page.reload(wait_until="domcontentloaded")
+            _refresh_state(state)
+
+        soup = BeautifulSoup(page.content(), "html.parser")
+        select = soup.find("select", attrs={"name": "armed"})
+        if not select:
+            state.add_log("Armed robbery: business select not found.")
+            _nav(PLAY_URL, state)
+            return
+
+        target = None
+        for option in select.find_all("option"):
+            raw = option.get_text(strip=True)
+            value = option.get("value", "")
+            if not value or raw.startswith("Please"):
+                continue
+            if "*" not in raw:
+                continue
+            name = raw.rstrip("*").strip()
+            is_public = name in PUBLIC_BUSINESSES
+            is_drug_house = name == "Drug House"
+            is_private = not is_public
+
+            if is_drug_house and not agg_drug_house:
+                continue
+            if is_private and not is_drug_house and not agg_private:
+                continue
+            target = (value, name, is_public, is_drug_house)
+            break
+
+        if target:
+            value, name, is_public, is_drug_house = target
+            page.select_option("select[name='armed']", value)
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
+            _refresh_state(state)
+
+            result_soup = BeautifulSoup(page.content(), "html.parser")
+            success_div = result_soup.find("div", id="success")
+            if success_div:
+                msg = success_div.get_text(strip=True)
+                state.add_log(f"Armed robbery success ({name}): {msg}")
+                amounts = re.findall(r"\$([\d,]+)", msg)
+                stolen = int(amounts[0].replace(",", "")) if amounts else 0
+                if stolen > 0:
+                    if is_public and payback_public:
+                        _payback_public_business(name, stolen, state)
+                    elif is_private and not is_drug_house and payback_private:
+                        _payback_private_business(name, stolen, state)
+                return
+
+            fail_div = result_soup.find("div", id="fail")
+            if fail_div:
+                state.add_log(f"Armed robbery failed: {fail_div.get_text(strip=True)}")
+            else:
+                state.add_log("Armed robbery: unexpected result page.")
+            _nav(PLAY_URL, state)
+            return
+
+        state.add_log(f"No valid armed robbery target (attempt {attempt + 1}/{ARMED_MAX_RETRIES}).")
+
+    state.add_log("Armed robbery: no valid targets after 12 attempts.")
+    state._agg_targets_exhausted = True
+    _nav(PLAY_URL, state)
+
+
 # ---------------------------------------------------------------------------
 # Executor
 # ---------------------------------------------------------------------------
@@ -467,6 +628,7 @@ HANDLERS = {
     "payback": handle_payback,
     "do_community_service": handle_community_service,
     "do_career_training": handle_career_training,
+    "do_armed_robbery": handle_armed_robbery,
 }
 
 
