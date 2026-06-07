@@ -351,7 +351,12 @@ def handle_check_weapon(action: Action, state: GameState):
 
 
 
-def handle_payback(action: Action, state: GameState):
+def handle_refresh_state(action: Action, state: GameState):
+    _nav(PLAY_URL, state)
+    state.add_log("State refreshed.")
+
+
+
     amount = action.params["amount"]
     target = action.params["target"]
     page = browser.page()
@@ -444,6 +449,7 @@ HANDLERS = {
     "check_earns": handle_check_earns,
     "do_crime": handle_do_crime,
     "check_weapon": handle_check_weapon,
+    "refresh_state": handle_refresh_state,
     "payback": handle_payback,
     "do_community_service": handle_community_service,
     "do_career_training": handle_career_training,

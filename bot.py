@@ -17,6 +17,7 @@ from tasks.agg_crimes import AggCrimeTask
 from tasks.community_service import CommunityServiceTask
 from tasks.career_training import CareerTrainingTask
 from tasks.away_action import AwayActionTask
+from tasks.refresh import RefreshTask
 
 _thread: threading.Thread = None
 _stop_event = threading.Event()
@@ -62,6 +63,8 @@ def _build_scheduler(c: dict) -> Scheduler:
     away_cfg = c.get("away_action", {})
     if away_cfg.get("enabled", False):
         sched.add(AwayActionTask(action_type=away_cfg.get("type", "drug_manufacturing")))
+
+    sched.add(RefreshTask(interval_seconds=60))
 
     return sched
 
