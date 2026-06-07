@@ -101,10 +101,7 @@ def start():
             "--disable-notifications",
             "--disable-save-password-bubble",
         ],
-        ignore_https_errors=True,
     )
-    # Deny notification permission globally
-    _context.grant_permissions([], origin="https://mafiamatrix.com")
     _page = _context.pages[0] if _context.pages else _context.new_page()
     print("[browser] Chrome launched.")
 
