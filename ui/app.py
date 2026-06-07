@@ -41,6 +41,11 @@ def save():
     c["aggravated_crimes"].setdefault("away_crime", {})
     c["aggravated_crimes"]["away_crime"]["crime"] = data.get("away_crime", "pickpocket")
     c["aggravated_crimes"]["away_crime"]["energy_threshold"] = int(data.get("away_threshold", 50))
+    c["aggravated_crimes"].setdefault("armed", {})
+    c["aggravated_crimes"]["armed"]["agg_private"] = data.get("armed_agg_private", False)
+    c["aggravated_crimes"]["armed"]["agg_drug_house"] = data.get("armed_agg_drug_house", False)
+    c["aggravated_crimes"]["armed"]["payback_private"] = data.get("armed_payback_private", False)
+    c["aggravated_crimes"]["armed"]["payback_public"] = data.get("armed_payback_public", False)
 
     c["action"]["enabled"] = data.get("action_enabled", False)
     c["action"]["type"] = data.get("action_type", "community_service")

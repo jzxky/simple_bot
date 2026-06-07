@@ -22,6 +22,12 @@ DEFAULT_CONFIG = {
         "away_crime": {
             "crime": "pickpocket",
             "energy_threshold": 50
+        },
+        "armed": {
+            "agg_private": False,
+            "agg_drug_house": False,
+            "payback_private": False,
+            "payback_public": False
         }
     },
     "action": {

@@ -18,11 +18,17 @@ class AggCrimeTask(Task):
     priority = 50
 
     def __init__(self, primary_crime: str, primary_threshold: int,
-                 away_crime: str, away_threshold: int):
+                 away_crime: str, away_threshold: int,
+                 armed_agg_private: bool = False, armed_agg_drug_house: bool = False,
+                 armed_payback_private: bool = False, armed_payback_public: bool = False):
         self.primary_crime = primary_crime
         self.primary_threshold = primary_threshold
         self.away_crime = away_crime
         self.away_threshold = away_threshold
+        self.armed_agg_private = armed_agg_private
+        self.armed_agg_drug_house = armed_agg_drug_house
+        self.armed_payback_private = armed_payback_private
+        self.armed_payback_public = armed_payback_public
         self._cooldown_until: float = 0.0
 
     def _pick_crime(self, state: GameState):
@@ -46,7 +52,18 @@ class AggCrimeTask(Task):
         crime, threshold = self._pick_crime(state)
         if not crime:
             return
-        executor.execute(Action("do_crime", crime=crime, threshold=threshold), state)
+
+        if crime == "armed":
+            executor.execute(Action("do_armed_robbery",
+                threshold=threshold,
+                agg_private=self.armed_agg_private,
+                agg_drug_house=self.armed_agg_drug_house,
+                payback_private=self.armed_payback_private,
+                payback_public=self.armed_payback_public,
+            ), state)
+        else:
+            executor.execute(Action("do_crime", crime=crime, threshold=threshold), state)
+
         if getattr(state, "_agg_targets_exhausted", False):
             self._cooldown_until = time.monotonic() + COOLDOWN_SECONDS
             state._agg_targets_exhausted = False

@@ -45,11 +45,16 @@ def _build_scheduler(c: dict) -> Scheduler:
         ac = c["aggravated_crimes"]
         pri = ac.get("primary", {})
         away = ac.get("away_crime", {})
+        armed = ac.get("armed", {})
         sched.add(AggCrimeTask(
             primary_crime=pri.get("crime", "pickpocket"),
             primary_threshold=pri.get("energy_threshold", 50),
             away_crime=away.get("crime", "pickpocket"),
             away_threshold=away.get("energy_threshold", 50),
+            armed_agg_private=armed.get("agg_private", False),
+            armed_agg_drug_house=armed.get("agg_drug_house", False),
+            armed_payback_private=armed.get("payback_private", False),
+            armed_payback_public=armed.get("payback_public", False),
         ))
 
     action_cfg = c.get("action", {})
