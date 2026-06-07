@@ -52,6 +52,11 @@ function populateActionSub(selectedValue) {
   ).join("");
 }
 
+function toggleAwayCrime() {
+  const primary = document.getElementById("primary_crime").value;
+  document.getElementById("away_crime_row").style.display = primary === "hack" ? "" : "none";
+}
+
 function showTab(id, btn) {
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -69,8 +74,7 @@ function saveConfig() {
     crimes_enabled: document.getElementById("crimes_enabled").checked,
     primary_crime: document.getElementById("primary_crime").value,
     primary_threshold: document.getElementById("primary_threshold").value,
-    secondary_crime: document.getElementById("secondary_crime").value,
-    secondary_threshold: document.getElementById("secondary_threshold").value,
+    away_crime: document.getElementById("away_crime").value,
     action_enabled: document.getElementById("action_enabled").checked,
     action_type: document.getElementById("action_type").value,
     action_sub: document.getElementById("action_sub").value,
