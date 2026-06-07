@@ -18,6 +18,8 @@ def _open_browser():
 
 
 if __name__ == "__main__":
-    threading.Thread(target=_open_browser, daemon=True).start()
+    no_ui = "--noui" in sys.argv
+    if not no_ui:
+        threading.Thread(target=_open_browser, daemon=True).start()
     from ui.app import run
     run()
