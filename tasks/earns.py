@@ -1,21 +1,22 @@
 """
-Checks the earn queue every 30 minutes and tops it up to 200 if below 10.
+Checks the earn queue on a timer and tops it up to 200 if below 10.
 """
 
-from tasks.base import TimerTask, Action
-from state import GameState
-
-EARN_URL = "https://mafiamatrix.com/income/earn.asp"
-QUEUE_MIN = 10
-QUEUE_MAX = 200
+import time
+from tasks.base import Task, Action
 
 
-class EarnsTask(TimerTask):
+class EarnsTask(Task):
+    priority = 30
+
     def __init__(self, earn_type: str, interval_minutes: float = 30):
-        super().__init__(priority=30, interval_seconds=interval_minutes * 60)
         self.earn_type = earn_type
+        self._interval = interval_minutes * 60
+        self._last_fired: float = 0.0
 
-    def _on_fire(self, state: GameState):
-        if not state.logged_in:
-            return None
-        return Action("check_earns", earn_type=self.earn_type)
+    def can_run(self, state) -> bool:
+        return state.logged_in and time.monotonic() - self._last_fired >= self._interval
+
+    def run(self, state, executor):
+        self._last_fired = time.monotonic()
+        executor.execute(Action("check_earns", earn_type=self.earn_type), state)

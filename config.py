@@ -28,6 +28,10 @@ DEFAULT_CONFIG = {
         "type": "community_service",
         "sub_option": ""
     },
+    "away_action": {
+        "enabled": False,
+        "type": "drug_manufacturing"
+    },
     "payback_enabled": True,
     "career_training": {
         "career": "fire"

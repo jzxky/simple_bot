@@ -80,8 +80,15 @@ def start():
         viewport={"width": 1280, "height": 900},
         locale="en-US",
         timezone_id="America/New_York",
+        args=[
+            "--disable-notifications",
+            "--disable-save-password-bubble",
+        ],
+        ignore_https_errors=True,
     )
-    _page = _context.new_page()
+    # Deny notification permission globally
+    _context.grant_permissions([], origin="https://mafiamatrix.com")
+    _page = _context.pages[0] if _context.pages else _context.new_page()
     print("[browser] Chrome launched.")
 
 

@@ -9,17 +9,7 @@ const EARN_MAP = {
 };
 
 const ACTION_SUB_MAP = {
-  community_service: [
-    ["gum","Scraping gum off pavements"],
-    ["tags","Cleaning up tags"],
-    ["weeding","Gardening in the local park"],
-    ["kids","Pedestrian controller at local school"],
-    ["pamphlets","Delivering pamphlets for mayor"],
-    ["delivery","Delivering groceries to elderly"],
-    ["football","Coaching little league football"],
-    ["suspect","Helping police in line-up"],
-    ["reading","Reading to elderly"],
-  ],
+  community_service: [],  // bot always picks the highest tier automatically
   career_training: [
     ["fire","Fire Department"],
     ["customs","Customs"],
@@ -34,7 +24,6 @@ const ACTION_SUB_MAP = {
   ],
   training_centre: [],
   drug_manufacturing: [],
-  dog_trains: [],
 };
 
 function populateEarns(selectedValue) {
@@ -85,6 +74,8 @@ function saveConfig() {
     action_enabled: document.getElementById("action_enabled").checked,
     action_type: document.getElementById("action_type").value,
     action_sub: document.getElementById("action_sub").value,
+    away_action_enabled: document.getElementById("away_action_enabled").checked,
+    away_action_type: document.getElementById("away_action_type").value,
     payback_enabled: document.getElementById("payback_enabled").checked,
     chrome_path: document.getElementById("chrome_path").value,
   };
