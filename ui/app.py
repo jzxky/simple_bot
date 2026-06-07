@@ -57,6 +57,10 @@ def save():
 
     c["payback_enabled"] = data.get("payback_enabled", False)
 
+    c.setdefault("misc", {})
+    c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
+    c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
+
     cfg.save(c)
     if bot.is_running():
         bot.request_reload()

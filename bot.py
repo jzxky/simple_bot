@@ -135,7 +135,12 @@ def _run(c: dict):
             # Detect session expiry on every tick
             if state.logged_in and "default.asp" in browser.current_url() and not browser.is_cloudflare_challenge():
                 state.logged_in = False
-                state.add_log("Session expired — will re-login.")
+                if c.get("misc", {}).get("relog_on_session_expire", True):
+                    state.add_log("Session expired — will re-login.")
+                else:
+                    state.add_log("Session expired — re-login disabled, pausing.")
+                    state.relog_suppressed = True
+                    _pause_event.set()
 
             # Screenshot requests from the Flask thread
             if not _screenshot_request.empty():
@@ -173,7 +178,7 @@ def _run(c: dict):
         state.add_log(f"Bot crashed: {e}")
     finally:
         try:
-            if state.logged_in:
+            if state.logged_in and c.get("misc", {}).get("logout_on_stop", True):
                 state.add_log("Logging out...")
                 browser.navigate("https://mafiamatrix.com/default.asp?action=logout")
         except Exception:
@@ -208,6 +213,7 @@ def pause():
 
 
 def resume():
+    state.relog_suppressed = False
     _pause_event.clear()
     state.add_log("Bot resumed.")
 

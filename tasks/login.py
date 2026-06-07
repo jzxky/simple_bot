@@ -17,7 +17,7 @@ class LoginTask(Task):
         self._last_attempt: float = 0.0
 
     def can_run(self, state) -> bool:
-        return not state.logged_in and time.monotonic() - self._last_attempt >= RETRY_INTERVAL
+        return not state.logged_in and not state.relog_suppressed and time.monotonic() - self._last_attempt >= RETRY_INTERVAL
 
     def run(self, state, executor):
         self._last_attempt = time.monotonic()

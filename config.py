@@ -42,6 +42,10 @@ DEFAULT_CONFIG = {
     "payback_enabled": True,
     "career_training": {
         "career": "fire"
+    },
+    "misc": {
+        "logout_on_stop": True,
+        "relog_on_session_expire": True
     }
 }
 

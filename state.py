@@ -35,6 +35,7 @@ class GameState:
     agg_pro_end: Optional[datetime] = None
     server_time: Optional[datetime] = None
     logged_in: bool = False
+    relog_suppressed: bool = False
     current_url: str = ""
     bot_running: bool = False
     last_error: str = ""
