@@ -75,6 +75,7 @@ function saveConfig() {
     primary_crime: document.getElementById("primary_crime").value,
     primary_threshold: document.getElementById("primary_threshold").value,
     away_crime: document.getElementById("away_crime").value,
+    away_threshold: document.getElementById("away_threshold").value,
     action_enabled: document.getElementById("action_enabled").checked,
     action_type: document.getElementById("action_type").value,
     action_sub: document.getElementById("action_sub").value,

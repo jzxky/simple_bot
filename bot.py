@@ -49,6 +49,7 @@ def _build_scheduler(c: dict) -> Scheduler:
             primary_crime=pri.get("crime", "pickpocket"),
             primary_threshold=pri.get("energy_threshold", 50),
             away_crime=away.get("crime", "pickpocket"),
+            away_threshold=away.get("energy_threshold", 50),
         ))
 
     action_cfg = c.get("action", {})

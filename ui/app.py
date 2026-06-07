@@ -40,6 +40,7 @@ def save():
     c["aggravated_crimes"]["primary"]["energy_threshold"] = int(data.get("primary_threshold", 50))
     c["aggravated_crimes"].setdefault("away_crime", {})
     c["aggravated_crimes"]["away_crime"]["crime"] = data.get("away_crime", "pickpocket")
+    c["aggravated_crimes"]["away_crime"]["energy_threshold"] = int(data.get("away_threshold", 50))
 
     c["action"]["enabled"] = data.get("action_enabled", False)
     c["action"]["type"] = data.get("action_type", "community_service")
