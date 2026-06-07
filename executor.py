@@ -309,7 +309,8 @@ def handle_do_crime(action: Action, state: GameState):
 def handle_check_weapon(action: Action, state: GameState):
     crime = action.params["crime"]
     page = browser.page()
-    _nav(PROFILE_URL, state)
+    page.goto(PROFILE_URL, wait_until="networkidle", timeout=30000)
+    parse_state(page.content(), browser.current_url(), state)
 
     if not _check_session(state):
         return
@@ -322,7 +323,7 @@ def handle_check_weapon(action: Action, state: GameState):
 
     tables = weapons_div.find_all("table", class_="item_table")
     equipped_names = set()
-    stash_slots = []  # list of (weapon_name, carry_url)
+    stash_slots = []
 
     for table in tables:
         header = table.find("div", style=lambda s: s and "ff9900" in s)
@@ -339,7 +340,6 @@ def handle_check_weapon(action: Action, state: GameState):
 
         action_td = table.find("td", class_="item_content", align="center")
         if not action_td:
-            # try finding action row differently
             tds = table.find_all("td", class_="item_content")
             action_td = tds[-1] if tds else None
 
@@ -355,11 +355,6 @@ def handle_check_weapon(action: Action, state: GameState):
             if carry_link:
                 stash_slots.append((weapon_name, carry_link))
 
-    if crime == "mugging":
-        needed = MUGGING_WEAPONS
-    else:
-        needed = None  # armed robbery: any non-body-part
-
     def _is_valid(name):
         if crime == "mugging":
             return name in MUGGING_WEAPONS
@@ -373,9 +368,10 @@ def handle_check_weapon(action: Action, state: GameState):
         if _is_valid(wname):
             state.add_log(f"Equipping {wname} for {crime}.")
             browser.navigate(carry_url)
-            page.wait_for_load_state("domcontentloaded")
             _refresh_state(state)
             return
+
+    state.add_log(f"No valid weapon found for {crime}.")
 
     state.add_log(f"No valid weapon found for {crime}. Skipping crime.")
     # Signal crime task to skip by marking no weapon — handled by AggCrimeTask resetting
