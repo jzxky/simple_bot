@@ -78,7 +78,8 @@ def start():
         PROFILE_DIR,
         headless=False,
         executable_path=_find_chrome(),
-        viewport={"width": 1280, "height": 900},
+        viewport={"width": 800, "height": 900},
+        screen={"width": 800, "height": 900},
         locale="en-US",
         timezone_id="America/New_York",
         args=[
