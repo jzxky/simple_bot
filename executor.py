@@ -277,7 +277,10 @@ def handle_do_crime(action: Action, state: GameState):
                     state.add_log(f"Crime failed vs {player} (after weapon equip): {fail_div2.get_text(strip=True)}")
                 continue
             state.add_log(f"Crime failed vs {player}: {fail_msg}")
-            continue
+            if crime == "hack" and "increased security" in fail_msg.lower():
+                continue
+            _nav(PLAY_URL, state)
+            return
 
     state._agg_targets_exhausted = True
     state.add_log("All targets exhausted.")
