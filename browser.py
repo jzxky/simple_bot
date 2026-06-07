@@ -34,13 +34,6 @@ def start():
         ],
     )
     _page = _context.pages[0] if _context.pages else _context.new_page()
-    # Sync viewport to the actual window size so the page renders at full width
-    try:
-        w = _page.evaluate("() => window.outerWidth") or 1920
-        h = _page.evaluate("() => window.outerHeight") or 1080
-        _page.set_viewport_size({"width": w, "height": h})
-    except Exception:
-        _page.set_viewport_size({"width": 1920, "height": 1080})
     print("[browser] Browser launched.")
 
 
