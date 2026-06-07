@@ -16,6 +16,7 @@ from tasks.earns import EarnsTask
 from tasks.agg_crimes import AggCrimeTask
 from tasks.community_service import CommunityServiceTask
 from tasks.career_training import CareerTrainingTask
+from tasks.away_action import AwayActionTask
 
 _thread: threading.Thread = None
 _stop_event = threading.Event()
@@ -57,6 +58,10 @@ def _build_scheduler(c: dict) -> Scheduler:
             sched.add(CommunityServiceTask())
         elif action_type == "career_training":
             sched.add(CareerTrainingTask(career=sub))
+
+    away_cfg = c.get("away_action", {})
+    if away_cfg.get("enabled", False):
+        sched.add(AwayActionTask(action_type=away_cfg.get("type", "drug_manufacturing")))
 
     return sched
 

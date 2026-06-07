@@ -97,10 +97,10 @@
       </div>
     </section>
 
-    <!-- Action Selection -->
+    <!-- Home City Action -->
     <section class="card">
       <h2>
-        Action Selection
+        Home City Action
         <label class="toggle-label">
           <input type="checkbox" id="action_enabled" {% if config.action.enabled %}checked{% endif %}>
           <span class="toggle"></span>
@@ -114,11 +114,30 @@
             <option value="university"        {% if config.action.type == 'university'        %}selected{% endif %}>University Training</option>
             <option value="training_centre"   {% if config.action.type == 'training_centre'   %}selected{% endif %}>Training Centre</option>
             <option value="drug_manufacturing"{% if config.action.type == 'drug_manufacturing'%}selected{% endif %}>Drug Manufacturing</option>
-            <option value="dog_trains"        {% if config.action.type == 'dog_trains'        %}selected{% endif %}>Dog Trains</option>
           </select>
         </label>
         <label id="action_sub_label">Sub-option
           <select id="action_sub"></select>
+        </label>
+      </div>
+    </section>
+
+    <!-- Away from Home City Action -->
+    <section class="card">
+      <h2>
+        Away from Home City
+        <label class="toggle-label">
+          <input type="checkbox" id="away_action_enabled" {% if config.get('away_action', {}).get('enabled') %}checked{% endif %}>
+          <span class="toggle"></span>
+        </label>
+      </h2>
+      <div class="row">
+        <label>Action
+          <select id="away_action_type">
+            <option value="drug_manufacturing" {% if config.get('away_action', {}).get('type') == 'drug_manufacturing' %}selected{% endif %}>Drug Manufacturing</option>
+            <option value="community_service"  {% if config.get('away_action', {}).get('type') == 'community_service'  %}selected{% endif %}>Community Service</option>
+            <option value="dog_trains"         {% if config.get('away_action', {}).get('type') == 'dog_trains'         %}selected{% endif %}>Dog Trains</option>
+          </select>
         </label>
       </div>
     </section>

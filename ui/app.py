@@ -41,6 +41,10 @@ def save():
     c["action"]["type"] = data.get("action_type", "community_service")
     c["action"]["sub_option"] = data.get("action_sub", "")
 
+    c.setdefault("away_action", {})
+    c["away_action"]["enabled"] = data.get("away_action_enabled", False)
+    c["away_action"]["type"] = data.get("away_action_type", "drug_manufacturing")
+
     c["payback_enabled"] = data.get("payback_enabled", False)
 
     c.setdefault("bot_config", {})
