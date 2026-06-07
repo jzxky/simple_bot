@@ -79,7 +79,7 @@ function saveConfig() {
     payback_enabled: document.getElementById("payback_enabled").checked,
   };
 
-  fetch("/save", {
+  return fetch("/save", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(data),
@@ -94,10 +94,17 @@ let _botRunning = false;
 let _botPaused = false;
 
 function toggleBot() {
-  const endpoint = _botRunning ? "/stop" : "/start";
-  fetch(endpoint, {method: "POST"})
-    .then(r => r.json())
-    .then(d => updateBotState(d.running, d.paused));
+  if (_botRunning) {
+    fetch("/stop", {method: "POST"})
+      .then(r => r.json())
+      .then(d => updateBotState(d.running, d.paused));
+  } else {
+    saveConfig().then(() =>
+      fetch("/start", {method: "POST"})
+        .then(r => r.json())
+        .then(d => updateBotState(d.running, d.paused))
+    );
+  }
 }
 
 function togglePause() {
