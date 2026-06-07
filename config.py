@@ -19,9 +19,8 @@ DEFAULT_CONFIG = {
             "crime": "hack",
             "energy_threshold": 60
         },
-        "secondary": {
-            "crime": "pickpocket",
-            "energy_threshold": 50
+        "away_crime": {
+            "crime": "pickpocket"
         }
     },
     "action": {

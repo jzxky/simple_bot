@@ -44,12 +44,11 @@ def _build_scheduler(c: dict) -> Scheduler:
     if c.get("aggravated_crimes", {}).get("enabled", False):
         ac = c["aggravated_crimes"]
         pri = ac.get("primary", {})
-        sec = ac.get("secondary", {})
+        away = ac.get("away_crime", {})
         sched.add(AggCrimeTask(
             primary_crime=pri.get("crime", "pickpocket"),
             primary_threshold=pri.get("energy_threshold", 50),
-            secondary_crime=sec.get("crime", "pickpocket"),
-            secondary_threshold=sec.get("energy_threshold", 50),
+            away_crime=away.get("crime", "pickpocket"),
         ))
 
     action_cfg = c.get("action", {})

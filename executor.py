@@ -279,6 +279,7 @@ def handle_do_crime(action: Action, state: GameState):
             state.add_log(f"Crime failed vs {player}: {fail_msg}")
             continue
 
+    state._agg_targets_exhausted = True
     state.add_log("All targets exhausted.")
 
 

@@ -95,8 +95,8 @@
         </label>
       </h2>
       <div class="row">
-        <label>Primary Crime
-          <select id="primary_crime">
+        <label>Crime
+          <select id="primary_crime" onchange="toggleAwayCrime()">
             {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('hack','Hack Bank Account')] %}
             <option value="{{ crime }}" {% if config.aggravated_crimes.primary.crime == crime %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
@@ -106,16 +106,13 @@
           <input type="number" id="primary_threshold" min="0" max="100" value="{{ config.aggravated_crimes.primary.energy_threshold }}">
         </label>
       </div>
-      <div class="row">
-        <label>Fallback Crime
-          <select id="secondary_crime">
-            {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('hack','Hack Bank Account')] %}
-            <option value="{{ crime }}" {% if config.aggravated_crimes.secondary.crime == crime %}selected{% endif %}>{{ label }}</option>
+      <div class="row" id="away_crime_row" style="display:none">
+        <label>Out of Home City
+          <select id="away_crime">
+            {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering')] %}
+            <option value="{{ crime }}" {% if config.aggravated_crimes.get('away_crime', {}).get('crime') == crime %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
-        </label>
-        <label>Energy Threshold %
-          <input type="number" id="secondary_threshold" min="0" max="100" value="{{ config.aggravated_crimes.secondary.energy_threshold }}">
         </label>
       </div>
     </section>
@@ -213,6 +210,7 @@
   const INITIAL_ACTION_SUB = "{{ config.action.sub_option }}";
   populateEarns(INITIAL_EARN_TYPE);
   populateActionSub(INITIAL_ACTION_SUB);
+  toggleAwayCrime();
   pollStatus();
 </script>
 </body>
