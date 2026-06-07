@@ -52,6 +52,8 @@ def save():
     c["payback_enabled"] = data.get("payback_enabled", False)
 
     cfg.save(c)
+    if bot.is_running():
+        bot.request_reload()
     return jsonify({"ok": True})
 
 

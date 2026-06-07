@@ -97,15 +97,17 @@
       </div>
     </section>
 
-    <!-- Home City Action -->
+    <!-- Actions -->
     <section class="card">
-      <h2>
-        Home City Action
+      <h2>Actions</h2>
+
+      <h3>
+        Home City
         <label class="toggle-label">
           <input type="checkbox" id="action_enabled" {% if config.action.enabled %}checked{% endif %}>
           <span class="toggle"></span>
         </label>
-      </h2>
+      </h3>
       <div class="row">
         <label>Action
           <select id="action_type" onchange="populateActionSub()">
@@ -120,17 +122,14 @@
           <select id="action_sub"></select>
         </label>
       </div>
-    </section>
 
-    <!-- Away from Home City Action -->
-    <section class="card">
-      <h2>
-        Away from Home City
+      <h3>
+        Out of Home City
         <label class="toggle-label">
           <input type="checkbox" id="away_action_enabled" {% if config.get('away_action', {}).get('enabled') %}checked{% endif %}>
           <span class="toggle"></span>
         </label>
-      </h2>
+      </h3>
       <div class="row">
         <label>Action
           <select id="away_action_type">
