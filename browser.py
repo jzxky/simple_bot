@@ -30,6 +30,7 @@ def start():
         args=[
             "--disable-notifications",
             "--disable-save-password-bubble",
+            "--start-maximized",
         ],
     )
     _page = _context.pages[0] if _context.pages else _context.new_page()
