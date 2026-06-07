@@ -272,8 +272,11 @@ def handle_do_crime(action: Action, state: GameState):
                         state._last_crime_amount = stolen
                         state.add_log(f"Stolen: ${stolen:,} from {player}")
                     return
+                fail_div2 = result_soup.find("div", id="fail")
+                if fail_div2:
+                    state.add_log(f"Crime failed vs {player} (after weapon equip): {fail_div2.get_text(strip=True)}")
                 continue
-            state.add_log(f"Crime failed vs {player}, trying next.")
+            state.add_log(f"Crime failed vs {player}: {fail_msg}")
             continue
 
     state.add_log("All targets exhausted.")
