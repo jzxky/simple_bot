@@ -112,6 +112,14 @@ def status():
     })
 
 
+@app.route("/consume", methods=["POST"])
+def consume():
+    consume_type = request.get_json().get("type", "")
+    if consume_type:
+        bot.request_consume(consume_type)
+    return jsonify({"ok": True})
+
+
 @app.route("/screenshot")
 def screenshot():
     if not bot.is_running():

@@ -179,7 +179,7 @@ function pollStatus() {
       const cons = d.consumables || {};
       document.getElementById("stat-consumables").innerHTML =
         Object.entries(CONSUMABLE_LABELS).map(([k, label]) =>
-          `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty">${cons[k] ?? 0}</span></div>`
+          `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty ${_botRunning ? 'consumable-link' : ''}" onclick="${_botRunning ? `consumeItem('${k}')` : ''}">${cons[k] ?? 0}</span></div>`
         ).join("");
 
       // Log
@@ -217,6 +217,14 @@ function takeScreenshot() {
       btn.textContent = "Screenshot";
       btn.disabled = false;
     });
+}
+
+function consumeItem(type) {
+  fetch("/consume", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({type}),
+  });
 }
 
 function escHtml(s) {

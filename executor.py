@@ -383,6 +383,16 @@ def handle_check_weapon(action: Action, state: GameState):
 
 
 
+def handle_consume(action: Action, state: GameState):
+    consume_type = action.params["type"]
+    url = f"https://mafiamatrix.com/profile/consumables.asp?action=consume&type={consume_type}"
+    _nav(url, state)
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    msg_div = soup.find("div", id="success") or soup.find("div", id="fail")
+    msg = msg_div.get_text(strip=True) if msg_div else "No result."
+    state.add_log(f"Consume {consume_type}: {msg}")
+
+
 def handle_refresh_state(action: Action, state: GameState):
     _nav(PLAY_URL, state)
 
@@ -623,6 +633,7 @@ HANDLERS = {
     "check_earns": handle_check_earns,
     "do_crime": handle_do_crime,
     "check_weapon": handle_check_weapon,
+    "consume": handle_consume,
     "refresh_state": handle_refresh_state,
     "payback": handle_payback,
     "do_community_service": handle_community_service,

@@ -276,6 +276,7 @@ button {
 }
 .consumable-name { color: var(--muted); }
 .consumable-qty  { color: var(--text); font-weight: 600; }
+.consumable-link { color: var(--gold); cursor: pointer; text-decoration: underline; }
 
 /* Log */
 .log-card h2 { margin-bottom: 8px; }
