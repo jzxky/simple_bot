@@ -24,6 +24,7 @@ def start():
         PROFILE_DIR,
         channel="chrome",
         headless=False,
+        viewport=None,
         locale="en-US",
         timezone_id="America/New_York",
         args=[
