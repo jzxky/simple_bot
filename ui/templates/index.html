@@ -174,6 +174,7 @@
         <button class="tab-btn" onclick="showTab('promotion', this)">Promotion</button>
         <button class="tab-btn" onclick="showTab('casework', this)">Case Work</button>
         <button class="tab-btn" onclick="showTab('jail', this)">Jail</button>
+        <button class="tab-btn" onclick="showTab('misc', this)">Misc</button>
       </div>
 
       <div id="agg-settings" class="tab-panel active">
@@ -218,6 +219,26 @@
       <div id="promotion" class="tab-panel"><p class="placeholder">Promotion settings — coming soon.</p></div>
       <div id="casework"  class="tab-panel"><p class="placeholder">Case work settings — coming soon.</p></div>
       <div id="jail"      class="tab-panel"><p class="placeholder">Jail settings — coming soon.</p></div>
+      <div id="misc" class="tab-panel">
+        <div class="row">
+          <label class="inline-toggle">
+            Log out when stopping bot
+            <label class="toggle-label">
+              <input type="checkbox" id="logout_on_stop" {% if config.get('misc', {}).get('logout_on_stop', True) %}checked{% endif %}>
+              <span class="toggle"></span>
+            </label>
+          </label>
+        </div>
+        <div class="row">
+          <label class="inline-toggle">
+            Re-log if auto-logged out
+            <label class="toggle-label">
+              <input type="checkbox" id="relog_on_session_expire" {% if config.get('misc', {}).get('relog_on_session_expire', True) %}checked{% endif %}>
+              <span class="toggle"></span>
+            </label>
+          </label>
+        </div>
+      </div>
     </section>
 
     <!-- Controls -->
