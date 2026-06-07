@@ -103,6 +103,7 @@ def _run(c: dict):
                     "Complete the challenge in the browser then press Resume."
                 )
                 _pause_event.set()
+                continue
 
             # Detect session expiry on every tick
             if state.logged_in and "default.asp" in browser.current_url() and not browser.is_cloudflare_challenge():
