@@ -20,7 +20,8 @@ DEFAULT_CONFIG = {
             "energy_threshold": 60
         },
         "away_crime": {
-            "crime": "pickpocket"
+            "crime": "pickpocket",
+            "energy_threshold": 50
         }
     },
     "action": {

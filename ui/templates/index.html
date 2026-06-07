@@ -114,6 +114,9 @@
             {% endfor %}
           </select>
         </label>
+        <label>Energy Threshold %
+          <input type="number" id="away_threshold" min="0" max="100" value="{{ config.aggravated_crimes.get('away_crime', {}).get('energy_threshold', 50) }}">
+        </label>
       </div>
     </section>
 

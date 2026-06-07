@@ -17,31 +17,36 @@ COOLDOWN_SECONDS = 180
 class AggCrimeTask(Task):
     priority = 50
 
-    def __init__(self, primary_crime: str, primary_threshold: int, away_crime: str):
+    def __init__(self, primary_crime: str, primary_threshold: int,
+                 away_crime: str, away_threshold: int):
         self.primary_crime = primary_crime
         self.primary_threshold = primary_threshold
         self.away_crime = away_crime
+        self.away_threshold = away_threshold
         self._cooldown_until: float = 0.0
 
     def _pick_crime(self, state: GameState):
-        if state.energy < self.primary_threshold:
-            return None
         if self.primary_crime == HACK_CRIME and not state.in_home_city():
-            return self.away_crime if self.away_crime else None
-        return self.primary_crime
+            if self.away_crime and state.energy >= self.away_threshold:
+                return self.away_crime, self.away_threshold
+            return None, 0
+        if state.energy >= self.primary_threshold:
+            return self.primary_crime, self.primary_threshold
+        return None, 0
 
     def can_run(self, state: GameState) -> bool:
         if not state.logged_in:
             return False
         if time.monotonic() < self._cooldown_until:
             return False
-        return self._pick_crime(state) is not None
+        crime, _ = self._pick_crime(state)
+        return crime is not None
 
     def run(self, state: GameState, executor):
-        crime = self._pick_crime(state)
+        crime, threshold = self._pick_crime(state)
         if not crime:
             return
-        executor.execute(Action("do_crime", crime=crime, threshold=self.primary_threshold), state)
+        executor.execute(Action("do_crime", crime=crime, threshold=threshold), state)
         if getattr(state, "_agg_targets_exhausted", False):
             self._cooldown_until = time.monotonic() + COOLDOWN_SECONDS
             state._agg_targets_exhausted = False
