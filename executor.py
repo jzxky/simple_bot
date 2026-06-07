@@ -2,6 +2,7 @@
 ActionExecutor: maps Action.kind to handler functions that drive the browser.
 """
 
+import json
 import re
 import time
 from bs4 import BeautifulSoup
@@ -16,6 +17,10 @@ CRIME_URL = "https://mafiamatrix.com/income/agcrime.asp"
 EARN_URL = "https://mafiamatrix.com/income/earn.asp"
 CS_URL = "https://mafiamatrix.com/income/communityservice.asp"
 TRANSFER_URL = "https://mafiamatrix.com/income/bank.asp?option=transfers"
+USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
+
+ONLINE_CRIMES = {"pickpocket", "mugging"}
+RESIDENT_CRIMES = {"hack", "breaking"}
 
 QUEUE_MIN = 10
 QUEUE_MAX = 200
@@ -137,22 +142,124 @@ def handle_check_earns(action: Action, state: GameState):
     state.add_log("Earn queue topped up.")
 
 
-def handle_select_crime(action: Action, state: GameState):
-    crime = action.params["crime"]
+def _get_online_local_players(state: GameState) -> list:
+    """Parse the who's online sidebar from the current page HTML."""
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    cell = soup.find("div", id="whosonlinecell")
+    if not cell:
+        return []
+    players = []
+    for a in cell.find_all("a"):
+        parts = a.get("id", "").split(":")
+        if len(parts) < 3:
+            continue
+        name, status = parts[1], parts[2]
+        if status == "In-Jail" or name == state.own_name:
+            continue
+        players.append(name)
+    return players
+
+
+def _get_city_residents(city: str, own_name: str) -> list:
+    """Fetch all players whose home city matches, via updateusers.php."""
+    browser.page().goto(USERS_URL, wait_until="domcontentloaded", timeout=15000)
+    text = browser.page().inner_text("body")
+    try:
+        data = json.loads(text)
+    except Exception:
+        return []
+    return [
+        p["userName"] for p in data
+        if p.get("userHomeCity") == city and p.get("userName") != own_name
+    ]
+
+
+def _nav_to_target_input(crime: str, state: GameState) -> bool:
+    """Navigate to agcrime.asp, select crime, submit — returns True if text input found."""
     page = browser.page()
-    browser.set_mobile_ua()
     _nav(CRIME_URL, state)
-
-    if not _check_session(state):
-        browser.clear_mobile_ua()
-        return
-
-    # Select the radio by name=agcrime and the configured value
     page.check(f"input[name='agcrime'][value='{crime}']")
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
-    _refresh_state(state)
-    state.add_log(f"Selected crime: {crime} — awaiting target selection page.")
+    return bool(page.query_selector("input[type='text']"))
+
+
+def handle_do_crime(action: Action, state: GameState):
+    crime = action.params["crime"]
+    page = browser.page()
+
+    if crime in ONLINE_CRIMES:
+        targets = _get_online_local_players(state)
+        state.add_log(f"Online local targets: {len(targets)}")
+    else:
+        targets = _get_city_residents(state.current_city, state.own_name)
+        state.add_log(f"City resident targets: {len(targets)}")
+
+    if not targets:
+        state.add_log(f"No targets found for {crime}, skipping.")
+        return
+
+    if not _nav_to_target_input(crime, state):
+        state.add_log("Target input not found after crime selection. Aborting.")
+        return
+    if not _check_session(state):
+        return
+    state.add_log(f"Selected crime: {crime}")
+
+    for player in targets:
+        if not page.query_selector("input[type='text']"):
+            if not _nav_to_target_input(crime, state):
+                state.add_log("Lost target input mid-loop. Aborting.")
+                return
+
+        page.fill("input[type='text']", player)
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+
+        result_soup = BeautifulSoup(page.content(), "html.parser")
+
+        success_div = result_soup.find("div", id="success")
+        if success_div:
+            msg = success_div.get_text(strip=True)
+            state.add_log(f"Crime success vs {player}: {msg}")
+            amounts = re.findall(r"\$([\d,]+)", msg)
+            stolen = int(amounts[0].replace(",", "")) if amounts else 0
+            if stolen > 0:
+                state._last_crime_victim = player
+                state._last_crime_amount = stolen
+                state.add_log(f"Stolen: ${stolen:,} from {player}")
+            return
+
+        fail_div = result_soup.find("div", id="fail")
+        if fail_div:
+            fail_msg = fail_div.get_text(strip=True)
+            if "weapon" in fail_msg.lower():
+                state.add_log("Weapon required — equipping and retrying.")
+                handle_check_weapon(Action("check_weapon", crime=crime), state)
+                if not _nav_to_target_input(crime, state):
+                    return
+                page.fill("input[type='text']", player)
+                page.click("input[type='submit'][name='B1']")
+                page.wait_for_load_state("domcontentloaded")
+                _refresh_state(state)
+                result_soup = BeautifulSoup(page.content(), "html.parser")
+                success_div = result_soup.find("div", id="success")
+                if success_div:
+                    msg = success_div.get_text(strip=True)
+                    state.add_log(f"Crime success vs {player}: {msg}")
+                    amounts = re.findall(r"\$([\d,]+)", msg)
+                    stolen = int(amounts[0].replace(",", "")) if amounts else 0
+                    if stolen > 0:
+                        state._last_crime_victim = player
+                        state._last_crime_amount = stolen
+                        state.add_log(f"Stolen: ${stolen:,} from {player}")
+                    return
+                continue
+            state.add_log(f"Crime failed vs {player}, trying next.")
+            continue
+
+    state.add_log("All targets exhausted.")
 
 
 def handle_check_weapon(action: Action, state: GameState):
@@ -230,88 +337,6 @@ def handle_check_weapon(action: Action, state: GameState):
     # Signal crime task to skip by marking no weapon — handled by AggCrimeTask resetting
 
 
-def _get_to_target_page(crime: str, state: GameState):
-    page = browser.page()
-    _nav(CRIME_URL, state)
-    page.check(f"input[name='agcrime'][value='{crime}']")
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
-
-
-def handle_iterate_crime(action: Action, state: GameState):
-    crime = action.params["crime"]
-    page = browser.page()
-
-    if not page.query_selector("select"):
-        state.add_log("Target list not found — re-navigating to target page.")
-        _get_to_target_page(crime, state)
-        if not page.query_selector("select"):
-            state.add_log("Could not reach target selection page. Aborting.")
-            browser.clear_mobile_ua()
-            return
-
-    soup = BeautifulSoup(page.content(), "html.parser")
-    select = soup.find("select")
-    options = [o["value"] for o in select.find_all("option")
-               if o.get("value") and o.get_text(strip=True) != "Please Select..."]
-
-    for player in options:
-        if player == state.own_name:
-            continue
-
-        page.select_option("select", player)
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
-        _refresh_state(state)
-
-        result_soup = BeautifulSoup(page.content(), "html.parser")
-
-        success_div = result_soup.find("div", id="success")
-        if success_div:
-            msg = success_div.get_text(strip=True)
-            state.add_log(f"Crime success vs {player}: {msg}")
-            amounts = re.findall(r"\$([\d,]+)", msg)
-            stolen = int(amounts[0].replace(",", "")) if amounts else 0
-            if stolen > 0:
-                state._last_crime_victim = player
-                state._last_crime_amount = stolen
-                state.add_log(f"Stolen: ${stolen:,} from {player}")
-            browser.clear_mobile_ua()
-            return
-
-        fail_div = result_soup.find("div", id="fail")
-        if fail_div:
-            fail_msg = fail_div.get_text(strip=True)
-            if "weapon" in fail_msg.lower():
-                state.add_log("Weapon required — equipping and retrying.")
-                handle_check_weapon(Action("check_weapon", crime=crime), state)
-                _get_to_target_page(crime, state)
-                if page.query_selector("select"):
-                    page.select_option("select", player)
-                    page.click("input[type='submit'][name='B1']")
-                    page.wait_for_load_state("domcontentloaded")
-                    _refresh_state(state)
-                    result_soup = BeautifulSoup(page.content(), "html.parser")
-                    success_div = result_soup.find("div", id="success")
-                    if success_div:
-                        msg = success_div.get_text(strip=True)
-                        state.add_log(f"Crime success vs {player}: {msg}")
-                        amounts = re.findall(r"\$([\d,]+)", msg)
-                        stolen = int(amounts[0].replace(",", "")) if amounts else 0
-                        if stolen > 0:
-                            state._last_crime_victim = player
-                            state._last_crime_amount = stolen
-                            state.add_log(f"Stolen: ${stolen:,} from {player}")
-                        browser.clear_mobile_ua()
-                        return
-                continue
-            state.add_log(f"Crime failed vs {player}, trying next.")
-            if not page.query_selector("select"):
-                _get_to_target_page(crime, state)
-            continue
-
-    browser.clear_mobile_ua()
-    state.add_log("All targets failed or exhausted.")
 
 
 def handle_payback(action: Action, state: GameState):
@@ -405,9 +430,8 @@ def handle_career_training(action: Action, state: GameState):
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
-    "select_crime": handle_select_crime,
+    "do_crime": handle_do_crime,
     "check_weapon": handle_check_weapon,
-    "iterate_crime": handle_iterate_crime,
     "payback": handle_payback,
     "do_community_service": handle_community_service,
     "do_career_training": handle_career_training,
