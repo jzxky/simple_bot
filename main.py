@@ -1,13 +1,23 @@
 """
-Entry point. Starts the Flask UI (which also controls the bot).
-Open http://localhost:5000 in your browser.
+Entry point. Starts the Flask UI then opens the control panel in the default browser.
 """
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(__file__))
+import threading
+import webbrowser
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from ui.app import run
+PORT = 8080
+
+
+def _open_browser():
+    import time
+    time.sleep(1.5)
+    webbrowser.open(f"http://localhost:{PORT}")
+
 
 if __name__ == "__main__":
+    threading.Thread(target=_open_browser, daemon=True).start()
+    from ui.app import run
     run()

@@ -1,9 +1,10 @@
 import json
 import os
 import threading
+import paths
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
-ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
+CONFIG_PATH = os.path.join(paths.data_dir(), "config.json")
+ENV_PATH = os.path.join(paths.data_dir(), ".env")
 
 DEFAULT_CONFIG = {
     "earns": {

@@ -10,8 +10,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from flask import Flask, render_template, request, jsonify
 import config as cfg
 import bot
+import paths
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
+_ui_root = os.path.join(paths.resource_dir(), "ui")
+app = Flask(__name__,
+            template_folder=os.path.join(_ui_root, "templates"),
+            static_folder=os.path.join(_ui_root, "static"))
 
 
 @app.route("/")

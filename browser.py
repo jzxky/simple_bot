@@ -9,9 +9,10 @@ the patchright-managed Chromium download.
 import os
 import sys
 import config as cfg
+import paths
 from patchright.sync_api import sync_playwright, Page, BrowserContext
 
-PROFILE_DIR = os.path.join(os.path.dirname(__file__), ".browser_profile")
+PROFILE_DIR = os.path.join(paths.data_dir(), ".browser_profile")
 CF_TIMEOUT = 20000
 
 _playwright = None
