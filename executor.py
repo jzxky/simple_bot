@@ -198,6 +198,7 @@ def _back_to_target_input(crime: str, state: GameState) -> bool:
 
 def handle_do_crime(action: Action, state: GameState):
     crime = action.params["crime"]
+    threshold = action.params.get("threshold", 0)
     page = browser.page()
 
     if crime in ONLINE_CRIMES:
@@ -219,6 +220,10 @@ def handle_do_crime(action: Action, state: GameState):
     state.add_log(f"Selected crime: {crime}")
 
     for player in targets:
+        if threshold and state.energy < threshold:
+            state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — stopping.")
+            return
+
         if not page.query_selector(_TARGET_INPUT):
             if not _back_to_target_input(crime, state):
                 state.add_log("Lost target input mid-loop. Aborting.")
@@ -354,40 +359,6 @@ def handle_check_weapon(action: Action, state: GameState):
 def handle_refresh_state(action: Action, state: GameState):
     _nav(PLAY_URL, state)
     state.add_log("State refreshed.")
-
-
-def handle_payback(action: Action, state: GameState):
-    amount = action.params["amount"]
-    target = action.params["target"]
-    page = browser.page()
-    _nav(TRANSFER_URL, state)
-
-    if not _check_session(state):
-        return
-
-    page.fill("input[name='transferamount']", str(amount))
-    page.fill("input[name='transfername']", target)
-    page.click("input[name='B1']")
-    page.wait_for_load_state("domcontentloaded")
-    _refresh_state(state)
-    state.add_log(f"Payback sent: ${amount:,} to {target}.")
-
-
-def handle_payback(action: Action, state: GameState):
-    amount = action.params["amount"]
-    target = action.params["target"]
-    page = browser.page()
-    _nav(TRANSFER_URL, state)
-
-    if not _check_session(state):
-        return
-
-    page.fill("input[name='transferamount']", str(amount))
-    page.fill("input[name='transfername']", target)
-    page.click("input[name='B1']")
-    page.wait_for_load_state("domcontentloaded")
-    _refresh_state(state)
-    state.add_log(f"Payback sent: ${amount:,} to {target}.")
 
 
 def handle_payback(action: Action, state: GameState):

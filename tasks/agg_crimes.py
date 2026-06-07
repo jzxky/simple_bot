@@ -38,7 +38,7 @@ class AggCrimeTask(Task):
         return crime is not None
 
     def run(self, state: GameState, executor):
-        crime, _ = self._pick_crime(state)
+        crime, threshold = self._pick_crime(state)
         if not crime:
             return
-        executor.execute(Action("do_crime", crime=crime), state)
+        executor.execute(Action("do_crime", crime=crime, threshold=threshold), state)
