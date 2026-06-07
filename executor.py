@@ -373,6 +373,23 @@ def handle_refresh_state(action: Action, state: GameState):
     state.add_log(f"Payback sent: ${amount:,} to {target}.")
 
 
+def handle_payback(action: Action, state: GameState):
+    amount = action.params["amount"]
+    target = action.params["target"]
+    page = browser.page()
+    _nav(TRANSFER_URL, state)
+
+    if not _check_session(state):
+        return
+
+    page.fill("input[name='transferamount']", str(amount))
+    page.fill("input[name='transfername']", target)
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log(f"Payback sent: ${amount:,} to {target}.")
+
+
 def handle_community_service(action: Action, state: GameState):
     in_home = action.params["in_home_city"]
     page = browser.page()
