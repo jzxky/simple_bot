@@ -139,6 +139,14 @@ def current_url() -> str:
     return _page.url
 
 
+def is_cloudflare_challenge() -> bool:
+    """Return True if the current page is a Cloudflare managed challenge."""
+    try:
+        return "Just a moment" in _page.title()
+    except Exception:
+        return False
+
+
 def _wait_for_cloudflare():
     """If Cloudflare challenge is present, wait for it to resolve."""
     try:
