@@ -237,7 +237,12 @@ def handle_do_crime(action: Action, state: GameState):
         return
     state.add_log(f"Selected crime: {crime}")
 
+    failed_transfers: set = set()
+
     for player in targets:
+        if player in failed_transfers:
+            continue
+
         if threshold and state.energy < threshold:
             state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — stopping.")
             return
@@ -269,17 +274,38 @@ def handle_do_crime(action: Action, state: GameState):
         fail_div = result_soup.find("div", id="fail")
         if fail_div:
             fail_msg = fail_div.get_text(strip=True)
+            state.add_log(f"Crime failed vs {player}: {fail_msg}")
             if "weapon" in fail_msg.lower():
-                state.add_log("Weapon required — weapon check disabled, skipping target.")
+                state.add_log("Weapon check disabled, skipping target.")
                 continue
+            if crime == "hack" and "increased security" in fail_msg.lower():
+                continue
+            if crime == "hack" and "no money in their account" in fail_msg.lower():
+                state.add_log(f"No money in {player}'s account — sending $1 to unlock, then retrying.")
+                if not _back_to_target_input(crime, state):
+                    state.add_log("Lost target input after no-money fail. Aborting.")
+                    return
+                ok = _do_transfer(player, 1, state)
+                if not ok:
+                    state.add_log(f"Transfer to {player} failed — skipping for this run.")
+                    failed_transfers.add(player)
+                    if not _nav_to_target_input(crime, state):
+                        state.add_log("Could not return to crime page. Aborting.")
+                        return
+                    continue
+                # Navigate back to crime page and retry this player
+                if not _nav_to_target_input(crime, state):
+                    state.add_log("Could not return to crime page after transfer. Aborting.")
+                    return
+                page.fill(_TARGET_INPUT, player)
                 page.click("input[type='submit'][name='B1']")
                 page.wait_for_load_state("domcontentloaded")
                 _refresh_state(state)
-                result_soup = BeautifulSoup(page.content(), "html.parser")
-                success_div = result_soup.find("div", id="success")
+                retry_soup = BeautifulSoup(page.content(), "html.parser")
+                success_div = retry_soup.find("div", id="success")
                 if success_div:
                     msg = success_div.get_text(strip=True)
-                    state.add_log(f"Crime success vs {player}: {msg}")
+                    state.add_log(f"Crime success vs {player} (retry): {msg}")
                     amounts = re.findall(r"\$([\d,]+)", msg)
                     stolen = int(amounts[0].replace(",", "")) if amounts else 0
                     if stolen > 0:
@@ -287,12 +313,9 @@ def handle_do_crime(action: Action, state: GameState):
                         state._last_crime_amount = stolen
                         state.add_log(f"Stolen: ${stolen:,} from {player}")
                     return
-                fail_div2 = result_soup.find("div", id="fail")
-                if fail_div2:
-                    state.add_log(f"Crime failed vs {player} (after weapon equip): {fail_div2.get_text(strip=True)}")
-                continue
-            state.add_log(f"Crime failed vs {player}: {fail_msg}")
-            if crime == "hack" and "increased security" in fail_msg.lower():
+                retry_fail = retry_soup.find("div", id="fail")
+                if retry_fail:
+                    state.add_log(f"Retry failed vs {player}: {retry_fail.get_text(strip=True)}")
                 continue
             if crime in ("pickpocket", "mugging", "breaking") and "recently survived" in fail_msg.lower():
                 continue
@@ -478,17 +501,26 @@ def handle_career_training(action: Action, state: GameState):
     state.add_log(f"Career training submitted for {career}.")
 
 
-def _do_transfer(recipient: str, amount: int, state: GameState):
+def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
+    """Returns True if transfer succeeded, False otherwise."""
     page = browser.page()
     _nav(TRANSFER_URL, state)
     if not _check_session(state):
-        return
+        return False
     page.fill("input[name='transferamount']", str(amount))
     page.fill("input[name='transfername']", recipient)
     page.click("input[name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
-    state.add_log(f"Payback sent: ${amount:,} to {recipient}.")
+    soup = BeautifulSoup(page.content(), "html.parser")
+    success = soup.find("div", id="success")
+    if success:
+        state.add_log(f"Transfer sent: ${amount:,} to {recipient}.")
+        return True
+    fail = soup.find("div", id="fail")
+    msg = fail.get_text(strip=True) if fail else "Unknown error"
+    state.add_log(f"Transfer failed to {recipient}: {msg}")
+    return False
 
 
 def _payback_public_business(business_name: str, amount: int, state: GameState):
