@@ -27,6 +27,7 @@ class GameState:
     bot_running: bool = False
     last_error: str = ""
     log: list = field(default_factory=list)
+    timers: dict = field(default_factory=dict)
 
     def in_home_city(self) -> bool:
         return self.current_city != "" and self.current_city == self.home_city
@@ -88,39 +89,40 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
         except (ValueError, TypeError):
             s.energy = 0
 
-    # AggPro timer
-    agg_div = soup.find("div", class_="aggprotimer")
-    if agg_div:
-        agg_span = agg_div.find("span", class_="donation_timer")
-        if agg_span:
-            ready_span = agg_span.find("span", style=lambda v: v and "00bb01" in v)
+    # All timers from #user_timers_holder
+    timers = {}
+    holder = soup.find("div", id="user_timers_holder")
+    if holder:
+        for form in holder.find_all("form"):
+            name = form.get("name", "")
+            if not name:
+                continue
+            span = form.find("span", class_="donation_timer")
+            if not span:
+                continue
+            ready_span = span.find("span", style=lambda v: v and "00bb01" in v)
             if ready_span:
-                s.agg_pro_active = False
-                s.agg_pro_end = None
+                timers[name] = {"ready": True, "end": None}
             else:
-                s.agg_pro_active = True
-                end_str = agg_span.get("data-date-end", "")
+                end_str = span.get("data-date-end", "")
+                end_dt = None
                 if end_str:
                     try:
-                        s.agg_pro_end = datetime.strptime(end_str.strip(), SERVER_TIME_FMT)
+                        end_dt = datetime.strptime(end_str.strip(), SERVER_TIME_FMT)
                     except ValueError:
-                        s.agg_pro_end = None
+                        pass
+                timers[name] = {"ready": False, "end": end_dt}
+    s.timers = timers
 
-    # Action timer
-    timer_span = soup.find("span", class_="donation_timer")
-    if timer_span:
-        ready_span = timer_span.find("span", style=lambda v: v and "00bb01" in v)
-        if ready_span and "Ready" in ready_span.get_text():
-            s.action_timer_ready = True
-            s.action_timer_end = None
-        else:
-            s.action_timer_ready = False
-            end_str = timer_span.get("data-date-end", "")
-            if end_str:
-                try:
-                    s.action_timer_end = datetime.strptime(end_str.strip(), SERVER_TIME_FMT)
-                except ValueError:
-                    s.action_timer_end = None
+    # Derive action timer fields from timers dict
+    action_t = timers.get("action", {})
+    s.action_timer_ready = action_t.get("ready", False)
+    s.action_timer_end = action_t.get("end")
+
+    # Derive aggpro fields from timers dict
+    aggpro_t = timers.get("aggpro", {})
+    s.agg_pro_active = not aggpro_t.get("ready", True)
+    s.agg_pro_end = aggpro_t.get("end")
 
     # Login state
     s.logged_in = "default.asp" not in url or "loggedin" in url
