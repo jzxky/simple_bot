@@ -5,6 +5,7 @@ ActionExecutor: maps Action.kind to handler functions that drive the browser.
 import json
 import re
 import time
+import config as cfg
 from bs4 import BeautifulSoup
 from tasks.base import Action
 from state import GameState, parse_state
@@ -123,6 +124,24 @@ def handle_check_earns(action: Action, state: GameState):
     _nav(EARN_URL, state)
 
     if not _check_session(state):
+        return
+
+    # Check the earn is available (non-red option) before doing anything
+    earn_soup = BeautifulSoup(page.content(), "html.parser")
+    earn_div = earn_soup.find("div", class_="earn-option", attrs={"data-earn": earn_type})
+    if earn_div:
+        span = earn_div.find("span")
+        color = (span.get("style") or "") if span else ""
+        unavailable = "color: #FF0" in color or (span and span.find("s") is not None)
+    else:
+        unavailable = True
+
+    if unavailable:
+        earn_name = earn_div.find("span").get_text(strip=True) if earn_div else earn_type
+        state.add_log(f"Earn '{earn_name}' is not available — disabling earns. Select a new earn and save to re-enable.")
+        c = cfg.load()
+        c["earns"]["enabled"] = False
+        cfg.save(c)
         return
 
     # Enable AUTO mode — check if the auto panel is hidden, if so click the knob to toggle
