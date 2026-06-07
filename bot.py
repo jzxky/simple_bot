@@ -21,6 +21,7 @@ from tasks.community_service import CommunityServiceTask
 from tasks.career_training import CareerTrainingTask
 from tasks.away_action import AwayActionTask
 from tasks.refresh import RefreshTask
+from tasks.consume import ConsumeTask
 
 _thread: threading.Thread = None
 _stop_event = threading.Event()
@@ -28,6 +29,7 @@ _pause_event = threading.Event()
 _reload_event = threading.Event()
 _screenshot_request: queue.Queue = queue.Queue(maxsize=1)
 _screenshot_result: queue.Queue = queue.Queue(maxsize=1)
+_consume_queue: queue.Queue = queue.Queue()
 state = GameState()
 
 
@@ -74,6 +76,7 @@ def _build_scheduler(c: dict) -> Scheduler:
         sched.add(AwayActionTask(action_type=away_cfg.get("type", "drug_manufacturing")))
 
     sched.add(RefreshTask(interval_seconds=60))
+    sched.add(ConsumeTask(_consume_queue))
 
     return sched
 
@@ -219,6 +222,10 @@ def is_paused() -> bool:
 
 def request_reload():
     _reload_event.set()
+
+
+def request_consume(consume_type: str):
+    _consume_queue.put(consume_type)
 
 
 def request_screenshot(timeout: float = 10.0) -> bytes:
