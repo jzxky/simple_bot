@@ -5,7 +5,10 @@ Bot entry point. Builds the scheduler from config and runs the loop.
 import threading
 import time
 import queue
+import os
+from datetime import datetime
 import config as cfg
+import paths
 import browser
 from state import GameState
 from scheduler import Scheduler
@@ -75,11 +78,29 @@ def _build_scheduler(c: dict) -> Scheduler:
     return sched
 
 
+def _open_log_file() -> object:
+    logs_dir = os.path.join(paths.data_dir(), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".log"
+    return open(os.path.join(logs_dir, filename), "w", encoding="utf-8", buffering=1)
+
+
 def _run(c: dict):
     global state
     state = GameState()
     state.bot_running = True
     executor = ActionExecutor()
+    log_file = _open_log_file()
+    _orig_add_log = state.add_log
+
+    def _add_log_with_file(message: str):
+        _orig_add_log(message)
+        try:
+            log_file.write(state.log[-1] + "\n")
+        except Exception:
+            pass
+
+    state.add_log = _add_log_with_file
 
     try:
         state.add_log("Starting browser...")
@@ -156,6 +177,10 @@ def _run(c: dict):
             pass
         browser.stop()
         state.bot_running = False
+        try:
+            log_file.close()
+        except Exception:
+            pass
 
 
 def start():

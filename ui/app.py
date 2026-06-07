@@ -93,7 +93,7 @@ def status():
     return jsonify({
         "running": bot.is_running(),
         "paused": bot.is_paused(),
-        "log": s.log[-50:],
+        "log": s.log[-500:],
         "energy": s.energy,
         "action_ready": s.action_available(),
         "city": s.current_city,
