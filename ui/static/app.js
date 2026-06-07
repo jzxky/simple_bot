@@ -127,15 +127,46 @@ function updateBotState(running, paused) {
   txt.textContent = running ? (paused ? "Paused" : "Running") : "Stopped";
 }
 
+const CONSUMABLE_LABELS = {
+  marijuana: "Weed", cocaine: "Cocaine", ecstasy: "Ecstasy",
+  acid: "Acid", speed: "Speed", heroin: "Heroin", pice: "P/Ice",
+};
+
 function pollStatus() {
   fetch("/status")
     .then(r => r.json())
     .then(d => {
       updateBotState(d.running, d.paused);
-      document.getElementById("energy-val").textContent = d.energy;
+
+      // Status bar
+      document.getElementById("energy-val").textContent = d.energy ?? "--";
       document.getElementById("city-val").textContent = d.city || "--";
       document.getElementById("action-val").textContent = d.action_ready ? "Ready" : "Waiting";
 
+      // Character stats
+      document.getElementById("stat-name").textContent = d.own_name || "--";
+      document.getElementById("stat-rank").textContent = d.rank || "--";
+      document.getElementById("stat-next-rank").textContent = d.next_rank || "--";
+      document.getElementById("stat-rank-progress").textContent = d.rank_progress != null ? d.rank_progress + "%" : "--";
+      document.getElementById("stat-occupation").textContent = d.occupation || "--";
+      document.getElementById("stat-city").textContent = d.city || "--";
+      document.getElementById("stat-health").textContent = d.health != null ? d.health + "%" : "--";
+      document.getElementById("stat-energy").textContent = d.energy != null ? d.energy + "%" : "--";
+      document.getElementById("stat-earns").textContent = d.earns_24h != null ? d.earns_24h : "--";
+      document.getElementById("stat-aggpro").textContent = d.agg_pro_active ? "Active" : "Inactive";
+
+      const fmt = n => "$" + (n ?? 0).toLocaleString();
+      document.getElementById("stat-clean").textContent = d.clean_money != null ? fmt(d.clean_money) : "--";
+      document.getElementById("stat-dirty").textContent = d.dirty_money != null ? fmt(d.dirty_money) : "--";
+
+      // Consumables
+      const cons = d.consumables || {};
+      document.getElementById("stat-consumables").innerHTML =
+        Object.entries(CONSUMABLE_LABELS).map(([k, label]) =>
+          `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty">${cons[k] ?? 0}</span></div>`
+        ).join("");
+
+      // Log
       const box = document.getElementById("log-box");
       box.innerHTML = [...d.log].reverse()
         .map(l => `<div class="log-line">${escHtml(l)}</div>`)

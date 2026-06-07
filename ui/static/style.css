@@ -221,6 +221,62 @@ button {
 #screenshot-btn:hover { border-color: var(--accent); color: var(--accent); }
 #screenshot-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* Character stats card */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+}
+.stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.stat-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.stat-consumables {
+  margin-top: 4px;
+}
+.stat-consumables > .stat-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.consumables-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.consumable-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.consumable-name { color: var(--muted); }
+.consumable-qty  { color: var(--text); font-weight: 600; }
+
 /* Log */
 .log-card h2 { margin-bottom: 8px; }
 #log-box {
