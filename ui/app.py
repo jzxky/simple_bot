@@ -114,6 +114,7 @@ def status():
         "agg_pro_active": s.agg_pro_active,
         "consumables": s.consumables,
         "own_name": s.own_name,
+        "earns_enabled": cfg.load().get("earns", {}).get("enabled", True),
     })
 
 

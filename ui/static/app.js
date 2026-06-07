@@ -158,6 +158,11 @@ function pollStatus() {
     .then(d => {
       updateBotState(d.running, d.paused);
 
+      // Sync earns enabled checkbox (bot may have disabled it due to unavailable earn)
+      if (d.earns_enabled != null) {
+        document.getElementById("earns_enabled").checked = d.earns_enabled;
+      }
+
       // Status bar
       document.getElementById("energy-val").textContent = d.energy ?? "--";
       document.getElementById("city-val").textContent = d.city || "--";
