@@ -279,6 +279,8 @@ def handle_do_crime(action: Action, state: GameState):
             state.add_log(f"Crime failed vs {player}: {fail_msg}")
             if crime == "hack" and "increased security" in fail_msg.lower():
                 continue
+            if crime in ("pickpocket", "mugging", "breaking") and "recently survived" in fail_msg.lower():
+                continue
             _nav(PLAY_URL, state)
             return
 
