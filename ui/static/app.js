@@ -77,7 +77,6 @@ function saveConfig() {
     away_action_enabled: document.getElementById("away_action_enabled").checked,
     away_action_type: document.getElementById("away_action_type").value,
     payback_enabled: document.getElementById("payback_enabled").checked,
-    chrome_path: document.getElementById("chrome_path").value,
   };
 
   fetch("/save", {

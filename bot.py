@@ -76,12 +76,6 @@ def _run(c: dict):
         state.add_log("Starting browser...")
         browser.start()
         state.add_log("Browser started.")
-    except browser.ChromeNotFoundError as e:
-        state.add_log(f"ERROR: {e}")
-        state.add_log("Download Chrome from https://www.google.com/chrome or set a custom path in Bot Config settings.")
-        state.last_error = str(e)
-        state.bot_running = False
-        return
     except Exception as e:
         state.add_log(f"Browser failed to start: {e}")
         state.last_error = str(e)

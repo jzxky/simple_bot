@@ -150,7 +150,6 @@
         <button class="tab-btn" onclick="showTab('promotion', this)">Promotion</button>
         <button class="tab-btn" onclick="showTab('casework', this)">Case Work</button>
         <button class="tab-btn" onclick="showTab('jail', this)">Jail</button>
-        <button class="tab-btn" onclick="showTab('bot-config', this)">Bot Config</button>
       </div>
 
       <div id="agg-settings" class="tab-panel active">
@@ -168,13 +167,6 @@
       <div id="promotion" class="tab-panel"><p class="placeholder">Promotion settings — coming soon.</p></div>
       <div id="casework"  class="tab-panel"><p class="placeholder">Case work settings — coming soon.</p></div>
       <div id="jail"      class="tab-panel"><p class="placeholder">Jail settings — coming soon.</p></div>
-      <div id="bot-config" class="tab-panel">
-        <div class="row">
-          <label style="flex:1;">Custom Chrome path <span class="muted">(leave blank to auto-detect)</span>
-            <input type="text" id="chrome_path" placeholder="e.g. /usr/bin/google-chrome" value="{{ config.get('bot_config', {}).get('chrome_path', '') }}">
-          </label>
-        </div>
-      </div>
     </section>
 
     <!-- Controls -->
