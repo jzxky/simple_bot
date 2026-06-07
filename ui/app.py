@@ -51,9 +51,6 @@ def save():
 
     c["payback_enabled"] = data.get("payback_enabled", False)
 
-    c.setdefault("bot_config", {})
-    c["bot_config"]["chrome_path"] = data.get("chrome_path", "")
-
     cfg.save(c)
     return jsonify({"ok": True})
 
