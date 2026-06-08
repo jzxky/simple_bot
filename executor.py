@@ -209,6 +209,11 @@ def handle_clear_earn_queue(action: Action, state: GameState):
     _refresh_state(state)
     state.add_log("Earn queue cleared.")
 
+    c = cfg.load()
+    if c.get("earns", {}).get("enabled", False):
+        earn_type = c["earns"].get("earn_type", "surgeon")
+        handle_check_earns(Action("check_earns", earn_type=earn_type), state)
+
 
 def _get_online_local_players(state: GameState) -> list:
     """Parse the who's online sidebar from the current page HTML."""
@@ -458,7 +463,6 @@ def handle_consume(action: Action, state: GameState):
 
 def handle_refresh_state(action: Action, state: GameState):
     _nav(PLAY_URL, state)
-    state.add_log(f"Energy: {state.energy}%")
 
 
 def handle_payback(action: Action, state: GameState):

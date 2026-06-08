@@ -75,6 +75,7 @@ header h1 {
   display: flex;
   align-items: center;
   gap: 10px;
+  justify-content: space-between;
 }
 
 .card h3 {
@@ -89,6 +90,7 @@ header h1 {
   display: flex;
   align-items: center;
   gap: 10px;
+  justify-content: space-between;
 }
 .card h3:first-of-type { margin-top: 0; }
 

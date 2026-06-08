@@ -187,9 +187,9 @@ function pollStatus() {
       // Consumables
       const cons = d.consumables || {};
       document.getElementById("stat-consumables").innerHTML =
-        Object.entries(CONSUMABLE_LABELS).map(([k, label]) =>
-          `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty ${_botRunning ? 'consumable-link' : ''}" onclick="${_botRunning ? `consumeItem('${k}')` : ''}">${cons[k] ?? 0}</span></div>`
-        ).join("");
+        Object.entries(CONSUMABLE_LABELS).filter(([k]) => (cons[k] ?? 0) > 0).map(([k, label]) =>
+          `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty ${_botRunning ? 'consumable-link' : ''}" onclick="${_botRunning ? `consumeItem('${k}')` : ''}">${cons[k]}</span></div>`
+        ).join("") || '<span class="placeholder">No consumables</span>';
 
       // Timers
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active);
