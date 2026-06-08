@@ -21,6 +21,7 @@ from tasks.community_service import CommunityServiceTask
 from tasks.career_training import CareerTrainingTask
 from tasks.fire_duties import FireDutiesTask
 from tasks.drug_manufacturing import DrugManufacturingTask
+from tasks.case_work import HospitalCaseWorkTask
 from tasks.away_action import AwayActionTask
 from tasks.refresh import RefreshTask
 from tasks.consume import ConsumeTask
@@ -78,6 +79,10 @@ def _build_scheduler(c: dict) -> Scheduler:
             sched.add(FireDutiesTask())
         elif action_type == "drug_manufacturing":
             sched.add(DrugManufacturingTask())
+
+    cw_cfg = c.get("case_work", {})
+    if cw_cfg.get("hospital_enabled", False):
+        sched.add(HospitalCaseWorkTask(poll_interval=cw_cfg.get("hospital_poll_interval", 31)))
 
     away_cfg = c.get("away_action", {})
     if away_cfg.get("enabled", False):

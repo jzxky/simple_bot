@@ -90,6 +90,8 @@ function saveConfig() {
     payback_enabled: document.getElementById("payback_enabled").checked,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
+    hospital_enabled: document.getElementById("hospital_enabled").checked,
+    hospital_poll_interval: parseInt(document.getElementById("hospital_poll_interval").value) || 31,
   };
 
   return fetch("/save", {

@@ -62,6 +62,10 @@ def save():
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
 
+    c.setdefault("case_work", {})
+    c["case_work"]["hospital_enabled"] = data.get("hospital_enabled", False)
+    c["case_work"]["hospital_poll_interval"] = int(data.get("hospital_poll_interval", 31))
+
     cfg.save(c)
     if bot.is_running():
         bot.request_reload()
