@@ -129,6 +129,10 @@ input:focus, select:focus {
 }
 select option { background: var(--surface2); }
 
+/* Push toggles to the right edge when inside headings */
+.card h2 .toggle-label,
+.card h3 .toggle-label { margin-left: auto; }
+
 /* Toggle switch */
 .toggle-label {
   display: flex;
@@ -258,23 +262,37 @@ button {
 .stat-timer-value { color: var(--accent); font-variant-numeric: tabular-nums; }
 
 .consumables-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 6px;
+  margin-bottom: 12px;
 }
 .consumable-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 4px;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: 7px 10px;
+  min-height: 52px;
+  text-align: center;
 }
-.consumable-name { color: var(--muted); }
-.consumable-qty  { color: var(--text); font-weight: 600; }
-.consumable-link { color: var(--gold); cursor: pointer; text-decoration: underline; }
+.consumable-name {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.consumable-qty {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+.consumable-link { cursor: pointer; text-decoration: underline; color: var(--accent); }
 
 /* Inline action buttons inside cards */
 .action-btn {
@@ -293,13 +311,13 @@ button {
 .action-btn:hover { border-color: var(--accent); color: var(--accent); }
 .action-btn:disabled { opacity: 0.5; cursor: default; }
 
-/* Character name in header */
+/* Character name in header — matches h2 style */
 .stat-name-header {
-  font-weight: 400;
+  font-weight: 700;
   font-size: 13px;
-  color: var(--text);
-  text-transform: none;
-  letter-spacing: 0;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
 }
 
 /* Settings groups — 2 col desktop, 1 col mobile */
