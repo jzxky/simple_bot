@@ -832,6 +832,9 @@ def handle_check_hospital_cases(action: Action, state: GameState):
         cells = row.find_all("td", class_="display_border")
         if len(cells) < 4:
             continue
+        patient_name = cells[0].get_text(strip=True)
+        if state.own_name and patient_name.lower() == state.own_name.lower():
+            continue
         injury = cells[1].get_text(strip=True)
         task_type = _hospital_injury_to_type(injury)
         link = cells[3].find("a", href=lambda h: h and "display=surgery" in h)
