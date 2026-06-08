@@ -7,8 +7,39 @@
 <link rel="stylesheet" href="/static/style.css">
 <style>
   .filter-bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-  .filter-bar input[type="text"] { max-width:280px; }
-  .filter-bar label { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted); white-space:nowrap; cursor:pointer; }
+  .filter-bar input[type="text"] { max-width:280px; flex:1; min-width:120px; }
+  .filter-bar .inline-toggle { white-space:nowrap; }
+
+  /* Hide low-priority columns on mobile */
+  @media (max-width: 600px) {
+    .col-homecity, .col-rank { display:none; }
+  }
+
+  /* Sortable column headers */
+  .priority-table th[data-col] { cursor:pointer; user-select:none; white-space:nowrap; }
+  .priority-table th[data-col]:hover { color:var(--accent); }
+  .sort-arrow { margin-left:4px; opacity:0.5; font-size:10px; }
+  .sort-arrow.active { opacity:1; color:var(--accent); }
+
+  /* Column filter row */
+  .priority-table .col-filter-row th { padding:4px 6px; }
+  .priority-table .col-filter-row input {
+    width:100%; box-sizing:border-box;
+    background:var(--bg-card); color:var(--text);
+    border:1px solid var(--border); border-radius:3px;
+    padding:3px 5px; font-size:11px;
+  }
+
+  /* Import card collapsible */
+  .import-toggle-row {
+    display:flex; align-items:center; justify-content:space-between;
+    cursor:pointer; user-select:none;
+  }
+  .import-toggle-row h2 { margin:0; }
+  .import-chevron { font-size:16px; color:var(--text-muted); transition:transform 0.2s; }
+  .import-chevron.open { transform:rotate(180deg); }
+  .import-body { display:none; margin-top:12px; }
+  .import-body.open { display:block; }
 
   .import-card textarea {
     width:100%; box-sizing:border-box;
@@ -40,23 +71,28 @@
   </header>
 
   <main>
-    <!-- Import tool -->
+    <!-- Import tool (collapsible) -->
     <section class="card import-card">
-      <h2>Import List</h2>
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Paste one username per line. Matched players will be assigned to the selected list and context.</p>
-      <textarea id="import-text" placeholder="Player1&#10;Player2&#10;Player3"></textarea>
-      <div class="import-row">
-        <select id="import-context">
-          <option value="agg_crimes">Aggravated Crimes</option>
-          <option value="case_work">Case Work</option>
-        </select>
-        <select id="import-assignment">
-          <option value="whitelist">Whitelist</option>
-          <option value="blacklist">Blacklist</option>
-        </select>
-        <button class="action-btn" onclick="runImport()">Import</button>
+      <div class="import-toggle-row" onclick="toggleImport()">
+        <h2>Import List</h2>
+        <span class="import-chevron" id="import-chevron">▼</span>
       </div>
-      <div id="import-report" class="import-report" style="display:none"></div>
+      <div class="import-body" id="import-body">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Paste one username per line. Matched players will be assigned to the selected list and context.</p>
+        <textarea id="import-text" placeholder="Player1&#10;Player2&#10;Player3"></textarea>
+        <div class="import-row">
+          <select id="import-context">
+            <option value="agg_crimes">Aggravated Crimes</option>
+            <option value="case_work">Case Work</option>
+          </select>
+          <select id="import-assignment">
+            <option value="whitelist">Whitelist</option>
+            <option value="blacklist">Blacklist</option>
+          </select>
+          <button class="action-btn" onclick="runImport()">Import</button>
+        </div>
+        <div id="import-report" class="import-report" style="display:none"></div>
+      </div>
     </section>
 
     <!-- Player table -->
@@ -69,22 +105,32 @@
       </div>
 
       <div class="filter-bar">
-        <input type="text" id="search" placeholder="Search players..." oninput="filterTable()">
-        <label>
-          <input type="checkbox" id="hide-unemployed" onchange="filterTable()">
+        <input type="text" id="search" placeholder="Search players..." oninput="applyFilters()">
+        <label class="inline-toggle">
           Hide unemployed
+          <label class="toggle-label">
+            <input type="checkbox" id="hide-unemployed" onchange="applyFilters()">
+            <span class="toggle"></span>
+          </label>
         </label>
       </div>
 
-      {% macro player_table(context) %}
-      <table class="priority-table" style="font-size:12px">
+      {% macro player_table(context, tid) %}
+      <table class="priority-table" style="font-size:12px" id="{{ tid }}">
         <thead>
           <tr>
-            <th style="width:160px">Username</th>
-            <th>Home City</th>
-            <th>Occupation</th>
-            <th>Rank</th>
-            <th style="width:130px">Assignment</th>
+            <th data-col="name" style="width:160px">Username <span class="sort-arrow" id="{{ tid }}-arrow-name">▲</span></th>
+            <th data-col="homecity" class="col-homecity">Home City <span class="sort-arrow" id="{{ tid }}-arrow-homecity">▲</span></th>
+            <th data-col="occupation">Occupation <span class="sort-arrow" id="{{ tid }}-arrow-occupation">▲</span></th>
+            <th data-col="rank" class="col-rank">Rank <span class="sort-arrow" id="{{ tid }}-arrow-rank">▲</span></th>
+            <th data-col="assignment" style="width:130px">Assignment <span class="sort-arrow" id="{{ tid }}-arrow-assignment">▲</span></th>
+          </tr>
+          <tr class="col-filter-row">
+            <th><input type="text" placeholder="Name…" oninput="applyFilters()" data-filter="name"></th>
+            <th class="col-homecity"><input type="text" placeholder="City…" oninput="applyFilters()" data-filter="homecity"></th>
+            <th><input type="text" placeholder="Occupation…" oninput="applyFilters()" data-filter="occupation"></th>
+            <th class="col-rank"><input type="text" placeholder="Rank…" oninput="applyFilters()" data-filter="rank"></th>
+            <th><input type="text" placeholder="Assignment…" oninput="applyFilters()" data-filter="assignment"></th>
           </tr>
         </thead>
         <tbody>
@@ -92,13 +138,16 @@
           {% if p.active %}
           <tr class="player-row"
               data-name="{{ name | lower }}"
-              data-occupation="{{ p.occupation | lower }}">
+              data-homecity="{{ p.homecity | lower }}"
+              data-occupation="{{ p.occupation | lower }}"
+              data-rank="{{ p.rank | lower }}"
+              data-assignment="{{ lists[context].get(name, '') | lower }}">
             <td>{{ name }}</td>
-            <td>{{ p.homecity }}</td>
+            <td class="col-homecity">{{ p.homecity }}</td>
             <td>{{ p.occupation }}</td>
-            <td>{{ p.rank }}</td>
+            <td class="col-rank">{{ p.rank }}</td>
             <td>
-              <select class="cw-select" onchange="setAssignment('{{ name }}', '{{ context }}', this.value)">
+              <select class="cw-select" onchange="setAssignment('{{ name }}', '{{ context }}', this.value, this)">
                 <option value="" {% if lists[context].get(name, '') == '' %}selected{% endif %}>None</option>
                 <option value="whitelist" {% if lists[context].get(name) == 'whitelist' %}selected{% endif %}>Whitelist</option>
                 <option value="blacklist" {% if lists[context].get(name) == 'blacklist' %}selected{% endif %}>Blacklist</option>
@@ -112,35 +161,85 @@
       {% endmacro %}
 
       <div id="tab-agg" class="tab-panel active">
-        {{ player_table("agg_crimes") }}
+        {{ player_table("agg_crimes", "tbl-agg") }}
       </div>
       <div id="tab-casework" class="tab-panel">
-        {{ player_table("case_work") }}
+        {{ player_table("case_work", "tbl-cw") }}
       </div>
     </section>
   </main>
 </div>
 
 <script>
+// ── Tab switching ────────────────────────────────────────────────────────────
 function showTab(id, btn) {
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   btn.classList.add("active");
-  filterTable();
+  applyFilters();
 }
 
-function filterTable() {
-  const q = document.getElementById("search").value.toLowerCase();
+// ── Filtering ────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const globalQ = document.getElementById("search").value.toLowerCase();
   const hideUnemployed = document.getElementById("hide-unemployed").checked;
-  document.querySelectorAll(".tab-panel.active .player-row").forEach(row => {
-    const nameMatch = row.dataset.name.includes(q);
-    const isUnemployed = row.dataset.occupation === "unemployed";
-    row.style.display = (nameMatch && !(hideUnemployed && isUnemployed)) ? "" : "none";
+
+  const panel = document.querySelector(".tab-panel.active");
+  if (!panel) return;
+
+  // Collect per-column filters
+  const colFilters = {};
+  panel.querySelectorAll(".col-filter-row input[data-filter]").forEach(inp => {
+    colFilters[inp.dataset.filter] = inp.value.toLowerCase();
+  });
+
+  panel.querySelectorAll(".player-row").forEach(row => {
+    const d = row.dataset;
+    if (hideUnemployed && d.occupation === "unemployed") { row.style.display = "none"; return; }
+    if (globalQ && !d.name.includes(globalQ)) { row.style.display = "none"; return; }
+    for (const [col, q] of Object.entries(colFilters)) {
+      if (q && !(d[col] || "").includes(q)) { row.style.display = "none"; return; }
+    }
+    row.style.display = "";
   });
 }
 
-function setAssignment(username, context, value) {
+// ── Sorting ──────────────────────────────────────────────────────────────────
+const _sortState = {};
+
+function initSortHeaders() {
+  document.querySelectorAll(".priority-table th[data-col]").forEach(th => {
+    th.addEventListener("click", () => {
+      const table = th.closest("table");
+      const col = th.dataset.col;
+      const tid = table.id;
+      const prev = _sortState[tid] || {};
+      const asc = (prev.col === col) ? !prev.asc : true;
+      _sortState[tid] = {col, asc};
+
+      // Reset all arrows in this table
+      table.querySelectorAll(".sort-arrow").forEach(a => a.classList.remove("active"));
+      const arrow = document.getElementById(`${tid}-arrow-${col}`);
+      if (arrow) { arrow.textContent = asc ? "▲" : "▼"; arrow.classList.add("active"); }
+
+      const tbody = table.querySelector("tbody");
+      const rows = Array.from(tbody.querySelectorAll(".player-row"));
+      rows.sort((a, b) => {
+        const av = (a.dataset[col] || "").toLowerCase();
+        const bv = (b.dataset[col] || "").toLowerCase();
+        return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+      applyFilters();
+    });
+  });
+}
+
+// ── Assignment ───────────────────────────────────────────────────────────────
+function setAssignment(username, context, value, selectEl) {
+  // Update data-assignment for column filtering
+  if (selectEl) selectEl.closest("tr").dataset.assignment = value.toLowerCase();
   fetch("/players/assign", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -148,6 +247,7 @@ function setAssignment(username, context, value) {
   });
 }
 
+// ── Refresh ──────────────────────────────────────────────────────────────────
 function refreshPlayers() {
   const btn = document.getElementById("refresh-btn");
   btn.textContent = "Refreshing...";
@@ -161,6 +261,14 @@ function refreshPlayers() {
       setTimeout(() => { btn.textContent = "Refresh List"; btn.disabled = false; }, 1500);
     })
     .catch(() => { btn.textContent = "Refresh List"; btn.disabled = false; });
+}
+
+// ── Import ───────────────────────────────────────────────────────────────────
+function toggleImport() {
+  const body = document.getElementById("import-body");
+  const chevron = document.getElementById("import-chevron");
+  body.classList.toggle("open");
+  chevron.classList.toggle("open");
 }
 
 function runImport() {
@@ -191,17 +299,18 @@ function runImport() {
       }
       el.innerHTML = html;
 
-      // Refresh selects for matched names in the active tab
+      // Update selects and data-assignment for matched rows in the active tab
       if (d.assigned > 0) {
         d.matched.forEach(name => {
-          const rows = document.querySelectorAll(".tab-panel.active .player-row");
-          rows.forEach(row => {
+          document.querySelectorAll(".tab-panel.active .player-row").forEach(row => {
             if (row.dataset.name === name.toLowerCase()) {
               const sel = row.querySelector("select");
               if (sel) sel.value = assignment;
+              row.dataset.assignment = assignment.toLowerCase();
             }
           });
         });
+        applyFilters();
       }
     })
     .catch(() => {
@@ -209,6 +318,8 @@ function runImport() {
       document.getElementById("import-report").innerHTML = `<div style="color:var(--error,#f87171)">Import failed.</div>`;
     });
 }
+
+initSortHeaders();
 </script>
 </body>
 </html>
