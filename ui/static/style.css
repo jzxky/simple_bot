@@ -293,6 +293,45 @@ button {
 .action-btn:hover { border-color: var(--accent); color: var(--accent); }
 .action-btn:disabled { opacity: 0.5; cursor: default; }
 
+/* Character name in header */
+.stat-name-header {
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Settings groups — 2 col desktop, 1 col mobile */
+.settings-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 600px) {
+  .settings-groups { grid-template-columns: 1fr; }
+}
+.settings-group h3 { margin-top: 0; }
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(46, 64, 96, 0.3);
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+  min-width: unset;
+  flex-direction: row;
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-row .toggle-label { flex-shrink: 0; }
+
+/* Eye icon button */
+.eye-btn { width: 36px; padding: 0; display: flex; align-items: center; justify-content: center; }
+.eye-icon { width: 18px; height: 13px; display: block; }
+
 /* Credential field with inline show/hide button */
 .input-with-btn {
   display: flex;

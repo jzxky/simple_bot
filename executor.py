@@ -458,6 +458,7 @@ def handle_consume(action: Action, state: GameState):
 
 def handle_refresh_state(action: Action, state: GameState):
     _nav(PLAY_URL, state)
+    state.add_log(f"Energy: {state.energy}%")
 
 
 def handle_payback(action: Action, state: GameState):
