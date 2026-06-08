@@ -105,6 +105,7 @@ function saveConfig() {
 
 let _botRunning = false;
 let _botPaused = false;
+let _prevEarnsEnabled = null;
 
 function toggleBot() {
   if (_botRunning) {
@@ -158,9 +159,12 @@ function pollStatus() {
     .then(d => {
       updateBotState(d.running, d.paused);
 
-      // Sync earns enabled checkbox (bot may have disabled it due to unavailable earn)
+      // Only uncheck earns if the bot just disabled it (true→false transition)
       if (d.earns_enabled != null) {
-        document.getElementById("earns_enabled").checked = d.earns_enabled;
+        if (_prevEarnsEnabled === true && d.earns_enabled === false) {
+          document.getElementById("earns_enabled").checked = false;
+        }
+        _prevEarnsEnabled = d.earns_enabled;
       }
 
       // Status bar
