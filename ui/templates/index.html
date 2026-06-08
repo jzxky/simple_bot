@@ -222,20 +222,28 @@
             <tr><th></th><th>#</th><th>Task</th><th>Target</th></tr>
           </thead>
           <tbody id="hospital-priority-body">
+            {% set HOSPITAL_META = {
+              'bionics':    {'label': 'Fit Bionics', 'pvp': true},
+              'sex_change': {'label': 'Sex Change',  'pvp': true},
+              'flu':        {'label': 'Treat Flu',   'pvp': true},
+              'recover':    {'label': 'Recover',     'pvp': true},
+              'dna':        {'label': 'DNA Testing', 'pvp': false},
+            } %}
             {% set hosp_tasks = config.get('case_work', {}).get('hospital', {}).get('tasks', [
-              {'type':'bionics',    'label':'Fit Bionics',  'pvp':true,  'target':'all'},
-              {'type':'sex_change', 'label':'Sex Change',   'pvp':true,  'target':'all'},
-              {'type':'flu',        'label':'Treat Flu',    'pvp':true,  'target':'all'},
-              {'type':'recover',    'label':'Recover',      'pvp':true,  'target':'all'},
-              {'type':'dna',        'label':'DNA Testing',  'pvp':false, 'enabled':true},
+              {'type':'bionics',    'target':'all'},
+              {'type':'sex_change', 'target':'all'},
+              {'type':'flu',        'target':'all'},
+              {'type':'recover',    'target':'all'},
+              {'type':'dna',        'enabled':true},
             ]) %}
             {% for task in hosp_tasks %}
+            {% set meta = HOSPITAL_META.get(task.type, {'label': task.type, 'pvp': false}) %}
             <tr data-type="{{ task.type }}">
               <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
               <td class="priority-num">{{ loop.index }}</td>
-              <td>{{ task.label }}{% if task.pvp %} <span class="muted">(PvP)</span>{% endif %}</td>
+              <td>{{ meta.label }}{% if meta.pvp %} <span class="muted">(PvP)</span>{% endif %}</td>
               <td>
-                {% if task.pvp %}
+                {% if meta.pvp %}
                 <select class="cw-select" id="cw_{{ task.type }}_target">
                   {% for v, l in [('all','All'),('whitelist','Whitelist'),('not_blacklist','Not Blacklist'),('none','None')] %}
                   <option value="{{ v }}" {% if task.get('target','all') == v %}selected{% endif %}>{{ l }}</option>

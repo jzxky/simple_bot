@@ -53,11 +53,11 @@ DEFAULT_CONFIG = {
         "hospital": {
             "poll_interval": 31,
             "tasks": [
-                {"type": "bionics",    "label": "Fit Bionics", "pvp": True,  "target": "all"},
-                {"type": "sex_change", "label": "Sex Change",  "pvp": True,  "target": "all"},
-                {"type": "flu",        "label": "Treat Flu",   "pvp": True,  "target": "all"},
-                {"type": "recover",    "label": "Recover",     "pvp": True,  "target": "all"},
-                {"type": "dna",        "label": "DNA Testing", "pvp": False, "enabled": True},
+                {"type": "bionics",    "target": "all"},
+                {"type": "sex_change", "target": "all"},
+                {"type": "flu",        "target": "all"},
+                {"type": "recover",    "target": "all"},
+                {"type": "dna",        "enabled": True},
             ]
         },
         "fire": {
