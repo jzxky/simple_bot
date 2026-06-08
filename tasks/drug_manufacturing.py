@@ -11,7 +11,10 @@ class DrugManufacturingTask(Task):
     priority = 40
 
     def can_run(self, state: GameState) -> bool:
-        return state.logged_in and state.action_available() and state.in_home_city()
+        return (state.logged_in
+                and state.action_available()
+                and state.in_home_city()
+                and "gangster" in state.occupation.lower())
 
     def run(self, state: GameState, executor):
         executor.execute(Action("do_drug_manufacturing"), state)
