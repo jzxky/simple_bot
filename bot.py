@@ -56,7 +56,7 @@ def _build_scheduler(c: dict) -> Scheduler:
         pri = ac.get("primary", {})
         away = ac.get("away_crime", {})
         armed = ac.get("armed", {})
-        sched.add(AggCrimeTask(
+        agg_task = AggCrimeTask(
             primary_crime=pri.get("crime", "pickpocket"),
             primary_threshold=pri.get("energy_threshold", 50),
             away_crime=away.get("crime", "pickpocket"),
@@ -66,7 +66,9 @@ def _build_scheduler(c: dict) -> Scheduler:
             armed_payback_private=armed.get("payback_private", False),
             armed_payback_public=armed.get("payback_public", False),
             fallback_to_away=ac.get("fallback_to_away", False),
-        ))
+        )
+        agg_task.scheduler = sched
+        sched.add(agg_task)
 
     action_cfg = c.get("action", {})
     if action_cfg.get("enabled", False):

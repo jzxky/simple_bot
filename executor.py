@@ -670,74 +670,83 @@ def handle_armed_robbery(action: Action, state: GameState):
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
-    for attempt in range(ARMED_MAX_RETRIES):
-        if attempt > 0:
-            time.sleep(5)
-            page.once("dialog", lambda d: d.accept())
-            page.reload(wait_until="domcontentloaded")
-            _refresh_state(state)
+    check_other_tasks = action.params.get("check_other_tasks")
+    pass_num = 0
 
-        soup = BeautifulSoup(page.content(), "html.parser")
-        select = soup.find("select", attrs={"name": "armed"})
-        if not select:
-            state.add_log("Armed robbery: business select not found.")
-            _nav(PLAY_URL, state)
-            return
+    while True:
+        pass_num += 1
+        for attempt in range(ARMED_MAX_RETRIES):
+            if attempt > 0 or pass_num > 1:
+                time.sleep(5)
+                page.once("dialog", lambda d: d.accept())
+                page.reload(wait_until="domcontentloaded")
+                _refresh_state(state)
 
-        target = None
-        for option in select.find_all("option"):
-            raw = option.get_text(strip=True)
-            value = option.get("value", "")
-            if not value or raw.startswith("Please"):
-                continue
-            if "*" not in raw:
-                continue
-            name = raw.rstrip("*").strip()
-            is_public = name in PUBLIC_BUSINESSES
-            is_drug_house = name == "Drug House"
-            is_private = not is_public
-
-            if is_drug_house and not agg_drug_house:
-                continue
-            if is_private and not is_drug_house and not agg_private:
-                continue
-            target = (value, name, is_public, is_drug_house)
-            break
-
-        if target:
-            value, name, is_public, is_drug_house = target
-            page.select_option("select[name='armed']", value)
-            page.click("input[type='submit'][name='B1']")
-            page.wait_for_load_state("domcontentloaded")
-            _refresh_state(state)
-
-            result_soup = BeautifulSoup(page.content(), "html.parser")
-            success_div = result_soup.find("div", id="success")
-            if success_div:
-                msg = success_div.get_text(strip=True)
-                state.add_log(f"Armed robbery success ({name}): {msg}")
-                amounts = re.findall(r"\$([\d,]+)", msg)
-                stolen = int(amounts[0].replace(",", "")) if amounts else 0
-                if stolen > 0:
-                    if is_public and payback_public:
-                        _payback_public_business(name, stolen, state)
-                    elif is_private and not is_drug_house and payback_private:
-                        _payback_private_business(name, stolen, state)
+            soup = BeautifulSoup(page.content(), "html.parser")
+            select = soup.find("select", attrs={"name": "armed"})
+            if not select:
+                state.add_log("Armed robbery: business select not found.")
+                _nav(PLAY_URL, state)
                 return
 
-            fail_div = result_soup.find("div", id="fail")
-            if fail_div:
-                state.add_log(f"Armed robbery failed: {fail_div.get_text(strip=True)}")
-            else:
-                state.add_log("Armed robbery: unexpected result page.")
+            target = None
+            for option in select.find_all("option"):
+                raw = option.get_text(strip=True)
+                value = option.get("value", "")
+                if not value or raw.startswith("Please"):
+                    continue
+                if "*" not in raw:
+                    continue
+                name = raw.rstrip("*").strip()
+                is_public = name in PUBLIC_BUSINESSES
+                is_drug_house = name == "Drug House"
+                is_private = not is_public
+
+                if is_drug_house and not agg_drug_house:
+                    continue
+                if is_private and not is_drug_house and not agg_private:
+                    continue
+                target = (value, name, is_public, is_drug_house)
+                break
+
+            if target:
+                value, name, is_public, is_drug_house = target
+                page.select_option("select[name='armed']", value)
+                page.click("input[type='submit'][name='B1']")
+                page.wait_for_load_state("domcontentloaded")
+                _refresh_state(state)
+
+                result_soup = BeautifulSoup(page.content(), "html.parser")
+                success_div = result_soup.find("div", id="success")
+                if success_div:
+                    msg = success_div.get_text(strip=True)
+                    state.add_log(f"Armed robbery success ({name}): {msg}")
+                    amounts = re.findall(r"\$([\d,]+)", msg)
+                    stolen = int(amounts[0].replace(",", "")) if amounts else 0
+                    if stolen > 0:
+                        if is_public and payback_public:
+                            _payback_public_business(name, stolen, state)
+                        elif is_private and not is_drug_house and payback_private:
+                            _payback_private_business(name, stolen, state)
+                    return
+
+                fail_div = result_soup.find("div", id="fail")
+                if fail_div:
+                    state.add_log(f"Armed robbery failed: {fail_div.get_text(strip=True)}")
+                else:
+                    state.add_log("Armed robbery: unexpected result page.")
+                _nav(PLAY_URL, state)
+                return
+
+            state.add_log(f"No valid armed robbery target (pass {pass_num}, attempt {attempt + 1}/{ARMED_MAX_RETRIES}).")
+
+        # 12 retries exhausted — check if another task needs to run
+        state.add_log(f"Armed robbery: no targets after pass {pass_num}. Checking task queue...")
+        if check_other_tasks and check_other_tasks():
+            state.add_log("Another task is ready — yielding armed robbery.")
             _nav(PLAY_URL, state)
             return
-
-        state.add_log(f"No valid armed robbery target (attempt {attempt + 1}/{ARMED_MAX_RETRIES}).")
-
-    state.add_log("Armed robbery: no valid targets after 12 attempts.")
-    state._agg_targets_exhausted = True
-    _nav(PLAY_URL, state)
+        state.add_log("No other tasks pending — retrying armed robbery.")
 
 
 def handle_drug_manufacturing(action: Action, state: GameState):
