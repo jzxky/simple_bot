@@ -75,7 +75,15 @@ def page() -> Page:
 
 
 def navigate(url: str) -> str:
-    _page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    for attempt in range(2):
+        try:
+            _page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            break
+        except Exception as e:
+            if "ERR_ABORTED" in str(e) and attempt == 0:
+                # Server redirect aborted the navigation — retry once
+                continue
+            raise
     _wait_for_cloudflare()
     return _page.content()
 
