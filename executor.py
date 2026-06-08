@@ -787,18 +787,38 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     if not _check_session(state):
         return
 
-    html = browser.page().content()
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
     table = soup.find("table", attrs={"border": "1"})
     if not table:
         return
 
-    table_text = table.get_text()
-    if all(marker in table_text for marker in _HOSPITAL_EMPTY_MARKERS):
-        return  # nothing to do
+    # Find all actionable case links inside display_border cells
+    case_links = []
+    for td in table.find_all("td", class_="display_border"):
+        a = td.find("a", href=lambda h: h and "display=surgery" in h)
+        if a:
+            href = a["href"]
+            if not href.startswith("http"):
+                href = "https://mafiamatrix.com/localcity/" + href
+            case_links.append((a.get_text(strip=True), href))
 
-    state.add_log("Hospital: case work available — saving snapshot for analysis.")
-    _save_casework_snapshot("hospital", html)
+    if not case_links:
+        return  # no cases available
+
+    label, url = case_links[0]
+    state.add_log(f"Hospital case work: {label}.")
+    _nav(url, state)
+
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    success = soup.find("div", id="success")
+    fail = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Hospital case work result: {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Hospital case work failed: {fail.get_text(strip=True)}")
+    else:
+        state.add_log("Hospital case work: submitted.")
+    _refresh_state(state)
 
 
 # ---------------------------------------------------------------------------

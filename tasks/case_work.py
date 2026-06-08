@@ -26,6 +26,8 @@ class CaseWorkTask(Task):
             return False
         if self.HOME_CITY_ONLY and not state.in_home_city():
             return False
+        if not state.timers.get("case", {}).get("ready", True):
+            return False
         return time.monotonic() - self._last_checked >= self._poll_interval
 
     def run(self, state: GameState, executor):
