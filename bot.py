@@ -31,6 +31,8 @@ _thread: threading.Thread = None
 _stop_event = threading.Event()
 _pause_event = threading.Event()
 _reload_event = threading.Event()
+_reload_requested_at: float = 0.0
+_RELOAD_DEBOUNCE = 2.0  # seconds
 _screenshot_request: queue.Queue = queue.Queue(maxsize=1)
 _screenshot_result: queue.Queue = queue.Queue(maxsize=1)
 _consume_queue: queue.Queue = queue.Queue()
@@ -38,7 +40,21 @@ _clear_earn_event = threading.Event()
 state = GameState()
 
 
-def _build_scheduler(c: dict) -> Scheduler:
+def _transfer_state(old_sched: Scheduler, new_sched: Scheduler):
+    """Copy timer/state fields from old tasks to matching new tasks by type."""
+    if old_sched is None:
+        return
+    old_by_type = {type(t): t for t in old_sched._tasks}
+    for new_task in new_sched._tasks:
+        old = old_by_type.get(type(new_task))
+        if old is None:
+            continue
+        for attr in ("_last_run", "_last_fired", "_last_checked", "_cooldown_until", "_hack_exhausted"):
+            if hasattr(old, attr):
+                setattr(new_task, attr, getattr(old, attr))
+
+
+def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched = Scheduler()
 
     creds = c.get("credentials", {})
@@ -99,6 +115,7 @@ def _build_scheduler(c: dict) -> Scheduler:
     sched.add(ConsumeTask(_consume_queue))
     sched.add(PlayerRefreshTask())
 
+    _transfer_state(old_sched, sched)
     return sched
 
 
@@ -175,11 +192,11 @@ def _run(c: dict):
             if _stop_event.is_set():
                 break
 
-            # Reload config and rebuild scheduler if Save was pressed
-            if _reload_event.is_set():
+            # Reload config and rebuild scheduler if Save was pressed (debounced)
+            if _reload_event.is_set() and time.monotonic() - _reload_requested_at >= _RELOAD_DEBOUNCE:
                 _reload_event.clear()
                 c = cfg.load()
-                sched = _build_scheduler(c)
+                sched = _build_scheduler(c, old_sched=sched)
                 state.add_log("Config reloaded.")
 
             sched.tick(state, executor)
@@ -253,6 +270,8 @@ def is_paused() -> bool:
 
 
 def request_reload():
+    global _reload_requested_at
+    _reload_requested_at = time.monotonic()
     _reload_event.set()
 
 
