@@ -192,6 +192,9 @@ function pollStatus() {
           `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty ${_botRunning ? 'consumable-link' : ''}" onclick="${_botRunning ? `consumeItem('${k}')` : ''}">${cons[k] ?? 0}</span></div>`
         ).join("");
 
+      // Timers
+      updateTimers(d.timers || {}, d.server_time);
+
       // Log
       const box = document.getElementById("log-box");
       box.innerHTML = [...d.log].reverse()
@@ -200,6 +203,103 @@ function pollStatus() {
     })
     .catch(() => {})
     .finally(() => setTimeout(pollStatus, 3000));
+}
+
+const TIMER_LABELS = {
+  action:   "Action Timer",
+  aggpro:   "AggPro",
+  crime:    "Crime",
+  earn:     "Earn",
+  business: "Business",
+  training: "Training",
+  jail:     "Jail",
+};
+
+// Each entry: { label, endMs (absolute ms), receivedAt (Date.now()) }
+let _activeTimers = {};
+let _timerInterval = null;
+
+function _parseServerTime(str) {
+  if (!str) return null;
+  // "MM/DD/YYYY HH:MM:SS AM/PM"
+  return new Date(str);
+}
+
+function _fmtCountdown(secs) {
+  if (secs <= 0) return "Ready";
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`;
+  if (m > 0) return `${m}m ${String(s).padStart(2,"0")}s`;
+  return `${s}s`;
+}
+
+function updateTimers(timers, serverTimeStr) {
+  const serverTime = _parseServerTime(serverTimeStr);
+  const now = Date.now();
+  const newActive = {};
+
+  for (const [key, t] of Object.entries(timers)) {
+    if (t.ready || !t.end) continue;
+    const endTime = _parseServerTime(t.end);
+    if (!endTime || !serverTime) continue;
+    const remainingSecs = Math.floor((endTime - serverTime) / 1000);
+    if (remainingSecs <= 0) continue;
+    // endMs in wall-clock time = now + remainingSecs
+    newActive[key] = {
+      label: TIMER_LABELS[key] || key,
+      endMs: now + remainingSecs * 1000,
+    };
+  }
+
+  _activeTimers = newActive;
+  _renderTimers();
+
+  // Start ticker if needed, clear if not
+  if (Object.keys(_activeTimers).length > 0 && !_timerInterval) {
+    _timerInterval = setInterval(_tickTimers, 1000);
+  } else if (Object.keys(_activeTimers).length === 0 && _timerInterval) {
+    clearInterval(_timerInterval);
+    _timerInterval = null;
+  }
+}
+
+function _tickTimers() {
+  const now = Date.now();
+  let anyActive = false;
+  for (const key of Object.keys(_activeTimers)) {
+    const remaining = Math.floor((_activeTimers[key].endMs - now) / 1000);
+    if (remaining <= 0) {
+      delete _activeTimers[key];
+    } else {
+      anyActive = true;
+    }
+  }
+  _renderTimers();
+  if (!anyActive) {
+    clearInterval(_timerInterval);
+    _timerInterval = null;
+  }
+}
+
+function _renderTimers() {
+  const wrap = document.getElementById("stat-timers");
+  const grid = document.getElementById("stat-timers-grid");
+  const entries = Object.entries(_activeTimers);
+  if (entries.length === 0) {
+    wrap.style.display = "none";
+    return;
+  }
+  const now = Date.now();
+  grid.innerHTML = entries.map(([key, t]) => {
+    const secs = Math.max(0, Math.floor((t.endMs - now) / 1000));
+    return `<div class="stat-item stat-item-timer">` +
+      `<span class="stat-label">${escHtml(t.label)}</span>` +
+      `<span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span>` +
+      `</div>`;
+  }).join("");
+  wrap.style.display = "";
 }
 
 function takeScreenshot() {

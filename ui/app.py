@@ -114,6 +114,11 @@ def status():
         "earns_24h": s.earns_24h,
         "consumables_24h": s.consumables_24h,
         "agg_pro_active": s.agg_pro_active,
+        "server_time": s.server_time.strftime("%m/%d/%Y %I:%M:%S %p") if s.server_time else None,
+        "timers": {
+            k: {"ready": v["ready"], "end": v["end"].strftime("%m/%d/%Y %I:%M:%S %p") if v.get("end") else None}
+            for k, v in s.timers.items()
+        },
         "consumables": s.consumables,
         "own_name": s.own_name,
         "earns_enabled": cfg.load().get("earns", {}).get("enabled", True),
