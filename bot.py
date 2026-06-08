@@ -19,6 +19,7 @@ from tasks.earns import EarnsTask
 from tasks.agg_crimes import AggCrimeTask
 from tasks.community_service import CommunityServiceTask
 from tasks.career_training import CareerTrainingTask
+from tasks.fire_duties import FireDutiesTask
 from tasks.away_action import AwayActionTask
 from tasks.refresh import RefreshTask
 from tasks.consume import ConsumeTask
@@ -71,6 +72,8 @@ def _build_scheduler(c: dict) -> Scheduler:
             sched.add(CommunityServiceTask())
         elif action_type == "career_training":
             sched.add(CareerTrainingTask(career=sub))
+        elif action_type == "fire_duties":
+            sched.add(FireDutiesTask())
 
     away_cfg = c.get("away_action", {})
     if away_cfg.get("enabled", False):
