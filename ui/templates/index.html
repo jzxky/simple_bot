@@ -137,6 +137,7 @@
         <label>Action
           <select id="action_type" onchange="populateActionSub()">
             <option value="community_service" {% if config.action.type == 'community_service' %}selected{% endif %}>Community Service</option>
+            <option value="fire_duties"       {% if config.action.type == 'fire_duties'       %}selected{% endif %}>Fire Duties</option>
             <option value="career_training"   {% if config.action.type == 'career_training'   %}selected{% endif %}>Career Training</option>
             <option value="university"        {% if config.action.type == 'university'        %}selected{% endif %}>University Training</option>
             <option value="training_centre"   {% if config.action.type == 'training_centre'   %}selected{% endif %}>Training Centre</option>

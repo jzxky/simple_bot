@@ -17,6 +17,7 @@ PROFILE_URL = "https://mafiamatrix.com/profile/default.asp"
 CRIME_URL = "https://mafiamatrix.com/income/agcrime.asp"
 EARN_URL = "https://mafiamatrix.com/income/earn.asp"
 CS_URL = "https://mafiamatrix.com/income/communityservice.asp"
+FD_URL = "https://mafiamatrix.com/income/fireduties.asp"
 TRANSFER_URL = "https://mafiamatrix.com/income/bank.asp?option=transfers"
 USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
 BIZ_URL = "https://mafiamatrix.com/business/business.asp"
@@ -473,6 +474,28 @@ def handle_community_service(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def handle_fire_duties(action: Action, state: GameState):
+    page = browser.page()
+    _nav(FD_URL, state)
+
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    options = soup.find_all("input", attrs={"name": "comservice", "type": "radio"})
+    if not options:
+        state.add_log("No fire duties options found.")
+        return
+
+    last = options[-1]
+    page.check(f"input[name='comservice'][value='{last['value']}']")
+    state.add_log(f"Fire duties: {last['value']}")
+
+    page.click("input[type='submit'][name='B2']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+
 def handle_career_training(action: Action, state: GameState):
     url = action.params["url"]
     career = action.params["career"]
@@ -678,6 +701,7 @@ HANDLERS = {
     "refresh_state": handle_refresh_state,
     "payback": handle_payback,
     "do_community_service": handle_community_service,
+    "do_fire_duties": handle_fire_duties,
     "do_career_training": handle_career_training,
     "do_armed_robbery": handle_armed_robbery,
 }
