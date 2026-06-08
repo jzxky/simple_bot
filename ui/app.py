@@ -69,11 +69,11 @@ def save():
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
     c["case_work"].setdefault("hospital", {})
-    c["case_work"]["hospital"]["poll_interval"] = int(data.get("hospital_poll_interval", 31))
+    c["case_work"]["hospital"]["poll_interval"] = max(31, int(data.get("hospital_poll_interval", 31)))
     if data.get("hospital_tasks"):
         c["case_work"]["hospital"]["tasks"] = data["hospital_tasks"]
     c["case_work"].setdefault("fire", {})
-    c["case_work"]["fire"]["poll_interval"] = int(data.get("fire_poll_interval", 31))
+    c["case_work"]["fire"]["poll_interval"] = max(31, int(data.get("fire_poll_interval", 31)))
 
     cfg.save(c)
     if bot.is_running():
