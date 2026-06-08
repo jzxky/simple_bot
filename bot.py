@@ -81,8 +81,12 @@ def _build_scheduler(c: dict) -> Scheduler:
             sched.add(DrugManufacturingTask())
 
     cw_cfg = c.get("case_work", {})
-    if cw_cfg.get("hospital_enabled", False):
-        sched.add(HospitalCaseWorkTask(poll_interval=cw_cfg.get("hospital_poll_interval", 31)))
+    if cw_cfg.get("enabled", False):
+        hosp = cw_cfg.get("hospital", {})
+        sched.add(HospitalCaseWorkTask(
+            poll_interval=hosp.get("poll_interval", 31),
+            tasks=hosp.get("tasks", []),
+        ))
 
     away_cfg = c.get("away_action", {})
     if away_cfg.get("enabled", False):

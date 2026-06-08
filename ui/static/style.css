@@ -347,7 +347,55 @@ button {
 .setting-row:last-child { border-bottom: none; }
 .setting-row .toggle-label { flex-shrink: 0; }
 
-/* Eye icon button */
+/* Case work priority table */
+.priority-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.priority-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.priority-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(46,64,96,0.3);
+  vertical-align: middle;
+}
+.priority-table tr:last-child td { border-bottom: none; }
+.priority-table tr.drag-over { background: rgba(200,168,75,0.1); }
+.drag-handle {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 16px;
+  user-select: none;
+  width: 20px;
+  text-align: center;
+}
+.drag-handle:active { cursor: grabbing; }
+.priority-num {
+  color: var(--muted);
+  font-size: 11px;
+  width: 18px;
+  text-align: center;
+}
+.cw-select { width: 140px !important; padding: 5px 8px; font-size: 12px; }
+.cw-poll-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.cw-poll-row input { width: 70px !important; }
+
 .eye-btn { width: 36px; padding: 0; display: flex; align-items: center; justify-content: center; }
 .eye-icon { width: 18px; height: 13px; display: block; }
 

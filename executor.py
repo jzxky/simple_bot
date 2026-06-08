@@ -781,7 +781,31 @@ def _save_casework_snapshot(name: str, html: str):
         f.write(png)
 
 
+_HOSPITAL_INJURY_TYPE = {
+    "sex change": "sex_change",
+    "bionic": "bionics",
+    "flu": "flu",
+    "recover": "recover",
+    "dna": "dna",
+}
+
+
+def _hospital_injury_to_type(injury_text: str) -> str:
+    t = injury_text.lower()
+    for keyword, task_type in _HOSPITAL_INJURY_TYPE.items():
+        if keyword in t:
+            return task_type
+    return "unknown"
+
+
 def handle_check_hospital_cases(action: Action, state: GameState):
+    tasks = action.params.get("tasks", [])
+    # Build priority-ordered list of enabled task types (skip target=none)
+    priority = [
+        t["type"] for t in tasks
+        if t.get("target", "all") != "none" and t.get("enabled", True) is not False
+    ]
+
     _nav(HOSPITAL_CASES_URL, state)
 
     if not _check_session(state):
@@ -792,20 +816,36 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     if not table:
         return
 
-    # Find all actionable case links inside display_border cells
-    case_links = []
-    for td in table.find_all("td", class_="display_border"):
-        a = td.find("a", href=lambda h: h and "display=surgery" in h)
-        if a:
-            href = a["href"]
+    # Parse each patient row: extract injury text and surgery link
+    available = {}  # task_type -> (label, url)
+    rows = table.find_all("tr")
+    for row in rows:
+        cells = row.find_all("td", class_="display_border")
+        if len(cells) < 4:
+            continue
+        injury = cells[1].get_text(strip=True)
+        task_type = _hospital_injury_to_type(injury)
+        link = cells[3].find("a", href=lambda h: h and "display=surgery" in h)
+        if link and task_type not in available:
+            href = link["href"]
             if not href.startswith("http"):
                 href = "https://mafiamatrix.com/localcity/" + href
-            case_links.append((a.get_text(strip=True), href))
+            available[task_type] = (injury, href)
 
-    if not case_links:
-        return  # no cases available
+    if not available:
+        return
 
-    label, url = case_links[0]
+    # Pick first match in priority order; fall back to first available if no config
+    chosen = None
+    if priority:
+        for task_type in priority:
+            if task_type in available:
+                chosen = available[task_type]
+                break
+    if not chosen:
+        chosen = next(iter(available.values()))
+
+    label, url = chosen
     state.add_log(f"Hospital case work: {label}.")
     _nav(url, state)
 
