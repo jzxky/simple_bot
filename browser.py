@@ -7,13 +7,12 @@ Uses a persistent profile so Cloudflare trusts the session over time.
 import json
 import os
 import paths
-from patchright.sync_api import sync_playwright, Page, BrowserContext, Browser
+from patchright.sync_api import sync_playwright, Page, BrowserContext
 
 PROFILE_DIR = os.path.join(paths.data_dir(), ".browser_profile")
 CF_TIMEOUT = 20000
 
 _playwright = None
-_browser: Browser = None
 _context: BrowserContext = None
 _page: Page = None
 
@@ -34,44 +33,40 @@ def _clear_window_placement():
 
 
 def start():
-    global _playwright, _browser, _context, _page
+    global _playwright, _context, _page
     os.makedirs(PROFILE_DIR, exist_ok=True)
     _clear_window_placement()
     _playwright = sync_playwright().start()
-    _browser = _playwright.chromium.launch(
+    _context = _playwright.chromium.launch_persistent_context(
+        PROFILE_DIR,
         channel="chrome",
         headless=False,
+        no_viewport=True,
+        locale="en-US",
+        timezone_id="America/New_York",
         args=[
-            f"--user-data-dir={PROFILE_DIR}",
             "--start-maximized",
             "--disable-notifications",
             "--disable-save-password-bubble",
         ],
     )
-    _context = _browser.new_context(
-        no_viewport=True,
-        locale="en-US",
-        timezone_id="America/New_York",
-    )
-    _page = _context.new_page()
+    _page = _context.pages[0] if _context.pages else _context.new_page()
     print("[browser] Browser launched.")
 
 
 def stop():
-    global _playwright, _browser, _context, _page
+    global _playwright, _context, _page
     try:
         if _page:
             _page.close()
         if _context:
             _context.close()
-        if _browser:
-            _browser.close()
         if _playwright:
             _playwright.stop()
     except Exception as e:
         print(f"[browser] Error during stop: {e}")
     finally:
-        _page = _context = _browser = _playwright = None
+        _page = _context = _playwright = None
         print("[browser] Browser stopped.")
 
 
