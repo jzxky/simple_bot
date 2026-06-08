@@ -452,29 +452,18 @@ function _serializePriorityTable(tbodyId) {
   return tasks;
 }
 
-// Drag-to-reorder for priority tables
-function _initDragTable(tbodyId) {
-  const tbody = document.getElementById(tbodyId);
-  if (!tbody) return;
-  let dragging = null;
-
-  tbody.addEventListener("dragstart", e => {
-    dragging = e.target.closest("tr");
-    if (dragging) dragging.style.opacity = "0.4";
-  });
-  tbody.addEventListener("dragend", e => {
-    if (dragging) dragging.style.opacity = "";
-    dragging = null;
-    _renumberTable(tbodyId);
-  });
-  tbody.addEventListener("dragover", e => {
-    e.preventDefault();
-    const target = e.target.closest("tr");
-    if (!target || target === dragging) return;
-    const rect = target.getBoundingClientRect();
-    const after = e.clientY > rect.top + rect.height / 2;
-    tbody.insertBefore(dragging, after ? target.nextSibling : target);
-  });
+// Up/down reorder for priority tables
+function _moveRow(btn, dir) {
+  const row = btn.closest("tr");
+  const tbody = row.parentElement;
+  if (dir === -1) {
+    const prev = row.previousElementSibling;
+    if (prev) tbody.insertBefore(row, prev);
+  } else {
+    const next = row.nextElementSibling;
+    if (next) tbody.insertBefore(next, row);
+  }
+  _renumberTable(tbody.id);
 }
 
 function _renumberTable(tbodyId) {
@@ -483,5 +472,3 @@ function _renumberTable(tbodyId) {
     if (num) num.textContent = i + 1;
   });
 }
-
-_initDragTable("hospital-priority-body");
