@@ -6,7 +6,7 @@ const EARN_MAP = {
   Bank:        [["bank_teller","Work at Local Bank"]],
   Mortician:   [["mortician_assistant","Mortician Assistant"]],
   Law:         [["legal_secretary","Legal Secretary"]],
-  Crime:       [["shoplift","Shoplift"],["steal_cheques","Steal Cheques"],["drag_racing","Compete at illegal drags"],["hack_bank","Hack bank account"],["scamming","Scamming"]],
+  Crime:       [["shoplift","Shoplift"],["steal_cheques","Steal Cheques"],["drag_racing","Compete at illegal drags"],["hack_bank","Hack bank account"],["scams","Scamming"]],
 };
 
 const ACTION_SUB_MAP = {
