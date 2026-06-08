@@ -7,7 +7,7 @@ import os
 import base64
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, abort
 import config as cfg
 import bot
 import paths
@@ -137,6 +137,58 @@ def screenshot():
         return jsonify({"image": f"data:image/png;base64,{data}"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/logs/list")
+def logs_list():
+    logs_dir = os.path.join(paths.data_dir(), "logs")
+    files = []
+    if os.path.isdir(logs_dir):
+        files = sorted(
+            [f for f in os.listdir(logs_dir) if f.endswith(".log")],
+            reverse=True,
+        )
+    return jsonify({"files": files})
+
+
+def _logs_dir() -> str:
+    return os.path.join(paths.data_dir(), "logs")
+
+
+@app.route("/logs")
+def logs_index():
+    logs_dir = _logs_dir()
+    files = []
+    if os.path.isdir(logs_dir):
+        files = sorted(
+            [f for f in os.listdir(logs_dir) if f.endswith(".log")],
+            reverse=True,
+        )
+    if not files:
+        return "<html><body style='font-family:sans-serif;color:#aaa;padding:20px'>No log files found.</body></html>"
+    return logs_viewer(files[0])
+
+
+@app.route("/logs/<filename>")
+def logs_viewer(filename):
+    logs_dir = _logs_dir()
+    files = []
+    if os.path.isdir(logs_dir):
+        files = sorted(
+            [f for f in os.listdir(logs_dir) if f.endswith(".log")],
+            reverse=True,
+        )
+    safe = os.path.basename(filename)
+    if safe not in files:
+        abort(404)
+    path = os.path.join(logs_dir, safe)
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        lines = []
+    return render_template("log.html", filename=safe, log_files=files,
+                           lines=lines, line_count=len(lines))
 
 
 def run():
