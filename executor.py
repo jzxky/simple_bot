@@ -772,23 +772,6 @@ def handle_drug_manufacturing(action: Action, state: GameState):
     state.add_log("Drug manufacturing: submitted.")
 
 
-_HOSPITAL_EMPTY_MARKERS = [
-    "There are currently no patients",
-    "There are currently no DNA samples",
-]
-
-
-def _save_casework_snapshot(name: str, html: str):
-    import datetime
-    site_map_dir = os.path.join(paths.data_dir(), "site_map")
-    os.makedirs(site_map_dir, exist_ok=True)
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    with open(os.path.join(site_map_dir, f"{name}_{ts}.html"), "w", encoding="utf-8") as f:
-        f.write(html)
-    png = browser.page().screenshot()
-    with open(os.path.join(site_map_dir, f"{name}_{ts}.png"), "wb") as f:
-        f.write(png)
-
 
 _HOSPITAL_INJURY_TYPE = {
     "sex change": "sex_change",
@@ -825,39 +808,24 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     if not table:
         return
 
-    # Parse each patient row: extract injury text and surgery link
+    # Parse each patient row: extract injury text and surgery/dna link
     available = {}  # task_type -> (label, url)
     rows = table.find_all("tr")
     for row in rows:
         cells = row.find_all("td", class_="display_border")
-        if len(cells) < 4:
+        if len(cells) < 2:
             continue
         patient_name = cells[0].get_text(strip=True)
         if state.own_name and patient_name.lower() == state.own_name.lower():
             continue
         injury = cells[1].get_text(strip=True)
         task_type = _hospital_injury_to_type(injury)
-        link = cells[3].find("a", href=lambda h: h and "display=surgery" in h)
+        link = row.find("a", href=lambda h: h and ("display=surgery" in h or "display=dna" in h))
         if link and task_type not in available:
             href = link["href"]
             if not href.startswith("http"):
                 href = "https://mafiamatrix.com/localcity/" + href
             available[task_type] = (injury, href)
-
-    # Check for a separate DNA table — look for any heading containing "DNA"
-    # followed by a table. Workflow is unknown; log and snapshot for investigation.
-    page_html = browser.page().content()
-    dna_soup = BeautifulSoup(page_html, "html.parser")
-    dna_heading = dna_soup.find(lambda tag: tag.name in ("h2", "h3", "b", "strong", "p")
-                                and "dna" in tag.get_text(strip=True).lower())
-    if dna_heading:
-        dna_table = dna_heading.find_next("table")
-        if dna_table:
-            dna_rows = [r for r in dna_table.find_all("tr")
-                        if r.find_all("td", class_="display_border")]
-            if dna_rows:
-                state.add_log(f"Hospital: found {len(dna_rows)} DNA sample(s) — snapshotting for investigation.")
-                _save_casework_snapshot("dna_samples", page_html)
 
     if not available:
         return
