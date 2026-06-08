@@ -374,9 +374,10 @@ button {
 }
 .input-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-/* Narrow number input for energy thresholds */
+/* Narrow inputs for energy thresholds */
 .label-narrow { flex: 0 0 auto; min-width: unset; }
 .input-narrow { width: 70px !important; padding: 7px 8px; }
+.input-narrow-wide { width: 150px !important; padding: 7px 8px; }
 
 /* Log */
 .log-card h2 { margin-bottom: 8px; }
