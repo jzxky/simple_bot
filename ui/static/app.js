@@ -179,7 +179,6 @@ function pollStatus() {
       document.getElementById("stat-energy").textContent = d.energy != null ? d.energy + "%" : "--";
       document.getElementById("stat-earns").textContent = d.earns_24h != null ? d.earns_24h : "--";
       document.getElementById("stat-cons-24h").textContent = d.consumables_24h != null ? d.consumables_24h : "--";
-      document.getElementById("stat-aggpro").textContent = d.agg_pro_active ? "Active" : "Inactive";
 
       const fmt = n => "$" + (n ?? 0).toLocaleString();
       document.getElementById("stat-clean").textContent = d.clean_money != null ? fmt(d.clean_money) : "--";
@@ -193,7 +192,7 @@ function pollStatus() {
         ).join("");
 
       // Timers
-      updateTimers(d.timers || {}, d.server_time);
+      updateTimers(d.timers || {}, d.server_time, d.agg_pro_active);
 
       // Log
       const box = document.getElementById("log-box");
@@ -235,78 +234,94 @@ function _fmtCountdown(secs) {
   return `${s}s`;
 }
 
-function updateTimers(timers, serverTimeStr) {
-  // Only re-anchor when the server has provided a fresh timestamp.
-  // Between polls the wall-clock countdown keeps ticking uninterrupted.
-  if (serverTimeStr === _lastServerTime) return;
-  _lastServerTime = serverTimeStr;
+// _aggProActive tracks latest agg_pro_active from status for always-visible tile
+let _aggProActive = false;
 
-  const serverTime = _parseServerTime(serverTimeStr);
-  if (!serverTime) return;
+function updateTimers(timers, serverTimeStr, aggProActive) {
+  _aggProActive = aggProActive;
 
-  const now = Date.now();
-  const newActive = {};
-
-  for (const [key, t] of Object.entries(timers)) {
-    if (t.ready || !t.end) continue;
-    const endTime = _parseServerTime(t.end);
-    if (!endTime) continue;
-    // Remaining seconds according to server clock, anchored to wall-clock now
-    const remainingSecs = Math.floor((endTime - serverTime) / 1000);
-    if (remainingSecs <= 0) continue;
-    newActive[key] = {
-      label: TIMER_LABELS[key] || key,
-      endMs: now + remainingSecs * 1000,
-    };
+  // Only re-anchor countdowns when server_time changes (fresh state refresh).
+  // Between polls the wall-clock countdowns keep ticking uninterrupted.
+  if (serverTimeStr !== _lastServerTime) {
+    _lastServerTime = serverTimeStr;
+    const serverTime = _parseServerTime(serverTimeStr);
+    if (serverTime) {
+      const now = Date.now();
+      const newActive = {};
+      for (const [key, t] of Object.entries(timers)) {
+        if (key === "aggpro") continue; // handled separately as always-visible
+        if (t.ready || !t.end) continue;
+        const endTime = _parseServerTime(t.end);
+        if (!endTime) continue;
+        const remainingSecs = Math.floor((endTime - serverTime) / 1000);
+        if (remainingSecs <= 0) continue;
+        newActive[key] = { label: TIMER_LABELS[key] || key, endMs: now + remainingSecs * 1000 };
+      }
+      // AggPro countdown
+      const ap = timers["aggpro"];
+      if (ap && !ap.ready && ap.end) {
+        const endTime = _parseServerTime(ap.end);
+        if (endTime) {
+          const remainingSecs = Math.floor((endTime - serverTime) / 1000);
+          if (remainingSecs > 0) {
+            newActive["aggpro"] = { label: "AggPro", endMs: now + remainingSecs * 1000 };
+          }
+        }
+      }
+      _activeTimers = newActive;
+    }
   }
 
-  _activeTimers = newActive;
   _renderTimers();
-
-  // Start ticker if needed, clear if not
   if (Object.keys(_activeTimers).length > 0 && !_timerInterval) {
     _timerInterval = setInterval(_tickTimers, 1000);
-  } else if (Object.keys(_activeTimers).length === 0 && _timerInterval) {
-    clearInterval(_timerInterval);
-    _timerInterval = null;
   }
 }
 
 function _tickTimers() {
   const now = Date.now();
-  let anyActive = false;
   for (const key of Object.keys(_activeTimers)) {
-    const remaining = Math.floor((_activeTimers[key].endMs - now) / 1000);
-    if (remaining <= 0) {
+    if (key === "aggpro") continue; // never auto-remove aggpro tile
+    if (Math.floor((_activeTimers[key].endMs - now) / 1000) <= 0) {
       delete _activeTimers[key];
-    } else {
-      anyActive = true;
     }
   }
+  // If aggpro countdown expired, keep tile but it will show as inactive
+  if (_activeTimers["aggpro"] && Math.floor((_activeTimers["aggpro"].endMs - now) / 1000) <= 0) {
+    delete _activeTimers["aggpro"];
+  }
   _renderTimers();
-  if (!anyActive) {
+  // Keep interval running as long as there are countdown timers or AggPro is shown
+  const countdownKeys = Object.keys(_activeTimers).filter(k => k !== "aggpro");
+  if (countdownKeys.length === 0 && !_aggProActive) {
     clearInterval(_timerInterval);
     _timerInterval = null;
   }
 }
 
 function _renderTimers() {
-  const wrap = document.getElementById("stat-timers");
   const grid = document.getElementById("stat-timers-grid");
-  const entries = Object.entries(_activeTimers);
-  if (entries.length === 0) {
-    wrap.style.display = "none";
-    return;
-  }
   const now = Date.now();
-  grid.innerHTML = entries.map(([key, t]) => {
+  const tiles = [];
+
+  // AggPro always shown
+  if (_activeTimers["aggpro"]) {
+    const secs = Math.max(0, Math.floor((_activeTimers["aggpro"].endMs - now) / 1000));
+    tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">AggPro</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
+  } else {
+    const val = _aggProActive ? "Active" : "None";
+    const cls = _aggProActive ? "stat-timer-value" : "";
+    tiles.push(`<div class="stat-item"><span class="stat-label">AggPro</span><span class="stat-value ${cls}">${val}</span></div>`);
+  }
+
+  // Other active countdown timers
+  for (const [key, t] of Object.entries(_activeTimers)) {
+    if (key === "aggpro") continue;
     const secs = Math.max(0, Math.floor((t.endMs - now) / 1000));
-    return `<div class="stat-item stat-item-timer">` +
-      `<span class="stat-label">${escHtml(t.label)}</span>` +
-      `<span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span>` +
-      `</div>`;
-  }).join("");
-  wrap.style.display = "";
+    tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">${escHtml(t.label)}</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
+  }
+
+  grid.innerHTML = tiles.join("");
 }
 
 function takeScreenshot() {
@@ -351,12 +366,13 @@ function clearEarnQueue() {
 
 function toggleFieldVisibility(id, btn) {
   const el = document.getElementById(id);
+  const slash = btn.querySelector(".eye-slash");
   if (el.type === "password") {
     el.type = "text";
-    btn.textContent = "Hide";
+    if (slash) slash.style.display = "none";
   } else {
     el.type = "password";
-    btn.textContent = "Show";
+    if (slash) slash.style.display = "";
   }
 }
 

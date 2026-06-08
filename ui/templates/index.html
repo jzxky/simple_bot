@@ -20,13 +20,12 @@
   <main>
     <!-- Character Stats -->
     <section class="card stats-card">
-      <h2>Character</h2>
+      <h2>Character <span class="stat-name-header">— <span id="stat-name">--</span></span></h2>
       <div class="stats-grid">
-        <div class="stat-item"><span class="stat-label">Name</span><span class="stat-value" id="stat-name">--</span></div>
         <div class="stat-item"><span class="stat-label">Rank</span><span class="stat-value" id="stat-rank">--</span></div>
+        <div class="stat-item"><span class="stat-label">Occupation</span><span class="stat-value" id="stat-occupation">--</span></div>
         <div class="stat-item"><span class="stat-label">Next Rank</span><span class="stat-value" id="stat-next-rank">--</span></div>
         <div class="stat-item"><span class="stat-label">Progress</span><span class="stat-value" id="stat-rank-progress">--</span></div>
-        <div class="stat-item"><span class="stat-label">Occupation</span><span class="stat-value" id="stat-occupation">--</span></div>
         <div class="stat-item"><span class="stat-label">City</span><span class="stat-value" id="stat-city">--</span></div>
         <div class="stat-item"><span class="stat-label">Home City</span><span class="stat-value" id="stat-home-city">--</span></div>
       </div>
@@ -34,7 +33,6 @@
       <div class="stats-grid">
         <div class="stat-item"><span class="stat-label">HP</span><span class="stat-value" id="stat-health">--</span></div>
         <div class="stat-item"><span class="stat-label">Energy</span><span class="stat-value" id="stat-energy">--</span></div>
-        <div class="stat-item"><span class="stat-label">AggPro</span><span class="stat-value" id="stat-aggpro">--</span></div>
         <div class="stat-item"><span class="stat-label">Earns / 24h</span><span class="stat-value" id="stat-earns">--</span></div>
         <div class="stat-item"><span class="stat-label">Consumables / 24h</span><span class="stat-value" id="stat-cons-24h">--</span></div>
       </div>
@@ -45,10 +43,8 @@
       </div>
       <hr class="stat-divider">
       <div class="consumables-grid" id="stat-consumables"></div>
-      <div id="stat-timers" class="stat-timers" style="display:none">
-        <hr class="stat-divider">
-        <div class="stats-grid" id="stat-timers-grid"></div>
-      </div>
+      <hr class="stat-divider">
+      <div class="stats-grid" id="stat-timers-grid"></div>
     </section>
 
     <!-- Credentials -->
@@ -58,7 +54,7 @@
         <label>Email
           <div class="input-with-btn">
             <input type="password" id="email" value="{{ config.credentials.email }}" autocomplete="off">
-            <button type="button" class="input-btn" onclick="toggleFieldVisibility('email', this)">Show</button>
+            <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('email', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
           </div>
         </label>
         <label>Password
@@ -119,7 +115,11 @@
           </select>
         </label>
         <label class="label-narrow">Energy %
-          <input type="number" class="input-narrow" id="primary_threshold" min="0" max="100" value="{{ config.aggravated_crimes.primary.energy_threshold }}">
+          <select class="input-narrow" id="primary_threshold">
+            {% for v in range(0, 105, 5) %}
+            <option value="{{ v }}" {% if config.aggravated_crimes.primary.energy_threshold == v %}selected{% endif %}>{{ v }}%</option>
+            {% endfor %}
+          </select>
         </label>
       </div>
       <div class="row" id="away_crime_row" style="display:none">
@@ -131,7 +131,11 @@
           </select>
         </label>
         <label class="label-narrow">Energy %
-          <input type="number" class="input-narrow" id="away_threshold" min="0" max="100" value="{{ config.aggravated_crimes.get('away_crime', {}).get('energy_threshold', 50) }}">
+          <select class="input-narrow" id="away_threshold">
+            {% for v in range(0, 105, 5) %}
+            <option value="{{ v }}" {% if config.aggravated_crimes.get('away_crime', {}).get('energy_threshold', 50) == v %}selected{% endif %}>{{ v }}%</option>
+            {% endfor %}
+          </select>
         </label>
       </div>
 
@@ -195,48 +199,31 @@
       </div>
 
       <div id="agg-settings" class="tab-panel active">
-        <div class="row">
-          <label class="inline-toggle">
-            Payback enabled
-            <label class="toggle-label">
-              <input type="checkbox" id="payback_enabled" {% if config.payback_enabled %}checked{% endif %}>
-              <span class="toggle"></span>
+        <div class="settings-groups">
+          <div class="settings-group">
+            <h3>PvP</h3>
+            <label class="inline-toggle setting-row">Payback Enabled
+              <label class="toggle-label"><input type="checkbox" id="payback_enabled" {% if config.payback_enabled %}checked{% endif %}><span class="toggle"></span></label>
             </label>
-          </label>
-          <label class="inline-toggle">
-            Fall back to second option if no hacking targets
-            <label class="toggle-label">
-              <input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %}>
-              <span class="toggle"></span>
+            <label class="inline-toggle setting-row">Fall back to second option if no hacking targets
+              <label class="toggle-label"><input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %}><span class="toggle"></span></label>
             </label>
-          </label>
-        </div>
-        <h3>Armed Robbery</h3>
-        <div class="row">
-          <label class="inline-toggle">Agg Private
-            <label class="toggle-label">
-              <input type="checkbox" id="armed_agg_private" {% if config.aggravated_crimes.get('armed', {}).get('agg_private') %}checked{% endif %}>
-              <span class="toggle"></span>
+          </div>
+          <div class="settings-group">
+            <h3>PvB</h3>
+            <label class="inline-toggle setting-row">Agg Private
+              <label class="toggle-label"><input type="checkbox" id="armed_agg_private" {% if config.aggravated_crimes.get('armed', {}).get('agg_private') %}checked{% endif %}><span class="toggle"></span></label>
             </label>
-          </label>
-          <label class="inline-toggle">Agg Drug House
-            <label class="toggle-label">
-              <input type="checkbox" id="armed_agg_drug_house" {% if config.aggravated_crimes.get('armed', {}).get('agg_drug_house') %}checked{% endif %}>
-              <span class="toggle"></span>
+            <label class="inline-toggle setting-row">Agg Drug House
+              <label class="toggle-label"><input type="checkbox" id="armed_agg_drug_house" {% if config.aggravated_crimes.get('armed', {}).get('agg_drug_house') %}checked{% endif %}><span class="toggle"></span></label>
             </label>
-          </label>
-          <label class="inline-toggle">Payback Private
-            <label class="toggle-label">
-              <input type="checkbox" id="armed_payback_private" {% if config.aggravated_crimes.get('armed', {}).get('payback_private') %}checked{% endif %}>
-              <span class="toggle"></span>
+            <label class="inline-toggle setting-row">Payback Private
+              <label class="toggle-label"><input type="checkbox" id="armed_payback_private" {% if config.aggravated_crimes.get('armed', {}).get('payback_private') %}checked{% endif %}><span class="toggle"></span></label>
             </label>
-          </label>
-          <label class="inline-toggle">Payback Public
-            <label class="toggle-label">
-              <input type="checkbox" id="armed_payback_public" {% if config.aggravated_crimes.get('armed', {}).get('payback_public') %}checked{% endif %}>
-              <span class="toggle"></span>
+            <label class="inline-toggle setting-row">Payback Public
+              <label class="toggle-label"><input type="checkbox" id="armed_payback_public" {% if config.aggravated_crimes.get('armed', {}).get('payback_public') %}checked{% endif %}><span class="toggle"></span></label>
             </label>
-          </label>
+          </div>
         </div>
       </div>
       <div id="business"  class="tab-panel"><p class="placeholder">Business settings — coming soon.</p></div>
