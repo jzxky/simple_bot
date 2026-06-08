@@ -5,6 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MafiaMatrix Bot — Players</title>
 <link rel="stylesheet" href="/static/style.css">
+<style>
+  .filter-bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  .filter-bar input[type="text"] { max-width:280px; }
+  .filter-bar label { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted); white-space:nowrap; cursor:pointer; }
+
+  .import-card textarea {
+    width:100%; box-sizing:border-box;
+    min-height:120px; resize:vertical;
+    background:var(--bg-card); color:var(--text);
+    border:1px solid var(--border); border-radius:4px;
+    padding:8px; font-size:13px; font-family:inherit;
+  }
+  .import-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  .import-row select { padding:5px 8px; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:4px; }
+
+  .import-report { margin-top:14px; font-size:13px; }
+  .import-report h4 { margin:0 0 6px; color:var(--accent); }
+  .import-report .report-stat { color:var(--text); margin-bottom:4px; }
+  .import-report .unmatched-list { color:var(--warn, #f59e0b); margin-top:8px; }
+  .import-report .unmatched-list li { margin:2px 0; }
+</style>
 </head>
 <body>
 <div class="container">
@@ -19,6 +40,26 @@
   </header>
 
   <main>
+    <!-- Import tool -->
+    <section class="card import-card">
+      <h2>Import List</h2>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Paste one username per line. Matched players will be assigned to the selected list and context.</p>
+      <textarea id="import-text" placeholder="Player1&#10;Player2&#10;Player3"></textarea>
+      <div class="import-row">
+        <select id="import-context">
+          <option value="agg_crimes">Aggravated Crimes</option>
+          <option value="case_work">Case Work</option>
+        </select>
+        <select id="import-assignment">
+          <option value="whitelist">Whitelist</option>
+          <option value="blacklist">Blacklist</option>
+        </select>
+        <button class="action-btn" onclick="runImport()">Import</button>
+      </div>
+      <div id="import-report" class="import-report" style="display:none"></div>
+    </section>
+
+    <!-- Player table -->
     <section class="card">
       <h2>Player Lists</h2>
 
@@ -27,8 +68,12 @@
         <button class="tab-btn" onclick="showTab('tab-casework', this)">Case Work</button>
       </div>
 
-      <div style="margin-bottom:10px">
-        <input type="text" id="search" placeholder="Search players..." oninput="filterTable()" style="max-width:300px">
+      <div class="filter-bar">
+        <input type="text" id="search" placeholder="Search players..." oninput="filterTable()">
+        <label>
+          <input type="checkbox" id="hide-unemployed" onchange="filterTable()">
+          Hide unemployed
+        </label>
       </div>
 
       {% macro player_table(context) %}
@@ -45,7 +90,9 @@
         <tbody>
           {% for name, p in players | dictsort %}
           {% if p.active %}
-          <tr class="player-row" data-name="{{ name | lower }}">
+          <tr class="player-row"
+              data-name="{{ name | lower }}"
+              data-occupation="{{ p.occupation | lower }}">
             <td>{{ name }}</td>
             <td>{{ p.homecity }}</td>
             <td>{{ p.occupation }}</td>
@@ -85,8 +132,11 @@ function showTab(id, btn) {
 
 function filterTable() {
   const q = document.getElementById("search").value.toLowerCase();
+  const hideUnemployed = document.getElementById("hide-unemployed").checked;
   document.querySelectorAll(".tab-panel.active .player-row").forEach(row => {
-    row.style.display = row.dataset.name.includes(q) ? "" : "none";
+    const nameMatch = row.dataset.name.includes(q);
+    const isUnemployed = row.dataset.occupation === "unemployed";
+    row.style.display = (nameMatch && !(hideUnemployed && isUnemployed)) ? "" : "none";
   });
 }
 
@@ -111,6 +161,53 @@ function refreshPlayers() {
       setTimeout(() => { btn.textContent = "Refresh List"; btn.disabled = false; }, 1500);
     })
     .catch(() => { btn.textContent = "Refresh List"; btn.disabled = false; });
+}
+
+function runImport() {
+  const text = document.getElementById("import-text").value;
+  const context = document.getElementById("import-context").value;
+  const assignment = document.getElementById("import-assignment").value;
+  const names = text.split("\n").map(n => n.trim()).filter(Boolean);
+  if (!names.length) return;
+
+  fetch("/players/import", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({names, context, assignment}),
+  })
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById("import-report");
+      el.style.display = "";
+      const contextLabel = context === "agg_crimes" ? "Aggravated Crimes" : "Case Work";
+      let html = `<h4>Import Result</h4>`;
+      html += `<div class="report-stat">${d.assigned} player(s) assigned to <strong>${assignment}</strong> in <strong>${contextLabel}</strong>.</div>`;
+      if (d.unmatched.length) {
+        html += `<div class="unmatched-list"><strong>${d.unmatched.length} name(s) not found (possible typos):</strong><ul>`;
+        d.unmatched.forEach(n => { html += `<li>${n}</li>`; });
+        html += `</ul></div>`;
+      } else {
+        html += `<div style="color:var(--ok,#4ade80);margin-top:6px">All names matched.</div>`;
+      }
+      el.innerHTML = html;
+
+      // Refresh selects for matched names in the active tab
+      if (d.assigned > 0) {
+        d.matched.forEach(name => {
+          const rows = document.querySelectorAll(".tab-panel.active .player-row");
+          rows.forEach(row => {
+            if (row.dataset.name === name.toLowerCase()) {
+              const sel = row.querySelector("select");
+              if (sel) sel.value = assignment;
+            }
+          });
+        });
+      }
+    })
+    .catch(() => {
+      document.getElementById("import-report").style.display = "";
+      document.getElementById("import-report").innerHTML = `<div style="color:var(--error,#f87171)">Import failed.</div>`;
+    });
 }
 </script>
 </body>
