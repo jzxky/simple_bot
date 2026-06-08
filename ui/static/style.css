@@ -75,7 +75,6 @@ header h1 {
   display: flex;
   align-items: center;
   gap: 10px;
-  justify-content: space-between;
 }
 
 .card h3 {
@@ -90,7 +89,6 @@ header h1 {
   display: flex;
   align-items: center;
   gap: 10px;
-  justify-content: space-between;
 }
 .card h3:first-of-type { margin-top: 0; }
 
@@ -133,7 +131,7 @@ select option { background: var(--surface2); }
 
 /* Push toggles to the right edge when inside headings */
 .card h2 .toggle-label,
-.card h3 .toggle-label { margin-left: auto; }
+.card h3 .toggle-label { margin-left: auto; flex: none; }
 
 /* Toggle switch */
 .toggle-label {
