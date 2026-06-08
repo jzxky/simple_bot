@@ -182,6 +182,7 @@ function pollStatus() {
       document.getElementById("stat-health").textContent = d.health != null ? d.health + "%" : "--";
       document.getElementById("stat-energy").textContent = d.energy != null ? d.energy + "%" : "--";
       document.getElementById("stat-earns").textContent = d.earns_24h != null ? d.earns_24h : "--";
+      document.getElementById("stat-cons-24h").textContent = d.consumables_24h != null ? d.consumables_24h : "--";
       document.getElementById("stat-aggpro").textContent = d.agg_pro_active ? "Active" : "Inactive";
 
       const fmt = n => "$" + (n ?? 0).toLocaleString();

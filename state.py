@@ -28,6 +28,7 @@ class GameState:
     next_rank: str = ""
     rank_progress: int = 0
     earns_24h: int = 0
+    consumables_24h: int = 0
     consumables: dict = field(default_factory=dict)
     action_timer_ready: bool = False
     action_timer_end: Optional[datetime] = None
@@ -145,6 +146,17 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
             s.earns_24h = int(float(earns_bar.get("aria-valuenow", 0)))
         except (ValueError, TypeError):
             pass
+
+    # Consumables used in last 24h (display_top label → display_end value)
+    for top in soup.find_all("div", id="display_top"):
+        if "Consumables / 24h" in top.get_text():
+            nxt = top.find_next_sibling("div", id="display_end")
+            if nxt:
+                try:
+                    s.consumables_24h = int(nxt.get_text(strip=True))
+                except (ValueError, TypeError):
+                    pass
+            break
 
     # Consumables inventory (from inline JS object)
     script = soup.find("script", string=re.compile(r"var consumables"))
