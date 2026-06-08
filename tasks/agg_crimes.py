@@ -95,3 +95,6 @@ class AggCrimeTask(Task):
             else:
                 self._cooldown_until = time.monotonic() + COOLDOWN_SECONDS
                 state.add_log("All targets exhausted — 3 minute cooldown started.")
+        elif self._hack_exhausted:
+            # Away crime ran and did not exhaust — go back to hack on next tick
+            self._hack_exhausted = False
