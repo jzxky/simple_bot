@@ -126,25 +126,7 @@ def handle_check_earns(action: Action, state: GameState):
     if not _check_session(state):
         return
 
-    # Check the earn is available (non-red option) before doing anything
-    earn_soup = BeautifulSoup(page.content(), "html.parser")
-    earn_div = earn_soup.find("div", class_="earn-option", attrs={"data-earn": earn_type})
-    if earn_div:
-        span = earn_div.find("span")
-        color = (span.get("style") or "") if span else ""
-        unavailable = "color: #FF0" in color or (span and span.find("s") is not None)
-    else:
-        unavailable = True
-
-    if unavailable:
-        earn_name = earn_div.find("span").get_text(strip=True) if earn_div else earn_type
-        state.add_log(f"Earn '{earn_name}' is not available — disabling earns. Select a new earn and save to re-enable.")
-        c = cfg.load()
-        c["earns"]["enabled"] = False
-        cfg.save(c)
-        return
-
-    # Enable AUTO mode — check if the auto panel is hidden, if so click the knob to toggle
+    # Enable AUTO mode first — check if the auto panel is hidden, if so click the knob to toggle
     auto_div = page.query_selector("div.mm-earn-mode-auto")
     if auto_div:
         style = auto_div.get_attribute("style") or ""
@@ -157,8 +139,23 @@ def handle_check_earns(action: Action, state: GameState):
             )
             state.add_log("Switched to AUTO earn mode.")
 
-    # Read queue count
+    # Check earn is available by looking for it in the schedule select inside the auto panel
     soup = BeautifulSoup(page.content(), "html.parser")
+    auto_panel = soup.find("div", class_="mm-earn-mode-auto")
+    available_values = []
+    if auto_panel:
+        sel = auto_panel.find("select", attrs={"name": "schedule_earn_identifier"})
+        if sel:
+            available_values = [o.get("value", "") for o in sel.find_all("option")]
+
+    if earn_type not in available_values:
+        state.add_log(f"Earn '{earn_type}' is not available — disabling earns. Select a new earn and save to re-enable.")
+        c = cfg.load()
+        c["earns"]["enabled"] = False
+        cfg.save(c)
+        return
+
+    # Read queue count
     cap_span = soup.find("span", class_="mm-earn-queue-cap")
     current_count = 0
     if cap_span:
