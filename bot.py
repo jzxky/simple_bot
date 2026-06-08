@@ -31,6 +31,7 @@ _reload_event = threading.Event()
 _screenshot_request: queue.Queue = queue.Queue(maxsize=1)
 _screenshot_result: queue.Queue = queue.Queue(maxsize=1)
 _consume_queue: queue.Queue = queue.Queue()
+_clear_earn_event = threading.Event()
 state = GameState()
 
 
@@ -167,6 +168,11 @@ def _run(c: dict):
 
             sched.tick(state, executor)
 
+            # Clear earn queue if requested from UI
+            if _clear_earn_event.is_set():
+                _clear_earn_event.clear()
+                executor.execute(Action("clear_earn_queue"), state)
+
             # Payback after a successful crime
             if getattr(state, "_last_crime_victim", None) and c.get("payback_enabled", False):
                 executor.execute(
@@ -236,6 +242,10 @@ def request_reload():
 
 def request_consume(consume_type: str):
     _consume_queue.put(consume_type)
+
+
+def request_clear_earn_queue():
+    _clear_earn_event.set()
 
 
 def request_screenshot(timeout: float = 10.0) -> bytes:

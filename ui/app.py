@@ -120,6 +120,14 @@ def status():
     })
 
 
+@app.route("/clear_earn_queue", methods=["POST"])
+def clear_earn_queue():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    bot.request_clear_earn_queue()
+    return jsonify({"ok": True})
+
+
 @app.route("/consume", methods=["POST"])
 def consume():
     consume_type = request.get_json().get("type", "")

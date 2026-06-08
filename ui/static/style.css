@@ -273,6 +273,23 @@ button {
 .consumable-qty  { color: var(--text); font-weight: 600; }
 .consumable-link { color: var(--gold); cursor: pointer; text-decoration: underline; }
 
+/* Inline action buttons inside cards */
+.action-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: var(--radius);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.action-btn:hover { border-color: var(--accent); color: var(--accent); }
+.action-btn:disabled { opacity: 0.5; cursor: default; }
+
 /* Credential field with inline show/hide button */
 .input-with-btn {
   display: flex;
