@@ -12,7 +12,7 @@
 
   /* Hide low-priority columns on mobile */
   @media (max-width: 600px) {
-    .col-homecity, .col-rank { display:none; }
+    .col-homecity, .col-rank, .col-occupation { display:none; }
   }
 
   /* Sortable column headers */
@@ -121,14 +121,14 @@
           <tr>
             <th data-col="name" style="width:160px">Username <span class="sort-arrow" id="{{ tid }}-arrow-name">▲</span></th>
             <th data-col="homecity" class="col-homecity">Home City <span class="sort-arrow" id="{{ tid }}-arrow-homecity">▲</span></th>
-            <th data-col="occupation">Occupation <span class="sort-arrow" id="{{ tid }}-arrow-occupation">▲</span></th>
+            <th data-col="occupation" class="col-occupation">Occupation <span class="sort-arrow" id="{{ tid }}-arrow-occupation">▲</span></th>
             <th data-col="rank" class="col-rank">Rank <span class="sort-arrow" id="{{ tid }}-arrow-rank">▲</span></th>
             <th data-col="assignment" style="width:130px">Assignment <span class="sort-arrow" id="{{ tid }}-arrow-assignment">▲</span></th>
           </tr>
           <tr class="col-filter-row">
             <th><input type="text" placeholder="Name…" oninput="applyFilters()" data-filter="name"></th>
             <th class="col-homecity"><input type="text" placeholder="City…" oninput="applyFilters()" data-filter="homecity"></th>
-            <th><input type="text" placeholder="Occupation…" oninput="applyFilters()" data-filter="occupation"></th>
+            <th class="col-occupation"><input type="text" placeholder="Occupation…" oninput="applyFilters()" data-filter="occupation"></th>
             <th class="col-rank"><input type="text" placeholder="Rank…" oninput="applyFilters()" data-filter="rank"></th>
             <th><input type="text" placeholder="Assignment…" oninput="applyFilters()" data-filter="assignment"></th>
           </tr>
@@ -144,7 +144,7 @@
               data-assignment="{{ lists[context].get(name, '') | lower }}">
             <td>{{ name }}</td>
             <td class="col-homecity">{{ p.homecity }}</td>
-            <td>{{ p.occupation }}</td>
+            <td class="col-occupation">{{ p.occupation }}</td>
             <td class="col-rank">{{ p.rank }}</td>
             <td>
               <select class="cw-select" onchange="setAssignment('{{ name }}', '{{ context }}', this.value, this)">
