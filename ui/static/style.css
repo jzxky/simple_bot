@@ -254,6 +254,9 @@ button {
   font-weight: 600;
   color: var(--text);
 }
+.stat-timers { }
+.stat-timer-value { color: var(--accent); font-variant-numeric: tabular-nums; }
+
 .consumables-grid {
   display: flex;
   flex-wrap: wrap;
