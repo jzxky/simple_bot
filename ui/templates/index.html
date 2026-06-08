@@ -285,6 +285,7 @@
         <button class="tab-btn" onclick="showTab('casework', this)">Case Work</button>
         <button class="tab-btn" onclick="showTab('jail', this)">Jail</button>
         <button class="tab-btn" onclick="showTab('misc', this)">Misc</button>
+        <button class="tab-btn" onclick="showTab('player-lists', this)">Player Lists</button>
       </div>
 
       <div id="agg-settings" class="tab-panel active">
@@ -319,6 +320,22 @@
       <div id="promotion" class="tab-panel"><p class="placeholder">Promotion settings — coming soon.</p></div>
       <div id="casework" class="tab-panel"><p class="placeholder">Case work is configured in the Case Work section above.</p></div>
       <div id="jail"      class="tab-panel"><p class="placeholder">Jail settings — coming soon.</p></div>
+      <div id="player-lists" class="tab-panel">
+        <div class="settings-groups">
+          <div class="settings-group">
+            <h3>General</h3>
+            <div class="setting-row">
+              <label for="player_refresh_interval">Refresh interval (minutes)</label>
+              <input type="number" id="player_refresh_interval" min="1" max="1440"
+                value="{{ config.get('players', {}).get('refresh_interval_minutes', 30) }}"
+                style="width:70px">
+            </div>
+            <div class="setting-row" style="margin-top:10px">
+              <a href="/players" target="_blank" class="log-open-link">Manage Lists ↗</a>
+            </div>
+          </div>
+        </div>
+      </div>
       <div id="misc" class="tab-panel">
         <div class="row">
           <label class="inline-toggle">

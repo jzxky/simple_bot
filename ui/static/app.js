@@ -94,6 +94,7 @@ function saveConfig() {
     hospital_poll_interval: parseInt(document.getElementById("hospital_poll_interval").value) || 31,
     fire_poll_interval: parseInt(document.getElementById("fire_poll_interval").value) || 31,
     hospital_tasks: _serializePriorityTable("hospital-priority-body"),
+    player_refresh_interval: parseInt(document.getElementById("player_refresh_interval").value) || 30,
   };
 
   return fetch("/save", {
