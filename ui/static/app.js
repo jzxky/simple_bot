@@ -1,12 +1,12 @@
 const EARN_MAP = {
-  Secret:      [["whore","Whore"],["street_fight","Streetfight"],["joyride","Joyride"],["pimp","Pimp"]],
+  Secret:      [["whore","Whore"],["street_fight","Streetfight"],["joy_ride","Joyride"],["pimp","Pimp"]],
   General:     [["shoplift","Shoplift"],["steal_cheques","Steal Cheques"]],
   Hospital:    [["nurse","Nurse"],["doctor","Doctor"],["surgeon","Surgeon"]],
   Engineering: [["mechanic","Mechanic"]],
   Bank:        [["bank_teller","Work at Local Bank"]],
   Mortician:   [["mortician_assistant","Mortician Assistant"]],
   Law:         [["legal_secretary","Legal Secretary"]],
-  Crime:       [["shoplift","Shoplift"],["steal_cheques","Steal Cheques"],["drag_racing","Compete at illegal drags"],["hack_bank","Hack bank account"],["scams","Scamming"]],
+  Crime:       [["shoplift","Shoplift"],["steal_cheques","Steal Cheques"],["drag_racing","Compete at illegal drags"],["hack_bank","Hack bank account"],["scamming","Scamming"]],
 };
 
 const ACTION_SUB_MAP = {
