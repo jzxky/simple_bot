@@ -423,10 +423,6 @@ def handle_consume(action: Action, state: GameState):
     msg_div = soup.find("div", id="success") or soup.find("div", id="fail")
     msg = msg_div.get_text(strip=True) if msg_div else "No result."
     state.add_log(f"Consume {consume_type}: {msg}")
-    # Game bug redirects to profile/default.asp after first consume — navigate away
-    # to prevent OneSignal background polling from destabilising the browser.
-    if "profile/default" in browser.current_url():
-        _nav(PLAY_URL, state)
 
 
 def handle_refresh_state(action: Action, state: GameState):
