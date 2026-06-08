@@ -64,7 +64,7 @@ def _nav(url: str, state: GameState):
 
 def _check_session(state: GameState) -> bool:
     """Return True if still logged in, False if redirected to login page."""
-    if "default.asp" in browser.current_url() and "loggedin" not in browser.current_url():
+    if browser.current_url().rstrip("/") == "https://mafiamatrix.com/default.asp":
         state.logged_in = False
         state.add_log("Session expired, will re-login.")
         return False

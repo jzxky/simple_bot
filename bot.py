@@ -134,7 +134,7 @@ def _run(c: dict):
                 continue
 
             # Detect session expiry on every tick
-            if state.logged_in and "default.asp" in browser.current_url() and not browser.is_cloudflare_challenge():
+            if state.logged_in and browser.current_url().rstrip("/") == "https://mafiamatrix.com/default.asp" and not browser.is_cloudflare_challenge():
                 state.logged_in = False
                 if c.get("misc", {}).get("relog_on_session_expire", True):
                     state.add_log("Session expired — will re-login.")

@@ -187,6 +187,6 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     s.agg_pro_end = aggpro_t.get("end")
 
     # Login state
-    s.logged_in = "default.asp" not in url or "loggedin" in url
+    s.logged_in = url.rstrip("/") != "https://mafiamatrix.com/default.asp"
 
     return s
