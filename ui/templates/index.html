@@ -241,7 +241,7 @@
             <tr data-type="{{ task.type }}">
               <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
               <td class="priority-num">{{ loop.index }}</td>
-              <td>{{ meta.label }}{% if meta.pvp %} <span class="muted">(PvP)</span>{% endif %}</td>
+              <td>{{ meta.label }}</td>
               <td>
                 {% if meta.pvp %}
                 <select class="cw-select" id="cw_{{ task.type }}_target">
