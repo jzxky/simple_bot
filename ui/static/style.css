@@ -480,3 +480,35 @@ button {
   padding: 2px 0;
   border-bottom: 1px solid rgba(46, 64, 96, 0.3);
 }
+
+/* ── Collapsible cards ───────────────────────────────────────────────────── */
+.collapse-btn {
+  background: none; border: none;
+  color: var(--text-muted, #6b7e99);
+  cursor: pointer; font-size: 12px;
+  padding: 0; line-height: 1;
+  transition: transform 0.18s;
+  flex-shrink: 0; margin-right: 2px;
+}
+.collapse-btn.collapsed { transform: rotate(-90deg); }
+.card-body.collapsed { display: none; }
+/* Remove bottom border on h2 when card is collapsed */
+.card-body.collapsed ~ h2,
+.card h2:has(+ .card-body.collapsed) { border-bottom-color: transparent; margin-bottom: 0; padding-bottom: 6px; }
+
+/* ── Unsaved input indicator ─────────────────────────────────────────────── */
+.input-unsaved { color: var(--red) !important; }
+input.input-unsaved { color: var(--red) !important; }
+
+/* ── Inline number-field save button ────────────────────────────────────── */
+.num-save-btn {
+  font-size: 11px; padding: 2px 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-muted, #6b7e99); border-radius: var(--radius);
+  cursor: pointer; white-space: nowrap;
+}
+.num-save-btn:hover { border-color: var(--accent); color: var(--accent); }
+.num-save-btn.needed { border-color: var(--red); color: var(--red); }
+
+/* ── Credentials save button ─────────────────────────────────────────────── */
+#creds-save-btn { margin-top: 10px; }
