@@ -14,10 +14,6 @@
     <div class="status-bar">
       <span id="status-dot" class="dot stopped"></span>
       <span id="status-text">Stopped</span>
-      <span class="spacer"></span>
-      <span>Energy: <strong id="energy-val">--</strong>%</span>
-      <span>City: <strong id="city-val">--</strong></span>
-      <span>Action timer: <strong id="action-val">--</strong></span>
     </div>
   </header>
 
@@ -25,7 +21,6 @@
     <!-- Character Stats -->
     <section class="card stats-card">
       <h2>Character</h2>
-      <p class="stat-group-label">Identity</p>
       <div class="stats-grid">
         <div class="stat-item"><span class="stat-label">Name</span><span class="stat-value" id="stat-name">--</span></div>
         <div class="stat-item"><span class="stat-label">Rank</span><span class="stat-value" id="stat-rank">--</span></div>
@@ -33,8 +28,9 @@
         <div class="stat-item"><span class="stat-label">Progress</span><span class="stat-value" id="stat-rank-progress">--</span></div>
         <div class="stat-item"><span class="stat-label">Occupation</span><span class="stat-value" id="stat-occupation">--</span></div>
         <div class="stat-item"><span class="stat-label">City</span><span class="stat-value" id="stat-city">--</span></div>
+        <div class="stat-item"><span class="stat-label">Home City</span><span class="stat-value" id="stat-home-city">--</span></div>
       </div>
-      <p class="stat-group-label">Status</p>
+      <hr class="stat-divider">
       <div class="stats-grid">
         <div class="stat-item"><span class="stat-label">HP</span><span class="stat-value" id="stat-health">--</span></div>
         <div class="stat-item"><span class="stat-label">Energy</span><span class="stat-value" id="stat-energy">--</span></div>
@@ -42,12 +38,12 @@
         <div class="stat-item"><span class="stat-label">Earns / 24h</span><span class="stat-value" id="stat-earns">--</span></div>
         <div class="stat-item"><span class="stat-label">Consumables / 24h</span><span class="stat-value" id="stat-cons-24h">--</span></div>
       </div>
-      <p class="stat-group-label">Finances</p>
+      <hr class="stat-divider">
       <div class="stats-grid">
         <div class="stat-item"><span class="stat-label">Clean Money</span><span class="stat-value" id="stat-clean">--</span></div>
         <div class="stat-item"><span class="stat-label">Dirty Money</span><span class="stat-value" id="stat-dirty">--</span></div>
       </div>
-      <p class="stat-group-label">Consumables</p>
+      <hr class="stat-divider">
       <div class="consumables-grid" id="stat-consumables"></div>
     </section>
 
@@ -56,10 +52,16 @@
       <h2>Credentials</h2>
       <div class="row">
         <label>Email
-          <input type="email" id="email" value="{{ config.credentials.email }}">
+          <div class="input-with-btn">
+            <input type="password" id="email" value="{{ config.credentials.email }}" autocomplete="off">
+            <button type="button" class="input-btn" onclick="toggleFieldVisibility('email', this)">Show</button>
+          </div>
         </label>
         <label>Password
-          <input type="password" id="password" value="{{ config.credentials.password }}">
+          <div class="input-with-btn">
+            <input type="password" id="password" value="{{ config.credentials.password }}">
+            <button type="button" class="input-btn" onclick="toggleFieldVisibility('password', this)">Show</button>
+          </div>
         </label>
       </div>
     </section>
@@ -109,8 +111,8 @@
             {% endfor %}
           </select>
         </label>
-        <label>Energy Threshold %
-          <input type="number" id="primary_threshold" min="0" max="100" value="{{ config.aggravated_crimes.primary.energy_threshold }}">
+        <label class="label-narrow">Energy %
+          <input type="number" class="input-narrow" id="primary_threshold" min="0" max="100" value="{{ config.aggravated_crimes.primary.energy_threshold }}">
         </label>
       </div>
       <div class="row" id="away_crime_row" style="display:none">
@@ -121,8 +123,8 @@
             {% endfor %}
           </select>
         </label>
-        <label>Energy Threshold %
-          <input type="number" id="away_threshold" min="0" max="100" value="{{ config.aggravated_crimes.get('away_crime', {}).get('energy_threshold', 50) }}">
+        <label class="label-narrow">Energy %
+          <input type="number" class="input-narrow" id="away_threshold" min="0" max="100" value="{{ config.aggravated_crimes.get('away_crime', {}).get('energy_threshold', 50) }}">
         </label>
       </div>
 
@@ -261,18 +263,18 @@
       <button id="save-btn" onclick="saveConfig()">Save</button>
       <button id="toggle-btn" onclick="toggleBot()">Start Bot</button>
       <button id="pause-btn" onclick="togglePause()" disabled>Pause</button>
+    </div>
+    <div class="controls controls-secondary">
       <button id="screenshot-btn" onclick="takeScreenshot()">Screenshot</button>
     </div>
 
     <!-- Log -->
     <section class="card log-card">
-      <h2>
-        Activity Log
-        <span class="log-open-bar">
-          <select id="log-file-select" class="log-file-select"></select>
-          <a id="log-open-link" href="/logs" target="_blank" class="log-open-link">Open full log ↗</a>
-        </span>
-      </h2>
+      <h2>Activity Log</h2>
+      <div class="log-open-bar">
+        <select id="log-file-select" class="log-file-select"></select>
+        <a id="log-open-link" href="/logs" target="_blank" class="log-open-link">Open full log ↗</a>
+      </div>
       <div id="log-box"></div>
     </section>
   </main>

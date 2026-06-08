@@ -102,6 +102,7 @@ def status():
         "energy": s.energy,
         "action_ready": s.action_available(),
         "city": s.current_city,
+        "home_city": s.home_city,
         "error": s.last_error,
         "rank": s.rank,
         "occupation": s.occupation,

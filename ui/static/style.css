@@ -191,7 +191,8 @@ select option { background: var(--surface2); }
 .muted { color: var(--muted); font-weight: normal; }
 
 /* Controls */
-.controls { display: flex; gap: 10px; margin-bottom: 14px; }
+.controls { display: flex; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.controls-secondary { margin-bottom: 14px; }
 button {
   padding: 9px 22px;
   border: 1px solid transparent;
@@ -222,13 +223,10 @@ button {
 #screenshot-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* Character stats card */
-.stat-group-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--muted);
-  margin-bottom: 6px;
+.stat-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0 10px;
 }
 .stats-grid {
   display: grid;
@@ -275,20 +273,49 @@ button {
 .consumable-qty  { color: var(--text); font-weight: 600; }
 .consumable-link { color: var(--gold); cursor: pointer; text-decoration: underline; }
 
+/* Credential field with inline show/hide button */
+.input-with-btn {
+  display: flex;
+  gap: 6px;
+}
+.input-with-btn input { flex: 1; }
+.input-btn {
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  height: 33px;
+  align-self: flex-end;
+}
+.input-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Narrow number input for energy thresholds */
+.label-narrow { flex: 0 0 auto; min-width: unset; }
+.input-narrow { width: 70px !important; padding: 7px 8px; }
+
 /* Log */
-.log-card h2 { margin-bottom: 8px; align-items: center; }
+.log-card h2 { margin-bottom: 8px; }
 .log-open-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 .log-file-select {
   font-size: 11px;
   padding: 3px 6px;
-  width: auto;
+  flex: 1;
   min-width: 0;
-  max-width: 200px;
+  max-width: 300px;
 }
 .log-open-link {
   font-size: 11px;

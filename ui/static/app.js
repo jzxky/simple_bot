@@ -167,11 +167,6 @@ function pollStatus() {
         _prevEarnsEnabled = d.earns_enabled;
       }
 
-      // Status bar
-      document.getElementById("energy-val").textContent = d.energy ?? "--";
-      document.getElementById("city-val").textContent = d.city || "--";
-      document.getElementById("action-val").textContent = d.action_ready ? "Ready" : "Waiting";
-
       // Character stats
       document.getElementById("stat-name").textContent = d.own_name || "--";
       document.getElementById("stat-rank").textContent = d.rank || "--";
@@ -179,6 +174,7 @@ function pollStatus() {
       document.getElementById("stat-rank-progress").textContent = d.rank_progress != null ? d.rank_progress + "%" : "--";
       document.getElementById("stat-occupation").textContent = d.occupation || "--";
       document.getElementById("stat-city").textContent = d.city || "--";
+      document.getElementById("stat-home-city").textContent = d.home_city || "--";
       document.getElementById("stat-health").textContent = d.health != null ? d.health + "%" : "--";
       document.getElementById("stat-energy").textContent = d.energy != null ? d.energy + "%" : "--";
       document.getElementById("stat-earns").textContent = d.earns_24h != null ? d.earns_24h : "--";
@@ -231,6 +227,17 @@ function takeScreenshot() {
       btn.textContent = "Screenshot";
       btn.disabled = false;
     });
+}
+
+function toggleFieldVisibility(id, btn) {
+  const el = document.getElementById(id);
+  if (el.type === "password") {
+    el.type = "text";
+    btn.textContent = "Hide";
+  } else {
+    el.type = "password";
+    btn.textContent = "Show";
+  }
 }
 
 function consumeItem(type) {
