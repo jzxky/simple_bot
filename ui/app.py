@@ -247,5 +247,28 @@ def players_assign():
     return jsonify({"ok": True})
 
 
+@app.route("/players/import", methods=["POST"])
+def players_import():
+    data = request.get_json()
+    names = [n.strip() for n in data.get("names", []) if n.strip()]
+    context = data.get("context", "agg_crimes")
+    assignment = data.get("assignment", "blacklist")
+
+    store = pl.load()
+    known = {k.lower(): k for k in store["players"]}
+
+    matched = []
+    unmatched = []
+    for name in names:
+        canonical = known.get(name.lower())
+        if canonical:
+            pl.set_assignment(canonical, context, assignment)
+            matched.append(canonical)
+        else:
+            unmatched.append(name)
+
+    return jsonify({"assigned": len(matched), "matched": matched, "unmatched": unmatched})
+
+
 def run():
     app.run(host="0.0.0.0", port=8080, debug=False)
