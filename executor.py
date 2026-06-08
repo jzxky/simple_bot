@@ -18,6 +18,8 @@ CRIME_URL = "https://mafiamatrix.com/income/agcrime.asp"
 EARN_URL = "https://mafiamatrix.com/income/earn.asp"
 CS_URL = "https://mafiamatrix.com/income/communityservice.asp"
 FD_URL = "https://mafiamatrix.com/income/fireduties.asp"
+DM_URL = "https://mafiamatrix.com/income/manufacture.asp"
+INCOME_URL = "https://mafiamatrix.com/income/income.asp"
 TRANSFER_URL = "https://mafiamatrix.com/income/bank.asp?option=transfers"
 USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
 BIZ_URL = "https://mafiamatrix.com/business/business.asp"
@@ -723,6 +725,29 @@ def handle_armed_robbery(action: Action, state: GameState):
     _nav(PLAY_URL, state)
 
 
+def handle_drug_manufacturing(action: Action, state: GameState):
+    page = browser.page()
+    _nav(DM_URL, state)
+
+    if not _check_session(state):
+        return
+
+    if INCOME_URL in browser.current_url():
+        state.add_log("Drug manufacturing redirected to income page — likely missing science degree or not in Gangster career.")
+        return
+
+    select = page.query_selector("select[name='action']")
+    if not select:
+        state.add_log("Drug manufacturing: action select not found on page.")
+        return
+
+    page.select_option("select[name='action']", value="Yes")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log("Drug manufacturing: submitted.")
+
+
 # ---------------------------------------------------------------------------
 # Executor
 # ---------------------------------------------------------------------------
@@ -740,6 +765,7 @@ HANDLERS = {
     "do_fire_duties": handle_fire_duties,
     "do_career_training": handle_career_training,
     "do_armed_robbery": handle_armed_robbery,
+    "do_drug_manufacturing": handle_drug_manufacturing,
 }
 
 
