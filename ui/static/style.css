@@ -222,10 +222,18 @@ button {
 #screenshot-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* Character stats card */
+.stat-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
   margin-bottom: 12px;
 }
 .stat-item {
@@ -247,17 +255,6 @@ button {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
-}
-.stat-consumables {
-  margin-top: 4px;
-}
-.stat-consumables > .stat-label {
-  display: block;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin-bottom: 6px;
 }
 .consumables-grid {
   display: flex;

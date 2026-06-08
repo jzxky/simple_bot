@@ -111,6 +111,7 @@ def status():
         "next_rank": s.next_rank,
         "rank_progress": s.rank_progress,
         "earns_24h": s.earns_24h,
+        "consumables_24h": s.consumables_24h,
         "agg_pro_active": s.agg_pro_active,
         "consumables": s.consumables,
         "own_name": s.own_name,
