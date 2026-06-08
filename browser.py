@@ -41,23 +41,16 @@ def start():
         PROFILE_DIR,
         channel="chrome",
         headless=False,
-        no_viewport=True,
+        viewport={"width": 1024, "height": 768},
         locale="en-US",
         timezone_id="America/New_York",
         args=[
             "--disable-notifications",
             "--disable-save-password-bubble",
-            "--start-maximized",
+            "--window-size=1024,768",
         ],
     )
     _page = _context.pages[0] if _context.pages else _context.new_page()
-    # Sync viewport to the actual window size so the page renders at full width
-    try:
-        w = _page.evaluate("() => window.outerWidth") or 1920
-        h = _page.evaluate("() => window.outerHeight") or 1080
-        _page.set_viewport_size({"width": w, "height": h})
-    except Exception:
-        _page.set_viewport_size({"width": 1920, "height": 1080})
     print("[browser] Browser launched.")
 
 
