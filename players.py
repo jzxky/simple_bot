@@ -10,12 +10,18 @@ import time
 from datetime import datetime
 import paths
 import browser
+import config as cfg
 from tasks.base import Task
 
 PLAYERS_PATH = os.path.join(paths.data_dir(), "players.json")
 USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
 DEAD_CITIES = {"heaven", "hell", "locked"}
-REFRESH_INTERVAL = 30 * 60  # seconds
+_DEFAULT_REFRESH_INTERVAL = 30 * 60  # seconds
+
+
+def _refresh_interval() -> int:
+    minutes = cfg.load().get("players", {}).get("refresh_interval_minutes", 30)
+    return max(1, int(minutes)) * 60
 
 _lock = threading.Lock()
 
@@ -128,7 +134,7 @@ class PlayerRefreshTask(Task):
         self._last_run: float = 0.0
 
     def can_run(self, state) -> bool:
-        return state.logged_in and time.monotonic() - self._last_run >= REFRESH_INTERVAL
+        return state.logged_in and time.monotonic() - self._last_run >= _refresh_interval()
 
     def run(self, state, executor):
         self._last_run = time.monotonic()

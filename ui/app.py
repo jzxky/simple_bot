@@ -59,6 +59,9 @@ def save():
 
     c["payback_enabled"] = data.get("payback_enabled", False)
 
+    c.setdefault("players", {})
+    c["players"]["refresh_interval_minutes"] = int(data.get("player_refresh_interval", 30))
+
     c.setdefault("misc", {})
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)

@@ -63,6 +63,9 @@ DEFAULT_CONFIG = {
         "fire": {
             "poll_interval": 31
         }
+    },
+    "players": {
+        "refresh_interval_minutes": 30
     }
 }
 
