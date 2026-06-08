@@ -141,6 +141,7 @@ select option { background: var(--surface2); }
   flex-direction: row;
   gap: 6px;
   min-width: unset;
+  flex: none;
 }
 .toggle-label input[type="checkbox"] { display: none; }
 .toggle {
