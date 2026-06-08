@@ -65,7 +65,9 @@ function showTab(id, btn) {
   btn.classList.add("active");
 }
 
-function saveConfig() {
+// ── Save ─────────────────────────────────────────────────────────────────────
+
+function _doSave() {
   const data = {
     email: document.getElementById("email").value,
     password: document.getElementById("password").value,
@@ -101,10 +103,72 @@ function saveConfig() {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(data),
-  }).then(r => r.json()).then(() => {
-    const btn = document.getElementById("save-btn");
-    btn.textContent = "Saved!";
-    setTimeout(() => btn.textContent = "Save", 1500);
+  }).then(r => r.json());
+}
+
+function autoSave() {
+  _doSave();
+}
+
+// ── Credentials save ──────────────────────────────────────────────────────────
+
+function markCredsDirty() {
+  document.getElementById("email").classList.add("input-unsaved");
+  document.getElementById("password").classList.add("input-unsaved");
+  document.getElementById("creds-save-btn").classList.add("needed");
+}
+
+function saveCredentials() {
+  _doSave().then(() => {
+    document.getElementById("email").classList.remove("input-unsaved");
+    document.getElementById("password").classList.remove("input-unsaved");
+    document.getElementById("creds-save-btn").classList.remove("needed");
+  });
+}
+
+// ── Number input save ─────────────────────────────────────────────────────────
+
+function markNumDirty(el) {
+  el.classList.add("input-unsaved");
+  const btn = document.getElementById("save-" + el.id);
+  if (btn) btn.classList.add("needed");
+}
+
+function saveNum(id) {
+  _doSave().then(() => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove("input-unsaved");
+    const btn = document.getElementById("save-" + id);
+    if (btn) btn.classList.remove("needed");
+  });
+}
+
+// ── Collapse ──────────────────────────────────────────────────────────────────
+
+function _collapseState() {
+  try { return JSON.parse(localStorage.getItem("mm_collapse") || "{}"); } catch { return {}; }
+}
+
+function toggleSection(id) {
+  const section = document.getElementById(id);
+  const body = section.querySelector(".card-body");
+  const btn = section.querySelector(".collapse-btn");
+  const collapsed = body.classList.toggle("collapsed");
+  btn.classList.toggle("collapsed", collapsed);
+  const state = _collapseState();
+  state[id] = collapsed;
+  localStorage.setItem("mm_collapse", JSON.stringify(state));
+}
+
+function initCollapse() {
+  const state = _collapseState();
+  document.querySelectorAll(".card[id]").forEach(section => {
+    if (state[section.id]) {
+      const body = section.querySelector(".card-body");
+      const btn = section.querySelector(".collapse-btn");
+      if (body) body.classList.add("collapsed");
+      if (btn) btn.classList.add("collapsed");
+    }
   });
 }
 
@@ -118,7 +182,7 @@ function toggleBot() {
       .then(r => r.json())
       .then(d => updateBotState(d.running, d.paused));
   } else {
-    saveConfig().then(() =>
+    _doSave().then(() =>
       fetch("/start", {method: "POST"})
         .then(r => r.json())
         .then(d => updateBotState(d.running, d.paused))
@@ -362,14 +426,9 @@ function takeScreenshot() {
 function clearEarnQueue() {
   const btn = document.getElementById("clear-earn-btn");
   btn.disabled = true;
-  btn.textContent = "Queuing...";
   fetch("/clear_earn_queue", { method: "POST" })
     .then(r => r.json())
-    .then(d => {
-      btn.textContent = d.error ? "Error" : "Queued";
-      setTimeout(() => { btn.textContent = "Clear Queue"; btn.disabled = false; }, 2000);
-    })
-    .catch(() => { btn.textContent = "Clear Queue"; btn.disabled = false; });
+    .finally(() => { btn.disabled = false; });
 }
 
 function toggleFieldVisibility(id, btn) {
@@ -465,6 +524,7 @@ function _moveRow(btn, dir) {
     if (next) tbody.insertBefore(next, row);
   }
   _renumberTable(tbody.id);
+  autoSave();
 }
 
 function _renumberTable(tbodyId) {
