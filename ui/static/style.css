@@ -369,16 +369,26 @@ button {
   vertical-align: middle;
 }
 .priority-table tr:last-child td { border-bottom: none; }
-.priority-table tr.drag-over { background: rgba(200,168,75,0.1); }
-.drag-handle {
-  cursor: grab;
-  color: var(--muted);
-  font-size: 16px;
-  user-select: none;
-  width: 20px;
-  text-align: center;
+.priority-move {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 28px;
 }
-.drag-handle:active { cursor: grabbing; }
+.priority-move button {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  padding: 1px 4px;
+  cursor: pointer;
+  line-height: 1.4;
+  font-weight: bold;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.priority-move button:hover { border-color: var(--accent); color: var(--accent); }
 .priority-num {
   color: var(--muted);
   font-size: 11px;

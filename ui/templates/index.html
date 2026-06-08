@@ -230,8 +230,8 @@
               {'type':'dna',        'label':'DNA Testing',  'pvp':false, 'enabled':true},
             ]) %}
             {% for task in hosp_tasks %}
-            <tr draggable="true" data-type="{{ task.type }}">
-              <td class="drag-handle">⠿</td>
+            <tr data-type="{{ task.type }}">
+              <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
               <td class="priority-num">{{ loop.index }}</td>
               <td>{{ task.label }}{% if task.pvp %} <span class="muted">(PvP)</span>{% endif %}</td>
               <td>
