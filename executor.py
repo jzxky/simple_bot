@@ -772,23 +772,6 @@ def handle_drug_manufacturing(action: Action, state: GameState):
     state.add_log("Drug manufacturing: submitted.")
 
 
-_HOSPITAL_EMPTY_MARKERS = [
-    "There are currently no patients",
-    "There are currently no DNA samples",
-]
-
-
-def _save_casework_snapshot(name: str, html: str):
-    import datetime
-    site_map_dir = os.path.join(paths.data_dir(), "site_map")
-    os.makedirs(site_map_dir, exist_ok=True)
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    with open(os.path.join(site_map_dir, f"{name}_{ts}.html"), "w", encoding="utf-8") as f:
-        f.write(html)
-    png = browser.page().screenshot()
-    with open(os.path.join(site_map_dir, f"{name}_{ts}.png"), "wb") as f:
-        f.write(png)
-
 
 _HOSPITAL_INJURY_TYPE = {
     "sex change": "sex_change",
@@ -825,19 +808,22 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     if not table:
         return
 
-    # Parse each patient row: extract injury text and surgery link
+    # Parse each patient row: extract injury text and surgery/dna link
     available = {}  # task_type -> (label, url)
     rows = table.find_all("tr")
     for row in rows:
         cells = row.find_all("td", class_="display_border")
-        if len(cells) < 4:
+        if len(cells) < 2:
+            continue
+        patient_name = cells[0].get_text(strip=True)
+        if state.own_name and patient_name.lower() == state.own_name.lower():
             continue
         patient_name = cells[0].get_text(strip=True)
         if state.own_name and patient_name.lower() == state.own_name.lower():
             continue
         injury = cells[1].get_text(strip=True)
         task_type = _hospital_injury_to_type(injury)
-        link = cells[3].find("a", href=lambda h: h and "display=surgery" in h)
+        link = row.find("a", href=lambda h: h and ("display=surgery" in h or "display=dna" in h))
         if link and task_type not in available:
             href = link["href"]
             if not href.startswith("http"):
