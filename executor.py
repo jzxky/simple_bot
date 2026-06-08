@@ -472,17 +472,31 @@ def handle_payback(action: Action, state: GameState):
     amount = action.params["amount"]
     target = action.params["target"]
     page = browser.page()
-    _nav(TRANSFER_URL, state)
 
-    if not _check_session(state):
+    for attempt in range(2):
+        _nav(TRANSFER_URL, state)
+
+        if not _check_session(state):
+            return
+
+        page.fill("input[name='transferamount']", str(amount))
+        page.fill("input[name='transfername']", target)
+        page.click("input[name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+
+        soup = BeautifulSoup(page.content(), "html.parser")
+        result_text = soup.get_text()
+
+        if "Your transfer was blocked due to possible spam!" in result_text:
+            state.add_log(f"Payback to {target} blocked as spam — retrying in 60s.")
+            time.sleep(60)
+            continue
+
+        _refresh_state(state)
+        state.add_log(f"Payback sent: ${amount:,} to {target}.")
         return
 
-    page.fill("input[name='transferamount']", str(amount))
-    page.fill("input[name='transfername']", target)
-    page.click("input[name='B1']")
-    page.wait_for_load_state("domcontentloaded")
-    _refresh_state(state)
-    state.add_log(f"Payback sent: ${amount:,} to {target}.")
+    state.add_log(f"Payback to {target} blocked twice — giving up.")
 
 
 def handle_community_service(action: Action, state: GameState):
