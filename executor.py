@@ -844,6 +844,21 @@ def handle_check_hospital_cases(action: Action, state: GameState):
                 href = "https://mafiamatrix.com/localcity/" + href
             available[task_type] = (injury, href)
 
+    # Check for a separate DNA table — look for any heading containing "DNA"
+    # followed by a table. Workflow is unknown; log and snapshot for investigation.
+    page_html = browser.page().content()
+    dna_soup = BeautifulSoup(page_html, "html.parser")
+    dna_heading = dna_soup.find(lambda tag: tag.name in ("h2", "h3", "b", "strong", "p")
+                                and "dna" in tag.get_text(strip=True).lower())
+    if dna_heading:
+        dna_table = dna_heading.find_next("table")
+        if dna_table:
+            dna_rows = [r for r in dna_table.find_all("tr")
+                        if r.find_all("td", class_="display_border")]
+            if dna_rows:
+                state.add_log(f"Hospital: found {len(dna_rows)} DNA sample(s) — snapshotting for investigation.")
+                _save_casework_snapshot("dna_samples", page_html)
+
     if not available:
         return
 
