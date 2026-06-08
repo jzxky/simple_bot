@@ -244,3 +244,24 @@ function consumeItem(type) {
 function escHtml(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
+
+function loadLogFiles() {
+  fetch("/logs/list")
+    .then(r => r.json())
+    .then(d => {
+      const sel = document.getElementById("log-file-select");
+      const link = document.getElementById("log-open-link");
+      const files = d.files || [];
+      sel.innerHTML = files.length
+        ? files.map(f => `<option value="${escHtml(f)}">${escHtml(f)}</option>`).join("")
+        : `<option value="">No logs</option>`;
+      sel.onchange = () => {
+        const f = sel.value;
+        if (f) link.href = "/logs/" + encodeURIComponent(f);
+      };
+      if (files.length) link.href = "/logs/" + encodeURIComponent(files[0]);
+    })
+    .catch(() => {});
+}
+
+loadLogFiles();

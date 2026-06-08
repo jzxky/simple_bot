@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log — {{ filename }}</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .log-viewer {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--text);
+  }
+  .log-viewer .log-line {
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(46, 64, 96, 0.3);
+  }
+  .log-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .log-toolbar select {
+    flex: 1;
+    min-width: 220px;
+  }
+  .log-filename {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'Consolas', 'Courier New', monospace;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Activity Log</h1>
+  </header>
+  <main>
+    <section class="card">
+      <div class="log-toolbar">
+        <select id="log-select" onchange="switchLog()">
+          {% for f in log_files %}
+          <option value="{{ f }}" {% if f == filename %}selected{% endif %}>{{ f }}</option>
+          {% endfor %}
+        </select>
+        <span class="log-filename">{{ line_count }} lines</span>
+      </div>
+      <div class="log-viewer" id="log-viewer">
+        {% for line in lines %}
+        <div class="log-line">{{ line }}</div>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+function switchLog() {
+  const f = document.getElementById("log-select").value;
+  window.location.href = "/logs/" + encodeURIComponent(f);
+}
+// Scroll to bottom on load
+window.addEventListener("load", () => {
+  const v = document.getElementById("log-viewer");
+  v.scrollTop = v.scrollHeight;
+});
+</script>
+</body>
+</html>

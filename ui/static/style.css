@@ -276,7 +276,29 @@ button {
 .consumable-link { color: var(--gold); cursor: pointer; text-decoration: underline; }
 
 /* Log */
-.log-card h2 { margin-bottom: 8px; }
+.log-card h2 { margin-bottom: 8px; align-items: center; }
+.log-open-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.log-file-select {
+  font-size: 11px;
+  padding: 3px 6px;
+  width: auto;
+  min-width: 0;
+  max-width: 200px;
+}
+.log-open-link {
+  font-size: 11px;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.log-open-link:hover { color: var(--accent-hover); text-decoration: underline; }
 #log-box {
   background: var(--surface2);
   border: 1px solid var(--border);
