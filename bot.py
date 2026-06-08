@@ -25,6 +25,7 @@ from tasks.case_work import HospitalCaseWorkTask
 from tasks.away_action import AwayActionTask
 from tasks.refresh import RefreshTask
 from tasks.consume import ConsumeTask
+from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
 _stop_event = threading.Event()
@@ -94,6 +95,7 @@ def _build_scheduler(c: dict) -> Scheduler:
 
     sched.add(RefreshTask(interval_seconds=60))
     sched.add(ConsumeTask(_consume_queue))
+    sched.add(PlayerRefreshTask())
 
     return sched
 

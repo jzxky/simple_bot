@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MafiaMatrix Bot — Players</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1 style="margin-bottom:10px"><a href="/" style="color:var(--accent);text-decoration:none">← Back</a> &nbsp; Player Lists</h1>
+    <div class="status-bar">
+      <span>Updated: <span id="last-updated">{{ last_updated or "Never" }}</span></span>
+      <span class="spacer"></span>
+      <span id="player-count" class="muted">{{ active_count }} active</span>
+      <button id="refresh-btn" class="action-btn" onclick="refreshPlayers()">Refresh List</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Player Lists</h2>
+
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="showTab('tab-agg', this)">Aggravated Crimes</button>
+        <button class="tab-btn" onclick="showTab('tab-casework', this)">Case Work</button>
+      </div>
+
+      <div style="margin-bottom:10px">
+        <input type="text" id="search" placeholder="Search players..." oninput="filterTable()" style="max-width:300px">
+      </div>
+
+      {% macro player_table(context) %}
+      <table class="priority-table" style="font-size:12px">
+        <thead>
+          <tr>
+            <th style="width:160px">Username</th>
+            <th>Home City</th>
+            <th>Occupation</th>
+            <th>Rank</th>
+            <th style="width:130px">Assignment</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for name, p in players | dictsort %}
+          {% if p.active %}
+          <tr class="player-row" data-name="{{ name | lower }}">
+            <td>{{ name }}</td>
+            <td>{{ p.homecity }}</td>
+            <td>{{ p.occupation }}</td>
+            <td>{{ p.rank }}</td>
+            <td>
+              <select class="cw-select" onchange="setAssignment('{{ name }}', '{{ context }}', this.value)">
+                <option value="" {% if lists[context].get(name, '') == '' %}selected{% endif %}>None</option>
+                <option value="whitelist" {% if lists[context].get(name) == 'whitelist' %}selected{% endif %}>Whitelist</option>
+                <option value="blacklist" {% if lists[context].get(name) == 'blacklist' %}selected{% endif %}>Blacklist</option>
+              </select>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endmacro %}
+
+      <div id="tab-agg" class="tab-panel active">
+        {{ player_table("agg_crimes") }}
+      </div>
+      <div id="tab-casework" class="tab-panel">
+        {{ player_table("case_work") }}
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+function showTab(id, btn) {
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  btn.classList.add("active");
+  filterTable();
+}
+
+function filterTable() {
+  const q = document.getElementById("search").value.toLowerCase();
+  document.querySelectorAll(".tab-panel.active .player-row").forEach(row => {
+    row.style.display = row.dataset.name.includes(q) ? "" : "none";
+  });
+}
+
+function setAssignment(username, context, value) {
+  fetch("/players/assign", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username, context, value}),
+  });
+}
+
+function refreshPlayers() {
+  const btn = document.getElementById("refresh-btn");
+  btn.textContent = "Refreshing...";
+  btn.disabled = true;
+  fetch("/players/refresh", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById("last-updated").textContent = d.last_updated || "";
+      document.getElementById("player-count").textContent = d.active_count + " active";
+      btn.textContent = "Done";
+      setTimeout(() => { btn.textContent = "Refresh List"; btn.disabled = false; }, 1500);
+    })
+    .catch(() => { btn.textContent = "Refresh List"; btn.disabled = false; });
+}
+</script>
+</body>
+</html>

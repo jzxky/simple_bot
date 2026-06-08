@@ -11,6 +11,7 @@ from flask import Flask, render_template, request, jsonify, abort
 import config as cfg
 import bot
 import paths
+import players as pl
 
 _ui_root = os.path.join(paths.resource_dir(), "ui")
 app = Flask(__name__,
@@ -212,6 +213,35 @@ def logs_viewer(filename):
         lines = []
     return render_template("log.html", filename=safe, log_files=files,
                            lines=lines, line_count=len(lines))
+
+
+@app.route("/players")
+def players_page():
+    store = pl.load()
+    active_count = sum(1 for p in store["players"].values() if p.get("active"))
+    return render_template(
+        "players.html",
+        players=store["players"],
+        lists=store["lists"],
+        last_updated=store.get("last_updated"),
+        active_count=active_count,
+    )
+
+
+@app.route("/players/refresh", methods=["POST"])
+def players_refresh():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running to refresh player list."}), 400
+    count = pl.refresh()
+    store = pl.load()
+    return jsonify({"active_count": count, "last_updated": store.get("last_updated")})
+
+
+@app.route("/players/assign", methods=["POST"])
+def players_assign():
+    data = request.get_json()
+    pl.set_assignment(data["username"], data["context"], data.get("value", ""))
+    return jsonify({"ok": True})
 
 
 def run():
