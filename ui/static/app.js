@@ -229,6 +229,19 @@ function takeScreenshot() {
     });
 }
 
+function clearEarnQueue() {
+  const btn = document.getElementById("clear-earn-btn");
+  btn.disabled = true;
+  btn.textContent = "Queuing...";
+  fetch("/clear_earn_queue", { method: "POST" })
+    .then(r => r.json())
+    .then(d => {
+      btn.textContent = d.error ? "Error" : "Queued";
+      setTimeout(() => { btn.textContent = "Clear Queue"; btn.disabled = false; }, 2000);
+    })
+    .catch(() => { btn.textContent = "Clear Queue"; btn.disabled = false; });
+}
+
 function toggleFieldVisibility(id, btn) {
   const el = document.getElementById(id);
   if (el.type === "password") {

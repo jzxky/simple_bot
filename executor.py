@@ -180,6 +180,36 @@ def handle_check_earns(action: Action, state: GameState):
     state.add_log("Earn queue topped up.")
 
 
+def handle_clear_earn_queue(action: Action, state: GameState):
+    page = browser.page()
+    _nav(EARN_URL, state)
+
+    if not _check_session(state):
+        return
+
+    # Ensure AUTO panel is visible
+    auto_div = page.query_selector("div.mm-earn-mode-auto")
+    if auto_div:
+        style = auto_div.get_attribute("style") or ""
+        if "display: none" in style or "display:none" in style:
+            page.click("span.mm-earn-toggle-knob")
+            page.wait_for_function(
+                "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
+                "return el && !el.style.display.includes('none'); }",
+                timeout=5000
+            )
+
+    btn = page.query_selector("button.mm-earn-queue-clear-btn")
+    if not btn:
+        state.add_log("Clear queue button not found on earn page.")
+        return
+
+    btn.click()
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log("Earn queue cleared.")
+
+
 def _get_online_local_players(state: GameState) -> list:
     """Parse the who's online sidebar from the current page HTML."""
     soup = BeautifulSoup(state.page_html, "html.parser")
@@ -695,6 +725,7 @@ def handle_armed_robbery(action: Action, state: GameState):
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
+    "clear_earn_queue": handle_clear_earn_queue,
     "do_crime": handle_do_crime,
     "check_weapon": handle_check_weapon,
     "consume": handle_consume,
