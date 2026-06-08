@@ -3,7 +3,8 @@ Aggravated crime task.
 
 Primary crime is always attempted when in home city (or for non-home-city crimes, anywhere).
 Away crime is only configured when primary is 'hack' and is attempted when not in home city.
-A 3-minute cooldown applies after all targets are exhausted.
+Armed robbery loops indefinitely — after each 12-retry pass with no targets it checks whether
+any other task (except consume) is ready; if so it yields, otherwise it retries immediately.
 """
 
 import time
@@ -33,20 +34,32 @@ class AggCrimeTask(Task):
         self.fallback_to_away = fallback_to_away
         self._cooldown_until: float = 0.0
         self._hack_exhausted: bool = False
+        self.scheduler = None  # set by bot.py after scheduler is built
+
+    def _other_task_ready(self, state: GameState) -> bool:
+        """Return True if any task other than self or ConsumeTask can run."""
+        if self.scheduler is None:
+            return False
+        from tasks.consume import ConsumeTask
+        for task in self.scheduler._tasks:
+            if task is self:
+                continue
+            if isinstance(task, ConsumeTask):
+                continue
+            if task.can_run(state):
+                return True
+        return False
 
     def _pick_crime(self, state: GameState):
         if self.primary_crime == HACK_CRIME:
             if not state.in_home_city():
-                # Out of home city — use away crime directly
                 if self.away_crime and state.energy >= self.away_threshold:
                     return self.away_crime, self.away_threshold
                 return None, 0
-            # In home city
             if not self._hack_exhausted:
                 if state.energy >= self.primary_threshold:
                     return self.primary_crime, self.primary_threshold
                 return None, 0
-            # Hack exhausted — try fallback if enabled
             if self.fallback_to_away and self.away_crime and state.energy >= self.away_threshold:
                 return self.away_crime, self.away_threshold
             return None, 0
@@ -74,6 +87,7 @@ class AggCrimeTask(Task):
                 agg_drug_house=self.armed_agg_drug_house,
                 payback_private=self.armed_payback_private,
                 payback_public=self.armed_payback_public,
+                check_other_tasks=lambda: self._other_task_ready(state),
             ), state)
         else:
             executor.execute(Action("do_crime", crime=crime, threshold=threshold), state)
@@ -84,11 +98,9 @@ class AggCrimeTask(Task):
             if (self.primary_crime == HACK_CRIME and self.fallback_to_away
                     and self.away_crime and state.in_home_city()):
                 if not self._hack_exhausted:
-                    # Hack just exhausted — switch to fallback, no cooldown yet
                     self._hack_exhausted = True
                     state.add_log("Hack targets exhausted — falling back to away crime.")
                 else:
-                    # Fallback also exhausted — cooldown, reset for next cycle
                     self._hack_exhausted = False
                     self._cooldown_until = time.monotonic() + COOLDOWN_SECONDS
                     state.add_log("All targets exhausted — 3 minute cooldown started.")
@@ -96,5 +108,4 @@ class AggCrimeTask(Task):
                 self._cooldown_until = time.monotonic() + COOLDOWN_SECONDS
                 state.add_log("All targets exhausted — 3 minute cooldown started.")
         elif self._hack_exhausted:
-            # Away crime ran and did not exhaust — go back to hack on next tick
             self._hack_exhausted = False
