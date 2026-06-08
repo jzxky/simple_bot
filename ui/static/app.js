@@ -215,13 +215,13 @@ const TIMER_LABELS = {
   jail:     "Jail",
 };
 
-// Each entry: { label, endMs (absolute ms), receivedAt (Date.now()) }
+// Each entry: { label, endMs (absolute wall-clock ms) }
 let _activeTimers = {};
 let _timerInterval = null;
+let _lastServerTime = null;  // only recalculate anchors when server_time changes
 
 function _parseServerTime(str) {
   if (!str) return null;
-  // "MM/DD/YYYY HH:MM:SS AM/PM"
   return new Date(str);
 }
 
@@ -236,17 +236,24 @@ function _fmtCountdown(secs) {
 }
 
 function updateTimers(timers, serverTimeStr) {
+  // Only re-anchor when the server has provided a fresh timestamp.
+  // Between polls the wall-clock countdown keeps ticking uninterrupted.
+  if (serverTimeStr === _lastServerTime) return;
+  _lastServerTime = serverTimeStr;
+
   const serverTime = _parseServerTime(serverTimeStr);
+  if (!serverTime) return;
+
   const now = Date.now();
   const newActive = {};
 
   for (const [key, t] of Object.entries(timers)) {
     if (t.ready || !t.end) continue;
     const endTime = _parseServerTime(t.end);
-    if (!endTime || !serverTime) continue;
+    if (!endTime) continue;
+    // Remaining seconds according to server clock, anchored to wall-clock now
     const remainingSecs = Math.floor((endTime - serverTime) / 1000);
     if (remainingSecs <= 0) continue;
-    // endMs in wall-clock time = now + remainingSecs
     newActive[key] = {
       label: TIMER_LABELS[key] || key,
       endMs: now + remainingSecs * 1000,
