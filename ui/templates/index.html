@@ -212,7 +212,8 @@
       <!-- Hospital -->
       <div id="cw-hospital" style="display:none">
         <div class="cw-poll-row">
-          Poll every
+          <a href="/players" target="_blank" class="log-open-link">Manage Lists ↗</a>
+          &nbsp;·&nbsp; Poll every
           <input type="number" id="hospital_poll_interval" class="input-narrow" min="31"
             value="{{ config.get('case_work', {}).get('hospital', {}).get('poll_interval', 31) }}">
           seconds
@@ -241,7 +242,7 @@
             <tr data-type="{{ task.type }}">
               <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
               <td class="priority-num">{{ loop.index }}</td>
-              <td>{{ meta.label }}{% if meta.pvp %} <span class="muted">(PvP)</span>{% endif %}</td>
+              <td>{{ meta.label }}</td>
               <td>
                 {% if meta.pvp %}
                 <select class="cw-select" id="cw_{{ task.type }}_target">
