@@ -90,8 +90,10 @@ function saveConfig() {
     payback_enabled: document.getElementById("payback_enabled").checked,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
-    hospital_enabled: document.getElementById("hospital_enabled").checked,
+    case_work_enabled: document.getElementById("case_work_enabled").checked,
     hospital_poll_interval: parseInt(document.getElementById("hospital_poll_interval").value) || 31,
+    fire_poll_interval: parseInt(document.getElementById("fire_poll_interval").value) || 31,
+    hospital_tasks: _serializePriorityTable("hospital-priority-body"),
   };
 
   return fetch("/save", {
@@ -195,6 +197,9 @@ function pollStatus() {
 
       // Timers
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active);
+
+      // Case work auto-detect
+      updateCaseWorkSection(d.occupation || "");
 
       // Log
       const box = document.getElementById("log-box");
@@ -410,3 +415,73 @@ function loadLogFiles() {
 }
 
 loadLogFiles();
+
+// ---------------------------------------------------------------------------
+// Case Work
+// ---------------------------------------------------------------------------
+
+const CW_HOSPITAL_OCCUPATIONS = new Set(["Nurse", "Doctor", "Surgeon", "Hospital Director"]);
+const CW_FIRE_OCCUPATIONS = new Set(["Volunteer Fire Fighter", "Fire Fighter", "Fire Chief"]);
+
+function updateCaseWorkSection(occupation) {
+  const isHospital = CW_HOSPITAL_OCCUPATIONS.has(occupation);
+  const isFire = CW_FIRE_OCCUPATIONS.has(occupation);
+  const hasWork = isHospital || isFire;
+
+  document.getElementById("cw-none").style.display = hasWork ? "none" : "";
+  document.getElementById("cw-hospital").style.display = isHospital ? "" : "none";
+  document.getElementById("cw-fire").style.display = isFire ? "" : "none";
+
+  const label = document.getElementById("cw-career-label");
+  label.textContent = isHospital ? "— Hospital" : isFire ? "— Fire" : "";
+}
+
+function _serializePriorityTable(tbodyId) {
+  const rows = document.querySelectorAll(`#${tbodyId} tr`);
+  const tasks = [];
+  rows.forEach(row => {
+    const type = row.dataset.type;
+    if (!type) return;
+    const targetSel = row.querySelector(".cw-select");
+    const toggle = row.querySelector('input[type="checkbox"]');
+    const task = { type };
+    if (targetSel) task.target = targetSel.value;
+    if (toggle) task.enabled = toggle.checked;
+    tasks.push(task);
+  });
+  return tasks;
+}
+
+// Drag-to-reorder for priority tables
+function _initDragTable(tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  let dragging = null;
+
+  tbody.addEventListener("dragstart", e => {
+    dragging = e.target.closest("tr");
+    if (dragging) dragging.style.opacity = "0.4";
+  });
+  tbody.addEventListener("dragend", e => {
+    if (dragging) dragging.style.opacity = "";
+    dragging = null;
+    _renumberTable(tbodyId);
+  });
+  tbody.addEventListener("dragover", e => {
+    e.preventDefault();
+    const target = e.target.closest("tr");
+    if (!target || target === dragging) return;
+    const rect = target.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    tbody.insertBefore(dragging, after ? target.nextSibling : target);
+  });
+}
+
+function _renumberTable(tbodyId) {
+  document.querySelectorAll(`#${tbodyId} tr`).forEach((row, i) => {
+    const num = row.querySelector(".priority-num");
+    if (num) num.textContent = i + 1;
+  });
+}
+
+_initDragTable("hospital-priority-body");

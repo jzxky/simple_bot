@@ -49,8 +49,20 @@ DEFAULT_CONFIG = {
         "relog_on_session_expire": True
     },
     "case_work": {
-        "hospital_enabled": False,
-        "hospital_poll_interval": 31
+        "enabled": False,
+        "hospital": {
+            "poll_interval": 31,
+            "tasks": [
+                {"type": "bionics",    "label": "Fit Bionics", "pvp": True,  "target": "all"},
+                {"type": "sex_change", "label": "Sex Change",  "pvp": True,  "target": "all"},
+                {"type": "flu",        "label": "Treat Flu",   "pvp": True,  "target": "all"},
+                {"type": "recover",    "label": "Recover",     "pvp": True,  "target": "all"},
+                {"type": "dna",        "label": "DNA Testing", "pvp": False, "enabled": True},
+            ]
+        },
+        "fire": {
+            "poll_interval": 31
+        }
     }
 }
 

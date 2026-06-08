@@ -186,6 +186,76 @@
       </div>
     </section>
 
+    <!-- Case Work -->
+    <section class="card" id="case-work-card">
+      <h2>
+        Case Work
+        <span id="cw-career-label" class="muted" style="font-weight:normal;font-size:11px;text-transform:none;letter-spacing:0;margin-left:4px"></span>
+        <label class="toggle-label">
+          <input type="checkbox" id="case_work_enabled" {% if config.get('case_work', {}).get('enabled') %}checked{% endif %}>
+          <span class="toggle"></span>
+        </label>
+      </h2>
+
+      <p id="cw-none" class="placeholder" style="display:none">No case work available for this occupation.</p>
+
+      <!-- Hospital -->
+      <div id="cw-hospital" style="display:none">
+        <div class="cw-poll-row">
+          Poll every
+          <input type="number" id="hospital_poll_interval" class="input-narrow" min="31"
+            value="{{ config.get('case_work', {}).get('hospital', {}).get('poll_interval', 31) }}">
+          seconds
+        </div>
+        <table class="priority-table" id="hospital-priority-table">
+          <thead>
+            <tr><th></th><th>#</th><th>Task</th><th>Target</th></tr>
+          </thead>
+          <tbody id="hospital-priority-body">
+            {% set hosp_tasks = config.get('case_work', {}).get('hospital', {}).get('tasks', [
+              {'type':'bionics',    'label':'Fit Bionics',  'pvp':true,  'target':'all'},
+              {'type':'sex_change', 'label':'Sex Change',   'pvp':true,  'target':'all'},
+              {'type':'flu',        'label':'Treat Flu',    'pvp':true,  'target':'all'},
+              {'type':'recover',    'label':'Recover',      'pvp':true,  'target':'all'},
+              {'type':'dna',        'label':'DNA Testing',  'pvp':false, 'enabled':true},
+            ]) %}
+            {% for task in hosp_tasks %}
+            <tr draggable="true" data-type="{{ task.type }}">
+              <td class="drag-handle">⠿</td>
+              <td class="priority-num">{{ loop.index }}</td>
+              <td>{{ task.label }}{% if task.pvp %} <span class="muted">(PvP)</span>{% endif %}</td>
+              <td>
+                {% if task.pvp %}
+                <select class="cw-select" id="cw_{{ task.type }}_target">
+                  {% for v, l in [('all','All'),('whitelist','Whitelist'),('not_blacklist','Not Blacklist'),('none','None')] %}
+                  <option value="{{ v }}" {% if task.get('target','all') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+                {% else %}
+                <label class="toggle-label" style="justify-content:flex-start">
+                  <input type="checkbox" id="cw_{{ task.type }}_enabled" {% if task.get('enabled', true) %}checked{% endif %}>
+                  <span class="toggle"></span>
+                </label>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Fire (placeholder) -->
+      <div id="cw-fire" style="display:none">
+        <div class="cw-poll-row">
+          Poll every
+          <input type="number" id="fire_poll_interval" class="input-narrow" min="31"
+            value="{{ config.get('case_work', {}).get('fire', {}).get('poll_interval', 31) }}">
+          seconds
+        </div>
+        <p class="placeholder">Fire case work — coming soon.</p>
+      </div>
+    </section>
+
     <!-- Tabs -->
     <section class="card tabs-card">
       <h2>Settings</h2>
@@ -228,21 +298,7 @@
       </div>
       <div id="business"  class="tab-panel"><p class="placeholder">Business settings — coming soon.</p></div>
       <div id="promotion" class="tab-panel"><p class="placeholder">Promotion settings — coming soon.</p></div>
-      <div id="casework" class="tab-panel">
-        <div class="settings-groups">
-          <div class="settings-group">
-            <h3>Hospital
-              <label class="toggle-label">
-                <input type="checkbox" id="hospital_enabled" {% if config.get('case_work', {}).get('hospital_enabled') %}checked{% endif %}>
-                <span class="toggle"></span>
-              </label>
-            </h3>
-            <label class="setting-row">Poll interval (seconds)
-              <input type="number" id="hospital_poll_interval" class="input-narrow" min="31" value="{{ config.get('case_work', {}).get('hospital_poll_interval', 31) }}">
-            </label>
-          </div>
-        </div>
-      </div>
+      <div id="casework" class="tab-panel"><p class="placeholder">Case work is configured in the Case Work section above.</p></div>
       <div id="jail"      class="tab-panel"><p class="placeholder">Jail settings — coming soon.</p></div>
       <div id="misc" class="tab-panel">
         <div class="row">
