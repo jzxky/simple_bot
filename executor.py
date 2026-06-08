@@ -23,6 +23,7 @@ INCOME_URL = "https://mafiamatrix.com/income/income.asp"
 TRANSFER_URL = "https://mafiamatrix.com/income/bank.asp?option=transfers"
 USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
 BIZ_URL = "https://mafiamatrix.com/business/business.asp"
+HOSPITAL_CASES_URL = "https://mafiamatrix.com/localcity/hospital.asp?display=patients"
 
 ONLINE_CRIMES = {"pickpocket", "mugging"}
 RESIDENT_CRIMES = {"hack", "breaking"}
@@ -748,6 +749,44 @@ def handle_drug_manufacturing(action: Action, state: GameState):
     state.add_log("Drug manufacturing: submitted.")
 
 
+_HOSPITAL_EMPTY_MARKERS = [
+    "There are currently no patients",
+    "There are currently no DNA samples",
+]
+
+
+def _save_casework_snapshot(name: str, html: str):
+    import datetime
+    site_map_dir = os.path.join(paths.data_dir(), "site_map")
+    os.makedirs(site_map_dir, exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    with open(os.path.join(site_map_dir, f"{name}_{ts}.html"), "w", encoding="utf-8") as f:
+        f.write(html)
+    png = browser.page().screenshot()
+    with open(os.path.join(site_map_dir, f"{name}_{ts}.png"), "wb") as f:
+        f.write(png)
+
+
+def handle_check_hospital_cases(action: Action, state: GameState):
+    _nav(HOSPITAL_CASES_URL, state)
+
+    if not _check_session(state):
+        return
+
+    html = browser.page().content()
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find("table", attrs={"border": "1"})
+    if not table:
+        return
+
+    table_text = table.get_text()
+    if all(marker in table_text for marker in _HOSPITAL_EMPTY_MARKERS):
+        return  # nothing to do
+
+    state.add_log("Hospital: case work available — saving snapshot for analysis.")
+    _save_casework_snapshot("hospital", html)
+
+
 # ---------------------------------------------------------------------------
 # Executor
 # ---------------------------------------------------------------------------
@@ -766,6 +805,7 @@ HANDLERS = {
     "do_career_training": handle_career_training,
     "do_armed_robbery": handle_armed_robbery,
     "do_drug_manufacturing": handle_drug_manufacturing,
+    "check_hospital_cases": handle_check_hospital_cases,
 }
 
 

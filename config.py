@@ -47,6 +47,10 @@ DEFAULT_CONFIG = {
     "misc": {
         "logout_on_stop": True,
         "relog_on_session_expire": True
+    },
+    "case_work": {
+        "hospital_enabled": False,
+        "hospital_poll_interval": 31
     }
 }
 

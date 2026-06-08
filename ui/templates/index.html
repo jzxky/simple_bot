@@ -228,7 +228,21 @@
       </div>
       <div id="business"  class="tab-panel"><p class="placeholder">Business settings — coming soon.</p></div>
       <div id="promotion" class="tab-panel"><p class="placeholder">Promotion settings — coming soon.</p></div>
-      <div id="casework"  class="tab-panel"><p class="placeholder">Case work settings — coming soon.</p></div>
+      <div id="casework" class="tab-panel">
+        <div class="settings-groups">
+          <div class="settings-group">
+            <h3>Hospital
+              <label class="toggle-label">
+                <input type="checkbox" id="hospital_enabled" {% if config.get('case_work', {}).get('hospital_enabled') %}checked{% endif %}>
+                <span class="toggle"></span>
+              </label>
+            </h3>
+            <label class="setting-row">Poll interval (seconds)
+              <input type="number" id="hospital_poll_interval" class="input-narrow" min="31" value="{{ config.get('case_work', {}).get('hospital_poll_interval', 31) }}">
+            </label>
+          </div>
+        </div>
+      </div>
       <div id="jail"      class="tab-panel"><p class="placeholder">Jail settings — coming soon.</p></div>
       <div id="misc" class="tab-panel">
         <div class="row">
