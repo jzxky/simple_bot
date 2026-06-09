@@ -367,16 +367,6 @@
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>General</h3>
               <div class="setting-row">
-                <label for="default_consumable">Default Consumable</label>
-                <select id="default_consumable" style="width:160px" onchange="updateConsumeTimerLabel(); autoSave()">
-                  <option value="">— None —</option>
-                  {% for v, l in [('marijuana','Marijuana'),('cocaine','Cocaine'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('pice','P / Ice'),('heroin','Heroin')] %}
-                  <option value="{{ v }}" {% if cons.get('default_consumable') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-                <span id="consume-timer-label" class="muted" style="font-size:12px;margin-left:6px"></span>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
                 <label for="consume_timer_limit">Timer Limit (mm:ss)</label>
                 <input type="text" id="consume_timer_limit" style="width:80px"
                   value="{{ cons.get('timer_limit', '00:00') }}"
@@ -470,7 +460,6 @@
   _updateCrimePills();
   _updateEarnsPills();
   _updateActionsPills();
-  updateConsumeTimerLabel();
   pollStatus();
 </script>
 </body>
