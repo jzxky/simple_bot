@@ -32,6 +32,7 @@
       <h2>
         <button class="collapse-btn" onclick="toggleSection('s-character')">▾</button>
         Character <span class="stat-name-header">— <span id="stat-name">--</span></span>
+        <span class="section-pills" id="pills-s-character"></span>
       </h2>
       <div class="card-body">
         <div class="stats-grid">
@@ -125,6 +126,7 @@
       <h2>
         <button class="collapse-btn" onclick="toggleSection('s-crimes')">▾</button>
         Aggravated Crimes
+        <span class="section-pills" id="pills-s-crimes"></span>
         <label class="toggle-label">
           <input type="checkbox" id="crimes_enabled" {% if config.aggravated_crimes.enabled %}checked{% endif %} onchange="autoSave()">
           <span class="toggle"></span>
@@ -414,6 +416,7 @@
   populateActionSub(INITIAL_ACTION_SUB);
   toggleAwayCrime();
   initCollapse();
+  _updateCrimePills();
   pollStatus();
 </script>
 </body>

@@ -108,6 +108,7 @@ function _doSave() {
 
 function autoSave() {
   _doSave();
+  _updateCrimePills();
 }
 
 // ── Credentials save ──────────────────────────────────────────────────────────
@@ -155,6 +156,7 @@ function toggleSection(id) {
   const btn = section.querySelector(".collapse-btn");
   const collapsed = body.classList.toggle("collapsed");
   btn.classList.toggle("collapsed", collapsed);
+  section.classList.toggle("is-collapsed", collapsed);
   const state = _collapseState();
   state[id] = collapsed;
   localStorage.setItem("mm_collapse", JSON.stringify(state));
@@ -168,8 +170,50 @@ function initCollapse() {
       const btn = section.querySelector(".collapse-btn");
       if (body) body.classList.add("collapsed");
       if (btn) btn.classList.add("collapsed");
+      section.classList.add("is-collapsed");
     }
   });
+}
+
+// ── Section pills ─────────────────────────────────────────────────────────────
+
+const _CRIME_LABELS = {
+  pickpocket: "Pickpocket", mugging: "Mugging", breaking: "B&E",
+  armed: "Armed", hack: "Hack",
+};
+
+function _pill(text) {
+  return `<span class="pill">${escHtml(text)}</span>`;
+}
+
+function _updateCrimePills() {
+  const el = document.getElementById("pills-s-crimes");
+  if (!el) return;
+  const crime = document.getElementById("primary_crime").value;
+  const thresh = parseFloat(document.getElementById("primary_threshold").value);
+  const pills = [_pill(`${_CRIME_LABELS[crime] || crime} ${thresh}%`)];
+  if (crime === "hack") {
+    const ac = document.getElementById("away_crime").value;
+    const at = parseFloat(document.getElementById("away_threshold").value);
+    pills.push(_pill(`${_CRIME_LABELS[ac] || ac} ${at}%`));
+  }
+  el.innerHTML = pills.join("");
+}
+
+let _lastEnergy = null;
+
+function _updateCharPills() {
+  const el = document.getElementById("pills-s-character");
+  if (!el) return;
+  const pills = [];
+  if (_lastEnergy != null) pills.push(_pill(`⚡ ${_lastEnergy}%`));
+  const now = Date.now();
+  for (const [key, t] of Object.entries(_activeTimers)) {
+    const secs = Math.max(0, Math.floor((t.endMs - now) / 1000));
+    if (secs > 0) pills.push(_pill(`${t.label}: ${_fmtCountdown(secs)}`));
+  }
+  if (_aggProActive && !_activeTimers["aggpro"]) pills.push(_pill("AggPro: Active"));
+  el.innerHTML = pills.join("");
 }
 
 let _botRunning = false;
@@ -261,7 +305,9 @@ function pollStatus() {
         ).join("") || '<span class="placeholder">No consumables</span>';
 
       // Timers
+      _lastEnergy = d.energy;
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active);
+      _updateCharPills();
 
       // Case work auto-detect
       updateCaseWorkSection(d.occupation || "");
@@ -363,6 +409,7 @@ function _tickTimers() {
     delete _activeTimers["aggpro"];
   }
   _renderTimers();
+  _updateCharPills();
   // Keep interval running as long as there are countdown timers or AggPro is shown
   const countdownKeys = Object.keys(_activeTimers).filter(k => k !== "aggpro");
   if (countdownKeys.length === 0 && !_aggProActive) {
