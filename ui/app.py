@@ -62,6 +62,14 @@ def save():
     c.setdefault("players", {})
     c["players"]["refresh_interval_minutes"] = int(data.get("player_refresh_interval", 30))
 
+    c.setdefault("consumables", {})
+    c["consumables"]["timer_limit"] = data.get("consume_timer_limit", "00:00")
+    c["consumables"]["default_consumable"] = data.get("default_consumable", "")
+    c["consumables"]["auto_consume"] = data.get("auto_consume", False)
+    c["consumables"]["auto_consumable"] = data.get("auto_consumable", "")
+    c["consumables"]["consumable_limit"] = int(data.get("consumable_limit", 33))
+    c["consumables"]["buffer"] = int(data.get("consumable_buffer", 0))
+
     c.setdefault("misc", {})
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)

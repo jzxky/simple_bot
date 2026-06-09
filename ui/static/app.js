@@ -98,6 +98,12 @@ function _doSave() {
     fire_poll_interval: parseInt(document.getElementById("fire_poll_interval").value) || 31,
     hospital_tasks: _serializePriorityTable("hospital-priority-body"),
     player_refresh_interval: parseInt(document.getElementById("player_refresh_interval").value) || 30,
+    consume_timer_limit: document.getElementById("consume_timer_limit").value || "00:00",
+    default_consumable: document.getElementById("default_consumable").value,
+    auto_consume: document.getElementById("auto_consume").checked,
+    auto_consumable: document.getElementById("auto_consumable").value,
+    consumable_limit: parseInt(document.getElementById("consumable_limit").value) || 33,
+    consumable_buffer: parseInt(document.getElementById("consumable_buffer").value) || 0,
   };
 
   return fetch("/save", {
@@ -212,9 +218,7 @@ function _updateEarnsPills() {
 function _updateActionsPills() {
   const el = document.getElementById("pills-s-actions");
   if (!el) return;
-  const home = _selText("action_type");
-  const away = _selText("away_action_type");
-  el.innerHTML = _pill(`HC - ${home} // Out of HC - ${away}`);
+  el.innerHTML = _pill(_selText("action_type")) + _pill(_selText("away_action_type"));
 }
 
 let _lastEnergy = null;
@@ -340,14 +344,39 @@ function pollStatus() {
 }
 
 const TIMER_LABELS = {
-  action:   "Action Timer",
+  action:   "Action",
   aggpro:   "AggPro",
   crime:    "Crime",
   earn:     "Earn",
   business: "Business",
   training: "Training",
   jail:     "Jail",
+  case:     "Case",
+  whack:    "Whack",
+  travel:   "Travel",
+  skill:    "Skill",
+  launder:  "Launder",
+  traffick: "Trafficking",
+  event:    "Event",
 };
+
+const CONSUMABLE_TIMER_LABEL = {
+  marijuana: "Case",
+  cocaine:   "Earn",
+  ecstasy:   "Energy",
+  acid:      "Travel",
+  speed:     "Whack",
+  pice:      "Skill",
+  heroin:    "Action",
+};
+
+function updateConsumeTimerLabel() {
+  const sel = document.getElementById("default_consumable");
+  const lbl = document.getElementById("consume-timer-label");
+  if (!sel || !lbl) return;
+  const timer = CONSUMABLE_TIMER_LABEL[sel.value] || "";
+  lbl.textContent = timer ? `→ ${timer} timer` : "";
+}
 
 // Each entry: { label, endMs (absolute wall-clock ms) }
 let _activeTimers = {};

@@ -66,6 +66,14 @@ DEFAULT_CONFIG = {
     },
     "players": {
         "refresh_interval_minutes": 30
+    },
+    "consumables": {
+        "timer_limit": "00:00",
+        "default_consumable": "",
+        "auto_consume": False,
+        "auto_consumable": "",
+        "consumable_limit": 33,
+        "buffer": 0
     }
 }
 
