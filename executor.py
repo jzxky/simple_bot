@@ -461,9 +461,6 @@ def handle_consume(action: Action, state: GameState):
     count = int(action.params.get("count", 1))
     url = f"https://mafiamatrix.com/profile/consumables.asp?action=consume&type={consume_type}"
 
-    if count > 1:
-        _nav(PLAY_URL, state)  # fresh state for accurate timer/energy before batch
-
     for i in range(count):
         _nav(url, state)
         soup = BeautifulSoup(browser.page().content(), "html.parser")
