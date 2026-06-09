@@ -142,6 +142,7 @@ def status():
         "consumables": s.consumables,
         "own_name": s.own_name,
         "earns_enabled": cfg.load().get("earns", {}).get("enabled", True),
+        "current_task": s.current_task,
     })
 
 

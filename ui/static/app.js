@@ -292,6 +292,9 @@ function pollStatus() {
     .then(d => {
       updateBotState(d.running, d.paused);
 
+      const taskEl = document.getElementById("status-task");
+      if (taskEl) taskEl.textContent = (d.running && !d.paused && d.current_task) ? d.current_task : "";
+
       // Only uncheck earns if the bot just disabled it (true→false transition)
       if (d.earns_enabled != null) {
         if (_prevEarnsEnabled === true && d.earns_enabled === false) {

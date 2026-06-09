@@ -42,6 +42,10 @@ def _timer_limit_secs(cfg_cons: dict) -> int:
         return 0
 
 
+def _ecstasy_blocked_by_fails(state: GameState) -> bool:
+    return state.agg_fail_count() >= 3
+
+
 def _passes_timer_gate(consume_type: str, state: GameState, cfg_cons: dict) -> bool:
     """Return True if the consumable's timer condition allows consuming."""
     limit_secs = _timer_limit_secs(cfg_cons)
@@ -49,11 +53,7 @@ def _passes_timer_gate(consume_type: str, state: GameState, cfg_cons: dict) -> b
         return True
 
     if consume_type == "ecstasy":
-        # Block if agg crimes disabled or too many recent failures
         return False
-
-def _ecstasy_blocked_by_fails(state: GameState) -> bool:
-    return state.agg_fail_count() >= 3
 
     timer_key = CONSUMABLE_TIMER_MAP.get(consume_type)
     if timer_key is None:
@@ -97,6 +97,7 @@ def _ecstasy_passes_gate(state: GameState, cfg_cons: dict, agg_cfg: dict) -> boo
 
 class ConsumeTask(Task):
     priority = 30
+    label = 'Consume'
 
     def __init__(self, consume_queue: queue.Queue):
         self._queue = consume_queue
