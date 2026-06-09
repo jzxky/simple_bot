@@ -34,7 +34,14 @@ main {
 }
 
 
-header { margin-bottom: 14px; max-width: 860px; }
+header {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 860px);
+  gap: 14px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.page-top { display: flex; flex-direction: column; gap: 10px; }
 header h1 {
   font-size: 20px;
   font-weight: 700;
@@ -205,7 +212,7 @@ select option { background: var(--surface2); }
 .muted { color: var(--muted); font-weight: normal; }
 
 /* Controls */
-.controls { display: flex; gap: 10px; flex-wrap: wrap; }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
 .controls button { flex: 1; }
 button {
   padding: 9px 22px;
