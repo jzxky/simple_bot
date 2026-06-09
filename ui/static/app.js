@@ -86,7 +86,7 @@ function _doSave() {
     action_enabled: document.getElementById("action_enabled").checked,
     action_type: document.getElementById("action_type").value,
     action_sub: document.getElementById("action_sub").value,
-    away_action_enabled: document.getElementById("away_action_enabled").checked,
+    away_action_enabled: document.getElementById("action_enabled").checked,
     away_action_type: document.getElementById("away_action_type").value,
     fallback_to_away: document.getElementById("fallback_to_away").checked,
     payback_enabled: document.getElementById("payback_enabled").checked,
@@ -177,13 +177,13 @@ function initCollapse() {
 
 // ── Section pills ─────────────────────────────────────────────────────────────
 
-const _CRIME_LABELS = {
-  pickpocket: "Pickpocket", mugging: "Mugging", breaking: "B&E",
-  armed: "Armed", hack: "Hack",
-};
-
 function _pill(text) {
   return `<span class="pill">${escHtml(text)}</span>`;
+}
+
+function _selText(id) {
+  const sel = document.getElementById(id);
+  return sel ? sel.options[sel.selectedIndex].text : "";
 }
 
 function _updateCrimePills() {
@@ -191,11 +191,10 @@ function _updateCrimePills() {
   if (!el) return;
   const crime = document.getElementById("primary_crime").value;
   const thresh = parseFloat(document.getElementById("primary_threshold").value);
-  const pills = [_pill(`${_CRIME_LABELS[crime] || crime} ${thresh}%`)];
+  const pills = [_pill(`${_selText("primary_crime")} ${thresh}%`)];
   if (crime === "hack") {
-    const ac = document.getElementById("away_crime").value;
     const at = parseFloat(document.getElementById("away_threshold").value);
-    pills.push(_pill(`${_CRIME_LABELS[ac] || ac} ${at}%`));
+    pills.push(_pill(`${_selText("away_crime")} ${at}%`));
   }
   el.innerHTML = pills.join("");
 }
@@ -539,8 +538,10 @@ function updateCaseWorkSection(occupation) {
   document.getElementById("cw-hospital").style.display = isHospital ? "" : "none";
   document.getElementById("cw-fire").style.display = isFire ? "" : "none";
 
-  const label = document.getElementById("cw-career-label");
-  label.textContent = isHospital ? "— Hospital" : isFire ? "— Fire" : "";
+  const pills = document.getElementById("pills-s-casework");
+  if (pills) {
+    pills.innerHTML = isHospital ? _pill("Hospital") : isFire ? _pill("Fire") : "";
+  }
 }
 
 function _serializePriorityTable(tbodyId) {
