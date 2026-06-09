@@ -73,10 +73,10 @@ def _passes_timer_gate(consume_type: str, state: GameState, cfg_cons: dict) -> b
     return remaining_secs > limit_secs
 
 
-def _smart_count(consume_type: str, state: GameState, cfg_cons: dict, agg_cfg: dict) -> int:
+def _smart_count(consume_type: str, state: GameState, cfg_cons: dict, agg_cfg: dict, respect_buffer: bool = True) -> int:
     """Return how many units to consume in one batch (floor(available_mins / 3)), capped by stock and headroom."""
     limit = int(cfg_cons.get("consumable_limit", 33))
-    buffer_ = int(cfg_cons.get("buffer", 0))
+    buffer_ = int(cfg_cons.get("buffer", 0)) if respect_buffer else 0
     headroom = max(0, (limit - buffer_) - (state.consumables_24h or 0))
     stock = state.consumables.get(consume_type, 0)
     cap = min(headroom, stock)
@@ -196,7 +196,7 @@ class ConsumeTask(Task):
         count = 1
         if smart:
             agg_cfg = c.get("aggravated_crimes", {})
-            count = _smart_count(consume_type, state, cons_cfg, agg_cfg)
+            count = _smart_count(consume_type, state, cons_cfg, agg_cfg, respect_buffer=False)
             if count <= 0:
-                count = 1  # manual trigger: consume at least 1 even if smart says 0
+                return  # at daily limit — don't fire
         executor.execute(Action("consume", type=consume_type, count=count), state)
