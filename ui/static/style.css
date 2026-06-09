@@ -196,8 +196,8 @@ select option { background: var(--surface2); }
 .muted { color: var(--muted); font-weight: normal; }
 
 /* Controls */
-.controls { display: flex; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
-.controls-secondary { margin-bottom: 14px; }
+.controls { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.controls button { flex: 1; }
 button {
   padding: 9px 22px;
   border: 1px solid transparent;
