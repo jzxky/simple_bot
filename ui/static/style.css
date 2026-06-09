@@ -23,13 +23,14 @@ body {
   min-height: 100vh;
 }
 
-.container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+.container { max-width: 2720px; margin: 0 auto; padding: 20px; }
 
 main {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  grid-template-columns: repeat(auto-fill, 860px);
   gap: 14px;
   align-items: start;
+  justify-content: center;
 }
 
 /* Full-width items */
