@@ -8,6 +8,7 @@ from tasks.base import Task, Action
 
 class EarnsTask(Task):
     priority = 30
+    label = 'Earns'
 
     def __init__(self, earn_type: str, interval_minutes: float = 30):
         self.earn_type = earn_type

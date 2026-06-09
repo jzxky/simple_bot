@@ -9,6 +9,7 @@ from state import GameState
 
 class CommunityServiceTask(Task):
     priority = 40
+    label = 'Community Service'
 
     def can_run(self, state: GameState) -> bool:
         return state.logged_in and state.action_available() and state.in_home_city()

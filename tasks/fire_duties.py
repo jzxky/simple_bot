@@ -10,6 +10,7 @@ from state import GameState
 
 class FireDutiesTask(Task):
     priority = 40
+    label = 'Fire Duties'
 
     def can_run(self, state: GameState) -> bool:
         return (
