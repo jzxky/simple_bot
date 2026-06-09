@@ -25,6 +25,8 @@ from tasks.case_work import HospitalCaseWorkTask
 from tasks.away_action import AwayActionTask
 from tasks.refresh import RefreshTask
 from tasks.consume import ConsumeTask
+from tasks.check_top_job import CheckTopJobTask
+from tasks.snipe_top_job import SnipeTopJobTask
 from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
@@ -114,6 +116,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(RefreshTask(interval_seconds=60))
     sched.add(ConsumeTask(_consume_queue))
     sched.add(PlayerRefreshTask())
+    sched.add(CheckTopJobTask())
+    sched.add(SnipeTopJobTask())
 
     _transfer_state(old_sched, sched)
     return sched

@@ -346,7 +346,17 @@
           </div>
         </div>
         <div id="business"  class="tab-panel"><p class="placeholder">Business settings — coming soon.</p></div>
-        <div id="promotion" class="tab-panel"><p class="placeholder">Promotion settings — coming soon.</p></div>
+        <div id="promotion" class="tab-panel">
+          {% set promo = config.get('promo', {}) %}
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Hospital Director</h3>
+              <label class="inline-toggle setting-row">Monitor Top Job
+                <label class="toggle-label"><input type="checkbox" id="monitor_top_job" {% if promo.get('monitor_top_job') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+            </div>
+          </div>
+        </div>
         <div id="casework"  class="tab-panel"><p class="placeholder">Case work is configured in the Case Work section above.</p></div>
         <div id="jail"      class="tab-panel"><p class="placeholder">Jail settings — coming soon.</p></div>
         <div id="player-lists" class="tab-panel">

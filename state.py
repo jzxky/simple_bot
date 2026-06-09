@@ -44,6 +44,7 @@ class GameState:
     timers: dict = field(default_factory=dict)
     agg_fail_times: list = field(default_factory=list)
     current_task: str = ""
+    snipe_top_job_pending: bool = False
 
     def agg_fail_count(self) -> int:
         cutoff = datetime.now() - timedelta(minutes=30)
