@@ -171,15 +171,13 @@
       <h2>
         <button class="collapse-btn" onclick="toggleSection('s-actions')">▾</button>
         Actions
+        <label class="toggle-label">
+          <input type="checkbox" id="action_enabled" {% if config.action.enabled or config.get('away_action', {}).get('enabled') %}checked{% endif %} onchange="autoSave()">
+          <span class="toggle"></span>
+        </label>
       </h2>
       <div class="card-body">
-        <h3>
-          Home City
-          <label class="toggle-label">
-            <input type="checkbox" id="action_enabled" {% if config.action.enabled %}checked{% endif %} onchange="autoSave()">
-            <span class="toggle"></span>
-          </label>
-        </h3>
+        <h3>Home City</h3>
         <div class="row">
           <label>Action
             <select id="action_type" onchange="populateActionSub(); autoSave()">
@@ -196,13 +194,7 @@
           </label>
         </div>
 
-        <h3>
-          Out of Home City
-          <label class="toggle-label">
-            <input type="checkbox" id="away_action_enabled" {% if config.get('away_action', {}).get('enabled') %}checked{% endif %} onchange="autoSave()">
-            <span class="toggle"></span>
-          </label>
-        </h3>
+        <h3>Out of Home City</h3>
         <div class="row">
           <label>Action
             <select id="away_action_type" onchange="autoSave()">
@@ -220,7 +212,7 @@
       <h2>
         <button class="collapse-btn" onclick="toggleSection('s-casework')">▾</button>
         Case Work
-        <span id="cw-career-label" class="muted" style="font-weight:normal;font-size:11px;text-transform:none;letter-spacing:0;margin-left:4px"></span>
+        <span class="section-pills" id="pills-s-casework"></span>
         <label class="toggle-label">
           <input type="checkbox" id="case_work_enabled" {% if config.get('case_work', {}).get('enabled') %}checked{% endif %} onchange="autoSave()">
           <span class="toggle"></span>
