@@ -458,12 +458,19 @@ def handle_check_weapon(action: Action, state: GameState):
 
 def handle_consume(action: Action, state: GameState):
     consume_type = action.params["type"]
+    count = int(action.params.get("count", 1))
     url = f"https://mafiamatrix.com/profile/consumables.asp?action=consume&type={consume_type}"
-    _nav(url, state)
-    soup = BeautifulSoup(browser.page().content(), "html.parser")
-    msg_div = soup.find("div", id="success") or soup.find("div", id="fail")
-    msg = msg_div.get_text(strip=True) if msg_div else "No result."
-    state.add_log(f"Consume {consume_type}: {msg}")
+
+    if count > 1:
+        _nav(PLAY_URL, state)  # fresh state for accurate timer/energy before batch
+
+    for i in range(count):
+        _nav(url, state)
+        soup = BeautifulSoup(browser.page().content(), "html.parser")
+        msg_div = soup.find("div", id="success") or soup.find("div", id="fail")
+        msg = msg_div.get_text(strip=True) if msg_div else "No result."
+        label = f"[{i+1}/{count}] " if count > 1 else ""
+        state.add_log(f"Consume {consume_type}: {label}{msg}")
 
 
 def handle_refresh_state(action: Action, state: GameState):

@@ -73,6 +73,45 @@ def _passes_timer_gate(consume_type: str, state: GameState, cfg_cons: dict) -> b
     return remaining_secs > limit_secs
 
 
+def _smart_count(consume_type: str, state: GameState, cfg_cons: dict, agg_cfg: dict) -> int:
+    """Return how many units to consume in one batch (floor(available_mins / 3)), capped by stock and headroom."""
+    limit = int(cfg_cons.get("consumable_limit", 33))
+    buffer_ = int(cfg_cons.get("buffer", 0))
+    headroom = max(0, (limit - buffer_) - (state.consumables_24h or 0))
+    stock = state.consumables.get(consume_type, 0)
+    cap = min(headroom, stock)
+    if cap <= 0:
+        return 0
+
+    if consume_type == "ecstasy":
+        if _ecstasy_blocked_by_fails(state):
+            return 0
+        in_home = (state.current_city == state.home_city)
+        if in_home:
+            threshold_pct = float(agg_cfg.get("primary", {}).get("energy_threshold", 50))
+        else:
+            threshold_pct = float(agg_cfg.get("away_crime", {}).get("energy_threshold", 50))
+        current_pct = state.energy if state.energy is not None else 0.0
+        gap_mins = _energy_to_mins(threshold_pct) - _energy_to_mins(current_pct)
+        count = math.floor(gap_mins / 3)
+    else:
+        timer_key = CONSUMABLE_TIMER_MAP.get(consume_type)
+        if timer_key is None:
+            return 1
+        timer = state.timers.get(timer_key, {})
+        if timer.get("ready", True):
+            return 0
+        end = timer.get("end")
+        if end is None:
+            return 0
+        from datetime import datetime
+        now = state.server_time or datetime.utcnow()
+        remaining_secs = max(0, int((end - now).total_seconds()))
+        count = math.floor(remaining_secs / 180)
+
+    return min(max(0, count), cap)
+
+
 def _ecstasy_passes_gate(state: GameState, cfg_cons: dict, agg_cfg: dict) -> bool:
     """Ecstasy gate: gap between current and threshold energy > floor(timer_limit_mins)."""
     if _ecstasy_blocked_by_fails(state):
@@ -134,12 +173,19 @@ class ConsumeTask(Task):
     def run(self, state: GameState, executor):
         c = cfg.load()
         cons_cfg = c.get("consumables", {})
+        smart = cons_cfg.get("smart_consumables", False)
 
         # Auto-consume fires before manual queue
         if self._auto_consume_ready(state, c, cons_cfg):
             auto_type = cons_cfg.get("auto_consumable", "")
-            state.add_log(f"Auto-consuming {auto_type}.")
-            executor.execute(Action("consume", type=auto_type), state)
+            count = 1
+            if smart:
+                agg_cfg = c.get("aggravated_crimes", {})
+                count = _smart_count(auto_type, state, cons_cfg, agg_cfg)
+                if count <= 0:
+                    return
+            state.add_log(f"Auto-consuming {auto_type}" + (f" x{count}" if count > 1 else "") + ".")
+            executor.execute(Action("consume", type=auto_type, count=count), state)
             return
 
         # Manual queue — not gated by timer limit
@@ -147,4 +193,10 @@ class ConsumeTask(Task):
             consume_type = self._queue.get_nowait()
         except Exception:
             return
-        executor.execute(Action("consume", type=consume_type), state)
+        count = 1
+        if smart:
+            agg_cfg = c.get("aggravated_crimes", {})
+            count = _smart_count(consume_type, state, cons_cfg, agg_cfg)
+            if count <= 0:
+                count = 1  # manual trigger: consume at least 1 even if smart says 0
+        executor.execute(Action("consume", type=consume_type, count=count), state)
