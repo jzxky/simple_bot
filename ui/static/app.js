@@ -332,11 +332,17 @@ function pollStatus() {
       // Case work auto-detect
       updateCaseWorkSection(d.occupation || "");
 
-      // Log
-      const box = document.getElementById("log-box");
-      box.innerHTML = [...d.log].reverse()
-        .map(l => `<div class="log-line">${escHtml(l)}</div>`)
-        .join("");
+      // Log — only update live view; switch back to live if first log file matches
+      const logSel = document.getElementById("log-file-select");
+      if (logSel && logSel.options.length && logSel.options[0].value === _logCurrentFile) {
+        _logLiveMode = true;
+      }
+      if (_logLiveMode) {
+        const box = document.getElementById("log-box");
+        box.innerHTML = [...d.log].reverse()
+          .map(l => `<div class="log-line">${escHtml(l)}</div>`)
+          .join("");
+      }
     })
     .catch(() => {})
     .finally(() => setTimeout(pollStatus, 3000));
@@ -535,16 +541,44 @@ function loadLogFiles() {
     .then(r => r.json())
     .then(d => {
       const sel = document.getElementById("log-file-select");
-      const link = document.getElementById("log-open-link");
       const files = d.files || [];
       sel.innerHTML = files.length
         ? files.map(f => `<option value="${escHtml(f)}">${escHtml(f)}</option>`).join("")
         : `<option value="">No logs</option>`;
-      sel.onchange = () => {
-        const f = sel.value;
-        if (f) link.href = "/logs/" + encodeURIComponent(f);
-      };
-      if (files.length) link.href = "/logs/" + encodeURIComponent(files[0]);
+      _logCurrentFile = files.length ? files[0] : "";
+    })
+    .catch(() => {});
+}
+
+let _logLiveMode = true;
+let _logCurrentFile = "";
+
+function onLogFileChange() {
+  const sel = document.getElementById("log-file-select");
+  _logCurrentFile = sel.value;
+  if (!_logCurrentFile) return;
+  // If the user picks the first (latest) file, restore live mode
+  const isLatest = sel.selectedIndex === 0;
+  _logLiveMode = isLatest;
+  if (!isLatest) _loadLogFile(_logCurrentFile);
+}
+
+function openFullLog() {
+  if (_logCurrentFile) {
+    window.open("/logs/" + encodeURIComponent(_logCurrentFile), "_blank");
+  } else {
+    window.open("/logs", "_blank");
+  }
+}
+
+function _loadLogFile(filename) {
+  fetch("/logs/lines/" + encodeURIComponent(filename))
+    .then(r => r.json())
+    .then(d => {
+      const box = document.getElementById("log-box");
+      box.innerHTML = [...(d.lines || [])].reverse()
+        .map(l => `<div class="log-line">${escHtml(l)}</div>`)
+        .join("");
     })
     .catch(() => {});
 }
