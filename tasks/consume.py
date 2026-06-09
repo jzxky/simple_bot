@@ -175,6 +175,14 @@ class ConsumeTask(Task):
         cons_cfg = c.get("consumables", {})
         smart = cons_cfg.get("smart_consumables", False)
 
+        # Always refresh state before any consume decision
+        executor.execute(Action("refresh_state"), state)
+
+        # Hard limit check — never consume if at or past daily cap
+        limit = int(cons_cfg.get("consumable_limit", 33))
+        if (state.consumables_24h or 0) >= limit:
+            return
+
         # Auto-consume fires before manual queue
         if self._auto_consume_ready(state, c, cons_cfg):
             auto_type = cons_cfg.get("auto_consumable", "")
@@ -198,5 +206,5 @@ class ConsumeTask(Task):
             agg_cfg = c.get("aggravated_crimes", {})
             count = _smart_count(consume_type, state, cons_cfg, agg_cfg, respect_buffer=False)
             if count <= 0:
-                return  # at daily limit — don't fire
+                return
         executor.execute(Action("consume", type=consume_type, count=count), state)
