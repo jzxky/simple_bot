@@ -293,17 +293,28 @@ def handle_do_crime(action: Action, state: GameState):
     state.add_log(f"Selected crime: {crime}")
 
     failed_transfers: set = set()
+    fail_counts: dict = {}
+
+    def _flush_fails():
+        if not fail_counts:
+            return
+        total = sum(fail_counts.values())
+        parts = ", ".join(f"{n}x {msg}" for msg, n in fail_counts.items())
+        state.add_log(f"Crime run: {total} fail{'s' if total != 1 else ''} — {parts} (fail count: {state.agg_fail_count()}/3)")
+        fail_counts.clear()
 
     for player in targets:
         if player in failed_transfers:
             continue
 
         if threshold and state.energy < threshold:
+            _flush_fails()
             state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — stopping.")
             return
 
         if not page.query_selector(_TARGET_INPUT):
             if not _back_to_target_input(crime, state):
+                _flush_fails()
                 state.add_log("Lost target input mid-loop. Aborting.")
                 return
 
@@ -317,6 +328,7 @@ def handle_do_crime(action: Action, state: GameState):
         success_div = result_soup.find("div", id="success")
         if success_div:
             msg = success_div.get_text(strip=True)
+            _flush_fails()
             state.add_log(f"Crime success vs {player}: {msg}")
             amounts = re.findall(r"\$([\d,]+)", msg)
             stolen = int(amounts[0].replace(",", "")) if amounts else 0
@@ -331,15 +343,15 @@ def handle_do_crime(action: Action, state: GameState):
             fail_msg = fail_div.get_text(strip=True)
             if "failed" in fail_msg.lower():
                 state.record_agg_fail()
-            state.add_log(f"Crime failed vs {player}: {fail_msg} (fail count: {state.agg_fail_count()}/3)")
+            fail_counts[fail_msg] = fail_counts.get(fail_msg, 0) + 1
             if "weapon" in fail_msg.lower():
-                state.add_log("Weapon check disabled, skipping target.")
                 continue
             if crime == "hack" and "increased security" in fail_msg.lower():
                 continue
             if crime == "hack" and "no money in their account" in fail_msg.lower():
                 state.add_log(f"No money in {player}'s account — sending $1 to unlock, then retrying.")
                 if not _back_to_target_input(crime, state):
+                    _flush_fails()
                     state.add_log("Lost target input after no-money fail. Aborting.")
                     return
                 ok = _do_transfer(player, 1, state)
@@ -347,11 +359,12 @@ def handle_do_crime(action: Action, state: GameState):
                     state.add_log(f"Transfer to {player} failed — skipping for this run.")
                     failed_transfers.add(player)
                     if not _nav_to_target_input(crime, state):
+                        _flush_fails()
                         state.add_log("Could not return to crime page. Aborting.")
                         return
                     continue
-                # Navigate back to crime page and retry this player
                 if not _nav_to_target_input(crime, state):
+                    _flush_fails()
                     state.add_log("Could not return to crime page after transfer. Aborting.")
                     return
                 page.fill(_TARGET_INPUT, player)
@@ -362,6 +375,7 @@ def handle_do_crime(action: Action, state: GameState):
                 success_div = retry_soup.find("div", id="success")
                 if success_div:
                     msg = success_div.get_text(strip=True)
+                    _flush_fails()
                     state.add_log(f"Crime success vs {player} (retry): {msg}")
                     amounts = re.findall(r"\$([\d,]+)", msg)
                     stolen = int(amounts[0].replace(",", "")) if amounts else 0
@@ -372,13 +386,16 @@ def handle_do_crime(action: Action, state: GameState):
                     return
                 retry_fail = retry_soup.find("div", id="fail")
                 if retry_fail:
-                    state.add_log(f"Retry failed vs {player}: {retry_fail.get_text(strip=True)}")
+                    retry_msg = retry_fail.get_text(strip=True)
+                    fail_counts[retry_msg] = fail_counts.get(retry_msg, 0) + 1
                 continue
             if crime in ("pickpocket", "mugging", "breaking") and "recently survived" in fail_msg.lower():
                 continue
+            _flush_fails()
             _nav(PLAY_URL, state)
             return
 
+    _flush_fails()
     state._agg_targets_exhausted = True
     state.add_log("All targets exhausted.")
 
@@ -479,30 +496,24 @@ def handle_payback(action: Action, state: GameState):
     target = action.params["target"]
     page = browser.page()
 
-    for attempt in range(2):
-        _nav(TRANSFER_URL, state)
-
-        if not _check_session(state):
-            return
-
-        page.fill("input[name='transferamount']", str(amount))
-        page.fill("input[name='transfername']", target)
-        page.click("input[name='B1']")
-        page.wait_for_load_state("domcontentloaded")
-
-        soup = BeautifulSoup(page.content(), "html.parser")
-        result_text = soup.get_text()
-
-        if "Your transfer was blocked due to possible spam!" in result_text:
-            state.add_log(f"Payback to {target} blocked as spam — retrying in 60s.")
-            time.sleep(60)
-            continue
-
-        _refresh_state(state)
-        state.add_log(f"Payback sent: ${amount:,} to {target}.")
+    _nav(TRANSFER_URL, state)
+    if not _check_session(state):
         return
 
-    state.add_log(f"Payback to {target} blocked twice — giving up.")
+    page.fill("input[name='transferamount']", str(amount))
+    page.fill("input[name='transfername']", target)
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    result_text = soup.get_text()
+
+    if "Your transfer was blocked due to possible spam!" in result_text:
+        state.add_log(f"Payback to {target} blocked as spam — skipping.")
+        return
+
+    _refresh_state(state)
+    state.add_log(f"Payback sent: ${amount:,} to {target}.")
 
 
 def handle_community_service(action: Action, state: GameState):
@@ -741,7 +752,7 @@ def handle_armed_robbery(action: Action, state: GameState):
                     fail_msg = fail_div.get_text(strip=True)
                     if "failed" in fail_msg.lower():
                         state.record_agg_fail()
-                    state.add_log(f"Armed robbery failed: {fail_msg} (fail count: {state.agg_fail_count()}/3)")
+                    state.add_log(f"Armed robbery failed: {fail_msg}")
                 else:
                     state.add_log("Armed robbery: unexpected result page.")
                 _nav(PLAY_URL, state)
