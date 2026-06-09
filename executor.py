@@ -329,7 +329,9 @@ def handle_do_crime(action: Action, state: GameState):
         fail_div = result_soup.find("div", id="fail")
         if fail_div:
             fail_msg = fail_div.get_text(strip=True)
-            state.add_log(f"Crime failed vs {player}: {fail_msg}")
+            if "failed" in fail_msg.lower():
+                state.record_agg_fail()
+            state.add_log(f"Crime failed vs {player}: {fail_msg} (fail count: {state.agg_fail_count()}/3)")
             if "weapon" in fail_msg.lower():
                 state.add_log("Weapon check disabled, skipping target.")
                 continue
@@ -732,7 +734,10 @@ def handle_armed_robbery(action: Action, state: GameState):
 
                 fail_div = result_soup.find("div", id="fail")
                 if fail_div:
-                    state.add_log(f"Armed robbery failed: {fail_div.get_text(strip=True)}")
+                    fail_msg = fail_div.get_text(strip=True)
+                    if "failed" in fail_msg.lower():
+                        state.record_agg_fail()
+                    state.add_log(f"Armed robbery failed: {fail_msg} (fail count: {state.agg_fail_count()}/3)")
                 else:
                     state.add_log("Armed robbery: unexpected result page.")
                 _nav(PLAY_URL, state)

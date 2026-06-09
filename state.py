@@ -6,7 +6,7 @@ All time comparisons use server time, never the system clock.
 from __future__ import annotations
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from bs4 import BeautifulSoup
 
@@ -42,6 +42,15 @@ class GameState:
     last_error: str = ""
     log: list = field(default_factory=list)
     timers: dict = field(default_factory=dict)
+    agg_fail_times: list = field(default_factory=list)
+
+    def agg_fail_count(self) -> int:
+        cutoff = datetime.now() - timedelta(minutes=30)
+        self.agg_fail_times = [t for t in self.agg_fail_times if t > cutoff]
+        return len(self.agg_fail_times)
+
+    def record_agg_fail(self):
+        self.agg_fail_times.append(datetime.now())
 
     def in_home_city(self) -> bool:
         return self.current_city != "" and self.current_city == self.home_city
