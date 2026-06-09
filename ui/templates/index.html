@@ -90,6 +90,7 @@
       <h2>
         <button class="collapse-btn" onclick="toggleSection('s-earns')">▾</button>
         Earns
+        <span class="section-pills" id="pills-s-earns"></span>
         <label class="toggle-label">
           <input type="checkbox" id="earns_enabled" {% if config.earns.enabled %}checked{% endif %} onchange="autoSave()">
           <span class="toggle"></span>
@@ -171,6 +172,7 @@
       <h2>
         <button class="collapse-btn" onclick="toggleSection('s-actions')">▾</button>
         Actions
+        <span class="section-pills" id="pills-s-actions"></span>
         <label class="toggle-label">
           <input type="checkbox" id="action_enabled" {% if config.action.enabled or config.get('away_action', {}).get('enabled') %}checked{% endif %} onchange="autoSave()">
           <span class="toggle"></span>
@@ -407,6 +409,8 @@
   toggleAwayCrime();
   initCollapse();
   _updateCrimePills();
+  _updateEarnsPills();
+  _updateActionsPills();
   pollStatus();
 </script>
 </body>

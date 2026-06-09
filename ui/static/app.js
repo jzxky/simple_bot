@@ -34,6 +34,7 @@ function populateEarns(selectedValue) {
   sel.innerHTML = opts.map(([v, l]) =>
     `<option value="${v}" ${v === selectedValue ? "selected" : ""}>${l}</option>`
   ).join("");
+  _updateEarnsPills();
 }
 
 function populateActionSub(selectedValue) {
@@ -109,6 +110,8 @@ function _doSave() {
 function autoSave() {
   _doSave();
   _updateCrimePills();
+  _updateEarnsPills();
+  _updateActionsPills();
 }
 
 // ── Credentials save ──────────────────────────────────────────────────────────
@@ -191,12 +194,27 @@ function _updateCrimePills() {
   if (!el) return;
   const crime = document.getElementById("primary_crime").value;
   const thresh = parseFloat(document.getElementById("primary_threshold").value);
-  const pills = [_pill(`${_selText("primary_crime")} ${thresh}%`)];
+  const pills = [_pill(`${_selText("primary_crime")} // ${thresh}%`)];
   if (crime === "hack") {
     const at = parseFloat(document.getElementById("away_threshold").value);
-    pills.push(_pill(`${_selText("away_crime")} ${at}%`));
+    pills.push(_pill(`${_selText("away_crime")} // ${at}%`));
   }
   el.innerHTML = pills.join("");
+}
+
+function _updateEarnsPills() {
+  const el = document.getElementById("pills-s-earns");
+  if (!el) return;
+  const label = _selText("earn_type");
+  el.innerHTML = label ? _pill(label) : "";
+}
+
+function _updateActionsPills() {
+  const el = document.getElementById("pills-s-actions");
+  if (!el) return;
+  const home = _selText("action_type");
+  const away = _selText("away_action_type");
+  el.innerHTML = _pill(`HC - ${home} // Out of HC - ${away}`);
 }
 
 let _lastEnergy = null;
@@ -540,7 +558,15 @@ function updateCaseWorkSection(occupation) {
 
   const pills = document.getElementById("pills-s-casework");
   if (pills) {
-    pills.innerHTML = isHospital ? _pill("Hospital") : isFire ? _pill("Fire") : "";
+    if (isHospital) {
+      const interval = document.getElementById("hospital_poll_interval").value;
+      pills.innerHTML = _pill("Hospital") + _pill(`${interval}s`);
+    } else if (isFire) {
+      const interval = document.getElementById("fire_poll_interval").value;
+      pills.innerHTML = _pill("Fire") + _pill(`${interval}s`);
+    } else {
+      pills.innerHTML = "";
+    }
   }
 }
 
