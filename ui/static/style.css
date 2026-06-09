@@ -463,6 +463,21 @@ button {
   letter-spacing: 0.03em;
 }
 .log-open-link:hover { color: var(--accent-hover); text-decoration: underline; }
+.log-open-btn {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  padding: 4px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.log-open-btn:hover { border-color: var(--accent); background: var(--surface); }
 #log-box {
   background: var(--surface2);
   border: 1px solid var(--border);
@@ -489,6 +504,9 @@ button {
   padding: 0; line-height: 1;
   transition: transform 0.18s;
   flex-shrink: 0; margin-right: 2px;
+}
+@media (max-width: 600px) {
+  .collapse-btn { font-size: 18px; }
 }
 .collapse-btn.collapsed { transform: rotate(-90deg); }
 .card-body.collapsed { display: none; }
@@ -524,6 +542,8 @@ input.input-unsaved { color: var(--red) !important; }
   align-items: center;
   flex-wrap: wrap;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 .is-collapsed .section-pills { display: inline-flex; }
 .pill {

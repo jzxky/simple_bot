@@ -34,7 +34,7 @@
     <section class="card" id="s-character">
       <h2>
         <button class="collapse-btn" onclick="toggleSection('s-character')">▾</button>
-        Character <span class="stat-name-header">— <span id="stat-name">--</span></span>
+        Status <span class="stat-name-header">— <span id="stat-name">--</span></span>
         <span class="section-pills" id="pills-s-character"></span>
       </h2>
       <div class="card-body">
@@ -231,8 +231,7 @@
         <!-- Hospital -->
         <div id="cw-hospital" style="display:none">
           <div class="cw-poll-row">
-            <a href="/players" target="_blank" class="log-open-link">Manage Lists ↗</a>
-            &nbsp;·&nbsp; Poll every
+            Poll every
             <input type="number" id="hospital_poll_interval" class="input-narrow" min="31"
               value="{{ config.get('case_work', {}).get('hospital', {}).get('poll_interval', 31) }}"
               oninput="markNumDirty(this)">
@@ -415,23 +414,16 @@
           </div>
         </div>
         <div id="misc" class="tab-panel">
-          <div class="row">
-            <label class="inline-toggle">
-              Log out when stopping bot
-              <label class="toggle-label">
-                <input type="checkbox" id="logout_on_stop" {% if config.get('misc', {}).get('logout_on_stop', True) %}checked{% endif %} onchange="autoSave()">
-                <span class="toggle"></span>
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>General</h3>
+              <label class="inline-toggle setting-row">Log out when stopping bot
+                <label class="toggle-label"><input type="checkbox" id="logout_on_stop" {% if config.get('misc', {}).get('logout_on_stop', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
-            </label>
-          </div>
-          <div class="row">
-            <label class="inline-toggle">
-              Re-log if auto-logged out
-              <label class="toggle-label">
-                <input type="checkbox" id="relog_on_session_expire" {% if config.get('misc', {}).get('relog_on_session_expire', True) %}checked{% endif %} onchange="autoSave()">
-                <span class="toggle"></span>
+              <label class="inline-toggle setting-row">Re-log if auto-logged out
+                <label class="toggle-label"><input type="checkbox" id="relog_on_session_expire" {% if config.get('misc', {}).get('relog_on_session_expire', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
-            </label>
+            </div>
           </div>
         </div>
       </div>
@@ -445,8 +437,8 @@
       </h2>
       <div class="card-body">
         <div class="log-open-bar">
-          <select id="log-file-select" class="log-file-select"></select>
-          <a id="log-open-link" href="/logs" target="_blank" class="log-open-link">Open full log ↗</a>
+          <select id="log-file-select" class="log-file-select" onchange="onLogFileChange()"></select>
+          <button id="log-open-btn" class="log-open-btn" onclick="openFullLog()">Open full log ↗</button>
         </div>
         <div id="log-box"></div>
       </div>

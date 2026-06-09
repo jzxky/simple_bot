@@ -203,6 +203,19 @@ def logs_index():
     return logs_viewer(files[0])
 
 
+@app.route("/logs/lines/<filename>")
+def logs_lines(filename):
+    logs_dir = _logs_dir()
+    safe = os.path.basename(filename)
+    path = os.path.join(logs_dir, safe)
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        lines = []
+    return jsonify({"lines": lines})
+
+
 @app.route("/logs/<filename>")
 def logs_viewer(filename):
     logs_dir = _logs_dir()
