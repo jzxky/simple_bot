@@ -502,16 +502,19 @@ input.input-unsaved { color: var(--red) !important; }
 
 /* ── Inline number-field save button ────────────────────────────────────── */
 .num-save-btn {
-  font-size: 11px; padding: 2px 8px;
+  padding: 0;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
   background: var(--surface2); border: 1px solid var(--border);
-  color: var(--text-muted, #6b7e99); border-radius: var(--radius);
-  cursor: pointer; white-space: nowrap;
+  color: var(--muted); border-radius: var(--radius);
+  cursor: pointer; flex-shrink: 0;
 }
 .num-save-btn:hover { border-color: var(--accent); color: var(--accent); }
 .num-save-btn.needed { border-color: var(--red); color: var(--red); }
+.save-icon { width: 14px; height: 14px; fill: currentColor; display: block; flex-shrink: 0; }
 
 /* ── Credentials save button ─────────────────────────────────────────────── */
-#creds-save-btn { margin-top: 10px; }
+#creds-save-btn { margin-top: 10px; width: auto; padding: 6px 14px; }
 
 /* ── Collapsed section summary pills ────────────────────────────────────── */
 .section-pills {

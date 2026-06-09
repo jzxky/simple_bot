@@ -8,6 +8,11 @@
 </head>
 <body>
 
+<svg style="display:none" aria-hidden="true">
+  <symbol id="icon-save" viewBox="0 0 16 16">
+    <path d="M1.5 0h11.586a1.5 1.5 0 0 1 1.06.44l1.415 1.414A1.5 1.5 0 0 1 16 2.914V14.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 14.5v-13A1.5 1.5 0 0 1 1.5 0zM10.5 1.5v4h-5v-4H2a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h12a.5.5 0 0 0 .5-.5V2.914a.5.5 0 0 0-.146-.354l-1.414-1.414a.5.5 0 0 0-.354-.146H10.5zM8 9a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2zM6 2h3v3H6V2z"/>
+  </symbol>
+</svg>
 <div class="container">
   <header>
     <h1>MafiaMatrix Bot</h1>
@@ -81,7 +86,7 @@
             </div>
           </label>
         </div>
-        <button id="creds-save-btn" class="num-save-btn" onclick="saveCredentials()">Save Credentials</button>
+        <button id="creds-save-btn" class="num-save-btn" onclick="saveCredentials()"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
       </div>
     </section>
 
@@ -231,7 +236,7 @@
             <input type="number" id="hospital_poll_interval" class="input-narrow" min="31"
               value="{{ config.get('case_work', {}).get('hospital', {}).get('poll_interval', 31) }}"
               oninput="markNumDirty(this)">
-            <button class="num-save-btn" id="save-hospital_poll_interval" onclick="saveNum('hospital_poll_interval')">Save</button>
+            <button class="num-save-btn" id="save-hospital_poll_interval" onclick="saveNum('hospital_poll_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
             seconds
           </div>
           <table class="priority-table" id="hospital-priority-table">
@@ -286,7 +291,7 @@
             <input type="number" id="fire_poll_interval" class="input-narrow" min="31"
               value="{{ config.get('case_work', {}).get('fire', {}).get('poll_interval', 31) }}"
               oninput="markNumDirty(this)">
-            <button class="num-save-btn" id="save-fire_poll_interval" onclick="saveNum('fire_poll_interval')">Save</button>
+            <button class="num-save-btn" id="save-fire_poll_interval" onclick="saveNum('fire_poll_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
             seconds
           </div>
           <p class="placeholder">Fire case work — coming soon.</p>
@@ -353,7 +358,7 @@
                 <input type="number" id="player_refresh_interval" min="1" max="1440"
                   value="{{ config.get('players', {}).get('refresh_interval_minutes', 30) }}"
                   style="width:70px" oninput="markNumDirty(this)">
-                <button class="num-save-btn" id="save-player_refresh_interval" onclick="saveNum('player_refresh_interval')">Save</button>
+                <button class="num-save-btn" id="save-player_refresh_interval" onclick="saveNum('player_refresh_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               </div>
               <div class="setting-row" style="margin-top:10px">
                 <a href="/players" target="_blank" class="log-open-link">Manage Lists ↗</a>
@@ -371,7 +376,7 @@
                 <input type="text" id="consume_timer_limit" style="width:80px"
                   value="{{ cons.get('timer_limit', '00:00') }}"
                   placeholder="00:00" oninput="markNumDirty(this)">
-                <button class="num-save-btn" id="save-consume_timer_limit" onclick="saveNum('consume_timer_limit')">Save</button>
+                <button class="num-save-btn" id="save-consume_timer_limit" onclick="saveNum('consume_timer_limit')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               </div>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
@@ -404,7 +409,7 @@
                 <input type="number" id="consumable_buffer" min="0" style="width:80px"
                   value="{{ cons.get('buffer', 0) }}"
                   oninput="markNumDirty(this)">
-                <button class="num-save-btn" id="save-consumable_buffer" onclick="saveNum('consumable_buffer')">Save</button>
+                <button class="num-save-btn" id="save-consumable_buffer" onclick="saveNum('consumable_buffer')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               </div>
             </div>
           </div>
