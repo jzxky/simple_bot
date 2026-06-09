@@ -17,6 +17,7 @@ COOLDOWN_SECONDS = 180
 
 class AggCrimeTask(Task):
     priority = 50
+    label = 'Agg Crimes'
 
     def __init__(self, primary_crime: str, primary_threshold: int,
                  away_crime: str, away_threshold: int,

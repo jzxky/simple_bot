@@ -130,6 +130,7 @@ def is_allowed(username: str, context: str, target_mode: str) -> bool:
 class PlayerRefreshTask(Task):
     """Runs in the bot scheduler — refreshes player list every 30 minutes."""
     priority = 5  # low priority, runs in background
+    label = 'Player Refresh'
 
     def __init__(self):
         self._last_run: float = 0.0

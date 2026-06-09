@@ -16,6 +16,7 @@ class Action:
 
 class Task(ABC):
     priority: int = 0
+    label: str = ""  # display name shown in UI; defaults to class name if empty
 
     def can_run(self, state) -> bool:
         return True

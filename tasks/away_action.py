@@ -9,6 +9,7 @@ from state import GameState
 
 class AwayActionTask(Task):
     priority = 40
+    label = 'Away Action'
 
     def __init__(self, action_type: str):
         self.action_type = action_type

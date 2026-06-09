@@ -11,6 +11,7 @@ from state import GameState
 
 class CaseWorkTask(Task):
     priority = 50
+    label = 'Case Work'
 
     ELIGIBLE_OCCUPATIONS: set = set()
     HOME_CITY_ONLY: bool = True

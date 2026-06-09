@@ -10,6 +10,7 @@ RETRY_INTERVAL = 15
 
 class LoginTask(Task):
     priority = 100
+    label = 'Logging in'
 
     def __init__(self, email: str, password: str):
         self.email = email

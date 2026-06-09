@@ -14,6 +14,7 @@ CAREER_URLS = {
 
 class CareerTrainingTask(Task):
     priority = 40
+    label = 'Career Training'
 
     def __init__(self, career: str):
         self.career = career
