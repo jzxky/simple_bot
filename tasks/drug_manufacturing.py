@@ -8,7 +8,7 @@ from state import GameState
 
 
 class DrugManufacturingTask(Task):
-    priority = 40
+    priority = 60
     label = 'Drug Manufacturing'
 
     def can_run(self, state: GameState) -> bool:

@@ -13,7 +13,7 @@ CAREER_URLS = {
 
 
 class CareerTrainingTask(Task):
-    priority = 40
+    priority = 60
     label = 'Career Training'
 
     def __init__(self, career: str):

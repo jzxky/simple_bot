@@ -8,7 +8,7 @@ from state import GameState
 
 
 class CommunityServiceTask(Task):
-    priority = 40
+    priority = 60
     label = 'Community Service'
 
     def can_run(self, state: GameState) -> bool:
