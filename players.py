@@ -51,6 +51,7 @@ def refresh() -> int:
     try:
         browser.page().goto(USERS_URL, wait_until="domcontentloaded", timeout=15000)
         raw = json.loads(browser.page().inner_text("body"))
+        browser.page().goto("https://mafiamatrix.com/main.asp", wait_until="domcontentloaded", timeout=15000)
     except Exception:
         return 0
 
