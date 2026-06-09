@@ -49,8 +49,11 @@ def _passes_timer_gate(consume_type: str, state: GameState, cfg_cons: dict) -> b
         return True
 
     if consume_type == "ecstasy":
-        # Block auto-consume for ecstasy if agg crimes disabled
+        # Block if agg crimes disabled or too many recent failures
         return False
+
+def _ecstasy_blocked_by_fails(state: GameState) -> bool:
+    return state.agg_fail_count() >= 3
 
     timer_key = CONSUMABLE_TIMER_MAP.get(consume_type)
     if timer_key is None:
@@ -71,7 +74,9 @@ def _passes_timer_gate(consume_type: str, state: GameState, cfg_cons: dict) -> b
 
 
 def _ecstasy_passes_gate(state: GameState, cfg_cons: dict, agg_cfg: dict) -> bool:
-    """Ecstasy gate: gap between current and threshold energy > ceil(timer_limit_mins)."""
+    """Ecstasy gate: gap between current and threshold energy > floor(timer_limit_mins)."""
+    if _ecstasy_blocked_by_fails(state):
+        return False
     limit_secs = _timer_limit_secs(cfg_cons)
     if limit_secs == 0:
         return True
