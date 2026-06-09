@@ -15,22 +15,22 @@
 </svg>
 <div class="container">
   <header>
-    <div class="page-top">
-      <h1>MafiaMatrix Bot</h1>
-      <div class="status-bar">
-        <span id="status-dot" class="dot stopped"></span>
-        <span id="status-text">Stopped</span>
-        <span id="status-task" class="status-task"></span>
-      </div>
-      <div class="controls">
-        <button id="toggle-btn" onclick="toggleBot()">Start Bot</button>
-        <button id="pause-btn" onclick="togglePause()" disabled>Pause</button>
-        <button id="screenshot-btn" onclick="takeScreenshot()">Screenshot</button>
-      </div>
+    <h1>MafiaMatrix Bot</h1>
+    <div class="status-bar">
+      <span id="status-dot" class="dot stopped"></span>
+      <span id="status-text">Stopped</span>
+      <span id="status-task" class="status-task"></span>
     </div>
   </header>
 
   <main>
+    <!-- Controls -->
+    <div class="controls">
+      <button id="toggle-btn" onclick="toggleBot()">Start Bot</button>
+      <button id="pause-btn" onclick="togglePause()" disabled>Pause</button>
+      <button id="screenshot-btn" onclick="takeScreenshot()">Screenshot</button>
+    </div>
+
     <!-- Character Stats -->
     <section class="card" id="s-character">
       <h2>
