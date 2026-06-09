@@ -103,6 +103,7 @@ function _doSave() {
     auto_consumable: document.getElementById("auto_consumable").value,
     consumable_limit: parseInt(document.getElementById("consumable_limit").value) || 33,
     consumable_buffer: parseInt(document.getElementById("consumable_buffer").value) || 0,
+    smart_consumables: document.getElementById("smart_consumables").checked,
   };
 
   return fetch("/save", {

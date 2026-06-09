@@ -68,6 +68,7 @@ def save():
     c["consumables"]["auto_consumable"] = data.get("auto_consumable", "")
     c["consumables"]["consumable_limit"] = int(data.get("consumable_limit", 33))
     c["consumables"]["buffer"] = int(data.get("consumable_buffer", 0))
+    c["consumables"]["smart_consumables"] = data.get("smart_consumables", False)
 
     c.setdefault("misc", {})
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)

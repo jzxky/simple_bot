@@ -371,6 +371,9 @@
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>General</h3>
+              <label class="inline-toggle setting-row">Smart Consumables
+                <label class="toggle-label"><input type="checkbox" id="smart_consumables" {% if cons.get('smart_consumables') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
               <div class="setting-row">
                 <label for="consume_timer_limit">Timer Limit (mm:ss)</label>
                 <input type="text" id="consume_timer_limit" style="width:80px"

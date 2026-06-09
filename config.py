@@ -72,7 +72,8 @@ DEFAULT_CONFIG = {
         "auto_consume": False,
         "auto_consumable": "",
         "consumable_limit": 33,
-        "buffer": 0
+        "buffer": 0,
+        "smart_consumables": False
     }
 }
 
