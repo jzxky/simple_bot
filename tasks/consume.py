@@ -76,7 +76,7 @@ def _ecstasy_passes_gate(state: GameState, cfg_cons: dict, agg_cfg: dict) -> boo
     if limit_secs == 0:
         return True
 
-    limit_mins = math.ceil(limit_secs / 60)
+    limit_mins = math.floor(limit_secs / 60)
 
     # Pick threshold based on current city
     in_home = (state.current_city == state.home_city)
