@@ -91,6 +91,7 @@ function _doSave() {
     away_action_type: document.getElementById("away_action_type").value,
     fallback_to_away: document.getElementById("fallback_to_away").checked,
     payback_enabled: document.getElementById("payback_enabled").checked,
+    monitor_top_job: document.getElementById("monitor_top_job").checked,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
     case_work_enabled: document.getElementById("case_work_enabled").checked,

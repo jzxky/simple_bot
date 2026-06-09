@@ -67,6 +67,9 @@ DEFAULT_CONFIG = {
     "players": {
         "refresh_interval_minutes": 30
     },
+    "promo": {
+        "monitor_top_job": False
+    },
     "consumables": {
         "timer_limit": "00:00",
         "auto_consume": False,

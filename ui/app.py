@@ -70,6 +70,9 @@ def save():
     c["consumables"]["buffer"] = int(data.get("consumable_buffer", 0))
     c["consumables"]["smart_consumables"] = data.get("smart_consumables", False)
 
+    c.setdefault("promo", {})
+    c["promo"]["monitor_top_job"] = data.get("monitor_top_job", False)
+
     c.setdefault("misc", {})
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
