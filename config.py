@@ -69,7 +69,6 @@ DEFAULT_CONFIG = {
     },
     "consumables": {
         "timer_limit": "00:00",
-        "default_consumable": "",
         "auto_consume": False,
         "auto_consumable": "",
         "consumable_limit": 33,

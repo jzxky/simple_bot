@@ -99,7 +99,6 @@ function _doSave() {
     hospital_tasks: _serializePriorityTable("hospital-priority-body"),
     player_refresh_interval: parseInt(document.getElementById("player_refresh_interval").value) || 30,
     consume_timer_limit: document.getElementById("consume_timer_limit").value || "00:00",
-    default_consumable: document.getElementById("default_consumable").value,
     auto_consume: document.getElementById("auto_consume").checked,
     auto_consumable: document.getElementById("auto_consumable").value,
     consumable_limit: parseInt(document.getElementById("consumable_limit").value) || 33,
@@ -360,23 +359,6 @@ const TIMER_LABELS = {
   event:    "Event",
 };
 
-const CONSUMABLE_TIMER_LABEL = {
-  marijuana: "Case",
-  cocaine:   "Earn",
-  ecstasy:   "Energy",
-  acid:      "Travel",
-  speed:     "Whack",
-  pice:      "Skill",
-  heroin:    "Action",
-};
-
-function updateConsumeTimerLabel() {
-  const sel = document.getElementById("default_consumable");
-  const lbl = document.getElementById("consume-timer-label");
-  if (!sel || !lbl) return;
-  const timer = CONSUMABLE_TIMER_LABEL[sel.value] || "";
-  lbl.textContent = timer ? `→ ${timer} timer` : "";
-}
 
 // Each entry: { label, endMs (absolute wall-clock ms) }
 let _activeTimers = {};

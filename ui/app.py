@@ -64,7 +64,6 @@ def save():
 
     c.setdefault("consumables", {})
     c["consumables"]["timer_limit"] = data.get("consume_timer_limit", "00:00")
-    c["consumables"]["default_consumable"] = data.get("default_consumable", "")
     c["consumables"]["auto_consume"] = data.get("auto_consume", False)
     c["consumables"]["auto_consumable"] = data.get("auto_consumable", "")
     c["consumables"]["consumable_limit"] = int(data.get("consumable_limit", 33))
