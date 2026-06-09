@@ -54,6 +54,7 @@ header h1 {
 .dot.running { background: var(--success); box-shadow: 0 0 6px var(--success); }
 .dot.stopped { background: var(--muted); }
 .dot.paused  { background: #c8a020; box-shadow: 0 0 6px #c8a020; }
+.status-task { color: var(--muted); font-size: 12px; font-style: italic; }
 
 .card {
   background: var(--surface);

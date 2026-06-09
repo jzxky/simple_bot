@@ -17,5 +17,9 @@ class Scheduler:
     def tick(self, state, executor):
         for task in self._tasks:
             if task.can_run(state):
-                task.run(state, executor)
+                state.current_task = task.label or type(task).__name__
+                try:
+                    task.run(state, executor)
+                finally:
+                    state.current_task = ""
                 return
