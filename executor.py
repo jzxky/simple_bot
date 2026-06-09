@@ -623,11 +623,11 @@ def _payback_public_business(business_name: str, amount: int, state: GameState):
         return
     recipient = next(
         (p["userName"] for p in data
-         if p.get("userCity") == state.current_city and p.get("userJob") == job),
+         if p.get("userHomeCity") == state.home_city and p.get("userOccupation") == job),
         None,
     )
     if not recipient:
-        state.add_log(f"No {job} found in {state.current_city} for payback.")
+        state.add_log(f"No {job} found in {state.home_city} for payback.")
         return
     _do_transfer(recipient, amount, state)
 
