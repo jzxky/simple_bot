@@ -23,9 +23,24 @@ body {
   min-height: 100vh;
 }
 
-.container { max-width: 860px; margin: 0 auto; padding: 20px; }
+.container { max-width: 1600px; margin: 0 auto; padding: 20px; }
 
-header { margin-bottom: 20px; }
+main {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+/* Full-width items */
+.controls,
+#s-character,
+#s-settings,
+.log-card {
+  grid-column: 1 / -1;
+}
+
+header { margin-bottom: 14px; }
 header h1 {
   font-size: 20px;
   font-weight: 700;
@@ -61,7 +76,6 @@ header h1 {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
-  margin-bottom: 14px;
 }
 
 .card h2 {
@@ -197,7 +211,7 @@ select option { background: var(--surface2); }
 .muted { color: var(--muted); font-weight: normal; }
 
 /* Controls */
-.controls { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; }
 .controls button { flex: 1; }
 button {
   padding: 9px 22px;
