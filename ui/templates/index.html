@@ -309,6 +309,7 @@
           <button class="tab-btn" onclick="showTab('jail', this)">Jail</button>
           <button class="tab-btn" onclick="showTab('misc', this)">Misc</button>
           <button class="tab-btn" onclick="showTab('player-lists', this)">Player Lists</button>
+          <button class="tab-btn" onclick="showTab('consumables-settings', this)">Consumables</button>
         </div>
 
         <div id="agg-settings" class="tab-panel active">
@@ -356,6 +357,64 @@
               </div>
               <div class="setting-row" style="margin-top:10px">
                 <a href="/players" target="_blank" class="log-open-link">Manage Lists ↗</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="consumables-settings" class="tab-panel">
+          {% set cons = config.get('consumables', {}) %}
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>General</h3>
+              <div class="setting-row">
+                <label for="default_consumable">Default Consumable</label>
+                <select id="default_consumable" style="width:160px" onchange="updateConsumeTimerLabel(); autoSave()">
+                  <option value="">— None —</option>
+                  {% for v, l in [('marijuana','Marijuana'),('cocaine','Cocaine'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('pice','P / Ice'),('heroin','Heroin')] %}
+                  <option value="{{ v }}" {% if cons.get('default_consumable') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+                <span id="consume-timer-label" class="muted" style="font-size:12px;margin-left:6px"></span>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="consume_timer_limit">Timer Limit (mm:ss)</label>
+                <input type="text" id="consume_timer_limit" style="width:80px"
+                  value="{{ cons.get('timer_limit', '00:00') }}"
+                  placeholder="00:00" oninput="markNumDirty(this)">
+                <button class="num-save-btn" id="save-consume_timer_limit" onclick="saveNum('consume_timer_limit')">Save</button>
+              </div>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                Auto-Consume
+                <label class="toggle-label">
+                  <input type="checkbox" id="auto_consume" {% if cons.get('auto_consume') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <div class="setting-row">
+                <label for="auto_consumable">Consumable</label>
+                <select id="auto_consumable" style="width:160px" onchange="autoSave()">
+                  <option value="">— None —</option>
+                  {% for v, l in [('marijuana','Marijuana'),('cocaine','Cocaine'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('pice','P / Ice'),('heroin','Heroin')] %}
+                  <option value="{{ v }}" {% if cons.get('auto_consumable') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="consumable_limit">Daily Limit</label>
+                <select id="consumable_limit" style="width:100px" onchange="autoSave()">
+                  {% for v in [33, 66, 99, 132, 165] %}
+                  <option value="{{ v }}" {% if cons.get('consumable_limit', 33) == v %}selected{% endif %}>{{ v }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="consumable_buffer">Buffer</label>
+                <input type="number" id="consumable_buffer" min="0" style="width:80px"
+                  value="{{ cons.get('buffer', 0) }}"
+                  oninput="markNumDirty(this)">
+                <button class="num-save-btn" id="save-consumable_buffer" onclick="saveNum('consumable_buffer')">Save</button>
               </div>
             </div>
           </div>
@@ -411,6 +470,7 @@
   _updateCrimePills();
   _updateEarnsPills();
   _updateActionsPills();
+  updateConsumeTimerLabel();
   pollStatus();
 </script>
 </body>
