@@ -92,6 +92,7 @@ function _doSave() {
     fallback_to_away: document.getElementById("fallback_to_away").checked,
     payback_mode: document.getElementById("payback_mode").value,
     monitor_top_job: document.getElementById("monitor_top_job").checked,
+    promo_thread_id: (document.getElementById("promo_thread_id") || {value:""}).value.trim(),
     jail_enabled: document.getElementById("jail_enabled").checked,
     jail_duty: document.getElementById("jail_duty").value,
     jail_action: document.getElementById("jail_action").value,
@@ -681,4 +682,48 @@ function _renumberTable(tbodyId) {
     const num = row.querySelector(".priority-num");
     if (num) num.textContent = i + 1;
   });
+}
+
+function findThreadId() {
+  const overlay = document.getElementById("thread-overlay");
+  const content = document.getElementById("thread-overlay-content");
+  overlay.style.display = "flex";
+  content.innerHTML = "<p style='color:#888;'>Loading…</p>";
+  fetch("/promo/bar_threads")
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        content.innerHTML = `<p style='color:#f38ba8;'>${data.error}</p>`;
+        return;
+      }
+      const threads = data.threads || [];
+      if (!threads.length) {
+        content.innerHTML = "<p style='color:#888;'>No threads found.</p>";
+        return;
+      }
+      content.innerHTML = threads.map(t =>
+        `<div class="thread-option" onclick="selectThread('${t.id}')" style="padding:8px 10px;cursor:pointer;border-radius:5px;margin-bottom:4px;background:#313244;color:#cdd6f4;">${t.title} <span style='color:#888;font-size:.85em'>#${t.id}</span></div>`
+      ).join("");
+    })
+    .catch(() => {
+      content.innerHTML = "<p style='color:#f38ba8;'>Failed to fetch threads.</p>";
+    });
+}
+
+function selectThread(id) {
+  const input = document.getElementById("promo_thread_id");
+  if (input) { input.value = id; autoSave(); }
+  closeThreadOverlay();
+}
+
+function closeThreadOverlay(event) {
+  if (event && event.target !== document.getElementById("thread-overlay")) return;
+  const overlay = document.getElementById("thread-overlay");
+  overlay.style.opacity = "1";
+  let op = 1;
+  const fade = setInterval(() => {
+    op -= 0.1;
+    overlay.style.opacity = op;
+    if (op <= 0) { clearInterval(fade); overlay.style.display = "none"; overlay.style.opacity = "1"; }
+  }, 20);
 }
