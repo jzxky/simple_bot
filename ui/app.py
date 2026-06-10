@@ -84,6 +84,7 @@ def save():
     c.setdefault("misc", {})
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
+    c["misc"]["min_cash_on_hand"] = int(data.get("min_cash_on_hand", 0))
 
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
@@ -174,6 +175,14 @@ def consume():
     consume_type = request.get_json().get("type", "")
     if consume_type:
         bot.request_consume(consume_type)
+    return jsonify({"ok": True})
+
+
+@app.route("/deposit", methods=["POST"])
+def deposit():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    bot.request_deposit()
     return jsonify({"ok": True})
 
 
