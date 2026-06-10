@@ -16,7 +16,7 @@ class EarnsTask(Task):
         self._last_fired: float = 0.0
 
     def can_run(self, state) -> bool:
-        return state.logged_in and time.monotonic() - self._last_fired >= self._interval
+        return state.logged_in and not state.in_jail and time.monotonic() - self._last_fired >= self._interval
 
     def run(self, state, executor):
         self._last_fired = time.monotonic()

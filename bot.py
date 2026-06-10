@@ -27,6 +27,9 @@ from tasks.refresh import RefreshTask
 from tasks.consume import ConsumeTask
 from tasks.check_top_job import CheckTopJobTask
 from tasks.snipe_top_job import SnipeTopJobTask
+from tasks.jail_duties import JailDutiesTask
+from tasks.jail_action import JailActionTask
+from tasks.jail_consume import JailConsumeTask
 from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
@@ -118,6 +121,9 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(PlayerRefreshTask())
     sched.add(CheckTopJobTask())
     sched.add(SnipeTopJobTask())
+    sched.add(JailDutiesTask())
+    sched.add(JailActionTask())
+    sched.add(JailConsumeTask())
 
     _transfer_state(old_sched, sched)
     return sched

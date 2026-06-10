@@ -92,6 +92,11 @@ function _doSave() {
     fallback_to_away: document.getElementById("fallback_to_away").checked,
     payback_enabled: document.getElementById("payback_enabled").checked,
     monitor_top_job: document.getElementById("monitor_top_job").checked,
+    jail_enabled: document.getElementById("jail_enabled").checked,
+    jail_duty: document.getElementById("jail_duty").value,
+    jail_action: document.getElementById("jail_action").value,
+    jail_use_consumables: document.getElementById("jail_use_consumables").checked,
+    jail_consumable: document.getElementById("jail_consumable").value,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
     case_work_enabled: document.getElementById("case_work_enabled").checked,
@@ -322,12 +327,32 @@ function pollStatus() {
       document.getElementById("stat-clean").textContent = d.clean_money != null ? fmt(d.clean_money) : "--";
       document.getElementById("stat-dirty").textContent = d.dirty_money != null ? fmt(d.dirty_money) : "--";
 
-      // Consumables
-      const cons = d.consumables || {};
-      document.getElementById("stat-consumables").innerHTML =
-        Object.entries(CONSUMABLE_LABELS).filter(([k]) => (cons[k] ?? 0) > 0).map(([k, label]) =>
-          `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty ${_botRunning ? 'consumable-link' : ''}" onclick="${_botRunning ? `consumeItem('${k}')` : ''}">${cons[k]}</span></div>`
-        ).join("") || '<span class="placeholder">No consumables</span>';
+      // Jail badge and status card tint
+      const jailBadge = document.getElementById("stat-jail-badge");
+      const statusCard = document.getElementById("s-character");
+      if (d.in_jail) {
+        if (jailBadge) jailBadge.style.display = "";
+        if (statusCard) statusCard.classList.add("in-jail");
+      } else {
+        if (jailBadge) jailBadge.style.display = "none";
+        if (statusCard) statusCard.classList.remove("in-jail");
+      }
+
+      // Consumables — show jail consumables if in jail, normal consumables otherwise
+      if (d.in_jail) {
+        const jcons = d.jail_consumables || {};
+        const JAIL_CONS_LABELS = { cigarettes: "Cigarettes", booze: "Booze", porn: "Porn", shanks: "Shanks" };
+        document.getElementById("stat-consumables").innerHTML =
+          Object.entries(JAIL_CONS_LABELS).filter(([k]) => (jcons[k] ?? 0) > 0).map(([k, label]) =>
+            `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty">${jcons[k]}</span></div>`
+          ).join("") || '<span class="placeholder">No jail consumables</span>';
+      } else {
+        const cons = d.consumables || {};
+        document.getElementById("stat-consumables").innerHTML =
+          Object.entries(CONSUMABLE_LABELS).filter(([k]) => (cons[k] ?? 0) > 0).map(([k, label]) =>
+            `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty ${_botRunning ? 'consumable-link' : ''}" onclick="${_botRunning ? `consumeItem('${k}')` : ''}">${cons[k]}</span></div>`
+          ).join("") || '<span class="placeholder">No consumables</span>';
+      }
 
       // Timers
       _lastEnergy = d.energy;

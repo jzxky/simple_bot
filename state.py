@@ -45,6 +45,9 @@ class GameState:
     agg_fail_times: list = field(default_factory=list)
     current_task: str = ""
     snipe_top_job_pending: bool = False
+    in_jail: bool = False
+    jail_rank: str = ""
+    jail_consumables: dict = field(default_factory=dict)
 
     def agg_fail_count(self) -> int:
         cutoff = datetime.now() - timedelta(minutes=30)
@@ -94,6 +97,14 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     # AggPro active — red name background is the definitive signal
     s.agg_pro_active = bool(soup.find("div", id="display_top", class_="display_red"))
 
+    # Jail detection — grey display_top with "Jail Rank" label
+    jail_top = soup.find("div", id="display_top", class_="display_grey")
+    s.in_jail = bool(jail_top and "Jail Rank" in jail_top.get_text(strip=True))
+    if s.in_jail:
+        nxt = jail_top.find_next_sibling("div")
+        if nxt:
+            s.jail_rank = nxt.get_text(strip=True)
+
     # nav_right fields — walk display_top labels
     for top in soup.find_all("div", id="display_top"):
         label = top.get_text(strip=True)
@@ -103,6 +114,8 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
         text = nxt.get_text(strip=True)
         if "Name" in label:
             pass  # own name parsed via anchor below
+        elif "Jail Rank" in label:
+            pass  # handled separately above
         elif "Rank" in label and "Next" not in label:
             s.rank = text
         elif "Occupation" in label:
@@ -208,6 +221,26 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     # Derive aggpro end time from timers dict (active state already set above)
     aggpro_t = timers.get("aggpro", {})
     s.agg_pro_end = aggpro_t.get("end")
+
+    # Jail consumables — parsed whenever contraband.asp is loaded
+    if "contraband.asp" in url:
+        _JAIL_ITEM_MAP = {
+            "Cigarettes": "cigarettes", "Booze": "booze",
+            "Heroin": "heroin", "Porn": "porn", "Shanks": "shanks",
+        }
+        jail_cons = {}
+        for row in soup.find_all("tr"):
+            cells = row.find_all("td", class_="display_border")
+            if len(cells) >= 2:
+                name = cells[0].get_text(strip=True)
+                key = _JAIL_ITEM_MAP.get(name)
+                if key:
+                    try:
+                        jail_cons[key] = int(cells[1].get_text(strip=True))
+                    except (ValueError, TypeError):
+                        jail_cons[key] = 0
+        if jail_cons:
+            s.jail_consumables = jail_cons
 
     # Login state
     s.logged_in = url.rstrip("/") != "https://mafiamatrix.com/default.asp"

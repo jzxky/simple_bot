@@ -73,6 +73,13 @@ def save():
     c.setdefault("promo", {})
     c["promo"]["monitor_top_job"] = data.get("monitor_top_job", False)
 
+    c.setdefault("jail", {})
+    c["jail"]["enabled"] = data.get("jail_enabled", False)
+    c["jail"]["duty"] = data.get("jail_duty", "laundry")
+    c["jail"]["action"] = data.get("jail_action", "gym")
+    c["jail"]["use_consumables"] = data.get("jail_use_consumables", False)
+    c["jail"]["consumable"] = data.get("jail_consumable", "cigarettes")
+
     c.setdefault("misc", {})
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
@@ -147,6 +154,9 @@ def status():
         "own_name": s.own_name,
         "earns_enabled": cfg.load().get("earns", {}).get("enabled", True),
         "current_task": s.current_task,
+        "in_jail": s.in_jail,
+        "jail_rank": s.jail_rank,
+        "jail_consumables": s.jail_consumables,
     })
 
 

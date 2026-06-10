@@ -77,6 +77,13 @@ DEFAULT_CONFIG = {
         "consumable_limit": 33,
         "buffer": 0,
         "smart_consumables": False
+    },
+    "jail": {
+        "enabled": False,
+        "duty": "laundry",
+        "action": "gym",
+        "use_consumables": False,
+        "consumable": "cigarettes"
     }
 }
 

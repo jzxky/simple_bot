@@ -20,7 +20,7 @@ class CareerTrainingTask(Task):
         self.career = career
 
     def can_run(self, state: GameState) -> bool:
-        return state.logged_in and state.action_available() and state.in_home_city()
+        return state.logged_in and not state.in_jail and state.action_available() and state.in_home_city()
 
     def run(self, state: GameState, executor):
         url = CAREER_URLS.get(self.career)

@@ -1,0 +1,24 @@
+import time
+import config as cfg
+from tasks.base import Task, Action
+
+
+class JailDutiesTask(Task):
+    priority = 30
+    label = 'Jail Duties'
+
+    def __init__(self):
+        self._interval = 30 * 60
+        self._last_fired: float = 0.0
+
+    def can_run(self, state) -> bool:
+        if not state.in_jail or not state.logged_in:
+            return False
+        if not cfg.load().get("jail", {}).get("enabled", False):
+            return False
+        return time.monotonic() - self._last_fired >= self._interval
+
+    def run(self, state, executor):
+        self._last_fired = time.monotonic()
+        duty = cfg.load().get("jail", {}).get("duty", "laundry")
+        executor.execute(Action("jail_duties", duty=duty), state)

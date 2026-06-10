@@ -559,3 +559,25 @@ input.input-unsaved { color: var(--red) !important; }
   text-transform: uppercase;
   white-space: nowrap;
 }
+
+/* Jail */
+.jail-badge {
+  display: inline-block;
+  background: #5a5a5a;
+  color: #ddd;
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.in-jail {
+  border-color: #5a5a5a !important;
+}
+.in-jail > h2 {
+  background: #3a3a3a !important;
+  border-bottom-color: #5a5a5a !important;
+}

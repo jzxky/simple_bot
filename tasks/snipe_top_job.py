@@ -25,6 +25,7 @@ class SnipeTopJobTask(Task):
     def can_run(self, state: GameState) -> bool:
         return (
             state.logged_in
+            and not state.in_jail
             and state.snipe_top_job_pending
             and state.occupation != TARGET_OCC
         )

@@ -69,7 +69,7 @@ class AggCrimeTask(Task):
         return None, 0
 
     def can_run(self, state: GameState) -> bool:
-        if not state.logged_in:
+        if not state.logged_in or state.in_jail:
             return False
         if time.monotonic() < self._cooldown_until:
             return False
