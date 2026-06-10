@@ -730,10 +730,57 @@ function closeThreadOverlay(event) {
   }, 20);
 }
 
-function requestDeposit() {
+// ── Cash overlay ──────────────────────────────────────────────────────────────
+
+function openCashOverlay() {
+  document.getElementById("cash-step-action").style.display = "";
+  document.getElementById("cash-step-withdraw").style.display = "none";
+  document.getElementById("cash-custom-input").style.display = "none";
+  document.getElementById("cash-custom-input").value = "";
+  document.querySelectorAll("input[name='wamt']").forEach(r => r.checked = false);
+  const ov = document.getElementById("cash-overlay");
+  ov.style.display = "flex";
+}
+
+function closeCashOverlay(event) {
+  if (event && event.target !== document.getElementById("cash-overlay")) return;
+  document.getElementById("cash-overlay").style.display = "none";
+}
+
+function cashDoDeposit() {
+  document.getElementById("cash-overlay").style.display = "none";
   fetch("/deposit", { method: "POST" })
     .then(r => r.json())
     .then(d => { if (d.error) alert(d.error); });
+}
+
+function cashShowWithdraw() {
+  document.getElementById("cash-step-action").style.display = "none";
+  document.getElementById("cash-step-withdraw").style.display = "";
+}
+
+function cashToggleCustom(radio) {
+  const inp = document.getElementById("cash-custom-input");
+  inp.style.display = radio.checked && radio.value === "x" ? "" : "none";
+  if (inp.style.display !== "none") inp.focus();
+}
+
+function cashSubmitWithdraw() {
+  const selected = document.querySelector("input[name='wamt']:checked");
+  if (!selected) return;
+  let amount;
+  if (selected.value === "x") {
+    amount = parseInt(document.getElementById("cash-custom-input").value, 10);
+    if (!amount || amount <= 0) return;
+  } else {
+    amount = parseInt(selected.value, 10);
+  }
+  document.getElementById("cash-overlay").style.display = "none";
+  fetch("/withdraw", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({amount}),
+  }).then(r => r.json()).then(d => { if (d.error) alert(d.error); });
 }
 
 function requestWithdraw() {

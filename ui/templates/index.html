@@ -56,7 +56,7 @@
         </div>
         <hr class="stat-divider">
         <div class="stats-grid">
-          <div class="stat-item" id="stat-clean-item" title="Click to deposit" style="cursor:pointer;" onclick="requestDeposit()"><span class="stat-label">Clean Money</span><span class="stat-value" id="stat-clean">--</span></div>
+          <div class="stat-item" id="stat-clean-item" title="Click for bank actions" style="cursor:pointer;" onclick="openCashOverlay()"><span class="stat-label">Clean Money</span><span class="stat-value" id="stat-clean">--</span></div>
           <div class="stat-item"><span class="stat-label">Dirty Money</span><span class="stat-value" id="stat-dirty">--</span></div>
           <div class="stat-item" title="Click to withdraw" style="cursor:pointer;" onclick="requestWithdraw()"><span class="stat-label">Bank Balance</span><span class="stat-value" id="stat-bank">--</span></div>
         </div>
@@ -375,6 +375,31 @@
           <div id="thread-overlay-box" style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:20px;min-width:320px;max-width:480px;max-height:70vh;overflow-y:auto;" onclick="event.stopPropagation()">
             <h4 style="margin:0 0 12px;color:#cdd6f4;">Bar Threads</h4>
             <div id="thread-overlay-content"></div>
+          </div>
+        </div>
+
+        <div id="cash-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;" onclick="closeCashOverlay(event)">
+          <div style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:24px;min-width:280px;" onclick="event.stopPropagation()">
+            <div id="cash-step-action">
+              <h4 style="margin:0 0 16px;color:#cdd6f4;">Clean Money</h4>
+              <div style="display:flex;gap:10px;">
+                <button class="btn-primary" style="flex:1;" onclick="cashDoDeposit()">Deposit</button>
+                <button class="btn-secondary" style="flex:1;" onclick="cashShowWithdraw()">Withdraw</button>
+              </div>
+            </div>
+            <div id="cash-step-withdraw" style="display:none;">
+              <h4 style="margin:0 0 14px;color:#cdd6f4;">Withdraw Amount</h4>
+              <div id="cash-withdraw-options" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
+                <label class="cash-opt"><input type="radio" name="wamt" value="3000"> $3,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="10000"> $10,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="50000"> $50,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="500000"> $500,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="1000000"> $1,000,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="x" onchange="cashToggleCustom(this)"> X (custom)</label>
+              </div>
+              <input type="number" id="cash-custom-input" placeholder="Enter amount" style="display:none;width:100%;margin-bottom:12px;box-sizing:border-box;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+              <button class="btn-primary" style="width:100%;" onclick="cashSubmitWithdraw()">Submit</button>
+            </div>
           </div>
         </div>
         <div id="casework"  class="tab-panel"><p class="placeholder">Case work is configured in the Case Work section above.</p></div>
