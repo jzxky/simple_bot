@@ -1134,12 +1134,15 @@ def handle_withdraw(action: Action, state: GameState):
 # ---------------------------------------------------------------------------
 # Executor
 def _jailbreak_result(soup) -> str:
-    """Extract first non-empty paragraph text after a form, or any div result message."""
-    for tag in ("div", "p"):
-        for el in soup.find_all(tag):
-            txt = el.get_text(strip=True)
-            if txt and len(txt) > 5 and "select" not in txt.lower() and "submit" not in txt.lower():
-                return txt
+    """Extract the result message from a jailbreak.asp response page.
+
+    The result sits inside the right-hand td.s1 as one or more <p> tags.
+    """
+    td = soup.find("td", class_="s1")
+    if td:
+        parts = [p.get_text(" ", strip=True) for p in td.find_all("p") if p.get_text(strip=True)]
+        if parts:
+            return " ".join(parts)
     return ""
 
 

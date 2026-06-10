@@ -531,6 +531,7 @@ input.input-unsaved { color: var(--red) !important; }
 .num-save-btn:hover { border-color: var(--accent); color: var(--accent); }
 .num-save-btn.needed { border-color: var(--red); color: var(--red); }
 .save-icon { width: 14px; height: 14px; fill: currentColor; display: block; flex-shrink: 0; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 3px 7px; }
 
 /* ── Credentials save button ─────────────────────────────────────────────── */
 #creds-save-btn { margin-top: 10px; width: auto; padding: 6px 14px; }
@@ -579,7 +580,7 @@ input.input-unsaved { color: var(--red) !important; }
   background: #4a4a4a !important;
 }
 .in-jail > h2 {
-  background: #3a3a3a !important;
+  background: #4a4a4a !important;
   border-bottom-color: #5a5a5a !important;
 }
 .in-jail .card-body {
