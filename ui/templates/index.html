@@ -39,26 +39,13 @@
         <span class="section-pills" id="pills-s-character"></span>
       </h2>
       <div class="card-body">
-        <!-- Normal (out of jail) -->
-        <div id="stat-grid-normal">
-          <div class="stats-grid">
-            <div class="stat-item"><span class="stat-label">Rank</span><span class="stat-value" id="stat-rank">--</span></div>
-            <div class="stat-item"><span class="stat-label">Occupation</span><span class="stat-value" id="stat-occupation">--</span></div>
-            <div class="stat-item"><span class="stat-label">Next Rank</span><span class="stat-value" id="stat-next-rank">--</span></div>
-            <div class="stat-item"><span class="stat-label">Progress</span><span class="stat-value" id="stat-rank-progress">--</span></div>
-            <div class="stat-item"><span class="stat-label">City</span><span class="stat-value" id="stat-city">--</span></div>
-            <div class="stat-item"><span class="stat-label">Home City</span><span class="stat-value" id="stat-home-city">--</span></div>
-          </div>
-        </div>
-        <!-- Jail mode -->
-        <div id="stat-grid-jail" style="display:none">
-          <table class="jail-profile-table">
-            <tr><td class="jpt-label">Jail Rank</td><td id="jpt-jail-rank">--</td></tr>
-            <tr><td class="jpt-label">Next Rank</td><td id="jpt-next-rank">--</td></tr>
-            <tr><td class="jpt-label">Progress</td><td id="jpt-progress">--</td></tr>
-            <tr><td class="jpt-label">City</td><td id="jpt-city">--</td></tr>
-            <tr><td class="jpt-label">Home City</td><td id="jpt-home-city">--</td></tr>
-          </table>
+        <div class="stats-grid">
+          <div class="stat-item" id="stat-rank-item"><span class="stat-label" id="stat-rank-label">Rank</span><span class="stat-value" id="stat-rank">--</span></div>
+          <div class="stat-item" id="stat-occupation-item"><span class="stat-label">Occupation</span><span class="stat-value" id="stat-occupation">--</span></div>
+          <div class="stat-item"><span class="stat-label">Next Rank</span><span class="stat-value" id="stat-next-rank">--</span></div>
+          <div class="stat-item"><span class="stat-label">Progress</span><span class="stat-value" id="stat-rank-progress">--</span></div>
+          <div class="stat-item"><span class="stat-label">City</span><span class="stat-value" id="stat-city">--</span></div>
+          <div class="stat-item"><span class="stat-label">Home City</span><span class="stat-value" id="stat-home-city">--</span></div>
         </div>
         <hr class="stat-divider">
         <div class="stats-grid">
