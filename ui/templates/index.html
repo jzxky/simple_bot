@@ -453,6 +453,11 @@
             <div class="settings-group">
               <h3>General</h3>
               <div class="setting-row">
+                <label for="player_list_enabled">Enable player list updates</label>
+                <input type="checkbox" id="player_list_enabled" onchange="markDirty()"
+                  {% if config.get('players', {}).get('enabled', True) %}checked{% endif %}>
+              </div>
+              <div class="setting-row">
                 <label for="player_refresh_interval">Refresh interval (minutes)</label>
                 <input type="number" id="player_refresh_interval" min="1" max="1440"
                   value="{{ config.get('players', {}).get('refresh_interval_minutes', 30) }}"

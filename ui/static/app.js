@@ -107,6 +107,7 @@ function _doSave() {
     hospital_poll_interval: parseInt(document.getElementById("hospital_poll_interval").value) || 31,
     fire_poll_interval: parseInt(document.getElementById("fire_poll_interval").value) || 31,
     hospital_tasks: _serializePriorityTable("hospital-priority-body"),
+    player_list_enabled: document.getElementById("player_list_enabled").checked,
     player_refresh_interval: parseInt(document.getElementById("player_refresh_interval").value) || 30,
     consume_timer_limit: document.getElementById("consume_timer_limit").value || "00:00",
     auto_consume: document.getElementById("auto_consume").checked,
@@ -824,12 +825,8 @@ function loadJbPopulation() {
     .then(d => {
       _populateSelect("jb-target", d.jail_inmates, "— Select target —");
       const partnerRow = document.getElementById("jb-partner-row");
-      if (d.is_gangster && d.partners.length) {
-        _populateSelect("jb-partner", d.partners, "— Select partner —");
-        partnerRow.style.display = "";
-      } else {
-        partnerRow.style.display = "none";
-      }
+      _populateSelect("jb-partner", d.partners, "— Select partner —");
+      partnerRow.style.display = "";
     });
 }
 
@@ -1006,7 +1003,7 @@ function renderCharHistory(data, reqs) {
 
   // ── Stat sections ─────────────────────────────────────────────────────────
   const SECTION_ORDER = [
-    "Character Information", "Acquired Money",
+    "Character Information",
     "Crimes Committed", "Gambling",
     "Whacking Info",
     // Career sections — show all, each gets hide-zeros
@@ -1060,12 +1057,17 @@ function renderCharHistory(data, reqs) {
   }
 
   // ── Skills & Traits (unlocked only, single column) ────────────────────────
-  const allUnlocked = (data.skills_traits || []).filter(s => s.status === "Unlocked" || s.status === "Active");
+  const _HIDDEN_SKILLS = new Set(["Throw Snowball", "Diligent Worker", "Bloodlust"]);
+  const allUnlocked = (data.skills_traits || []).filter(s =>
+    !_HIDDEN_SKILLS.has(s.name) && (s.status === "Unlocked" || s.status === "Active")
+  );
   const lockedTraits = (data.skills_traits || []).filter(s =>
+    !_HIDDEN_SKILLS.has(s.name) &&
     s.status !== "Unlocked" && s.status !== "Active" &&
     s.type === "Trait"
   );
   const lockedSkills = (data.skills_traits || []).filter(s =>
+    !_HIDDEN_SKILLS.has(s.name) &&
     s.status !== "Unlocked" && s.status !== "Active" &&
     s.type === "Skill"
   );

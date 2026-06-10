@@ -196,6 +196,8 @@ class PlayerRefreshTask(Task):
         self._last_run: float = 0.0
 
     def can_run(self, state) -> bool:
+        if not cfg.load().get("players", {}).get("enabled", True):
+            return False
         return state.logged_in and time.monotonic() - self._last_run >= _refresh_interval()
 
     def run(self, state, executor):
