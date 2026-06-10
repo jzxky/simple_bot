@@ -1055,11 +1055,29 @@ def handle_deposit(action: Action, state: GameState):
     if amount <= 0:
         state.add_log(f"Deposit: nothing to deposit (clean money {state.clean_money}, min {min_cash}).")
         return
-    DEPOSIT_URL = "https://mafiamatrix.com/income/deposit.asp"
+    DEPOSIT_URL = "https://mafiamatrix.com/income/bank.asp?option=deposit"
     page = browser.page()
-    page.request.post(DEPOSIT_URL, form={"deposit": str(amount)})
+    page.goto(DEPOSIT_URL, wait_until="domcontentloaded", timeout=15000)
+    page.fill("input[name='deposit']", str(amount))
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded", timeout=10000)
     _refresh_state(state)
     state.add_log(f"Deposit: deposited ${amount:,}.")
+
+
+def handle_withdraw(action: Action, state: GameState):
+    amount = int(action.params.get("amount", 0))
+    if amount <= 0:
+        state.add_log("Withdraw: amount must be greater than zero.")
+        return
+    WITHDRAW_URL = "https://mafiamatrix.com/income/bank.asp?option=withdrawal"
+    page = browser.page()
+    page.goto(WITHDRAW_URL, wait_until="domcontentloaded", timeout=15000)
+    page.fill("input[name='withdrawal']", str(amount))
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded", timeout=10000)
+    _refresh_state(state)
+    state.add_log(f"Withdraw: withdrew ${amount:,}.")
 
 
 # ---------------------------------------------------------------------------
@@ -1085,6 +1103,7 @@ HANDLERS = {
     "jail_action": handle_jail_action,
     "jail_consume": handle_jail_consume,
     "deposit": handle_deposit,
+    "withdraw": handle_withdraw,
 }
 
 

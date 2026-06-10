@@ -31,6 +31,7 @@ from tasks.jail_duties import JailDutiesTask
 from tasks.jail_action import JailActionTask
 from tasks.jail_consume import JailConsumeTask
 from tasks.deposit import DepositTask
+from tasks.withdraw import WithdrawTask
 from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
@@ -43,6 +44,7 @@ _screenshot_request: queue.Queue = queue.Queue(maxsize=1)
 _screenshot_result: queue.Queue = queue.Queue(maxsize=1)
 _consume_queue: queue.Queue = queue.Queue()
 _deposit_queue: queue.Queue = queue.Queue()
+_withdraw_queue: queue.Queue = queue.Queue()
 _clear_earn_event = threading.Event()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
@@ -123,6 +125,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(RefreshTask(interval_seconds=60))
     sched.add(ConsumeTask(_consume_queue))
     sched.add(DepositTask(_deposit_queue))
+    sched.add(WithdrawTask(_withdraw_queue))
     sched.add(PlayerRefreshTask())
     sched.add(CheckTopJobTask())
     sched.add(SnipeTopJobTask())
@@ -341,6 +344,10 @@ def request_consume(consume_type: str):
 
 def request_deposit():
     _deposit_queue.put(True)
+
+
+def request_withdraw(amount: int):
+    _withdraw_queue.put(amount)
 
 
 def request_clear_earn_queue():

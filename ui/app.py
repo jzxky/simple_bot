@@ -142,6 +142,7 @@ def status():
         "health": s.health,
         "clean_money": s.clean_money,
         "dirty_money": s.dirty_money,
+        "bank_balance": s.bank_balance,
         "next_rank": s.next_rank,
         "rank_progress": s.rank_progress,
         "earns_24h": s.earns_24h,
@@ -183,6 +184,17 @@ def deposit():
     if not bot.is_running():
         return jsonify({"error": "Bot is not running."}), 400
     bot.request_deposit()
+    return jsonify({"ok": True})
+
+
+@app.route("/withdraw", methods=["POST"])
+def withdraw():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    amount = int(request.get_json().get("amount", 0))
+    if amount <= 0:
+        return jsonify({"error": "Amount must be greater than zero."}), 400
+    bot.request_withdraw(amount)
     return jsonify({"ok": True})
 
 

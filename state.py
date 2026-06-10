@@ -25,6 +25,7 @@ class GameState:
     health: int = 100
     clean_money: int = 0
     dirty_money: int = 0
+    bank_balance: int = 0
     next_rank: str = ""
     rank_progress: int = 0
     earns_24h: int = 0
@@ -242,6 +243,17 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
                         jail_cons[key] = 0
         if jail_cons:
             s.jail_consumables = jail_cons
+
+    # Bank balance — parsed whenever bank.asp is loaded
+    if "bank.asp" in url:
+        for strong in soup.find_all("strong"):
+            if "Bank Balance" in strong.get_text():
+                sib = strong.find_next_sibling(string=True) or (strong.parent.get_text(strip=True) if strong.parent else "")
+                try:
+                    s.bank_balance = _parse_money(str(sib))
+                except Exception:
+                    pass
+                break
 
     # Login state
     s.logged_in = url.rstrip("/") != "https://mafiamatrix.com/default.asp"
