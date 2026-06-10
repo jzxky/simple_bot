@@ -46,7 +46,8 @@ DEFAULT_CONFIG = {
     },
     "misc": {
         "logout_on_stop": True,
-        "relog_on_session_expire": True
+        "relog_on_session_expire": True,
+        "min_cash_on_hand": 0
     },
     "case_work": {
         "enabled": False,

@@ -56,7 +56,7 @@
         </div>
         <hr class="stat-divider">
         <div class="stats-grid">
-          <div class="stat-item"><span class="stat-label">Clean Money</span><span class="stat-value" id="stat-clean">--</span></div>
+          <div class="stat-item" id="stat-clean-item" title="Click to deposit" style="cursor:pointer;" onclick="requestDeposit()"><span class="stat-label">Clean Money</span><span class="stat-value" id="stat-clean">--</span></div>
           <div class="stat-item"><span class="stat-label">Dirty Money</span><span class="stat-value" id="stat-dirty">--</span></div>
         </div>
         <hr class="stat-divider">
@@ -500,6 +500,13 @@
               <label class="inline-toggle setting-row">Re-log if auto-logged out
                 <label class="toggle-label"><input type="checkbox" id="relog_on_session_expire" {% if config.get('misc', {}).get('relog_on_session_expire', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+              <div class="setting-row">
+                <span>Min Cash on Hand</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="number" id="min_cash_on_hand" value="{{ config.get('misc', {}).get('min_cash_on_hand', 0) }}" min="0" step="1000" style="width:120px;" onchange="autoSave()" oninput="markNumDirty(this)">
+                  <button id="save-min_cash_on_hand" class="btn-secondary save-num-btn" onclick="saveNum('min_cash_on_hand')">Save</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

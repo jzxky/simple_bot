@@ -1049,6 +1049,26 @@ def handle_jail_consume(action: Action, state: GameState):
         state.add_log(f"Jail consume {name}: submitted.")
 
 
+def handle_deposit(action: Action, state: GameState):
+    min_cash = int(action.params.get("min_cash_on_hand", 0))
+    amount = (state.clean_money or 0) - min_cash
+    if amount <= 0:
+        state.add_log(f"Deposit: nothing to deposit (clean money {state.clean_money}, min {min_cash}).")
+        return
+    DEPOSIT_URL = "https://mafiamatrix.com/income/deposit.asp"
+    page = browser.page()
+    page.goto(DEPOSIT_URL, wait_until="domcontentloaded", timeout=15000)
+    inp = page.query_selector("input[name='deposit']")
+    if not inp:
+        state.add_log("Deposit: deposit input not found on page.")
+        return
+    page.evaluate(f"document.querySelector(\"input[name='deposit']\").value = '{amount}'")
+    page.click("input[type='submit']")
+    page.wait_for_load_state("domcontentloaded", timeout=10000)
+    _refresh_state(state)
+    state.add_log(f"Deposit: deposited ${amount:,}.")
+
+
 # ---------------------------------------------------------------------------
 # Executor
 # ---------------------------------------------------------------------------
@@ -1071,6 +1091,7 @@ HANDLERS = {
     "jail_duties": handle_jail_duties,
     "jail_action": handle_jail_action,
     "jail_consume": handle_jail_consume,
+    "deposit": handle_deposit,
 }
 
 
