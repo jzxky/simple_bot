@@ -68,30 +68,6 @@
     </section>
 
     <!-- Credentials -->
-    <section class="card" id="s-credentials">
-      <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-credentials')">▾</button>
-        Credentials
-      </h2>
-      <div class="card-body">
-        <div class="row">
-          <label>Email
-            <div class="input-with-btn">
-              <input type="password" id="email" value="{{ config.credentials.email }}" autocomplete="off" oninput="markCredsDirty()">
-              <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('email', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
-            </div>
-          </label>
-          <label>Password
-            <div class="input-with-btn">
-              <input type="password" id="password" value="{{ config.credentials.password }}" oninput="markCredsDirty()">
-              <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('password', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
-            </div>
-          </label>
-        </div>
-        <button id="creds-save-btn" class="num-save-btn" onclick="saveCredentials()"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
-      </div>
-    </section>
-
     <!-- Earns -->
     <section class="card" id="s-earns">
       <h2>
@@ -316,6 +292,7 @@
           <button class="tab-btn" onclick="showTab('misc', this)">Misc</button>
           <button class="tab-btn" onclick="showTab('player-lists', this)">Player Lists</button>
           <button class="tab-btn" onclick="showTab('consumables-settings', this)">Consumables</button>
+          <button class="tab-btn" onclick="showTab('credentials', this)">Credentials</button>
         </div>
 
         <div id="agg-settings" class="tab-panel active">
@@ -547,6 +524,28 @@
             </div>
           </div>
         </div>
+        <div id="credentials" class="tab-panel">
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Login</h3>
+              <div class="row">
+                <label>Email
+                  <div class="input-with-btn">
+                    <input type="password" id="email" value="{{ config.credentials.email }}" autocomplete="off" oninput="markCredsDirty()">
+                    <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('email', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                  </div>
+                </label>
+                <label>Password
+                  <div class="input-with-btn">
+                    <input type="password" id="password" value="{{ config.credentials.password }}" oninput="markCredsDirty()">
+                    <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('password', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                  </div>
+                </label>
+              </div>
+              <button id="creds-save-btn" class="num-save-btn" style="margin-top:10px" onclick="saveCredentials()"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -596,14 +595,16 @@
           <div id="jb-plan-form" class="task-subpanel" style="display:none;">
             <div class="task-row">
               <label class="task-label">Target <span class="task-hint">(in jail)</span></label>
-              <div style="display:flex;gap:6px;flex:1;">
+              <div style="display:flex;gap:6px;flex:1;min-width:0;">
                 <select id="jb-target" class="task-select task-select-flex"></select>
                 <button class="btn-secondary task-inline-btn" onclick="checkJailOffline()" id="jb-check-btn">Check Offline</button>
               </div>
             </div>
             <div id="jb-partner-row" class="task-row" style="display:none;">
               <label class="task-label">Partner</label>
-              <select id="jb-partner" class="task-select task-select-flex"></select>
+              <div style="display:flex;gap:6px;flex:1;min-width:0;">
+                <select id="jb-partner" class="task-select task-select-flex"></select>
+              </div>
             </div>
             <div class="task-row">
               <label class="task-label">Hold Action Timer</label>
