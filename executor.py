@@ -473,18 +473,35 @@ def handle_check_weapon(action: Action, state: GameState):
 
 
 
+_CONSUMABLE_NAMES = {
+    "marijuana": "Marijuana",
+    "cocaine":   "Cocaine",
+    "ecstasy":   "Ecstasy",
+    "acid":      "Acid",
+    "speed":     "Speed",
+    "pice":      "P / Ice",
+    "heroin":    "Heroin",
+}
+
+
 def handle_consume(action: Action, state: GameState):
     consume_type = action.params["type"]
     count = int(action.params.get("count", 1))
     url = f"https://mafiamatrix.com/profile/consumables.asp?action=consume&type={consume_type}"
+    display_name = _CONSUMABLE_NAMES.get(consume_type, consume_type.title())
 
     for i in range(count):
         _nav(url, state)
+        label = f"[{i+1}/{count}] " if count > 1 else ""
+
+        if "profile/default.asp" in browser.current_url():
+            state.add_log(f"Consume {display_name}: {label}You successfully consumed the {display_name}!")
+            continue
+
         soup = BeautifulSoup(browser.page().content(), "html.parser")
         msg_div = soup.find("div", id="success") or soup.find("div", id="fail")
         msg = msg_div.get_text(strip=True) if msg_div else "No result."
-        label = f"[{i+1}/{count}] " if count > 1 else ""
-        state.add_log(f"Consume {consume_type}: {label}{msg}")
+        state.add_log(f"Consume {display_name}: {label}{msg}")
 
 
 def handle_refresh_state(action: Action, state: GameState):
