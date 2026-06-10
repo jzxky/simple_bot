@@ -1057,14 +1057,7 @@ def handle_deposit(action: Action, state: GameState):
         return
     DEPOSIT_URL = "https://mafiamatrix.com/income/deposit.asp"
     page = browser.page()
-    page.goto(DEPOSIT_URL, wait_until="domcontentloaded", timeout=15000)
-    inp = page.query_selector("input[name='deposit']")
-    if not inp:
-        state.add_log("Deposit: deposit input not found on page.")
-        return
-    page.evaluate(f"document.querySelector(\"input[name='deposit']\").value = '{amount}'")
-    page.click("input[type='submit']")
-    page.wait_for_load_state("domcontentloaded", timeout=10000)
+    page.request.post(DEPOSIT_URL, form={"deposit": str(amount)})
     _refresh_state(state)
     state.add_log(f"Deposit: deposited ${amount:,}.")
 
