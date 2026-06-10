@@ -359,7 +359,21 @@
               <label class="inline-toggle setting-row">Monitor Top Job
                 <label class="toggle-label"><input type="checkbox" id="monitor_top_job" {% if promo.get('monitor_top_job') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+              <div class="setting-row">
+                <span>Top Job Thread ID</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="text" id="promo_thread_id" value="{{ promo.get('top_job_thread_id', '') }}" placeholder="Thread ID" style="width:120px;" onchange="autoSave()">
+                  <button type="button" class="btn-secondary" onclick="findThreadId()">Find ID</button>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+
+        <div id="thread-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;" onclick="closeThreadOverlay(event)">
+          <div id="thread-overlay-box" style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:20px;min-width:320px;max-width:480px;max-height:70vh;overflow-y:auto;" onclick="event.stopPropagation()">
+            <h4 style="margin:0 0 12px;color:#cdd6f4;">Bar Threads</h4>
+            <div id="thread-overlay-content"></div>
           </div>
         </div>
         <div id="casework"  class="tab-panel"><p class="placeholder">Case work is configured in the Case Work section above.</p></div>
