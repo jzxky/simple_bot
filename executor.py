@@ -864,9 +864,12 @@ def _hospital_injury_to_type(injury_text: str) -> str:
 def handle_check_hospital_cases(action: Action, state: GameState):
     tasks = action.params.get("tasks", [])
     # Build priority-ordered list of enabled task types (skip target=none)
+    # DNA processing requires home city — skip it when travelling
+    in_home = state.in_home_city()
     priority = [
         t["type"] for t in tasks
         if t.get("target", "all") != "none" and t.get("enabled", True) is not False
+        and not (t["type"] == "dna" and not in_home)
     ]
 
     _nav(HOSPITAL_CASES_URL, state)
