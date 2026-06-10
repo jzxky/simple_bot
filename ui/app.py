@@ -13,6 +13,7 @@ import bot
 import paths
 import players as pl
 import character_history as ch
+import trait_requirements as tr
 
 _ui_root = os.path.join(paths.resource_dir(), "ui")
 app = Flask(__name__,
@@ -206,6 +207,22 @@ def withdraw():
 @app.route("/character_history")
 def character_history():
     return jsonify(ch.load())
+
+
+@app.route("/trait_requirements")
+def trait_requirements():
+    data = ch.load()
+    result = {}
+    for name, entry in tr.REQUIREMENTS.items():
+        if name in tr.HIDDEN_FROM_LOCKED:
+            continue
+        progress = tr.evaluate_progress(name, data)
+        result[name] = {
+            "ranks": entry["ranks"],
+            "description": entry["description"],
+            "progress": progress,
+        }
+    return jsonify(result)
 
 
 @app.route("/character_history/refresh", methods=["POST"])

@@ -594,60 +594,169 @@ input.input-unsaved { color: var(--red) !important; }
 .cash-opt:hover { background: #45475a; }
 
 /* ── Character History ──────────────────────────── */
+
+/* Two-column grid that stacks on mobile */
+.ch-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+@media (max-width: 540px) {
+  .ch-grid { grid-template-columns: 1fr; }
+}
+.ch-grid-item { display: flex; flex-direction: column; }
+
+/* Section card */
 .ch-section {
-  margin-bottom: 16px;
-}
-.ch-section-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #89b4fa;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 0 0 6px;
-}
-.ch-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-.ch-table th {
-  text-align: left;
-  color: #888;
-  font-weight: 500;
-  font-size: 0.75rem;
-  padding: 3px 8px;
-  border-bottom: 1px solid #313244;
-}
-.ch-table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid #1e1e2e;
-  color: #cdd6f4;
-}
-.ch-table .ch-key {
-  color: #a6adc8;
-  width: 45%;
-}
-.ch-table .ch-val {
-  font-weight: 500;
-}
-.ch-table-wide .ch-key { width: auto; }
-.ch-row-active td { color: #a6e3a1; }
-.ch-row-inactive td { color: #585b70; }
-.ch-career-details {
-  margin-top: 8px;
+  background: #181825;
   border: 1px solid #313244;
   border-radius: 6px;
   overflow: hidden;
+  margin-bottom: 8px;
+  flex: 1;
 }
-.ch-career-summary {
-  padding: 8px 12px;
+.ch-section-full {
+  margin-bottom: 8px;
+}
+.ch-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
   background: #1e1e2e;
-  cursor: pointer;
-  color: #a6adc8;
-  font-size: 0.85rem;
-  font-weight: 500;
-  list-style: none;
+  border-bottom: 1px solid #313244;
 }
-.ch-career-summary:hover { background: #313244; }
-.ch-career-details[open] .ch-career-summary { border-bottom: 1px solid #313244; }
-.ch-career-details > .ch-section { padding: 10px 12px 0; }
+.ch-section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #89b4fa;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  flex: 1;
+}
+
+/* Hide-zeros toggle */
+.ch-hz-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  color: #6c7086;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+.ch-hz-label input { accent-color: #89b4fa; cursor: pointer; }
+.ch-hz-label:hover { color: #a6adc8; }
+
+/* Key/value table */
+.ch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.ch-table td {
+  padding: 4px 10px;
+  border-bottom: 1px solid #1e1e2e;
+  color: #cdd6f4;
+}
+.ch-table tr:last-child td { border-bottom: none; }
+.ch-key { color: #a6adc8; width: 55%; }
+.ch-val { font-weight: 500; text-align: right; }
+.ch-money { color: #f9e2af; }
+.ch-empty-note { padding: 6px 10px; font-size: 0.75rem; color: #45475a; }
+
+/* Earn History table */
+.ch-earn-table td { vertical-align: top; padding: 5px 10px; }
+.ch-earn-cat {
+  font-size: 0.68rem; font-weight: 700; color: #89b4fa;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  white-space: nowrap; width: 90px;
+}
+.ch-earn-entries { line-height: 1.8; }
+.ch-earn-item {
+  display: inline-block;
+  margin-right: 12px;
+  font-size: 0.8rem;
+}
+.ch-earn-label { color: #a6adc8; }
+.ch-earn-count { color: #cdd6f4; font-weight: 600; }
+.ch-earn-total {
+  text-align: right; font-size: 0.8rem;
+  font-weight: 700; color: #a6e3a1; white-space: nowrap;
+}
+
+/* Promotion History */
+.ch-table-scroll { overflow-x: auto; }
+.ch-promo-table th {
+  padding: 4px 10px; text-align: left; color: #585b70;
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid #313244; font-weight: 600; white-space: nowrap;
+}
+.ch-date { color: #585b70; font-size: 0.75rem; white-space: nowrap; }
+
+/* Unlocked skills/traits — single column list */
+.ch-unlocked-list {
+  list-style: none;
+  margin: 0; padding: 0;
+}
+.ch-unlocked-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #1e1e2e;
+  font-size: 0.83rem;
+}
+.ch-unlocked-item:last-child { border-bottom: none; }
+.ch-st-type {
+  font-size: 0.65rem; font-weight: 700; color: #89b4fa;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  min-width: 36px;
+}
+.ch-st-name { color: #a6e3a1; flex: 1; }
+.ch-rank-badge {
+  font-size: 0.72rem; background: #313244; color: #a6adc8;
+  border-radius: 3px; padding: 1px 5px; white-space: nowrap;
+}
+
+/* Locked traits panel */
+.ch-locked-btn {
+  background: #313244; border: 1px solid #45475a; color: #a6adc8;
+  border-radius: 4px; padding: 2px 8px; font-size: 0.72rem;
+  cursor: pointer; margin-left: auto;
+}
+.ch-locked-btn:hover { background: #45475a; }
+.ch-locked-divider {
+  padding: 5px 10px; font-size: 0.68rem; font-weight: 700;
+  color: #585b70; text-transform: uppercase; letter-spacing: 0.06em;
+  background: #1e1e2e; border-top: 1px solid #313244;
+  border-bottom: 1px solid #313244;
+}
+.ch-locked-item {
+  padding: 7px 10px;
+  border-bottom: 1px solid #1e1e2e;
+}
+.ch-locked-item:last-child { border-bottom: none; }
+.ch-locked-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 3px;
+}
+.ch-locked-name { color: #585b70; flex: 1; font-size: 0.83rem; }
+.ch-locked-desc { font-size: 0.75rem; color: #45475a; margin-bottom: 4px; }
+.ch-req-unknown { font-style: italic; }
+.ch-req { margin-top: 4px; }
+.ch-req-label {
+  font-size: 0.75rem; color: #6c7086;
+  display: flex; justify-content: space-between;
+  margin-bottom: 2px;
+}
+.ch-req-counts { color: #a6adc8; font-weight: 500; }
+.ch-req-bar {
+  height: 4px; background: #313244; border-radius: 2px; overflow: hidden;
+}
+.ch-req-fill {
+  height: 100%; background: #89b4fa; border-radius: 2px;
+  transition: width 0.3s ease;
+}

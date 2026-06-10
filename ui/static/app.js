@@ -799,6 +799,9 @@ function requestWithdraw() {
 
 // ── Character History ────────────────────────────────────────────────────────
 
+let _chData = null;
+let _chReqs = null;
+
 function toggleCharHistoryTab() {
   const enabled = document.getElementById("char_history_enabled").checked;
   const sec = document.getElementById("s-char-history");
@@ -816,12 +819,75 @@ function refreshCharHistory() {
 }
 
 function loadCharHistory() {
-  fetch("/character_history")
-    .then(r => r.json())
-    .then(renderCharHistory);
+  Promise.all([
+    fetch("/character_history").then(r => r.json()),
+    fetch("/trait_requirements").then(r => r.json()),
+  ]).then(([data, reqs]) => {
+    _chData = data;
+    _chReqs = reqs;
+    renderCharHistory(data, reqs);
+  });
 }
 
-function renderCharHistory(data) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function _isZero(val) {
+  if (val === null || val === undefined) return true;
+  const s = String(val).trim();
+  // "0", "$0", "0/0", "0 successful out of 0" all count as zero
+  return /^[\$\s]*0[\s,]*$/.test(s) || /^0\s+successful\s+out\s+of\s+0$/.test(s);
+}
+
+function _sectionHideZerosId(title) {
+  return "ch-hz-" + title.replace(/[^a-zA-Z0-9]/g, "_");
+}
+
+function _isHideZeros(title) {
+  const el = document.getElementById(_sectionHideZerosId(title));
+  return el ? el.checked : false;
+}
+
+function _fmtVal(val) {
+  // Highlight money values
+  if (typeof val === "string" && val.startsWith("$")) {
+    return `<span class="ch-money">${val}</span>`;
+  }
+  return val;
+}
+
+// ── Section builders ──────────────────────────────────────────────────────────
+
+function _buildStatSection(sec) {
+  const hzId = _sectionHideZerosId(sec.title);
+  const hideZeros = _isHideZeros(sec.title);
+  const rows = hideZeros ? sec.rows.filter(r => !_isZero(r.value)) : sec.rows;
+  if (!rows.length && hideZeros) return `<div class="ch-section ch-section-empty">
+    <div class="ch-section-head"><span class="ch-section-title">${sec.title}</span>${_hzToggle(hzId, sec.title)}</div>
+    <p class="ch-empty-note">All values zero</p></div>`;
+
+  let html = `<div class="ch-section">
+    <div class="ch-section-head"><span class="ch-section-title">${sec.title}</span>${_hzToggle(hzId, sec.title)}</div>
+    <table class="ch-table">`;
+  for (const row of rows) {
+    html += `<tr><td class="ch-key">${row.key}</td><td class="ch-val">${_fmtVal(row.value)}</td></tr>`;
+  }
+  return html + "</table></div>";
+}
+
+function _hzToggle(hzId, title) {
+  const checked = _isHideZeros(title) ? "checked" : "";
+  return `<label class="ch-hz-label" title="Hide zero values">
+    <input type="checkbox" id="${hzId}" ${checked} onchange="reRenderCharHistory()"> Hide zeros
+  </label>`;
+}
+
+function reRenderCharHistory() {
+  if (_chData) renderCharHistory(_chData, _chReqs);
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+
+function renderCharHistory(data, reqs) {
   const body = document.getElementById("char-history-body");
   const updEl = document.getElementById("char-history-updated");
   if (!data || !data.stat_sections) {
@@ -831,62 +897,142 @@ function renderCharHistory(data) {
 
   updEl.textContent = data.last_updated ? "Updated: " + data.last_updated : "";
 
+  const byTitle = {};
+  for (const sec of (data.stat_sections || [])) byTitle[sec.title] = sec;
+
   let html = "";
 
-  // ── Core stat sections (always visible) ──────────────────────────────────
-  const CORE = new Set(["Character Information", "Whacking Info", "Acquired Money", "Crimes", "Gambling"]);
-  for (const sec of (data.stat_sections || [])) {
-    if (!CORE.has(sec.title)) continue;
-    html += `<div class="ch-section"><h4 class="ch-section-title">${sec.title}</h4><table class="ch-table">`;
-    for (const row of sec.rows) {
-      html += `<tr><td class="ch-key">${row.key}</td><td class="ch-val">${row.value}</td></tr>`;
+  // ── Stat sections ─────────────────────────────────────────────────────────
+  const SECTION_ORDER = [
+    "Character Information", "Acquired Money",
+    "Crimes Committed", "Gambling",
+    "Whacking Info",
+    // Career sections — show all, each gets hide-zeros
+    "Mayor", "Funeral Work", "Banking Work", "Customs Work",
+    "Medical Work", "Law Work", "Police Work", "Engineering", "Fire Fighter",
+  ];
+
+  // Two-column grid for sections
+  const secs = SECTION_ORDER.map(t => byTitle[t]).filter(Boolean);
+  html += `<div class="ch-grid">`;
+  for (const sec of secs) {
+    html += `<div class="ch-grid-item">${_buildStatSection(sec)}</div>`;
+  }
+  html += `</div>`;
+
+  // ── Earn History ──────────────────────────────────────────────────────────
+  if (data.earn_history && data.earn_history.length) {
+    const hzId = "ch-hz-earn_history";
+    const hideZeros = _isHideZeros("earn_history");
+    html += `<div class="ch-section ch-section-full">
+      <div class="ch-section-head">
+        <span class="ch-section-title">Earn History</span>
+        ${_hzToggle(hzId, "earn_history")}
+      </div>
+      <table class="ch-table ch-earn-table">`;
+    for (const cat of data.earn_history) {
+      const entries = hideZeros ? cat.entries.filter(e => e.count > 0) : cat.entries;
+      if (!entries.length) continue;
+      const total = entries.reduce((s, e) => s + e.count, 0);
+      html += `<tr>
+        <td class="ch-earn-cat">${cat.category}</td>
+        <td class="ch-earn-entries">`;
+      for (const e of entries) {
+        html += `<span class="ch-earn-item"><span class="ch-earn-label">${e.type}</span> <span class="ch-earn-count">${e.count.toLocaleString()}</span></span>`;
+      }
+      html += `</td><td class="ch-earn-total">${total.toLocaleString()}</td></tr>`;
     }
-    html += "</table></div>";
+    html += `</table></div>`;
   }
 
   // ── Promotion History ─────────────────────────────────────────────────────
   if (data.promotion_history && data.promotion_history.length) {
-    html += `<div class="ch-section"><h4 class="ch-section-title">Promotion History</h4><table class="ch-table ch-table-wide">
-      <thead><tr><th>City</th><th>Rank</th><th>Occupation</th><th>Date</th></tr></thead><tbody>`;
+    html += `<div class="ch-section ch-section-full">
+      <div class="ch-section-head"><span class="ch-section-title">Promotion History</span></div>
+      <div class="ch-table-scroll"><table class="ch-table ch-promo-table">
+        <thead><tr><th>City</th><th>Rank</th><th>Occupation</th><th>Date</th></tr></thead><tbody>`;
     for (const p of data.promotion_history) {
-      html += `<tr><td>${p.city}</td><td>${p.rank}</td><td>${p.occupation}</td><td style="white-space:nowrap">${p.date}</td></tr>`;
+      html += `<tr><td>${p.city}</td><td>${p.rank}</td><td>${p.occupation}</td><td class="ch-date">${p.date}</td></tr>`;
     }
-    html += "</tbody></table></div>";
+    html += `</tbody></table></div></div>`;
   }
 
-  // ── Skills & Traits ───────────────────────────────────────────────────────
-  if (data.skills_traits && data.skills_traits.length) {
-    const traits = data.skills_traits.filter(s => s.type === "Trait");
-    const skills = data.skills_traits.filter(s => s.type === "Skill");
-    const renderSkillsTraits = (items, label) => {
-      if (!items.length) return "";
-      let t = `<div class="ch-section"><h4 class="ch-section-title">${label}</h4><table class="ch-table ch-table-wide">
-        <thead><tr><th>Name</th><th>Rank</th><th>Status</th><th>Used</th></tr></thead><tbody>`;
-      for (const s of items) {
-        const rankStr = s.max_rank > 0 ? `${s.rank}/${s.max_rank}` : `${s.rank}`;
-        const unlocked = s.status === "Unlocked" || s.status === "Active";
-        t += `<tr class="${unlocked ? "ch-row-active" : "ch-row-inactive"}">
-          <td>${s.name}</td><td>${rankStr}</td><td>${s.status}</td><td>${s.used}</td></tr>`;
-      }
-      return t + "</tbody></table></div>";
-    };
-    html += renderSkillsTraits(traits, "Traits");
-    html += renderSkillsTraits(skills, "Skills");
-  }
+  // ── Skills & Traits (unlocked only, single column) ────────────────────────
+  const allUnlocked = (data.skills_traits || []).filter(s => s.status === "Unlocked" || s.status === "Active");
+  const lockedTraits = (data.skills_traits || []).filter(s =>
+    s.status !== "Unlocked" && s.status !== "Active" &&
+    s.type === "Trait"
+  );
+  const lockedSkills = (data.skills_traits || []).filter(s =>
+    s.status !== "Unlocked" && s.status !== "Active" &&
+    s.type === "Skill"
+  );
 
-  // ── Career sections (collapsed) ──────────────────────────────────────────
-  const careerSecs = (data.stat_sections || []).filter(s => s.career);
-  if (careerSecs.length) {
-    html += `<details class="ch-career-details"><summary class="ch-career-summary">Career Stats (${careerSecs.length} sections)</summary>`;
-    for (const sec of careerSecs) {
-      html += `<div class="ch-section"><h4 class="ch-section-title">${sec.title}</h4><table class="ch-table">`;
-      for (const row of sec.rows) {
-        html += `<tr><td class="ch-key">${row.key}</td><td class="ch-val">${row.value}</td></tr>`;
-      }
-      html += "</table></div>";
+  if (allUnlocked.length || lockedTraits.length || lockedSkills.length) {
+    html += `<div class="ch-section ch-section-full">
+      <div class="ch-section-head"><span class="ch-section-title">Skills &amp; Traits</span>`;
+    if (lockedTraits.length || lockedSkills.length) {
+      html += `<button class="ch-locked-btn" onclick="toggleLockedTraits()">Show Locked</button>`;
     }
-    html += "</details>";
+    html += `</div>`;
+
+    // Unlocked — single column list
+    if (allUnlocked.length) {
+      html += `<ul class="ch-unlocked-list">`;
+      for (const s of allUnlocked) {
+        const rankStr = s.max_rank > 1 ? ` <span class="ch-rank-badge">${s.rank}/${s.max_rank}</span>` : "";
+        html += `<li class="ch-unlocked-item">
+          <span class="ch-st-type">${s.type}</span>
+          <span class="ch-st-name">${s.name}</span>${rankStr}
+        </li>`;
+      }
+      html += `</ul>`;
+    } else {
+      html += `<p class="ch-empty-note">No unlocked skills or traits yet.</p>`;
+    }
+
+    // Locked panel (hidden by default)
+    html += `<div id="ch-locked-panel" style="display:none">`;
+    html += `<div class="ch-locked-divider">Locked — not yet unlocked</div>`;
+    const allLocked = [...lockedTraits, ...lockedSkills];
+    for (const s of allLocked) {
+      const reqData = reqs && reqs[s.name];
+      const progress = reqData && reqData.progress && reqData.progress.length
+        ? reqData.progress
+        : null;
+      const desc = reqData ? reqData.description : "";
+      html += `<div class="ch-locked-item">
+        <div class="ch-locked-row">
+          <span class="ch-st-type">${s.type}</span>
+          <span class="ch-locked-name">${s.name}</span>
+          <span class="ch-rank-badge">${s.rank}/${s.max_rank}</span>
+        </div>`;
+      if (desc) html += `<div class="ch-locked-desc">${desc}</div>`;
+      if (progress) {
+        for (const p of progress) {
+          const pct = p.pct;
+          html += `<div class="ch-req">
+            <div class="ch-req-label">${p.label} <span class="ch-req-counts">${p.current.toLocaleString()} / ${p.target.toLocaleString()}</span></div>
+            <div class="ch-req-bar"><div class="ch-req-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }
+      } else if (reqData && reqData.progress !== undefined) {
+        html += `<div class="ch-locked-desc ch-req-unknown">Requirements not yet configured.</div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`; // #ch-locked-panel
+    html += `</div>`; // .ch-section
   }
 
   body.innerHTML = html;
+}
+
+function toggleLockedTraits() {
+  const panel = document.getElementById("ch-locked-panel");
+  if (!panel) return;
+  const btn = document.querySelector(".ch-locked-btn");
+  const hidden = panel.style.display === "none";
+  panel.style.display = hidden ? "" : "none";
+  if (btn) btn.textContent = hidden ? "Hide Locked" : "Show Locked";
 }
