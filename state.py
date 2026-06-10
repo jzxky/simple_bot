@@ -107,10 +107,6 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
         "Jail Rank" in d.get_text(strip=True)
         for d in soup.find_all("div", id="display_top")
     )
-    if s.in_jail:
-        nxt = jail_top.find_next_sibling("div")
-        if nxt:
-            s.jail_rank = nxt.get_text(strip=True)
 
     # nav_right fields — walk display_top labels
     for top in soup.find_all("div", id="display_top"):
