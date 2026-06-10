@@ -16,7 +16,8 @@ class DrugManufacturingTask(Task):
                 and not state.in_jail
                 and state.action_available()
                 and state.in_home_city()
-                and "gangster" in state.occupation.lower())
+                and "gangster" in state.occupation.lower()
+                and not state.hold_action_timer)
 
     def run(self, state: GameState, executor):
         executor.execute(Action("do_drug_manufacturing"), state)

@@ -166,6 +166,7 @@ def status():
         "in_jail": s.in_jail,
         "jail_rank": s.jail_rank,
         "jail_consumables": s.jail_consumables,
+        "hold_action_timer": s.hold_action_timer,
     })
 
 
@@ -201,6 +202,54 @@ def withdraw():
     if amount <= 0:
         return jsonify({"error": "Amount must be greater than zero."}), 400
     bot.request_withdraw(amount)
+    return jsonify({"ok": True})
+
+
+@app.route("/tasks/online_population")
+def tasks_online_population():
+    return jsonify(bot.online_population())
+
+
+@app.route("/tasks/jail_inmates_check")
+def tasks_jail_inmates_check():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running to check jail."}), 400
+    try:
+        result = bot.request_jail_inmates(timeout=15.0)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/tasks/jailbreak_plan", methods=["POST"])
+def tasks_jailbreak_plan():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    data = request.get_json()
+    target = data.get("target", "").strip()
+    partner = data.get("partner", "").strip()
+    hold = bool(data.get("hold_action_timer", False))
+    if not target:
+        return jsonify({"error": "Target is required."}), 400
+    if not partner:
+        return jsonify({"error": "Partner is required."}), 400
+    bot.request_jailbreak_plan(target, partner, hold)
+    return jsonify({"ok": True})
+
+
+@app.route("/tasks/jailbreak_execute", methods=["POST"])
+def tasks_jailbreak_execute():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    bot.request_jailbreak_execute()
+    return jsonify({"ok": True})
+
+
+@app.route("/tasks/jailbreak_calloff", methods=["POST"])
+def tasks_jailbreak_calloff():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    bot.request_jailbreak_calloff()
     return jsonify({"ok": True})
 
 

@@ -26,6 +26,7 @@ BIZ_URL = "https://mafiamatrix.com/business/business.asp"
 HOSPITAL_CASES_URL = "https://mafiamatrix.com/localcity/hospital.asp?display=patients"
 JAIL_DUTIES_URL = "https://mafiamatrix.com/jail/duties.asp"
 JAIL_CONTRABAND_URL = "https://mafiamatrix.com/jail/contraband.asp"
+JAILBREAK_URL = "https://mafiamatrix.com/income/jailbreak.asp"
 
 JAIL_CONSUMABLE_NAMES = {
     "cigarettes": "Cigarettes",
@@ -61,7 +62,7 @@ PUBLIC_JOB_MAP = {
     "Bank": "Bank Manager",
 }
 
-ARMED_MAX_RETRIES = 12
+ARMED_MAX_RETRIES = 6
 
 
 def _refresh_state(state: GameState):
@@ -801,7 +802,7 @@ def handle_armed_robbery(action: Action, state: GameState):
 
             state.add_log(f"No valid armed robbery target (pass {pass_num}, attempt {attempt + 1}/{ARMED_MAX_RETRIES}).")
 
-        # 12 retries exhausted — check if another task needs to run
+        # retries exhausted — check if another task needs to run
         state.add_log(f"Armed robbery: no targets after pass {pass_num}. Checking task queue...")
         if check_other_tasks and check_other_tasks():
             state.add_log("Another task is ready — yielding armed robbery.")
@@ -1082,6 +1083,136 @@ def handle_withdraw(action: Action, state: GameState):
 
 # ---------------------------------------------------------------------------
 # Executor
+def _jailbreak_result(soup) -> str:
+    """Extract first non-empty paragraph text after a form, or any div result message."""
+    for tag in ("div", "p"):
+        for el in soup.find_all(tag):
+            txt = el.get_text(strip=True)
+            if txt and len(txt) > 5 and "select" not in txt.lower() and "submit" not in txt.lower():
+                return txt
+    return ""
+
+
+def handle_jailbreak_plan(action: Action, state: GameState):
+    target = action.params.get("target", "")
+    partner = action.params.get("partner", "")
+    hold = action.params.get("hold_action_timer", False)
+
+    page = browser.page()
+    page.goto(JAILBREAK_URL, wait_until="domcontentloaded", timeout=15000)
+    url = browser.current_url()
+
+    if "jailbreak.asp" not in url:
+        soup = BeautifulSoup(page.content(), "html.parser")
+        msg = _jailbreak_result(soup) or url
+        state.add_log(f"Jail break plan failed: {msg}")
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    select = soup.find("select", attrs={"name": "jailbreak"})
+    if not select:
+        state.add_log("Jail break plan: form not found on page.")
+        return
+
+    option_values = [o.get("value", "") for o in select.find_all("option") if o.get("value")]
+
+    if "execute" in option_values or "calloff" in option_values:
+        state.add_log("Jail break plan failed: a jail break is already planned — execute or call off first.")
+        return
+
+    if "plannew" not in option_values:
+        state.add_log("Jail break plan: 'Plan a new jail break' option not available.")
+        return
+
+    page.select_option("select[name='jailbreak']", "plannew")
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded", timeout=10000)
+
+    # Fill target and partner on the planning form
+    page.fill("input[name='escaper']", target)
+    page.fill("input[name='partner']", partner)
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded", timeout=10000)
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    msg = _jailbreak_result(soup)
+    state.add_log(f"Jail break planned (target: {target}, partner: {partner}): {msg or 'submitted.'}")
+    state.hold_action_timer = hold
+    _refresh_state(state)
+
+
+def handle_jailbreak_execute(action: Action, state: GameState):
+    page = browser.page()
+    page.goto(JAILBREAK_URL, wait_until="domcontentloaded", timeout=15000)
+    url = browser.current_url()
+
+    if "jailbreak.asp" not in url:
+        soup = BeautifulSoup(page.content(), "html.parser")
+        msg = _jailbreak_result(soup) or url
+        state.add_log(f"Jail break execute failed: {msg}")
+        state.hold_action_timer = False
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    select = soup.find("select", attrs={"name": "jailbreak"})
+    if not select:
+        state.add_log("Jail break execute: form not found.")
+        state.hold_action_timer = False
+        return
+
+    option_values = [o.get("value", "") for o in select.find_all("option") if o.get("value")]
+    if "execute" not in option_values:
+        state.add_log("Jail break execute: no jail break planned to execute.")
+        state.hold_action_timer = False
+        return
+
+    page.select_option("select[name='jailbreak']", "execute")
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded", timeout=10000)
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    msg = _jailbreak_result(soup)
+    state.add_log(f"Jail break executed: {msg or 'submitted.'}")
+    state.hold_action_timer = False
+    _refresh_state(state)
+
+
+def handle_jailbreak_calloff(action: Action, state: GameState):
+    page = browser.page()
+    page.goto(JAILBREAK_URL, wait_until="domcontentloaded", timeout=15000)
+    url = browser.current_url()
+
+    if "jailbreak.asp" not in url:
+        soup = BeautifulSoup(page.content(), "html.parser")
+        msg = _jailbreak_result(soup) or url
+        state.add_log(f"Jail break call off failed: {msg}")
+        state.hold_action_timer = False
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    select = soup.find("select", attrs={"name": "jailbreak"})
+    if not select:
+        state.add_log("Jail break call off: form not found.")
+        state.hold_action_timer = False
+        return
+
+    option_values = [o.get("value", "") for o in select.find_all("option") if o.get("value")]
+    if "calloff" not in option_values:
+        state.add_log("Jail break call off: no jail break to call off.")
+        state.hold_action_timer = False
+        return
+
+    page.select_option("select[name='jailbreak']", "calloff")
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded", timeout=10000)
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    msg = _jailbreak_result(soup)
+    state.add_log(f"Jail break called off: {msg or 'submitted.'}")
+    state.hold_action_timer = False
+    _refresh_state(state)
+
+
 # ---------------------------------------------------------------------------
 
 HANDLERS = {
@@ -1104,6 +1235,9 @@ HANDLERS = {
     "jail_consume": handle_jail_consume,
     "deposit": handle_deposit,
     "withdraw": handle_withdraw,
+    "jailbreak_plan": handle_jailbreak_plan,
+    "jailbreak_execute": handle_jailbreak_execute,
+    "jailbreak_calloff": handle_jailbreak_calloff,
 }
 
 

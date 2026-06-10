@@ -32,7 +32,9 @@ from tasks.jail_action import JailActionTask
 from tasks.jail_consume import JailConsumeTask
 from tasks.deposit import DepositTask
 from tasks.withdraw import WithdrawTask
+from tasks.maintain_cash import MaintainCashTask
 from tasks.character_history import CharacterHistoryTask
+from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJailBreakTask
 from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
@@ -47,6 +49,11 @@ _consume_queue: queue.Queue = queue.Queue()
 _deposit_queue: queue.Queue = queue.Queue()
 _withdraw_queue: queue.Queue = queue.Queue()
 _char_history_queue: queue.Queue = queue.Queue()
+_jailbreak_plan_queue: queue.Queue = queue.Queue()
+_jailbreak_execute_queue: queue.Queue = queue.Queue()
+_jailbreak_calloff_queue: queue.Queue = queue.Queue()
+_jail_inmates_request: queue.Queue = queue.Queue(maxsize=1)
+_jail_inmates_result: queue.Queue = queue.Queue(maxsize=1)
 _clear_earn_event = threading.Event()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
@@ -128,7 +135,11 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(ConsumeTask(_consume_queue))
     sched.add(DepositTask(_deposit_queue))
     sched.add(WithdrawTask(_withdraw_queue))
+    sched.add(MaintainCashTask())
     sched.add(CharacterHistoryTask(_char_history_queue))
+    sched.add(PlanJailBreakTask(_jailbreak_plan_queue))
+    sched.add(ExecuteJailBreakTask(_jailbreak_execute_queue))
+    sched.add(CallOffJailBreakTask(_jailbreak_calloff_queue))
     sched.add(PlayerRefreshTask())
     sched.add(CheckTopJobTask())
     sched.add(SnipeTopJobTask())
@@ -167,6 +178,21 @@ def _fetch_bar_threads() -> dict:
             threads.append({"id": m.group(1), "title": title})
     browser.navigate(MAIN_URL)
     return {"threads": threads}
+
+
+def _fetch_jail_inmates() -> dict:
+    from bs4 import BeautifulSoup as _BS
+    JAIL_URL = "https://mafiamatrix.com/localcity/jail.asp"
+    MAIN_URL = "https://mafiamatrix.com/main.asp"
+    html = browser.navigate(JAIL_URL)
+    soup = _BS(html, "html.parser")
+    inmates = []
+    for a in soup.find_all("a", style=lambda v: v and "color: #FFFFFF" in v):
+        name = a.get_text(strip=True)
+        if name:
+            inmates.append(name)
+    browser.navigate(MAIN_URL)
+    return {"inmates": inmates}
 
 
 def _should_payback(target: str, c: dict) -> bool:
@@ -254,6 +280,14 @@ def _run(c: dict):
                     _bar_threads_result.put(_fetch_bar_threads())
                 except Exception as e:
                     _bar_threads_result.put(e)
+
+            # Jail inmates requests from the Flask thread
+            if not _jail_inmates_request.empty():
+                try:
+                    _jail_inmates_request.get_nowait()
+                    _jail_inmates_result.put(_fetch_jail_inmates())
+                except Exception as e:
+                    _jail_inmates_result.put(e)
 
             if _stop_event.is_set():
                 break
@@ -355,6 +389,63 @@ def request_withdraw(amount: int):
 
 def request_char_history_refresh():
     _char_history_queue.put(True)
+
+
+def request_jailbreak_plan(target: str, partner: str, hold_action_timer: bool):
+    _jailbreak_plan_queue.put({
+        "target": target,
+        "partner": partner,
+        "hold_action_timer": hold_action_timer,
+    })
+
+
+def request_jailbreak_execute():
+    _jailbreak_execute_queue.put(True)
+
+
+def request_jailbreak_calloff():
+    _jailbreak_calloff_queue.put(True)
+
+
+def request_jail_inmates(timeout: float = 15.0) -> dict:
+    while not _jail_inmates_result.empty():
+        _jail_inmates_result.get_nowait()
+    _jail_inmates_request.put(True)
+    result = _jail_inmates_result.get(timeout=timeout)
+    if isinstance(result, Exception):
+        raise result
+    return result
+
+
+def online_population() -> dict:
+    """Parse whosonlinecell from current page HTML — no navigation needed."""
+    import re as _re
+    from bs4 import BeautifulSoup as _BS
+    html = state.page_html
+    own = state.own_name
+    occupation = state.occupation or ""
+    soup = _BS(html, "html.parser")
+    cell = soup.find("div", id="whosonlinecell")
+    jail_inmates = []
+    partners = []
+    if cell:
+        for a in cell.find_all("a", id=_re.compile(r"^profileLink:")):
+            parts = a.get("id", "").split(":")
+            if len(parts) < 3:
+                continue
+            name = parts[1]
+            classes = a.get("class", [])
+            if "jail" in classes:
+                jail_inmates.append(name)
+            if "normal" in classes and name != own:
+                if any(c in classes for c in ("crime", "crewleader", "godfather")):
+                    partners.append(name)
+    is_gangster = "gangster" in occupation.lower()
+    return {
+        "jail_inmates": sorted(jail_inmates),
+        "partners": sorted(partners) if is_gangster else [],
+        "is_gangster": is_gangster,
+    }
 
 
 def request_clear_earn_queue():

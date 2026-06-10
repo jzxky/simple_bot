@@ -797,6 +797,108 @@ function requestWithdraw() {
   }).then(r => r.json()).then(d => { if (d.error) alert(d.error); });
 }
 
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+
+function onTaskChange() {
+  const val = document.getElementById("task-selector").value;
+  document.querySelectorAll(".task-panel").forEach(p => p.style.display = "none");
+  if (val === "jailbreak") {
+    document.getElementById("task-jailbreak").style.display = "";
+    loadJbPopulation();
+  }
+}
+
+function onJbActionChange() {
+  const val = document.getElementById("jb-action").value;
+  ["jb-plan-form", "jb-execute-form", "jb-calloff-form"].forEach(id => {
+    document.getElementById(id).style.display = "none";
+  });
+  if (val === "plan") document.getElementById("jb-plan-form").style.display = "";
+  if (val === "execute") document.getElementById("jb-execute-form").style.display = "";
+  if (val === "calloff") document.getElementById("jb-calloff-form").style.display = "";
+}
+
+function loadJbPopulation() {
+  fetch("/tasks/online_population")
+    .then(r => r.json())
+    .then(d => {
+      _populateSelect("jb-target", d.jail_inmates, "— Select target —");
+      const partnerRow = document.getElementById("jb-partner-row");
+      if (d.is_gangster && d.partners.length) {
+        _populateSelect("jb-partner", d.partners, "— Select partner —");
+        partnerRow.style.display = "";
+      } else {
+        partnerRow.style.display = "none";
+      }
+    });
+}
+
+function checkJailOffline() {
+  const btn = document.getElementById("jb-check-btn");
+  btn.textContent = "Checking…";
+  btn.disabled = true;
+  fetch("/tasks/jail_inmates_check")
+    .then(r => r.json())
+    .then(d => {
+      btn.textContent = "Check Offline";
+      btn.disabled = false;
+      if (d.error) { alert(d.error); return; }
+      _populateSelect("jb-target", d.inmates, "— Select target —");
+    })
+    .catch(() => { btn.textContent = "Check Offline"; btn.disabled = false; });
+}
+
+function _populateSelect(id, items, placeholder) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  sel.innerHTML = `<option value="">${placeholder}</option>` +
+    items.map(n => `<option value="${n}">${n}</option>`).join("");
+}
+
+function _taskFeedback(feedbackId, msg, isError) {
+  const el = document.getElementById(feedbackId);
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = msg ? "" : "none";
+  el.className = "task-feedback " + (isError ? "task-feedback-error" : "task-feedback-ok");
+}
+
+function submitJbPlan() {
+  const target = document.getElementById("jb-target").value;
+  const partner = document.getElementById("jb-partner") ? document.getElementById("jb-partner").value : "";
+  const hold = document.getElementById("jb-hold-timer").checked;
+  if (!target) { _taskFeedback("jb-plan-feedback", "Please select a target.", true); return; }
+  if (document.getElementById("jb-partner-row").style.display !== "none" && !partner) {
+    _taskFeedback("jb-plan-feedback", "Please select a partner.", true); return;
+  }
+  fetch("/tasks/jailbreak_plan", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({target, partner, hold_action_timer: hold}),
+  }).then(r => r.json()).then(d => {
+    if (d.error) _taskFeedback("jb-plan-feedback", d.error, true);
+    else _taskFeedback("jb-plan-feedback", "Jail break plan queued — check the activity log.", false);
+  });
+}
+
+function submitJbExecute() {
+  fetch("/tasks/jailbreak_execute", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) _taskFeedback("jb-execute-feedback", d.error, true);
+      else _taskFeedback("jb-execute-feedback", "Execute queued — check the activity log.", false);
+    });
+}
+
+function submitJbCalloff() {
+  fetch("/tasks/jailbreak_calloff", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) _taskFeedback("jb-calloff-feedback", d.error, true);
+      else _taskFeedback("jb-calloff-feedback", "Call off queued — check the activity log.", false);
+    });
+}
+
 // ── Character History ────────────────────────────────────────────────────────
 
 let _chData = null;

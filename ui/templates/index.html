@@ -567,6 +567,72 @@
       </div>
     </section>
 
+    <!-- Tasks -->
+    <section class="card" id="s-tasks">
+      <h2>
+        <button class="collapse-btn" onclick="toggleSection('s-tasks')">▾</button>
+        Tasks
+      </h2>
+      <div class="card-body">
+        <div class="task-row">
+          <label class="task-label">Task</label>
+          <select id="task-selector" class="task-select" onchange="onTaskChange()">
+            <option value="">— Select a task —</option>
+            <option value="jailbreak">Jail Break</option>
+          </select>
+        </div>
+
+        <!-- Jail Break panel -->
+        <div id="task-jailbreak" class="task-panel" style="display:none;">
+          <div class="task-row">
+            <label class="task-label">Action</label>
+            <select id="jb-action" class="task-select" onchange="onJbActionChange()">
+              <option value="">— Select action —</option>
+              <option value="plan">Plan New Jail Break</option>
+              <option value="execute">Execute Jail Break</option>
+              <option value="calloff">Call Off Jail Break</option>
+            </select>
+          </div>
+
+          <!-- Plan form -->
+          <div id="jb-plan-form" class="task-subpanel" style="display:none;">
+            <div class="task-row">
+              <label class="task-label">Target <span class="task-hint">(in jail)</span></label>
+              <div style="display:flex;gap:6px;flex:1;">
+                <select id="jb-target" class="task-select task-select-flex"></select>
+                <button class="btn-secondary task-inline-btn" onclick="checkJailOffline()" id="jb-check-btn">Check Offline</button>
+              </div>
+            </div>
+            <div id="jb-partner-row" class="task-row" style="display:none;">
+              <label class="task-label">Partner</label>
+              <select id="jb-partner" class="task-select task-select-flex"></select>
+            </div>
+            <div class="task-row">
+              <label class="task-label">Hold Action Timer</label>
+              <label class="toggle-label"><input type="checkbox" id="jb-hold-timer"><span class="toggle"></span></label>
+              <span class="task-hint" style="margin-left:6px;">Prevents other tasks from using the action timer</span>
+            </div>
+            <div id="jb-plan-feedback" class="task-feedback" style="display:none;"></div>
+            <button class="btn-primary task-submit-btn" onclick="submitJbPlan()">Plan Jail Break</button>
+          </div>
+
+          <!-- Execute form -->
+          <div id="jb-execute-form" class="task-subpanel" style="display:none;">
+            <p class="task-hint-block">Executes the currently planned jail break. The action timer will be consumed.</p>
+            <div id="jb-execute-feedback" class="task-feedback" style="display:none;"></div>
+            <button class="btn-primary task-submit-btn" onclick="submitJbExecute()">Execute Jail Break</button>
+          </div>
+
+          <!-- Call off form -->
+          <div id="jb-calloff-form" class="task-subpanel" style="display:none;">
+            <p class="task-hint-block">Cancels the currently planned jail break.</p>
+            <div id="jb-calloff-feedback" class="task-feedback" style="display:none;"></div>
+            <button class="btn-primary task-submit-btn" onclick="submitJbCalloff()">Call Off Jail Break</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Log -->
     <section class="card log-card" id="s-log">
       <h2>

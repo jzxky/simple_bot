@@ -19,6 +19,7 @@ class FireDutiesTask(Task):
             and state.action_available()
             and state.in_home_city()
             and "fire" in state.occupation.lower()
+            and not state.hold_action_timer
         )
 
     def run(self, state: GameState, executor):
