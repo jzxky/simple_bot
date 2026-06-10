@@ -581,35 +581,31 @@ input.input-unsaved { color: var(--red) !important; }
   background: #3a3a3a !important;
   border-bottom-color: #5a5a5a !important;
 }
-.jail-profile-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 12px;
-  font-size: 13px;
-  border: 1px solid #555;
-  border-radius: var(--radius);
-  overflow: hidden;
+.in-jail .card-body {
+  background: #4a4a4a;
 }
-.jail-profile-table tr {
-  border-bottom: 1px solid #555;
-}
-.jail-profile-table tr:last-child {
-  border-bottom: none;
-}
-.jail-profile-table td {
-  padding: 8px 12px;
+.in-jail .stat-item {
   background: #525252;
-  color: #e0e0e0;
-  vertical-align: middle;
+  border-color: #666;
 }
-.jail-profile-table .jpt-label {
-  width: 42%;
-  background: #404040;
-  color: #aaa;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
+.in-jail .stat-label {
+  color: #b0b0b0;
+}
+.in-jail .stat-value {
+  color: #f0f0f0;
+}
+.in-jail .stat-divider {
+  border-top-color: #666;
+}
+.in-jail .placeholder {
+  color: #888;
+}
+.in-jail .stat-timer-value {
+  color: #c8c8c8 !important;
+}
+.in-jail .stat-timer-value.ready,
+.in-jail .stat-item-timer .stat-value.ready {
+  color: #8ecb8e !important;
 }
 .cash-opt {
   display: flex;

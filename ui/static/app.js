@@ -316,28 +316,23 @@ function pollStatus() {
 
       // Character stats
       document.getElementById("stat-name").textContent = d.own_name || "--";
-      document.getElementById("stat-rank").textContent = d.rank || "--";
       document.getElementById("stat-next-rank").textContent = d.next_rank || "--";
       document.getElementById("stat-rank-progress").textContent = d.rank_progress != null ? d.rank_progress + "%" : "--";
-      document.getElementById("stat-occupation").textContent = d.occupation || "--";
       document.getElementById("stat-city").textContent = d.city || "--";
       document.getElementById("stat-home-city").textContent = d.home_city || "--";
 
-      // Jail / normal first-section toggle
-      const gridNormal = document.getElementById("stat-grid-normal");
-      const gridJail = document.getElementById("stat-grid-jail");
+      // Jail: show jail_rank in rank pill, hide occupation pill
+      const rankLabel = document.getElementById("stat-rank-label");
+      const occupationItem = document.getElementById("stat-occupation-item");
       if (d.in_jail) {
-        if (gridNormal) gridNormal.style.display = "none";
-        if (gridJail) gridJail.style.display = "";
-        const _jv = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || "--"; };
-        _jv("jpt-jail-rank", d.jail_rank);
-        _jv("jpt-next-rank", d.next_rank);
-        _jv("jpt-progress", d.rank_progress != null ? d.rank_progress + "%" : null);
-        _jv("jpt-city", d.city);
-        _jv("jpt-home-city", d.home_city);
+        document.getElementById("stat-rank").textContent = d.jail_rank || "--";
+        if (rankLabel) rankLabel.textContent = "Jail Rank";
+        if (occupationItem) occupationItem.style.display = "none";
       } else {
-        if (gridNormal) gridNormal.style.display = "";
-        if (gridJail) gridJail.style.display = "none";
+        document.getElementById("stat-rank").textContent = d.rank || "--";
+        document.getElementById("stat-occupation").textContent = d.occupation || "--";
+        if (rankLabel) rankLabel.textContent = "Rank";
+        if (occupationItem) occupationItem.style.display = "";
       }
       document.getElementById("stat-health").textContent = d.health != null ? d.health + "%" : "--";
       document.getElementById("stat-energy").textContent = d.energy != null ? d.energy + "%" : "--";
