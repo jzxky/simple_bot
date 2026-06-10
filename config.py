@@ -86,6 +86,10 @@ DEFAULT_CONFIG = {
         "action": "gym",
         "use_consumables": False,
         "consumable": "cigarettes"
+    },
+    "character_history": {
+        "enabled": False,
+        "refresh_interval_minutes": 30
     }
 }
 

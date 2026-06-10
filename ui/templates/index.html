@@ -534,8 +534,36 @@
                 </div>
               </div>
             </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Character History</h3>
+              <label class="inline-toggle setting-row">Enable
+                <label class="toggle-label"><input type="checkbox" id="char_history_enabled" {% if config.get('character_history', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave(); toggleCharHistoryTab()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row">
+                <span>Refresh Interval (minutes)</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="number" id="char_history_interval" value="{{ config.get('character_history', {}).get('refresh_interval_minutes', 30) }}" min="5" step="5" style="width:80px;" onchange="autoSave()" oninput="markNumDirty(this)">
+                  <button id="save-char_history_interval" class="btn-secondary save-num-btn" onclick="saveNum('char_history_interval')">Save</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- Character History -->
+    <section class="card" id="s-char-history" style="{% if not config.get('character_history', {}).get('enabled', False) %}display:none;{% endif %}">
+      <h2>
+        <button class="collapse-btn" onclick="toggleSection('s-char-history')">▾</button>
+        Character History
+        <span style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <span id="char-history-updated" style="font-size:0.75rem;color:#888;font-weight:400;"></span>
+          <button class="btn-secondary" style="font-size:0.8rem;padding:3px 10px;" onclick="refreshCharHistory()">Refresh</button>
+        </span>
+      </h2>
+      <div class="card-body" id="char-history-body">
+        <p style="color:#888;font-size:0.9rem;">No data yet. Enable Character History and start the bot to fetch stats.</p>
       </div>
     </section>
 
