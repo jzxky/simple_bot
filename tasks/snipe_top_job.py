@@ -1,21 +1,17 @@
 """
-Hammers main.asp until the Hospital Director promotion page appears,
-submits it, then posts a forum announcement. Blocks the scheduler
-for up to 30 minutes.
+Hammers main.asp until the promotion page for the target top job appears,
+then submits it. Blocks the scheduler for up to 30 minutes.
 """
 
 import time
-from datetime import datetime
 from bs4 import BeautifulSoup
 import browser
 from state import GameState, parse_state
 from tasks.base import Task
+from tasks.check_top_job import TOP_JOB_MAP
 
 PLAY_URL      = "https://mafiamatrix.com/main.asp"
-PROMO_URL     = "https://mafiamatrix.com/promotion/hospitaldirector.asp"
-FORUM_POST_URL = "https://mafiamatrix.com/forum/postreply.asp?t=9995"
 SNIPE_TIMEOUT = 30 * 60  # seconds
-TARGET_OCC    = "Hospital Director"
 
 
 class SnipeTopJobTask(Task):
@@ -27,11 +23,14 @@ class SnipeTopJobTask(Task):
             state.logged_in
             and not state.in_jail
             and state.snipe_top_job_pending
-            and state.occupation != TARGET_OCC
+            and bool(state.snipe_top_job_promo_url)
+            and state.occupation in TOP_JOB_MAP
         )
 
     def run(self, state: GameState, executor):
-        state.add_log("SnipeTopJob: starting — hammering main.asp for up to 30 minutes.")
+        promo_url = state.snipe_top_job_promo_url
+        top_job = TOP_JOB_MAP.get(state.occupation, ("Unknown", ""))[0]
+        state.add_log(f"SnipeTopJob: starting — targeting {top_job}, hammering main.asp for up to 30 minutes.")
         deadline = time.monotonic() + SNIPE_TIMEOUT
         promoted = False
 
@@ -43,26 +42,24 @@ class SnipeTopJobTask(Task):
                 state.add_log(f"SnipeTopJob: nav error: {e}")
                 continue
 
-            if state.occupation == TARGET_OCC:
-                state.add_log("SnipeTopJob: occupation updated to Hospital Director via state parse.")
+            if state.occupation == top_job:
+                state.add_log(f"SnipeTopJob: occupation updated to {top_job} via state parse.")
                 promoted = True
                 break
 
-            if browser.current_url().rstrip("/") == PROMO_URL.rstrip("/"):
-                state.add_log("SnipeTopJob: promotion page detected — submitting.")
-                promoted = self._submit_promo(state)
+            if browser.current_url().rstrip("/") == promo_url.rstrip("/"):
+                state.add_log(f"SnipeTopJob: promotion page detected — submitting.")
+                promoted = self._submit_promo(state, top_job)
                 if promoted:
                     break
 
         if not promoted:
-            state.add_log("SnipeTopJob: timed out after 30 minutes without promotion.")
+            state.add_log(f"SnipeTopJob: timed out after 30 minutes without promotion.")
 
         state.snipe_top_job_pending = False
+        state.snipe_top_job_promo_url = ""
 
-        if promoted:
-            self._post_forum(state)
-
-    def _submit_promo(self, state: GameState) -> bool:
+    def _submit_promo(self, state: GameState, top_job: str) -> bool:
         try:
             page = browser.page()
             radio = page.query_selector("input[type='radio']")
@@ -70,26 +67,12 @@ class SnipeTopJobTask(Task):
                 radio.click()
             page.click("input[type='submit']")
             page.wait_for_load_state("domcontentloaded", timeout=10000)
-            html = page.content()
-            parse_state(html, page.url, state)
-            if state.occupation == TARGET_OCC:
-                state.add_log("SnipeTopJob: promotion successful!")
+            parse_state(page.content(), page.url, state)
+            if state.occupation == top_job:
+                state.add_log(f"SnipeTopJob: promotion to {top_job} successful!")
                 return True
             state.add_log("SnipeTopJob: form submitted but occupation not updated yet.")
             return False
         except Exception as e:
             state.add_log(f"SnipeTopJob: promo submit error: {e}")
             return False
-
-    def _post_forum(self, state: GameState):
-        try:
-            ts = state.server_time.strftime("%H:%M:%S") if state.server_time else datetime.utcnow().strftime("%H:%M:%S")
-            message = f"Serotonin - Hospital Director - {ts}"
-            page = browser.page()
-            page.goto(FORUM_POST_URL, wait_until="domcontentloaded", timeout=15000)
-            page.fill("textarea#body", message)
-            page.click("input[name='Submit']")
-            page.wait_for_load_state("domcontentloaded", timeout=10000)
-            state.add_log(f"SnipeTopJob: forum post made — \"{message}\".")
-        except Exception as e:
-            state.add_log(f"SnipeTopJob: forum post error: {e}")

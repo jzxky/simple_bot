@@ -45,6 +45,7 @@ class GameState:
     agg_fail_times: list = field(default_factory=list)
     current_task: str = ""
     snipe_top_job_pending: bool = False
+    snipe_top_job_promo_url: str = ""
     in_jail: bool = False
     jail_rank: str = ""
     jail_consumables: dict = field(default_factory=dict)
