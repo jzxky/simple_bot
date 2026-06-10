@@ -321,9 +321,14 @@
           <div class="settings-groups">
             <div class="settings-group">
               <h3>PvP</h3>
-              <label class="inline-toggle setting-row">Payback Enabled
-                <label class="toggle-label"><input type="checkbox" id="payback_enabled" {% if config.payback_enabled %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
+              <div class="setting-row">
+                <label for="payback_mode">Payback</label>
+                <select id="payback_mode" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
+                  <option value="{{ v }}" {% if config.get('payback_mode','everyone') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
               <label class="inline-toggle setting-row">Fall back to second option if no hacking targets
                 <label class="toggle-label"><input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
