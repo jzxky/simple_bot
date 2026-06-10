@@ -42,7 +42,7 @@ class CaseWorkTask(Task):
 
 class HospitalCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Nurse", "Doctor", "Surgeon", "Hospital Director"}
-    HOME_CITY_ONLY = True
+    HOME_CITY_ONLY = False  # DNA is filtered in the executor when away from home city
 
     def __init__(self, poll_interval: int = 31, tasks: list = None):
         super().__init__(poll_interval)
