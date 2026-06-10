@@ -15,7 +15,7 @@ class AwayActionTask(Task):
         self.action_type = action_type
 
     def can_run(self, state: GameState) -> bool:
-        return state.logged_in and state.action_available() and not state.in_home_city()
+        return state.logged_in and not state.in_jail and state.action_available() and not state.in_home_city()
 
     def run(self, state: GameState, executor):
         if self.action_type == "community_service":

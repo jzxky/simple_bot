@@ -21,7 +21,7 @@ class CaseWorkTask(Task):
         self._last_checked: float = 0.0
 
     def can_run(self, state: GameState) -> bool:
-        if not state.logged_in:
+        if not state.logged_in or state.in_jail:
             return False
         if state.occupation not in self.ELIGIBLE_OCCUPATIONS:
             return False

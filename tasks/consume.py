@@ -142,7 +142,7 @@ class ConsumeTask(Task):
         self._queue = consume_queue
 
     def can_run(self, state: GameState) -> bool:
-        if not state.logged_in:
+        if not state.logged_in or state.in_jail:
             return False
         c = cfg.load()
         cons_cfg = c.get("consumables", {})

@@ -24,6 +24,15 @@ TRANSFER_URL = "https://mafiamatrix.com/income/bank.asp?option=transfers"
 USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
 BIZ_URL = "https://mafiamatrix.com/business/business.asp"
 HOSPITAL_CASES_URL = "https://mafiamatrix.com/localcity/hospital.asp?display=patients"
+JAIL_DUTIES_URL = "https://mafiamatrix.com/jail/duties.asp"
+JAIL_CONTRABAND_URL = "https://mafiamatrix.com/jail/contraband.asp"
+
+JAIL_CONSUMABLE_NAMES = {
+    "cigarettes": "Cigarettes",
+    "booze": "Booze",
+    "porn": "Porn",
+    "shanks": "Shanks",
+}
 
 ONLINE_CRIMES = {"pickpocket", "mugging"}
 RESIDENT_CRIMES = {"hack", "breaking"}
@@ -926,6 +935,120 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def handle_jail_duties(action: Action, state: GameState):
+    duty = action.params["duty"]
+    page = browser.page()
+    _nav(JAIL_DUTIES_URL, state)
+
+    if not _check_session(state):
+        return
+
+    auto_div = page.query_selector("div.mm-earn-mode-auto")
+    if auto_div:
+        style = auto_div.get_attribute("style") or ""
+        if "display: none" in style or "display:none" in style:
+            page.click("span.mm-earn-toggle-knob")
+            page.wait_for_function(
+                "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
+                "return el && !el.style.display.includes('none'); }",
+                timeout=5000
+            )
+            state.add_log("Jail duties: switched to AUTO mode.")
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    auto_panel = soup.find("div", class_="mm-earn-mode-auto")
+    available_values = []
+    if auto_panel:
+        sel = auto_panel.find("select", attrs={"name": "schedule_earn_identifier"})
+        if sel:
+            available_values = [o.get("value", "") for o in sel.find_all("option")]
+
+    chosen = duty if duty in available_values else (available_values[-1] if available_values else None)
+    if not chosen:
+        state.add_log("Jail duties: no duty options available on page.")
+        return
+
+    cap_span = soup.find("span", class_="mm-earn-queue-cap")
+    current_count = 0
+    if cap_span:
+        try:
+            current_count = int(cap_span.get_text(strip=True).split("/")[0].strip())
+        except (ValueError, IndexError):
+            pass
+
+    if current_count >= 50:
+        state.add_log(f"Jail duty queue at {current_count}/200, no top-up needed.")
+        return
+
+    top_up = 200 - current_count
+    state.add_log(f"Jail duty queue at {current_count}/200, topping up by {top_up} ({chosen}).")
+    page.select_option("select[name='schedule_earn_identifier']", chosen)
+    page.fill("input[name='schedule_count']", str(top_up))
+    page.click("button.mm-earn-add-btn")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log("Jail duty queue topped up.")
+
+
+def handle_jail_action(action: Action, state: GameState):
+    jail_action = action.params["action"]
+    page = browser.page()
+    _nav(JAIL_CONTRABAND_URL, state)
+
+    if not _check_session(state):
+        return
+
+    radio = page.query_selector(f"input[type='radio'][value='{jail_action}']")
+    if not radio:
+        state.add_log(f"Jail action: radio for '{jail_action}' not found on page.")
+        return
+
+    page.check(f"input[type='radio'][value='{jail_action}']")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    success = soup.find("div", id="success")
+    fail = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Jail action ({jail_action}): {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Jail action ({jail_action}) failed: {fail.get_text(strip=True)}")
+    else:
+        state.add_log(f"Jail action ({jail_action}): submitted.")
+
+
+def handle_jail_consume(action: Action, state: GameState):
+    consumable = action.params["consumable"]
+    page = browser.page()
+    _nav(JAIL_CONTRABAND_URL, state)
+
+    if not _check_session(state):
+        return
+
+    radio = page.query_selector(f"input[type='radio'][value='{consumable}']")
+    if not radio:
+        state.add_log(f"Jail consume: radio for '{consumable}' not found on page.")
+        return
+
+    page.check(f"input[type='radio'][value='{consumable}']")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    success = soup.find("div", id="success")
+    fail = soup.find("div", id="fail")
+    name = JAIL_CONSUMABLE_NAMES.get(consumable, consumable.title())
+    if success:
+        state.add_log(f"Jail consume {name}: {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Jail consume {name} failed: {fail.get_text(strip=True)}")
+    else:
+        state.add_log(f"Jail consume {name}: submitted.")
+
+
 # ---------------------------------------------------------------------------
 # Executor
 # ---------------------------------------------------------------------------
@@ -945,6 +1068,9 @@ HANDLERS = {
     "do_armed_robbery": handle_armed_robbery,
     "do_drug_manufacturing": handle_drug_manufacturing,
     "check_hospital_cases": handle_check_hospital_cases,
+    "jail_duties": handle_jail_duties,
+    "jail_action": handle_jail_action,
+    "jail_consume": handle_jail_consume,
 }
 
 

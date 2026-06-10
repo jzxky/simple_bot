@@ -35,7 +35,7 @@
     <section class="card" id="s-character">
       <h2>
         <button class="collapse-btn" onclick="toggleSection('s-character')">▾</button>
-        Status <span class="stat-name-header">— <span id="stat-name">--</span></span>
+        Status <span class="stat-name-header">— <span id="stat-name">--</span></span><span id="stat-jail-badge" style="display:none"> <span class="jail-badge">JAIL</span></span>
         <span class="section-pills" id="pills-s-character"></span>
       </h2>
       <div class="card-body">
@@ -358,7 +358,51 @@
           </div>
         </div>
         <div id="casework"  class="tab-panel"><p class="placeholder">Case work is configured in the Case Work section above.</p></div>
-        <div id="jail"      class="tab-panel"><p class="placeholder">Jail settings — coming soon.</p></div>
+        <div id="jail" class="tab-panel">
+          {% set jail = config.get('jail', {}) %}
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                General
+                <label class="toggle-label">
+                  <input type="checkbox" id="jail_enabled" {% if jail.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <div class="setting-row">
+                <label for="jail_duty">Jail Duties</label>
+                <select id="jail_duty" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('laundry','Laundry'),('kitchen','Kitchen'),('workshop','Workshop'),('makeshank','Make Shank'),('digtunnel','Dig Tunnel')] %}
+                  <option value="{{ v }}" {% if jail.get('duty','laundry') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="jail_action">Jail Action</label>
+                <select id="jail_action" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('gym','Gym'),('stuffing','Stuffing')] %}
+                  <option value="{{ v }}" {% if jail.get('action','gym') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <label class="inline-toggle setting-row" style="margin-top:8px">
+                Use Consumables
+                <label class="toggle-label">
+                  <input type="checkbox" id="jail_use_consumables" {% if jail.get('use_consumables') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row" style="margin-top:8px" id="jail_consumable_row">
+                <label for="jail_consumable">Consumable</label>
+                <select id="jail_consumable" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('cigarettes','Cigarettes'),('booze','Booze'),('porn','Porn'),('shanks','Shanks')] %}
+                  <option value="{{ v }}" {% if jail.get('consumable','cigarettes') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
         <div id="player-lists" class="tab-panel">
           <div class="settings-groups">
             <div class="settings-group">
