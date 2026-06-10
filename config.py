@@ -68,7 +68,8 @@ DEFAULT_CONFIG = {
         "refresh_interval_minutes": 30
     },
     "promo": {
-        "monitor_top_job": False
+        "monitor_top_job": False,
+        "top_job_thread_id": ""
     },
     "consumables": {
         "timer_limit": "00:00",

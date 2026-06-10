@@ -42,6 +42,8 @@ _screenshot_request: queue.Queue = queue.Queue(maxsize=1)
 _screenshot_result: queue.Queue = queue.Queue(maxsize=1)
 _consume_queue: queue.Queue = queue.Queue()
 _clear_earn_event = threading.Event()
+_bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
+_bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
 state = GameState()
 
 
@@ -136,6 +138,28 @@ def _open_log_file() -> object:
     return open(os.path.join(logs_dir, filename), "w", encoding="utf-8", buffering=1)
 
 
+def _fetch_bar_threads() -> dict:
+    import re as _re
+    from bs4 import BeautifulSoup as _BS
+    BAR_URL = "https://mafiamatrix.com/localcity/bar.asp"
+    MAIN_URL = "https://mafiamatrix.com/main.asp"
+    html = browser.navigate(BAR_URL)
+    url = browser.current_url()
+    if "local.asp" in url:
+        browser.navigate(MAIN_URL)
+        return {"error": "Bar is currently torched — try again later."}
+    soup = _BS(html, "html.parser")
+    threads = []
+    for a in soup.select("tr.thread td.topic a[href]"):
+        href = a.get("href", "")
+        title = a.get_text(strip=True)
+        m = _re.search(r't=(\d+)', href)
+        if m and title:
+            threads.append({"id": m.group(1), "title": title})
+    browser.navigate(MAIN_URL)
+    return {"threads": threads}
+
+
 def _should_payback(target: str, c: dict) -> bool:
     mode = c.get("payback_mode", "nobody")
     if mode == "nobody":
@@ -213,6 +237,14 @@ def _run(c: dict):
                     _screenshot_result.put(png)
                 except Exception as e:
                     _screenshot_result.put(e)
+
+            # Bar threads requests from the Flask thread
+            if not _bar_threads_request.empty():
+                try:
+                    _bar_threads_request.get_nowait()
+                    _bar_threads_result.put(_fetch_bar_threads())
+                except Exception as e:
+                    _bar_threads_result.put(e)
 
             if _stop_event.is_set():
                 break
@@ -306,6 +338,16 @@ def request_consume(consume_type: str):
 
 def request_clear_earn_queue():
     _clear_earn_event.set()
+
+
+def request_bar_threads(timeout: float = 15.0) -> dict:
+    while not _bar_threads_result.empty():
+        _bar_threads_result.get_nowait()
+    _bar_threads_request.put(True)
+    result = _bar_threads_result.get(timeout=timeout)
+    if isinstance(result, Exception):
+        raise result
+    return result
 
 
 def request_screenshot(timeout: float = 10.0) -> bytes:
