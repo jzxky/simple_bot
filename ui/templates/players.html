@@ -7,21 +7,18 @@
 <link rel="stylesheet" href="/static/style.css">
 <style>
   .filter-bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-  .filter-bar input[type="text"] { max-width:280px; flex:1; min-width:120px; }
+  .filter-bar input[type="text"] { max-width:220px; flex:1; min-width:100px; }
   .filter-bar .inline-toggle { white-space:nowrap; }
 
-  /* Hide low-priority columns on mobile */
   @media (max-width: 600px) {
     .col-homecity, .col-rank, .col-occupation { display:none; }
   }
 
-  /* Sortable column headers */
   .priority-table th[data-col] { cursor:pointer; user-select:none; white-space:nowrap; }
   .priority-table th[data-col]:hover { color:var(--accent); }
   .sort-arrow { margin-left:4px; opacity:0.5; font-size:10px; }
   .sort-arrow.active { opacity:1; color:var(--accent); }
 
-  /* Column filter row */
   .priority-table .col-filter-row th { padding:4px 6px; }
   .priority-table .col-filter-row input {
     width:100%; box-sizing:border-box;
@@ -30,20 +27,22 @@
     padding:3px 5px; font-size:11px;
   }
 
-  /* Import card collapsible */
-  .import-toggle-row {
+  /* Player row group highlight */
+  .player-row { border-left: 3px solid transparent; }
+
+  /* Import / Groups collapsible */
+  .import-toggle-row, .group-toggle-row {
     display:flex; align-items:center; justify-content:space-between;
     cursor:pointer; user-select:none;
   }
-  .import-toggle-row h2 { margin:0; }
+  .import-toggle-row h2, .group-toggle-row h2 { margin:0; }
   .import-chevron { font-size:16px; color:var(--text-muted); transition:transform 0.2s; }
   .import-chevron.open { transform:rotate(180deg); }
-  .import-body { display:none; margin-top:12px; }
-  .import-body.open { display:block; }
+  .import-body, .group-body { display:none; margin-top:12px; }
+  .import-body.open, .group-body.open { display:block; }
 
   .import-card textarea {
-    width:100%; box-sizing:border-box;
-    min-height:120px; resize:vertical;
+    width:100%; box-sizing:border-box; min-height:120px; resize:vertical;
     background:var(--bg-card); color:var(--text);
     border:1px solid var(--border); border-radius:4px;
     padding:8px; font-size:13px; font-family:inherit;
@@ -56,6 +55,42 @@
   .import-report .report-stat { color:var(--text); margin-bottom:4px; }
   .import-report .unmatched-list { color:var(--warn, #f59e0b); margin-top:8px; }
   .import-report .unmatched-list li { margin:2px 0; }
+
+  /* Groups management */
+  .group-chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .group-chip {
+    display:flex; align-items:center; gap:6px;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:4px; padding:4px 8px; font-size:13px;
+  }
+  .group-chip-swatch {
+    width:14px; height:14px; border-radius:50%;
+    border:1px solid rgba(255,255,255,0.15); flex-shrink:0; cursor:pointer;
+    position:relative;
+  }
+  .group-chip-swatch input[type="color"] {
+    position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;
+  }
+  .group-chip-name { color:var(--text); }
+  .group-chip-delete {
+    background:none; border:none; color:var(--muted); cursor:pointer;
+    font-size:14px; line-height:1; padding:0 2px;
+  }
+  .group-chip-delete:hover { color:var(--error, #f87171); }
+  .group-create-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .group-create-row input[type="text"] { flex:1; min-width:140px; max-width:240px; }
+  .group-create-row input[type="color"] {
+    width:36px; height:32px; padding:2px; cursor:pointer;
+    border:1px solid var(--border); border-radius:4px; background:var(--bg-card);
+  }
+
+  /* Mass apply bar */
+  .mass-apply-bar {
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    padding:8px 0 12px; font-size:13px; color:var(--text-muted);
+  }
+  .mass-apply-bar select { padding:4px 8px; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:13px; }
+  .mass-apply-bar .action-btn { padding:5px 14px; font-size:13px; }
 </style>
 </head>
 <body>
@@ -71,6 +106,35 @@
   </header>
 
   <main>
+    <!-- Groups management (collapsible) -->
+    <section class="card">
+      <div class="group-toggle-row" onclick="toggleGroups()">
+        <h2>Groups</h2>
+        <span class="import-chevron" id="group-chevron">▼</span>
+      </div>
+      <div class="group-body" id="group-body">
+        <div class="group-chips" id="group-chips">
+          {% for g in groups %}
+          <div class="group-chip" id="chip-{{ loop.index }}" data-name="{{ g.name }}">
+            <span class="group-chip-swatch" style="background:{{ g.color }}">
+              <input type="color" value="{{ g.color }}" onchange="updateGroupColor('{{ g.name }}', this.value, this.parentElement)">
+            </span>
+            <span class="group-chip-name">{{ g.name }}</span>
+            <button class="group-chip-delete" onclick="deleteGroup('{{ g.name }}')" title="Delete group">×</button>
+          </div>
+          {% else %}
+          <span id="no-groups-msg" style="font-size:13px;color:var(--muted)">No groups yet.</span>
+          {% endfor %}
+        </div>
+        <div class="group-create-row">
+          <input type="text" id="new-group-name" placeholder="Group name…" onkeydown="if(event.key==='Enter')createGroup()">
+          <input type="color" id="new-group-color" value="#888888">
+          <button class="action-btn" onclick="createGroup()">Create Group</button>
+          <span id="group-create-error" style="font-size:12px;color:var(--error,#f87171);display:none"></span>
+        </div>
+      </div>
+    </section>
+
     <!-- Import tool (collapsible) -->
     <section class="card import-card">
       <div class="import-toggle-row" onclick="toggleImport()">
@@ -105,7 +169,7 @@
       </div>
 
       <div class="filter-bar">
-        <input type="text" id="search" placeholder="Search players..." oninput="applyFilters()">
+        <input type="text" id="search" placeholder="Search players…" oninput="applyFilters()">
         <label class="inline-toggle">
           Hide unemployed
           <label class="toggle-label">
@@ -113,16 +177,47 @@
             <span class="toggle"></span>
           </label>
         </label>
+        <select id="filter-group" onchange="applyFilters()" style="background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:13px">
+          <option value="">All groups</option>
+          <option value="__ungrouped__">Ungrouped</option>
+          {% for g in groups %}
+          <option value="{{ g.name }}">{{ g.name }}</option>
+          {% endfor %}
+        </select>
       </div>
 
-      {% macro player_table(context, tid) %}
+      {% macro player_table(context, tid, groups) %}
+      <!-- Mass apply bar -->
+      <div class="mass-apply-bar">
+        <span>For group</span>
+        <select id="mass-group-{{ tid }}">
+          {% for g in groups %}
+          <option value="{{ g.name }}">{{ g.name }}</option>
+          {% endfor %}
+        </select>
+        <span>set</span>
+        <select id="mass-context-{{ tid }}">
+          <option value="agg_crimes">Aggravated Crimes</option>
+          <option value="case_work">Case Work</option>
+        </select>
+        <span>to</span>
+        <select id="mass-assignment-{{ tid }}">
+          <option value="whitelist">Whitelist</option>
+          <option value="blacklist">Blacklist</option>
+          <option value="">Clear</option>
+        </select>
+        <button class="action-btn" onclick="massAssign('{{ tid }}')">Apply</button>
+        <span id="mass-result-{{ tid }}" style="font-size:12px;color:var(--ok,#4ade80);display:none"></span>
+      </div>
+
       <table class="priority-table" style="font-size:12px" id="{{ tid }}">
         <thead>
           <tr>
-            <th data-col="name" style="width:160px">Username <span class="sort-arrow" id="{{ tid }}-arrow-name">▲</span></th>
+            <th data-col="name" style="width:150px">Username <span class="sort-arrow" id="{{ tid }}-arrow-name">▲</span></th>
             <th data-col="homecity" class="col-homecity">Home City <span class="sort-arrow" id="{{ tid }}-arrow-homecity">▲</span></th>
             <th data-col="occupation" class="col-occupation">Occupation <span class="sort-arrow" id="{{ tid }}-arrow-occupation">▲</span></th>
             <th data-col="rank" class="col-rank">Rank <span class="sort-arrow" id="{{ tid }}-arrow-rank">▲</span></th>
+            <th data-col="group" style="width:120px">Group <span class="sort-arrow" id="{{ tid }}-arrow-group">▲</span></th>
             <th data-col="assignment" style="width:130px">Assignment <span class="sort-arrow" id="{{ tid }}-arrow-assignment">▲</span></th>
           </tr>
           <tr class="col-filter-row">
@@ -130,22 +225,34 @@
             <th class="col-homecity"><input type="text" placeholder="City…" oninput="applyFilters()" data-filter="homecity"></th>
             <th class="col-occupation"><input type="text" placeholder="Occupation…" oninput="applyFilters()" data-filter="occupation"></th>
             <th class="col-rank"><input type="text" placeholder="Rank…" oninput="applyFilters()" data-filter="rank"></th>
+            <th><input type="text" placeholder="Group…" oninput="applyFilters()" data-filter="group"></th>
             <th><input type="text" placeholder="Assignment…" oninput="applyFilters()" data-filter="assignment"></th>
           </tr>
         </thead>
         <tbody>
           {% for name, p in players | dictsort %}
           {% if p.active %}
+          {% set pg = p.get('group', '') %}
           <tr class="player-row"
               data-name="{{ name | lower }}"
               data-homecity="{{ p.homecity | lower }}"
               data-occupation="{{ p.occupation | lower }}"
               data-rank="{{ p.rank | lower }}"
+              data-group="{{ pg | lower }}"
+              data-group-raw="{{ pg }}"
               data-assignment="{{ lists[context].get(name, '') | lower }}">
             <td>{{ name }}</td>
             <td class="col-homecity">{{ p.homecity }}</td>
             <td class="col-occupation">{{ p.occupation }}</td>
             <td class="col-rank">{{ p.rank }}</td>
+            <td>
+              <select class="cw-select" onchange="setPlayerGroup('{{ name }}', this.value, this)">
+                <option value="" {% if not pg %}selected{% endif %}>None</option>
+                {% for g in groups %}
+                <option value="{{ g.name }}" {% if pg == g.name %}selected{% endif %}>{{ g.name }}</option>
+                {% endfor %}
+              </select>
+            </td>
             <td>
               <select class="cw-select" onchange="setAssignment('{{ name }}', '{{ context }}', this.value, this)">
                 <option value="" {% if lists[context].get(name, '') == '' %}selected{% endif %}>None</option>
@@ -161,16 +268,31 @@
       {% endmacro %}
 
       <div id="tab-agg" class="tab-panel active">
-        {{ player_table("agg_crimes", "tbl-agg") }}
+        {{ player_table("agg_crimes", "tbl-agg", groups) }}
       </div>
       <div id="tab-casework" class="tab-panel">
-        {{ player_table("case_work", "tbl-cw") }}
+        {{ player_table("case_work", "tbl-cw", groups) }}
       </div>
     </section>
   </main>
 </div>
 
 <script>
+// Group data injected from server
+const GROUPS = {{ groups | tojson }};
+const _groupColorMap = {};
+GROUPS.forEach(g => { _groupColorMap[g.name] = g.color; });
+
+// Apply group color highlights to all player rows
+function applyGroupColors() {
+  document.querySelectorAll(".player-row").forEach(row => {
+    const g = row.dataset.groupRaw || "";
+    row.style.borderLeft = g && _groupColorMap[g]
+      ? `3px solid ${_groupColorMap[g]}`
+      : "3px solid transparent";
+  });
+}
+
 // ── Tab switching ────────────────────────────────────────────────────────────
 function showTab(id, btn) {
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
@@ -184,11 +306,11 @@ function showTab(id, btn) {
 function applyFilters() {
   const globalQ = document.getElementById("search").value.toLowerCase();
   const hideUnemployed = document.getElementById("hide-unemployed").checked;
+  const groupFilter = document.getElementById("filter-group").value;
 
   const panel = document.querySelector(".tab-panel.active");
   if (!panel) return;
 
-  // Collect per-column filters
   const colFilters = {};
   panel.querySelectorAll(".col-filter-row input[data-filter]").forEach(inp => {
     colFilters[inp.dataset.filter] = inp.value.toLowerCase();
@@ -198,6 +320,8 @@ function applyFilters() {
     const d = row.dataset;
     if (hideUnemployed && d.occupation === "unemployed") { row.style.display = "none"; return; }
     if (globalQ && !d.name.includes(globalQ)) { row.style.display = "none"; return; }
+    if (groupFilter === "__ungrouped__" && d.groupRaw) { row.style.display = "none"; return; }
+    if (groupFilter && groupFilter !== "__ungrouped__" && d.groupRaw !== groupFilter) { row.style.display = "none"; return; }
     for (const [col, q] of Object.entries(colFilters)) {
       if (q && !(d[col] || "").includes(q)) { row.style.display = "none"; return; }
     }
@@ -218,7 +342,6 @@ function initSortHeaders() {
       const asc = (prev.col === col) ? !prev.asc : true;
       _sortState[tid] = {col, asc};
 
-      // Reset all arrows in this table
       table.querySelectorAll(".sort-arrow").forEach(a => a.classList.remove("active"));
       const arrow = document.getElementById(`${tid}-arrow-${col}`);
       if (arrow) { arrow.textContent = asc ? "▲" : "▼"; arrow.classList.add("active"); }
@@ -238,12 +361,114 @@ function initSortHeaders() {
 
 // ── Assignment ───────────────────────────────────────────────────────────────
 function setAssignment(username, context, value, selectEl) {
-  // Update data-assignment for column filtering
   if (selectEl) selectEl.closest("tr").dataset.assignment = value.toLowerCase();
   fetch("/players/assign", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({username, context, value}),
+  });
+}
+
+// ── Group per player ──────────────────────────────────────────────────────────
+function setPlayerGroup(username, group, selectEl) {
+  const row = selectEl ? selectEl.closest("tr") : null;
+  if (row) {
+    row.dataset.group = group.toLowerCase();
+    row.dataset.groupRaw = group;
+    row.style.borderLeft = group && _groupColorMap[group]
+      ? `3px solid ${_groupColorMap[group]}`
+      : "3px solid transparent";
+  }
+  fetch("/players/set_group", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username, group}),
+  });
+}
+
+// ── Mass assign ───────────────────────────────────────────────────────────────
+function massAssign(tid) {
+  const group = document.getElementById(`mass-group-${tid}`).value;
+  const context = document.getElementById(`mass-context-${tid}`).value;
+  const assignment = document.getElementById(`mass-assignment-${tid}`).value;
+  if (!group) return;
+
+  fetch("/players/group_mass_assign", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({group, context, assignment}),
+  })
+    .then(r => r.json())
+    .then(d => {
+      // Update selects in-page for the affected table
+      const table = document.getElementById(tid);
+      if (table) {
+        table.querySelectorAll(".player-row").forEach(row => {
+          if (row.dataset.groupRaw === group) {
+            const sel = row.querySelectorAll("select")[1]; // assignment select
+            if (sel) sel.value = assignment;
+            row.dataset.assignment = assignment.toLowerCase();
+          }
+        });
+        applyFilters();
+      }
+      const msg = document.getElementById(`mass-result-${tid}`);
+      if (msg) {
+        msg.textContent = `Applied to ${d.count} player(s).`;
+        msg.style.display = "";
+        setTimeout(() => { msg.style.display = "none"; }, 3000);
+      }
+    });
+}
+
+// ── Group management ──────────────────────────────────────────────────────────
+function toggleGroups() {
+  document.getElementById("group-body").classList.toggle("open");
+  document.getElementById("group-chevron").classList.toggle("open");
+}
+
+function createGroup() {
+  const name = document.getElementById("new-group-name").value.trim();
+  const color = document.getElementById("new-group-color").value;
+  const errEl = document.getElementById("group-create-error");
+  if (!name) return;
+
+  fetch("/players/groups/create", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name, color}),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) {
+        errEl.textContent = d.error || "Failed.";
+        errEl.style.display = "";
+        return;
+      }
+      errEl.style.display = "none";
+      document.getElementById("new-group-name").value = "";
+      // Reload page so selectors and filter dropdown update
+      location.reload();
+    });
+}
+
+function deleteGroup(name) {
+  if (!confirm(`Delete group "${name}"? Players in this group will become ungrouped.`)) return;
+  fetch("/players/groups/delete", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name}),
+  }).then(() => location.reload());
+}
+
+function updateGroupColor(name, color, swatchEl) {
+  swatchEl.style.background = color;
+  _groupColorMap[name] = color;
+  applyGroupColors();
+  fetch("/players/groups/update_color", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name, color}),
   });
 }
 
@@ -265,10 +490,8 @@ function refreshPlayers() {
 
 // ── Import ───────────────────────────────────────────────────────────────────
 function toggleImport() {
-  const body = document.getElementById("import-body");
-  const chevron = document.getElementById("import-chevron");
-  body.classList.toggle("open");
-  chevron.classList.toggle("open");
+  document.getElementById("import-body").classList.toggle("open");
+  document.getElementById("import-chevron").classList.toggle("open");
 }
 
 function runImport() {
@@ -291,7 +514,7 @@ function runImport() {
       let html = `<h4>Import Result</h4>`;
       html += `<div class="report-stat">${d.assigned} player(s) assigned to <strong>${assignment}</strong> in <strong>${contextLabel}</strong>.</div>`;
       if (d.unmatched.length) {
-        html += `<div class="unmatched-list"><strong>${d.unmatched.length} name(s) not found (possible typos):</strong><ul>`;
+        html += `<div class="unmatched-list"><strong>${d.unmatched.length} name(s) not found:</strong><ul>`;
         d.unmatched.forEach(n => { html += `<li>${n}</li>`; });
         html += `</ul></div>`;
       } else {
@@ -299,12 +522,11 @@ function runImport() {
       }
       el.innerHTML = html;
 
-      // Update selects and data-assignment for matched rows in the active tab
       if (d.assigned > 0) {
         d.matched.forEach(name => {
           document.querySelectorAll(".tab-panel.active .player-row").forEach(row => {
             if (row.dataset.name === name.toLowerCase()) {
-              const sel = row.querySelector("select");
+              const sel = row.querySelectorAll("select")[1];
               if (sel) sel.value = assignment;
               row.dataset.assignment = assignment.toLowerCase();
             }
@@ -314,12 +536,14 @@ function runImport() {
       }
     })
     .catch(() => {
-      document.getElementById("import-report").style.display = "";
-      document.getElementById("import-report").innerHTML = `<div style="color:var(--error,#f87171)">Import failed.</div>`;
+      const el = document.getElementById("import-report");
+      el.style.display = "";
+      el.innerHTML = `<div style="color:var(--error,#f87171)">Import failed.</div>`;
     });
 }
 
 initSortHeaders();
+applyGroupColors();
 </script>
 </body>
 </html>

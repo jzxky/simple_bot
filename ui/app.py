@@ -257,10 +257,12 @@ def logs_viewer(filename):
 def players_page():
     store = pl.load()
     active_count = sum(1 for p in store["players"].values() if p.get("active"))
+    groups = store.get("groups", [])
     return render_template(
         "players.html",
         players=store["players"],
         lists=store["lists"],
+        groups=groups,
         last_updated=store.get("last_updated"),
         active_count=active_count,
     )
@@ -280,6 +282,41 @@ def players_assign():
     data = request.get_json()
     pl.set_assignment(data["username"], data["context"], data.get("value", ""))
     return jsonify({"ok": True})
+
+
+@app.route("/players/groups/create", methods=["POST"])
+def players_groups_create():
+    data = request.get_json()
+    ok = pl.create_group(data.get("name", "").strip(), data.get("color", "#888888"))
+    return jsonify({"ok": ok, "error": "Name already exists." if not ok else None})
+
+
+@app.route("/players/groups/delete", methods=["POST"])
+def players_groups_delete():
+    data = request.get_json()
+    pl.delete_group(data.get("name", ""))
+    return jsonify({"ok": True})
+
+
+@app.route("/players/groups/update_color", methods=["POST"])
+def players_groups_update_color():
+    data = request.get_json()
+    pl.update_group_color(data.get("name", ""), data.get("color", "#888888"))
+    return jsonify({"ok": True})
+
+
+@app.route("/players/set_group", methods=["POST"])
+def players_set_group():
+    data = request.get_json()
+    pl.set_player_group(data["username"], data.get("group", ""))
+    return jsonify({"ok": True})
+
+
+@app.route("/players/group_mass_assign", methods=["POST"])
+def players_group_mass_assign():
+    data = request.get_json()
+    count = pl.group_mass_assign(data["group"], data["context"], data.get("assignment", ""))
+    return jsonify({"ok": True, "count": count})
 
 
 @app.route("/players/import", methods=["POST"])
