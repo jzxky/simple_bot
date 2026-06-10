@@ -170,6 +170,12 @@ class ConsumeTask(Task):
             return _ecstasy_passes_gate(state, cons_cfg, agg_cfg)
         return _passes_timer_gate(auto_type, state, cons_cfg)
 
+    def _ecstasy_bootstrap(self, state: GameState, executor, cons_cfg: dict, agg_cfg: dict, respect_buffer: bool) -> int:
+        """Consume 1 ecstasy probe when energy is 0%, refresh state, then return remaining count."""
+        executor.execute(Action("consume", type="ecstasy", count=1), state)
+        executor.execute(Action("refresh_state"), state)
+        return _smart_count("ecstasy", state, cons_cfg, agg_cfg, respect_buffer)
+
     def run(self, state: GameState, executor):
         c = cfg.load()
         cons_cfg = c.get("consumables", {})
@@ -189,6 +195,12 @@ class ConsumeTask(Task):
             count = 1
             if smart:
                 agg_cfg = c.get("aggravated_crimes", {})
+                if auto_type == "ecstasy" and state.energy == 0.0:
+                    count = self._ecstasy_bootstrap(state, executor, cons_cfg, agg_cfg, respect_buffer=True)
+                    if count > 0:
+                        state.add_log(f"Auto-consuming ecstasy x{count} (post-probe).")
+                        executor.execute(Action("consume", type="ecstasy", count=count), state)
+                    return
                 count = _smart_count(auto_type, state, cons_cfg, agg_cfg)
                 if count <= 0:
                     return
@@ -204,6 +216,11 @@ class ConsumeTask(Task):
         count = 1
         if smart:
             agg_cfg = c.get("aggravated_crimes", {})
+            if consume_type == "ecstasy" and state.energy == 0.0:
+                count = self._ecstasy_bootstrap(state, executor, cons_cfg, agg_cfg, respect_buffer=False)
+                if count > 0:
+                    executor.execute(Action("consume", type="ecstasy", count=count), state)
+                return
             count = _smart_count(consume_type, state, cons_cfg, agg_cfg, respect_buffer=False)
             if count <= 0:
                 return
