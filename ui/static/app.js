@@ -323,6 +323,23 @@ function pollStatus() {
       document.getElementById("stat-occupation").textContent = d.occupation || "--";
       document.getElementById("stat-city").textContent = d.city || "--";
       document.getElementById("stat-home-city").textContent = d.home_city || "--";
+
+      // Jail / normal first-section toggle
+      const gridNormal = document.getElementById("stat-grid-normal");
+      const gridJail = document.getElementById("stat-grid-jail");
+      if (d.in_jail) {
+        if (gridNormal) gridNormal.style.display = "none";
+        if (gridJail) gridJail.style.display = "";
+        const _jv = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || "--"; };
+        _jv("jpt-jail-rank", d.jail_rank);
+        _jv("jpt-next-rank", d.next_rank);
+        _jv("jpt-progress", d.rank_progress != null ? d.rank_progress + "%" : null);
+        _jv("jpt-city", d.city);
+        _jv("jpt-home-city", d.home_city);
+      } else {
+        if (gridNormal) gridNormal.style.display = "";
+        if (gridJail) gridJail.style.display = "none";
+      }
       document.getElementById("stat-health").textContent = d.health != null ? d.health + "%" : "--";
       document.getElementById("stat-energy").textContent = d.energy != null ? d.energy + "%" : "--";
       document.getElementById("stat-earns").textContent = d.earns_24h != null ? d.earns_24h : "--";
