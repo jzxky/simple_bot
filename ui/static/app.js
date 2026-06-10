@@ -328,6 +328,7 @@ function pollStatus() {
       const fmt = n => "$" + (n ?? 0).toLocaleString();
       document.getElementById("stat-clean").textContent = d.clean_money != null ? fmt(d.clean_money) : "--";
       document.getElementById("stat-dirty").textContent = d.dirty_money != null ? fmt(d.dirty_money) : "--";
+      document.getElementById("stat-bank").textContent = d.bank_balance ? fmt(d.bank_balance) : "--";
 
       // Jail badge and status card tint
       const jailBadge = document.getElementById("stat-jail-badge");
@@ -733,4 +734,16 @@ function requestDeposit() {
   fetch("/deposit", { method: "POST" })
     .then(r => r.json())
     .then(d => { if (d.error) alert(d.error); });
+}
+
+function requestWithdraw() {
+  const raw = prompt("Withdraw amount ($):");
+  if (!raw) return;
+  const amount = parseInt(raw.replace(/[^0-9]/g, ""), 10);
+  if (!amount || amount <= 0) return;
+  fetch("/withdraw", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({amount}),
+  }).then(r => r.json()).then(d => { if (d.error) alert(d.error); });
 }
