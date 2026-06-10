@@ -136,6 +136,21 @@ def _open_log_file() -> object:
     return open(os.path.join(logs_dir, filename), "w", encoding="utf-8", buffering=1)
 
 
+def _should_payback(target: str, c: dict) -> bool:
+    mode = c.get("payback_mode", "nobody")
+    if mode == "nobody":
+        return False
+    if mode == "everyone":
+        return True
+    import players as _pl
+    assignment = _pl.load()["lists"].get("agg_crimes", {}).get(target, "")
+    if mode == "whitelist_only":
+        return assignment == "whitelist"
+    if mode == "not_blacklist":
+        return assignment != "blacklist"
+    return False
+
+
 def _run(c: dict):
     global state
     state = GameState()
@@ -217,13 +232,13 @@ def _run(c: dict):
                 executor.execute(Action("clear_earn_queue"), state)
 
             # Payback after a successful crime
-            if getattr(state, "_last_crime_victim", None) and c.get("payback_enabled", False):
-                executor.execute(
-                    Action("payback", amount=state._last_crime_amount, target=state._last_crime_victim),
-                    state,
-                )
+            if getattr(state, "_last_crime_victim", None):
+                victim = state._last_crime_victim
+                amount = state._last_crime_amount
                 del state._last_crime_victim
                 del state._last_crime_amount
+                if _should_payback(victim, c):
+                    executor.execute(Action("payback", amount=amount, target=victim), state)
 
             time.sleep(2)
 

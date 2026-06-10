@@ -40,7 +40,7 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "type": "drug_manufacturing"
     },
-    "payback_enabled": True,
+    "payback_mode": "everyone",
     "career_training": {
         "career": "fire"
     },

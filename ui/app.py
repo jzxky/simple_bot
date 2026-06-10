@@ -57,7 +57,7 @@ def save():
     c["away_action"]["enabled"] = data.get("away_action_enabled", False)
     c["away_action"]["type"] = data.get("away_action_type", "drug_manufacturing")
 
-    c["payback_enabled"] = data.get("payback_enabled", False)
+    c["payback_mode"] = data.get("payback_mode", "nobody")
 
     c.setdefault("players", {})
     c["players"]["refresh_interval_minutes"] = int(data.get("player_refresh_interval", 30))
