@@ -427,6 +427,7 @@ def online_population() -> dict:
     """Parse whosonlinecell from current page HTML — no navigation needed."""
     import re as _re
     from bs4 import BeautifulSoup as _BS
+    import players as _pl
     html = state.page_html
     own = state.own_name
     is_gangster = (state.occupation or "").lower() == "gangster"
@@ -437,13 +438,13 @@ def online_population() -> dict:
     partners = []
     _GANGSTER_CLASSES = {"crime", "crewleader", "godfather"}
     _EXCLUDE_CLASSES = {"crime", "crewleader", "godfather", "cdtc", "jail"}
+    player_store = _pl.load().get("players", {})
     if cell:
         for a in cell.find_all("a", id=_re.compile(r"^profileLink:")):
             parts = a.get("id", "").split(":")
-            if len(parts) < 3:
+            if len(parts) < 2:
                 continue
             name = parts[1]
-            player_city = parts[2].lower()
             classes = set(a.get("class", []))
             if "jail" in classes:
                 jail_inmates.append(name)
@@ -452,8 +453,11 @@ def online_population() -> dict:
                     if classes & _GANGSTER_CLASSES:
                         partners.append(name)
                 else:
-                    if not (classes & _EXCLUDE_CLASSES) and player_city == own_city:
-                        partners.append(name)
+                    if not (classes & _EXCLUDE_CLASSES):
+                        p = player_store.get(name, {})
+                        p_city = p.get("homecity", "").lower()
+                        if p_city == own_city:
+                            partners.append(name)
     return {
         "jail_inmates": sorted(jail_inmates),
         "partners": sorted(partners),
