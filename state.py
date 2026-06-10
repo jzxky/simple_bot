@@ -50,6 +50,7 @@ class GameState:
     in_jail: bool = False
     jail_rank: str = ""
     jail_consumables: dict = field(default_factory=dict)
+    hold_action_timer: bool = False
 
     def agg_fail_count(self) -> int:
         cutoff = datetime.now() - timedelta(minutes=30)
