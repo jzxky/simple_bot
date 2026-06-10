@@ -423,23 +423,31 @@ def online_population() -> dict:
     from bs4 import BeautifulSoup as _BS
     html = state.page_html
     own = state.own_name
-    occupation = state.occupation or ""
+    is_gangster = (state.occupation or "").lower() == "gangster"
+    own_city = (state.home_city or "").lower()
     soup = _BS(html, "html.parser")
     cell = soup.find("div", id="whosonlinecell")
     jail_inmates = []
     partners = []
+    _GANGSTER_CLASSES = {"crime", "crewleader", "godfather"}
+    _EXCLUDE_CLASSES = {"crime", "crewleader", "godfather", "cdtc", "jail"}
     if cell:
         for a in cell.find_all("a", id=_re.compile(r"^profileLink:")):
             parts = a.get("id", "").split(":")
             if len(parts) < 3:
                 continue
             name = parts[1]
-            classes = a.get("class", [])
+            player_city = parts[2].lower()
+            classes = set(a.get("class", []))
             if "jail" in classes:
                 jail_inmates.append(name)
             if "normal" in classes and name != own:
-                if any(c in classes for c in ("crime", "crewleader", "godfather")):
-                    partners.append(name)
+                if is_gangster:
+                    if classes & _GANGSTER_CLASSES:
+                        partners.append(name)
+                else:
+                    if not (classes & _EXCLUDE_CLASSES) and player_city == own_city:
+                        partners.append(name)
     return {
         "jail_inmates": sorted(jail_inmates),
         "partners": sorted(partners),
