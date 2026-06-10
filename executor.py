@@ -945,6 +945,35 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def handle_clear_jail_duty_queue(action: Action, state: GameState):
+    page = browser.page()
+    _nav(JAIL_DUTIES_URL, state)
+
+    if not _check_session(state):
+        return
+
+    auto_div = page.query_selector("div.mm-earn-mode-auto")
+    if auto_div:
+        style = auto_div.get_attribute("style") or ""
+        if "display: none" in style or "display:none" in style:
+            page.click("span.mm-earn-toggle-knob")
+            page.wait_for_function(
+                "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
+                "return el && !el.style.display.includes('none'); }",
+                timeout=5000
+            )
+
+    btn = page.query_selector("button.mm-earn-queue-clear-btn")
+    if not btn:
+        state.add_log("Clear jail duty queue button not found.")
+        return
+
+    btn.click()
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log("Jail duty queue cleared.")
+
+
 def handle_jail_duties(action: Action, state: GameState):
     duty = action.params["duty"]
     page = browser.page()
@@ -1029,12 +1058,21 @@ def handle_jail_action(action: Action, state: GameState):
         state.add_log(f"Jail action ({jail_action}): submitted.")
 
 
+_JAIL_CONSUME_PRIORITY = ["porn", "booze", "cigarettes"]
+
+
 def handle_jail_consume(action: Action, state: GameState):
-    consumable = action.params["consumable"]
     page = browser.page()
     _nav(JAIL_CONTRABAND_URL, state)
 
     if not _check_session(state):
+        return
+
+    # Auto-pick highest-priority consumable the character actually has
+    jcons = state.jail_consumables or {}
+    consumable = next((c for c in _JAIL_CONSUME_PRIORITY if jcons.get(c, 0) > 0), None)
+    if not consumable:
+        state.add_log("Jail consume: no suitable consumables available (porn/booze/cigarettes).")
         return
 
     radio = page.query_selector(f"input[type='radio'][value='{consumable}']")
@@ -1242,6 +1280,7 @@ HANDLERS = {
     "jail_duties": handle_jail_duties,
     "jail_action": handle_jail_action,
     "jail_consume": handle_jail_consume,
+    "clear_jail_duty_queue": handle_clear_jail_duty_queue,
     "deposit": handle_deposit,
     "withdraw": handle_withdraw,
     "jailbreak_plan": handle_jailbreak_plan,

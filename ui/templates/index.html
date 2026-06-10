@@ -434,6 +434,7 @@
                   <option value="{{ v }}" {% if jail.get('duty','laundry') == v %}selected{% endif %}>{{ l }}</option>
                   {% endfor %}
                 </select>
+                <button class="btn-secondary" style="margin-left:8px" onclick="clearJailDutyQueue(event)">Clear Queue</button>
               </div>
               <div class="setting-row" style="margin-top:8px">
                 <label for="jail_action">Jail Action</label>
@@ -450,14 +451,6 @@
                   <span class="toggle"></span>
                 </label>
               </label>
-              <div class="setting-row" style="margin-top:8px" id="jail_consumable_row">
-                <label for="jail_consumable">Consumable</label>
-                <select id="jail_consumable" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('cigarettes','Cigarettes'),('booze','Booze'),('porn','Porn'),('shanks','Shanks')] %}
-                  <option value="{{ v }}" {% if jail.get('consumable','cigarettes') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
             </div>
           </div>
         </div>

@@ -78,11 +78,13 @@ def save():
     c["promo"]["top_job_thread_id"] = data.get("promo_thread_id", "")
 
     c.setdefault("jail", {})
+    prev_duty = c["jail"].get("duty", "laundry")
     c["jail"]["enabled"] = data.get("jail_enabled", False)
     c["jail"]["duty"] = data.get("jail_duty", "laundry")
     c["jail"]["action"] = data.get("jail_action", "gym")
     c["jail"]["use_consumables"] = data.get("jail_use_consumables", False)
-    c["jail"]["consumable"] = data.get("jail_consumable", "cigarettes")
+    if c["jail"]["duty"] != prev_duty and bot.is_running():
+        bot.request_clear_jail_duty_queue()
 
     c.setdefault("misc", {})
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
@@ -176,6 +178,14 @@ def clear_earn_queue():
     if not bot.is_running():
         return jsonify({"error": "Bot is not running."}), 400
     bot.request_clear_earn_queue()
+    return jsonify({"ok": True})
+
+
+@app.route("/clear_jail_duty_queue", methods=["POST"])
+def clear_jail_duty_queue():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    bot.request_clear_jail_duty_queue()
     return jsonify({"ok": True})
 
 
