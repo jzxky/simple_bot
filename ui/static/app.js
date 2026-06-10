@@ -101,6 +101,8 @@ function _doSave() {
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
     min_cash_on_hand: parseInt(document.getElementById("min_cash_on_hand").value) || 0,
+    char_history_enabled: document.getElementById("char_history_enabled").checked,
+    char_history_interval: parseInt(document.getElementById("char_history_interval").value) || 30,
     case_work_enabled: document.getElementById("case_work_enabled").checked,
     hospital_poll_interval: parseInt(document.getElementById("hospital_poll_interval").value) || 31,
     fire_poll_interval: parseInt(document.getElementById("fire_poll_interval").value) || 31,
@@ -793,4 +795,98 @@ function requestWithdraw() {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({amount}),
   }).then(r => r.json()).then(d => { if (d.error) alert(d.error); });
+}
+
+// ── Character History ────────────────────────────────────────────────────────
+
+function toggleCharHistoryTab() {
+  const enabled = document.getElementById("char_history_enabled").checked;
+  const sec = document.getElementById("s-char-history");
+  if (sec) sec.style.display = enabled ? "" : "none";
+  if (enabled) loadCharHistory();
+}
+
+function refreshCharHistory() {
+  fetch("/character_history/refresh", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert(d.error); return; }
+      setTimeout(loadCharHistory, 3000);
+    });
+}
+
+function loadCharHistory() {
+  fetch("/character_history")
+    .then(r => r.json())
+    .then(renderCharHistory);
+}
+
+function renderCharHistory(data) {
+  const body = document.getElementById("char-history-body");
+  const updEl = document.getElementById("char-history-updated");
+  if (!data || !data.stat_sections) {
+    body.innerHTML = "<p style='color:#888;font-size:0.9rem;'>No data yet. Enable Character History and start the bot to fetch stats.</p>";
+    return;
+  }
+
+  updEl.textContent = data.last_updated ? "Updated: " + data.last_updated : "";
+
+  let html = "";
+
+  // ── Core stat sections (always visible) ──────────────────────────────────
+  const CORE = new Set(["Character Information", "Whacking Info", "Acquired Money", "Crimes", "Gambling"]);
+  for (const sec of (data.stat_sections || [])) {
+    if (!CORE.has(sec.title)) continue;
+    html += `<div class="ch-section"><h4 class="ch-section-title">${sec.title}</h4><table class="ch-table">`;
+    for (const row of sec.rows) {
+      html += `<tr><td class="ch-key">${row.key}</td><td class="ch-val">${row.value}</td></tr>`;
+    }
+    html += "</table></div>";
+  }
+
+  // ── Promotion History ─────────────────────────────────────────────────────
+  if (data.promotion_history && data.promotion_history.length) {
+    html += `<div class="ch-section"><h4 class="ch-section-title">Promotion History</h4><table class="ch-table ch-table-wide">
+      <thead><tr><th>City</th><th>Rank</th><th>Occupation</th><th>Date</th></tr></thead><tbody>`;
+    for (const p of data.promotion_history) {
+      html += `<tr><td>${p.city}</td><td>${p.rank}</td><td>${p.occupation}</td><td style="white-space:nowrap">${p.date}</td></tr>`;
+    }
+    html += "</tbody></table></div>";
+  }
+
+  // ── Skills & Traits ───────────────────────────────────────────────────────
+  if (data.skills_traits && data.skills_traits.length) {
+    const traits = data.skills_traits.filter(s => s.type === "Trait");
+    const skills = data.skills_traits.filter(s => s.type === "Skill");
+    const renderSkillsTraits = (items, label) => {
+      if (!items.length) return "";
+      let t = `<div class="ch-section"><h4 class="ch-section-title">${label}</h4><table class="ch-table ch-table-wide">
+        <thead><tr><th>Name</th><th>Rank</th><th>Status</th><th>Used</th></tr></thead><tbody>`;
+      for (const s of items) {
+        const rankStr = s.max_rank > 0 ? `${s.rank}/${s.max_rank}` : `${s.rank}`;
+        const unlocked = s.status === "Unlocked" || s.status === "Active";
+        t += `<tr class="${unlocked ? "ch-row-active" : "ch-row-inactive"}">
+          <td>${s.name}</td><td>${rankStr}</td><td>${s.status}</td><td>${s.used}</td></tr>`;
+      }
+      return t + "</tbody></table></div>";
+    };
+    html += renderSkillsTraits(traits, "Traits");
+    html += renderSkillsTraits(skills, "Skills");
+  }
+
+  // ── Career sections (collapsed) ──────────────────────────────────────────
+  const careerSecs = (data.stat_sections || []).filter(s => s.career);
+  if (careerSecs.length) {
+    html += `<details class="ch-career-details"><summary class="ch-career-summary">Career Stats (${careerSecs.length} sections)</summary>`;
+    for (const sec of careerSecs) {
+      html += `<div class="ch-section"><h4 class="ch-section-title">${sec.title}</h4><table class="ch-table">`;
+      for (const row of sec.rows) {
+        html += `<tr><td class="ch-key">${row.key}</td><td class="ch-val">${row.value}</td></tr>`;
+      }
+      html += "</table></div>";
+    }
+    html += "</details>";
+  }
+
+  body.innerHTML = html;
 }

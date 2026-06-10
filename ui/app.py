@@ -12,6 +12,7 @@ import config as cfg
 import bot
 import paths
 import players as pl
+import character_history as ch
 
 _ui_root = os.path.join(paths.resource_dir(), "ui")
 app = Flask(__name__,
@@ -85,6 +86,10 @@ def save():
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
     c["misc"]["min_cash_on_hand"] = int(data.get("min_cash_on_hand", 0))
+
+    c.setdefault("character_history", {})
+    c["character_history"]["enabled"] = data.get("char_history_enabled", False)
+    c["character_history"]["refresh_interval_minutes"] = int(data.get("char_history_interval", 30))
 
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
@@ -195,6 +200,19 @@ def withdraw():
     if amount <= 0:
         return jsonify({"error": "Amount must be greater than zero."}), 400
     bot.request_withdraw(amount)
+    return jsonify({"ok": True})
+
+
+@app.route("/character_history")
+def character_history():
+    return jsonify(ch.load())
+
+
+@app.route("/character_history/refresh", methods=["POST"])
+def character_history_refresh():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running to refresh character history."}), 400
+    bot.request_char_history_refresh()
     return jsonify({"ok": True})
 
 

@@ -592,3 +592,62 @@ input.input-unsaved { color: var(--red) !important; }
   background: #313244;
 }
 .cash-opt:hover { background: #45475a; }
+
+/* ── Character History ──────────────────────────── */
+.ch-section {
+  margin-bottom: 16px;
+}
+.ch-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #89b4fa;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 6px;
+}
+.ch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.ch-table th {
+  text-align: left;
+  color: #888;
+  font-weight: 500;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-bottom: 1px solid #313244;
+}
+.ch-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #1e1e2e;
+  color: #cdd6f4;
+}
+.ch-table .ch-key {
+  color: #a6adc8;
+  width: 45%;
+}
+.ch-table .ch-val {
+  font-weight: 500;
+}
+.ch-table-wide .ch-key { width: auto; }
+.ch-row-active td { color: #a6e3a1; }
+.ch-row-inactive td { color: #585b70; }
+.ch-career-details {
+  margin-top: 8px;
+  border: 1px solid #313244;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.ch-career-summary {
+  padding: 8px 12px;
+  background: #1e1e2e;
+  cursor: pointer;
+  color: #a6adc8;
+  font-size: 0.85rem;
+  font-weight: 500;
+  list-style: none;
+}
+.ch-career-summary:hover { background: #313244; }
+.ch-career-details[open] .ch-career-summary { border-bottom: 1px solid #313244; }
+.ch-career-details > .ch-section { padding: 10px 12px 0; }
