@@ -27,7 +27,7 @@ _lock = threading.Lock()
 
 
 def _empty_store() -> dict:
-    return {"players": {}, "lists": {"agg_crimes": {}, "case_work": {}}, "last_updated": None}
+    return {"players": {}, "lists": {"agg_crimes": {}, "case_work": {}}, "groups": [], "last_updated": None}
 
 
 def load() -> dict:
@@ -95,6 +95,66 @@ def set_assignment(username: str, context: str, value: str):
     else:
         ctx.pop(username, None)
     _save(store)
+
+
+def create_group(name: str, color: str) -> bool:
+    """Create a new group. Returns False if name already exists."""
+    store = load()
+    groups = store.setdefault("groups", [])
+    if any(g["name"] == name for g in groups):
+        return False
+    groups.append({"name": name, "color": color or "#888888"})
+    _save(store)
+    return True
+
+
+def delete_group(name: str):
+    """Delete a group and unset it from all members."""
+    store = load()
+    store["groups"] = [g for g in store.get("groups", []) if g["name"] != name]
+    for player in store["players"].values():
+        if player.get("group") == name:
+            player.pop("group", None)
+    _save(store)
+
+
+def update_group_color(name: str, color: str):
+    """Update the color of an existing group."""
+    store = load()
+    for g in store.get("groups", []):
+        if g["name"] == name:
+            g["color"] = color
+            break
+    _save(store)
+
+
+def set_player_group(username: str, group_name: str):
+    """Assign a player to a group, or clear if group_name is empty."""
+    store = load()
+    player = store["players"].get(username)
+    if player is None:
+        return
+    if group_name:
+        player["group"] = group_name
+    else:
+        player.pop("group", None)
+    _save(store)
+
+
+def group_mass_assign(group_name: str, context: str, assignment: str) -> int:
+    """Apply an assignment to all players in a group. Returns count updated."""
+    store = load()
+    ctx = store.setdefault("lists", {}).setdefault(context, {})
+    count = 0
+    for name, player in store["players"].items():
+        if player.get("group") == group_name:
+            if assignment:
+                ctx[name] = assignment
+            else:
+                ctx.pop(name, None)
+            count += 1
+    _save(store)
+    return count
 
 
 def get_list(context: str) -> dict:
