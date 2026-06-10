@@ -2,6 +2,8 @@ import config as cfg
 from tasks.base import Task, Action
 from state import GameState
 
+_PRIORITY = ["porn", "booze", "cigarettes"]
+
 
 class JailConsumeTask(Task):
     priority = 30
@@ -15,11 +17,10 @@ class JailConsumeTask(Task):
             return False
         if not jail_cfg.get("use_consumables", False):
             return False
-        consumable = jail_cfg.get("consumable", "cigarettes")
-        if state.jail_consumables.get(consumable, 0) <= 0:
+        jcons = state.jail_consumables or {}
+        if not any(jcons.get(c, 0) > 0 for c in _PRIORITY):
             return False
         return state.timers.get("case", {}).get("ready", False)
 
     def run(self, state: GameState, executor):
-        consumable = cfg.load().get("jail", {}).get("consumable", "cigarettes")
-        executor.execute(Action("jail_consume", consumable=consumable), state)
+        executor.execute(Action("jail_consume"), state)

@@ -55,6 +55,7 @@ _jailbreak_calloff_queue: queue.Queue = queue.Queue()
 _jail_inmates_request: queue.Queue = queue.Queue(maxsize=1)
 _jail_inmates_result: queue.Queue = queue.Queue(maxsize=1)
 _clear_earn_event = threading.Event()
+_clear_jail_duty_queue_event = threading.Event()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
 state = GameState()
@@ -306,6 +307,11 @@ def _run(c: dict):
                 _clear_earn_event.clear()
                 executor.execute(Action("clear_earn_queue"), state)
 
+            # Clear jail duty queue if requested from UI
+            if _clear_jail_duty_queue_event.is_set():
+                _clear_jail_duty_queue_event.clear()
+                executor.execute(Action("clear_jail_duty_queue"), state)
+
             # Payback after a successful crime
             if getattr(state, "_last_crime_victim", None):
                 victim = state._last_crime_victim
@@ -456,6 +462,10 @@ def online_population() -> dict:
 
 def request_clear_earn_queue():
     _clear_earn_event.set()
+
+
+def request_clear_jail_duty_queue():
+    _clear_jail_duty_queue_event.set()
 
 
 def request_bar_threads(timeout: float = 15.0) -> dict:

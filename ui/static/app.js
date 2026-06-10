@@ -97,7 +97,6 @@ function _doSave() {
     jail_duty: document.getElementById("jail_duty").value,
     jail_action: document.getElementById("jail_action").value,
     jail_use_consumables: document.getElementById("jail_use_consumables").checked,
-    jail_consumable: document.getElementById("jail_consumable").value,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
     min_cash_on_hand: parseInt(document.getElementById("min_cash_on_hand").value) || 0,
@@ -834,6 +833,13 @@ function onJbActionChange() {
   if (val === "plan") document.getElementById("jb-plan-form").style.display = "";
   if (val === "execute") document.getElementById("jb-execute-form").style.display = "";
   if (val === "calloff") document.getElementById("jb-calloff-form").style.display = "";
+}
+
+function clearJailDutyQueue(e) {
+  if (e) e.preventDefault();
+  fetch("/clear_jail_duty_queue", { method: "POST" })
+    .then(r => r.json())
+    .then(d => { if (d.error) alert(d.error); });
 }
 
 function loadJbPopulation() {
