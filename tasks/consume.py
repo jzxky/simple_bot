@@ -93,7 +93,7 @@ def _smart_count(consume_type: str, state: GameState, cfg_cons: dict, agg_cfg: d
             threshold_pct = float(agg_cfg.get("away_crime", {}).get("energy_threshold", 50))
         current_pct = state.energy if state.energy is not None else 0.0
         gap_mins = _energy_to_mins(threshold_pct) - _energy_to_mins(current_pct)
-        count = math.floor(gap_mins / 3)
+        count = math.ceil(gap_mins / 3)
     else:
         timer_key = CONSUMABLE_TIMER_MAP.get(consume_type)
         if timer_key is None:
