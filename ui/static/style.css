@@ -581,3 +581,14 @@ input.input-unsaved { color: var(--red) !important; }
   background: #3a3a3a !important;
   border-bottom-color: #5a5a5a !important;
 }
+.cash-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #cdd6f4;
+  background: #313244;
+}
+.cash-opt:hover { background: #45475a; }
