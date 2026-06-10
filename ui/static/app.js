@@ -347,12 +347,15 @@ function pollStatus() {
       // Jail badge and status card tint
       const jailBadge = document.getElementById("stat-jail-badge");
       const statusCard = document.getElementById("s-character");
+      const clearQueueBtn = document.getElementById("jail-clear-queue-btn");
       if (d.in_jail) {
         if (jailBadge) jailBadge.style.display = "";
         if (statusCard) statusCard.classList.add("in-jail");
+        if (clearQueueBtn) clearQueueBtn.disabled = false;
       } else {
         if (jailBadge) jailBadge.style.display = "none";
         if (statusCard) statusCard.classList.remove("in-jail");
+        if (clearQueueBtn) clearQueueBtn.disabled = true;
       }
 
       // Consumables — show jail consumables if in jail, normal consumables otherwise
@@ -843,7 +846,12 @@ function loadJbPopulation() {
     .then(d => {
       _populateSelect("jb-target", d.jail_inmates, "— Select target —");
       const partnerRow = document.getElementById("jb-partner-row");
-      _populateSelect("jb-partner", d.partners, "— Select partner —");
+      const partnerSel = document.getElementById("jb-partner");
+      if (partnerSel) {
+        partnerSel.innerHTML = `<option value="">— Select partner —</option>` +
+          (d.partners || []).map(n => `<option value="${n}">${n}</option>`).join("") +
+          `<option value="__other__">Other…</option>`;
+      }
       partnerRow.style.display = "";
     });
 }
@@ -878,40 +886,44 @@ function _taskFeedback(feedbackId, msg, isError) {
   el.className = "task-feedback " + (isError ? "task-feedback-error" : "task-feedback-ok");
 }
 
+function onJbPartnerChange() {
+  const sel = document.getElementById("jb-partner");
+  const other = document.getElementById("jb-partner-other");
+  if (!sel || !other) return;
+  other.style.display = sel.value === "__other__" ? "" : "none";
+}
+
 function submitJbPlan() {
   const target = document.getElementById("jb-target").value;
-  const partner = document.getElementById("jb-partner") ? document.getElementById("jb-partner").value : "";
+  const partnerSel = document.getElementById("jb-partner");
+  let partner = partnerSel ? partnerSel.value : "";
+  if (partner === "__other__") {
+    partner = (document.getElementById("jb-partner-other") || {}).value || "";
+  }
   const hold = document.getElementById("jb-hold-timer").checked;
-  if (!target) { _taskFeedback("jb-plan-feedback", "Please select a target.", true); return; }
+  if (!target) { alert("Please select a target."); return; }
   if (document.getElementById("jb-partner-row").style.display !== "none" && !partner) {
-    _taskFeedback("jb-plan-feedback", "Please select a partner.", true); return;
+    alert("Please select or enter a partner."); return;
   }
   fetch("/tasks/jailbreak_plan", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({target, partner, hold_action_timer: hold}),
   }).then(r => r.json()).then(d => {
-    if (d.error) _taskFeedback("jb-plan-feedback", d.error, true);
-    else _taskFeedback("jb-plan-feedback", "Jail break plan queued — check the activity log.", false);
+    if (d.error) alert(d.error);
   });
 }
 
 function submitJbExecute() {
   fetch("/tasks/jailbreak_execute", {method: "POST"})
     .then(r => r.json())
-    .then(d => {
-      if (d.error) _taskFeedback("jb-execute-feedback", d.error, true);
-      else _taskFeedback("jb-execute-feedback", "Execute queued — check the activity log.", false);
-    });
+    .then(d => { if (d.error) alert(d.error); });
 }
 
 function submitJbCalloff() {
   fetch("/tasks/jailbreak_calloff", {method: "POST"})
     .then(r => r.json())
-    .then(d => {
-      if (d.error) _taskFeedback("jb-calloff-feedback", d.error, true);
-      else _taskFeedback("jb-calloff-feedback", "Call off queued — check the activity log.", false);
-    });
+    .then(d => { if (d.error) alert(d.error); });
 }
 
 // ── Character History ────────────────────────────────────────────────────────
@@ -1050,14 +1062,13 @@ function renderCharHistory(data, reqs) {
     for (const cat of data.earn_history) {
       const entries = hideZeros ? cat.entries.filter(e => e.count > 0) : cat.entries;
       if (!entries.length) continue;
-      const total = entries.reduce((s, e) => s + e.count, 0);
       html += `<tr>
         <td class="ch-earn-cat">${cat.category}</td>
         <td class="ch-earn-entries">`;
       for (const e of entries) {
         html += `<span class="ch-earn-item"><span class="ch-earn-label">${e.type}</span> <span class="ch-earn-count">${e.count.toLocaleString()}</span></span>`;
       }
-      html += `</td><td class="ch-earn-total">${total.toLocaleString()}</td></tr>`;
+      html += `</td></tr>`;
     }
     html += `</table></div>`;
   }
