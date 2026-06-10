@@ -169,7 +169,6 @@
       </div>
 
       <div class="filter-bar">
-        <input type="text" id="search" placeholder="Search players…" oninput="applyFilters()">
         <label class="inline-toggle">
           Hide unemployed
           <label class="toggle-label">
@@ -304,7 +303,7 @@ function showTab(id, btn) {
 
 // ── Filtering ────────────────────────────────────────────────────────────────
 function applyFilters() {
-  const globalQ = document.getElementById("search").value.toLowerCase();
+  const globalQ = "";
   const hideUnemployed = document.getElementById("hide-unemployed").checked;
   const groupFilter = document.getElementById("filter-group").value;
 
