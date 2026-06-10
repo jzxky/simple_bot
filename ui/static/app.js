@@ -1,7 +1,7 @@
 const EARN_MAP = {
   Secret:      [["whore","Whore"],["street_fight","Streetfight"],["joy_ride","Joyride"],["pimp","Pimp"]],
   General:     [["shoplift","Shoplift"],["steal_cheques","Steal Cheques"]],
-  Hospital:    [["nurse","Nurse"],["doctor","Doctor"],["surgeon","Surgeon"]],
+  Hospital:    [["nurse","Nurse"],["doctor","Doctor"],["surgeon","Surgeon"],["hospital_director","Hospital Director"]],
   Engineering: [["mechanic","Mechanic"]],
   Bank:        [["bank_teller","Work at Local Bank"]],
   Mortician:   [["mortician_assistant","Mortician Assistant"]],
