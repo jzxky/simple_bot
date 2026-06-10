@@ -300,6 +300,9 @@ def handle_do_crime(action: Action, state: GameState):
         return
     if not _check_session(state):
         return
+    if state.in_jail:
+        state.add_log("In jail — aborting crime.")
+        return
     state.add_log(f"Selected crime: {crime}")
 
     failed_transfers: set = set()
@@ -721,8 +724,14 @@ def handle_armed_robbery(action: Action, state: GameState):
     _nav(CRIME_URL, state)
     if not _check_session(state):
         return
+    if state.in_jail:
+        state.add_log("In jail — aborting armed robbery.")
+        return
     if threshold and state.energy < threshold:
         state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — aborting.")
+        return
+    if not page.query_selector("input[name='agcrime'][value='armed']"):
+        state.add_log("Armed crime option not available — aborting.")
         return
     page.check("input[name='agcrime'][value='armed']")
     page.click("input[type='submit'][name='B1']")
