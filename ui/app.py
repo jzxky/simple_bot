@@ -72,6 +72,7 @@ def save():
 
     c.setdefault("promo", {})
     c["promo"]["monitor_top_job"] = data.get("monitor_top_job", False)
+    c["promo"]["top_job_thread_id"] = data.get("promo_thread_id", "")
 
     c.setdefault("jail", {})
     c["jail"]["enabled"] = data.get("jail_enabled", False)
@@ -282,6 +283,17 @@ def players_assign():
     data = request.get_json()
     pl.set_assignment(data["username"], data["context"], data.get("value", ""))
     return jsonify({"ok": True})
+
+
+@app.route("/promo/bar_threads")
+def promo_bar_threads():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running to fetch bar threads."}), 400
+    try:
+        result = bot.request_bar_threads(timeout=15.0)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/players/groups/create", methods=["POST"])

@@ -1,12 +1,13 @@
 """
 Hammers main.asp until the promotion page for the target top job appears,
-then submits it. Blocks the scheduler for up to 30 minutes.
+then submits it and posts a forum announcement if a thread ID is configured
+and the character is in their home city.
 """
 
 import time
-from bs4 import BeautifulSoup
+import config as cfg
 import browser
-from state import GameState, parse_state
+from state import GameState, parse_state, SERVER_TIME_FMT
 from tasks.base import Task
 from tasks.check_top_job import TOP_JOB_MAP
 
@@ -59,6 +60,9 @@ class SnipeTopJobTask(Task):
         state.snipe_top_job_pending = False
         state.snipe_top_job_promo_url = ""
 
+        if promoted:
+            self._post_forum(state, top_job)
+
     def _submit_promo(self, state: GameState, top_job: str) -> bool:
         try:
             page = browser.page()
@@ -76,3 +80,25 @@ class SnipeTopJobTask(Task):
         except Exception as e:
             state.add_log(f"SnipeTopJob: promo submit error: {e}")
             return False
+
+    def _post_forum(self, state: GameState, top_job: str):
+        thread_id = cfg.load().get("promo", {}).get("top_job_thread_id", "").strip()
+        if not thread_id:
+            return
+
+        if not state.in_home_city():
+            state.add_log("SnipeTopJob: skipping forum post — not in home city.")
+            return
+
+        ts = state.server_time.strftime(SERVER_TIME_FMT) if state.server_time else "?"
+        message = f"{state.own_name} - {top_job} - {ts}"
+        post_url = f"https://mafiamatrix.com/forum/postreply.asp?t={thread_id}"
+        try:
+            page = browser.page()
+            page.goto(post_url, wait_until="domcontentloaded", timeout=15000)
+            page.fill("textarea#body", message)
+            page.click("input[name='Submit']")
+            page.wait_for_load_state("domcontentloaded", timeout=10000)
+            state.add_log(f"SnipeTopJob: forum post made — \"{message}\".")
+        except Exception as e:
+            state.add_log(f"SnipeTopJob: forum post error: {e}")
