@@ -490,18 +490,33 @@ def handle_consume(action: Action, state: GameState):
     url = f"https://mafiamatrix.com/profile/consumables.asp?action=consume&type={consume_type}"
     display_name = _CONSUMABLE_NAMES.get(consume_type, consume_type.title())
 
+    successes = 0
+    failures = 0
+
     for i in range(count):
         _nav(url, state)
-        label = f"[{i+1}/{count}] " if count > 1 else ""
 
         if "profile/default.asp" in browser.current_url():
-            state.add_log(f"Consume {display_name}: {label}You successfully consumed the {display_name}!")
+            successes += 1
+            if count == 1:
+                state.add_log(f"Consume {display_name}: You successfully consumed the {display_name}!")
             continue
 
         soup = BeautifulSoup(browser.page().content(), "html.parser")
         msg_div = soup.find("div", id="success") or soup.find("div", id="fail")
         msg = msg_div.get_text(strip=True) if msg_div else "No result."
-        state.add_log(f"Consume {display_name}: {label}{msg}")
+        if msg_div and msg_div.get("id") == "success":
+            successes += 1
+        else:
+            failures += 1
+        if count == 1:
+            state.add_log(f"Consume {display_name}: {msg}")
+
+    if count > 1:
+        summary = f"You successfully used {successes} x {display_name}."
+        if failures:
+            summary += f" ({failures} failed)"
+        state.add_log(f"Consume {display_name}: {summary}")
 
 
 def handle_refresh_state(action: Action, state: GameState):
