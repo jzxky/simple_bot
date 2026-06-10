@@ -182,7 +182,7 @@ REQUIREMENTS = {
 }
 
 # Traits/skills to never show in the locked list
-HIDDEN_FROM_LOCKED = {"Throw Snowball", "Bloodlust"}
+HIDDEN_FROM_LOCKED = {"Throw Snowball", "Bloodlust", "Diligent Worker"}
 
 
 def evaluate_progress(name: str, char_data: dict) -> list:

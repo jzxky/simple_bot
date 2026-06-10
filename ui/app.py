@@ -62,6 +62,7 @@ def save():
     c["payback_mode"] = data.get("payback_mode", "nobody")
 
     c.setdefault("players", {})
+    c["players"]["enabled"] = data.get("player_list_enabled", True)
     c["players"]["refresh_interval_minutes"] = int(data.get("player_refresh_interval", 30))
 
     c.setdefault("consumables", {})

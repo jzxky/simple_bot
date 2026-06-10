@@ -440,11 +440,9 @@ def online_population() -> dict:
             if "normal" in classes and name != own:
                 if any(c in classes for c in ("crime", "crewleader", "godfather")):
                     partners.append(name)
-    is_gangster = "gangster" in occupation.lower()
     return {
         "jail_inmates": sorted(jail_inmates),
-        "partners": sorted(partners) if is_gangster else [],
-        "is_gangster": is_gangster,
+        "partners": sorted(partners),
     }
 
 
