@@ -100,9 +100,13 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     # AggPro active — red name background is the definitive signal
     s.agg_pro_active = bool(soup.find("div", id="display_top", class_="display_red"))
 
-    # Jail detection — grey display_top with "Jail Rank" label
-    jail_top = soup.find("div", id="display_top", class_="display_grey")
-    s.in_jail = bool(jail_top and "Jail Rank" in jail_top.get_text(strip=True))
+    # Jail detection — body class mm-in-jail is definitive; also check nav_right for "Jail Rank"
+    body_el = soup.find("body")
+    body_classes = body_el.get("class", []) if body_el else []
+    s.in_jail = "mm-in-jail" in body_classes or any(
+        "Jail Rank" in d.get_text(strip=True)
+        for d in soup.find_all("div", id="display_top")
+    )
     if s.in_jail:
         nxt = jail_top.find_next_sibling("div")
         if nxt:
