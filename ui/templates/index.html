@@ -36,6 +36,279 @@
       </label>
     </div>
 
+    <!-- Settings Tabs -->
+    <section class="card tabs-card" id="s-settings">
+      <h2>
+        <button class="collapse-btn" onclick="toggleSection('s-settings')">▾</button>
+        Settings
+      </h2>
+      <div class="card-body">
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="showTab('agg-settings', this)">Aggravated Crimes</button>
+          <button class="tab-btn" onclick="showTab('business', this)">Business</button>
+          <button class="tab-btn" onclick="showTab('promotion', this)">Promotion</button>
+          <button class="tab-btn" onclick="showTab('casework', this)">Case Work</button>
+          <button class="tab-btn" onclick="showTab('jail', this)">Jail</button>
+          <button class="tab-btn" onclick="showTab('misc', this)">Misc</button>
+          <button class="tab-btn" onclick="showTab('player-lists', this)">Player Lists</button>
+          <button class="tab-btn" onclick="showTab('consumables-settings', this)">Consumables</button>
+          <button class="tab-btn" onclick="showTab('credentials', this)">Credentials</button>
+        </div>
+
+        <div id="agg-settings" class="tab-panel active">
+          <div class="settings-groups">
+            <div class="settings-group">
+              <h3>PvP</h3>
+              <div class="setting-row">
+                <label for="payback_mode">Payback</label>
+                <select id="payback_mode" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
+                  <option value="{{ v }}" {% if config.get('payback_mode','everyone') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <label class="inline-toggle setting-row">Fall back to second option if no hacking targets
+                <label class="toggle-label"><input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+            </div>
+            <div class="settings-group">
+              <h3>PvB</h3>
+              <label class="inline-toggle setting-row">Agg Private
+                <label class="toggle-label"><input type="checkbox" id="armed_agg_private" {% if config.aggravated_crimes.get('armed', {}).get('agg_private') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <label class="inline-toggle setting-row">Agg Drug House
+                <label class="toggle-label"><input type="checkbox" id="armed_agg_drug_house" {% if config.aggravated_crimes.get('armed', {}).get('agg_drug_house') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <label class="inline-toggle setting-row">Payback Private
+                <label class="toggle-label"><input type="checkbox" id="armed_payback_private" {% if config.aggravated_crimes.get('armed', {}).get('payback_private') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <label class="inline-toggle setting-row">Payback Public
+                <label class="toggle-label"><input type="checkbox" id="armed_payback_public" {% if config.aggravated_crimes.get('armed', {}).get('payback_public') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div id="business"  class="tab-panel"><p class="placeholder">Business settings — coming soon.</p></div>
+        <div id="promotion" class="tab-panel">
+          {% set promo = config.get('promo', {}) %}
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>General</h3>
+              <label class="inline-toggle setting-row">Monitor Top Job
+                <label class="toggle-label"><input type="checkbox" id="monitor_top_job" {% if promo.get('monitor_top_job') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row">
+                <span>Top Job Thread ID</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="text" id="promo_thread_id" value="{{ promo.get('top_job_thread_id', '') }}" placeholder="Thread ID" style="width:120px;" onchange="autoSave()">
+                  <button type="button" class="btn-secondary" onclick="findThreadId()">Find ID</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="thread-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;" onclick="closeThreadOverlay(event)">
+          <div id="thread-overlay-box" style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:20px;min-width:320px;max-width:480px;max-height:70vh;overflow-y:auto;" onclick="event.stopPropagation()">
+            <h4 style="margin:0 0 12px;color:#cdd6f4;">Bar Threads</h4>
+            <div id="thread-overlay-content"></div>
+          </div>
+        </div>
+
+        <div id="cash-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;" onclick="closeCashOverlay(event)">
+          <div style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:24px;min-width:280px;" onclick="event.stopPropagation()">
+            <div id="cash-step-action">
+              <h4 style="margin:0 0 16px;color:#cdd6f4;">Clean Money</h4>
+              <div style="display:flex;gap:10px;">
+                <button class="btn-primary" style="flex:1;" onclick="cashDoDeposit()">Deposit</button>
+                <button class="btn-secondary" style="flex:1;" onclick="cashShowWithdraw()">Withdraw</button>
+              </div>
+            </div>
+            <div id="cash-step-withdraw" style="display:none;">
+              <h4 style="margin:0 0 14px;color:#cdd6f4;">Withdraw Amount</h4>
+              <div id="cash-withdraw-options" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
+                <label class="cash-opt"><input type="radio" name="wamt" value="3000"> $3,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="10000"> $10,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="50000"> $50,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="500000"> $500,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="1000000"> $1,000,000</label>
+                <label class="cash-opt"><input type="radio" name="wamt" value="x" onchange="cashToggleCustom(this)"> X (custom)</label>
+              </div>
+              <input type="number" id="cash-custom-input" placeholder="Enter amount" style="display:none;width:100%;margin-bottom:12px;box-sizing:border-box;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+              <button class="btn-primary" style="width:100%;" onclick="cashSubmitWithdraw()">Submit</button>
+            </div>
+          </div>
+        </div>
+        <div id="casework"  class="tab-panel"><p class="placeholder">Case work is configured in the Case Work section above.</p></div>
+        <div id="jail" class="tab-panel">
+          {% set jail = config.get('jail', {}) %}
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                General
+                <label class="toggle-label">
+                  <input type="checkbox" id="jail_enabled" {% if jail.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <div class="setting-row">
+                <label for="jail_duty">Jail Duties</label>
+                <select id="jail_duty" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('laundry','Laundry'),('kitchen','Kitchen'),('workshop','Workshop'),('makeshank','Make Shank'),('digtunnel','Dig Tunnel')] %}
+                  <option value="{{ v }}" {% if jail.get('duty','laundry') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+                <button id="jail-clear-queue-btn" class="btn-secondary" style="margin-left:8px" onclick="clearJailDutyQueue(event)" disabled>Clear Queue</button>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="jail_action">Jail Action</label>
+                <select id="jail_action" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('gym','Gym'),('stuffing','Stuffing')] %}
+                  <option value="{{ v }}" {% if jail.get('action','gym') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <label class="inline-toggle setting-row" style="margin-top:8px">
+                Use Consumables
+                <label class="toggle-label">
+                  <input type="checkbox" id="jail_use_consumables" {% if jail.get('use_consumables') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div id="player-lists" class="tab-panel">
+          <div class="settings-groups">
+            <div class="settings-group">
+              <h3>General</h3>
+              <div class="setting-row">
+                <label for="player_list_enabled">Enable player list updates</label>
+                <input type="checkbox" id="player_list_enabled" onchange="markDirty()"
+                  {% if config.get('players', {}).get('enabled', True) %}checked{% endif %}>
+              </div>
+              <div class="setting-row">
+                <label for="player_refresh_interval">Refresh interval (minutes)</label>
+                <input type="number" id="player_refresh_interval" min="1" max="1440"
+                  value="{{ config.get('players', {}).get('refresh_interval_minutes', 30) }}"
+                  style="width:70px" oninput="markNumDirty(this)">
+                <button class="num-save-btn" id="save-player_refresh_interval" onclick="saveNum('player_refresh_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+              </div>
+              <div class="setting-row" style="margin-top:10px">
+                <a href="/players" target="_blank" class="log-open-link">Manage Lists ↗</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="consumables-settings" class="tab-panel">
+          {% set cons = config.get('consumables', {}) %}
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>General</h3>
+              <label class="inline-toggle setting-row">Smart Consumables
+                <label class="toggle-label"><input type="checkbox" id="smart_consumables" {% if cons.get('smart_consumables') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row">
+                <label for="consume_timer_limit">Timer Limit (mm:ss)</label>
+                <input type="text" id="consume_timer_limit" style="width:80px"
+                  value="{{ cons.get('timer_limit', '00:00') }}"
+                  placeholder="00:00" oninput="markNumDirty(this)">
+                <button class="num-save-btn" id="save-consume_timer_limit" onclick="saveNum('consume_timer_limit')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+              </div>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                Auto-Consume
+                <label class="toggle-label">
+                  <input type="checkbox" id="auto_consume" {% if cons.get('auto_consume') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <div class="setting-row">
+                <label for="auto_consumable">Consumable</label>
+                <select id="auto_consumable" style="width:160px" onchange="autoSave()">
+                  <option value="">— None —</option>
+                  {% for v, l in [('marijuana','Marijuana'),('cocaine','Cocaine'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('pice','P / Ice'),('heroin','Heroin')] %}
+                  <option value="{{ v }}" {% if cons.get('auto_consumable') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="consumable_limit">Daily Limit</label>
+                <select id="consumable_limit" style="width:100px" onchange="autoSave()">
+                  {% for v in [33, 66, 99, 132, 165] %}
+                  <option value="{{ v }}" {% if cons.get('consumable_limit', 33) == v %}selected{% endif %}>{{ v }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="consumable_buffer">Buffer</label>
+                <input type="number" id="consumable_buffer" min="0" style="width:80px"
+                  value="{{ cons.get('buffer', 0) }}"
+                  oninput="markNumDirty(this)">
+                <button class="num-save-btn" id="save-consumable_buffer" onclick="saveNum('consumable_buffer')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="misc" class="tab-panel">
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>General</h3>
+              <label class="inline-toggle setting-row">Log out when stopping bot
+                <label class="toggle-label"><input type="checkbox" id="logout_on_stop" {% if config.get('misc', {}).get('logout_on_stop', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <label class="inline-toggle setting-row">Re-log if auto-logged out
+                <label class="toggle-label"><input type="checkbox" id="relog_on_session_expire" {% if config.get('misc', {}).get('relog_on_session_expire', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row">
+                <span>Min Cash on Hand</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="number" id="min_cash_on_hand" value="{{ config.get('misc', {}).get('min_cash_on_hand', 0) }}" min="0" step="1000" style="width:120px;" onchange="autoSave()" oninput="markNumDirty(this)">
+                  <button id="save-min_cash_on_hand" class="num-save-btn" onclick="saveNum('min_cash_on_hand')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+                </div>
+              </div>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Character History</h3>
+              <label class="inline-toggle setting-row">Enable
+                <label class="toggle-label"><input type="checkbox" id="char_history_enabled" {% if config.get('character_history', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave(); toggleCharHistoryTab()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row">
+                <span>Refresh Interval (minutes)</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="number" id="char_history_interval" value="{{ config.get('character_history', {}).get('refresh_interval_minutes', 30) }}" min="5" step="5" style="width:80px;" onchange="autoSave()" oninput="markNumDirty(this)">
+                  <button id="save-char_history_interval" class="num-save-btn" onclick="saveNum('char_history_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="credentials" class="tab-panel">
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Login</h3>
+              <div class="row">
+                <label>Email
+                  <div class="input-with-btn">
+                    <input type="password" id="email" value="{{ config.credentials.email }}" autocomplete="off" oninput="markCredsDirty()">
+                    <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('email', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                  </div>
+                </label>
+                <label>Password
+                  <div class="input-with-btn">
+                    <input type="password" id="password" value="{{ config.credentials.password }}" oninput="markCredsDirty()">
+                    <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('password', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                  </div>
+                </label>
+              </div>
+              <button id="creds-save-btn" class="num-save-btn" style="margin-top:10px" onclick="saveCredentials()"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Activity Log -->
     <section class="card log-card" id="s-log">
       <h2>
@@ -365,278 +638,6 @@
       </div>
     </section>
 
-    <!-- Settings Tabs -->
-    <section class="card tabs-card" id="s-settings">
-      <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-settings')">▾</button>
-        Settings
-      </h2>
-      <div class="card-body">
-        <div class="tab-bar">
-          <button class="tab-btn active" onclick="showTab('agg-settings', this)">Aggravated Crimes</button>
-          <button class="tab-btn" onclick="showTab('business', this)">Business</button>
-          <button class="tab-btn" onclick="showTab('promotion', this)">Promotion</button>
-          <button class="tab-btn" onclick="showTab('casework', this)">Case Work</button>
-          <button class="tab-btn" onclick="showTab('jail', this)">Jail</button>
-          <button class="tab-btn" onclick="showTab('misc', this)">Misc</button>
-          <button class="tab-btn" onclick="showTab('player-lists', this)">Player Lists</button>
-          <button class="tab-btn" onclick="showTab('consumables-settings', this)">Consumables</button>
-          <button class="tab-btn" onclick="showTab('credentials', this)">Credentials</button>
-        </div>
-
-        <div id="agg-settings" class="tab-panel active">
-          <div class="settings-groups">
-            <div class="settings-group">
-              <h3>PvP</h3>
-              <div class="setting-row">
-                <label for="payback_mode">Payback</label>
-                <select id="payback_mode" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
-                  <option value="{{ v }}" {% if config.get('payback_mode','everyone') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <label class="inline-toggle setting-row">Fall back to second option if no hacking targets
-                <label class="toggle-label"><input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-            </div>
-            <div class="settings-group">
-              <h3>PvB</h3>
-              <label class="inline-toggle setting-row">Agg Private
-                <label class="toggle-label"><input type="checkbox" id="armed_agg_private" {% if config.aggravated_crimes.get('armed', {}).get('agg_private') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <label class="inline-toggle setting-row">Agg Drug House
-                <label class="toggle-label"><input type="checkbox" id="armed_agg_drug_house" {% if config.aggravated_crimes.get('armed', {}).get('agg_drug_house') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <label class="inline-toggle setting-row">Payback Private
-                <label class="toggle-label"><input type="checkbox" id="armed_payback_private" {% if config.aggravated_crimes.get('armed', {}).get('payback_private') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <label class="inline-toggle setting-row">Payback Public
-                <label class="toggle-label"><input type="checkbox" id="armed_payback_public" {% if config.aggravated_crimes.get('armed', {}).get('payback_public') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-            </div>
-          </div>
-        </div>
-        <div id="business"  class="tab-panel"><p class="placeholder">Business settings — coming soon.</p></div>
-        <div id="promotion" class="tab-panel">
-          {% set promo = config.get('promo', {}) %}
-          <div class="settings-groups">
-            <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>General</h3>
-              <label class="inline-toggle setting-row">Monitor Top Job
-                <label class="toggle-label"><input type="checkbox" id="monitor_top_job" {% if promo.get('monitor_top_job') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <div class="setting-row">
-                <span>Top Job Thread ID</span>
-                <div style="display:flex;gap:6px;align-items:center;">
-                  <input type="text" id="promo_thread_id" value="{{ promo.get('top_job_thread_id', '') }}" placeholder="Thread ID" style="width:120px;" onchange="autoSave()">
-                  <button type="button" class="btn-secondary" onclick="findThreadId()">Find ID</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div id="thread-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;" onclick="closeThreadOverlay(event)">
-          <div id="thread-overlay-box" style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:20px;min-width:320px;max-width:480px;max-height:70vh;overflow-y:auto;" onclick="event.stopPropagation()">
-            <h4 style="margin:0 0 12px;color:#cdd6f4;">Bar Threads</h4>
-            <div id="thread-overlay-content"></div>
-          </div>
-        </div>
-
-        <div id="cash-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;" onclick="closeCashOverlay(event)">
-          <div style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:24px;min-width:280px;" onclick="event.stopPropagation()">
-            <div id="cash-step-action">
-              <h4 style="margin:0 0 16px;color:#cdd6f4;">Clean Money</h4>
-              <div style="display:flex;gap:10px;">
-                <button class="btn-primary" style="flex:1;" onclick="cashDoDeposit()">Deposit</button>
-                <button class="btn-secondary" style="flex:1;" onclick="cashShowWithdraw()">Withdraw</button>
-              </div>
-            </div>
-            <div id="cash-step-withdraw" style="display:none;">
-              <h4 style="margin:0 0 14px;color:#cdd6f4;">Withdraw Amount</h4>
-              <div id="cash-withdraw-options" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
-                <label class="cash-opt"><input type="radio" name="wamt" value="3000"> $3,000</label>
-                <label class="cash-opt"><input type="radio" name="wamt" value="10000"> $10,000</label>
-                <label class="cash-opt"><input type="radio" name="wamt" value="50000"> $50,000</label>
-                <label class="cash-opt"><input type="radio" name="wamt" value="500000"> $500,000</label>
-                <label class="cash-opt"><input type="radio" name="wamt" value="1000000"> $1,000,000</label>
-                <label class="cash-opt"><input type="radio" name="wamt" value="x" onchange="cashToggleCustom(this)"> X (custom)</label>
-              </div>
-              <input type="number" id="cash-custom-input" placeholder="Enter amount" style="display:none;width:100%;margin-bottom:12px;box-sizing:border-box;" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
-              <button class="btn-primary" style="width:100%;" onclick="cashSubmitWithdraw()">Submit</button>
-            </div>
-          </div>
-        </div>
-        <div id="casework"  class="tab-panel"><p class="placeholder">Case work is configured in the Case Work section above.</p></div>
-        <div id="jail" class="tab-panel">
-          {% set jail = config.get('jail', {}) %}
-          <div class="settings-groups">
-            <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>
-                General
-                <label class="toggle-label">
-                  <input type="checkbox" id="jail_enabled" {% if jail.get('enabled') %}checked{% endif %} onchange="autoSave()">
-                  <span class="toggle"></span>
-                </label>
-              </h3>
-              <div class="setting-row">
-                <label for="jail_duty">Jail Duties</label>
-                <select id="jail_duty" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('laundry','Laundry'),('kitchen','Kitchen'),('workshop','Workshop'),('makeshank','Make Shank'),('digtunnel','Dig Tunnel')] %}
-                  <option value="{{ v }}" {% if jail.get('duty','laundry') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-                <button id="jail-clear-queue-btn" class="btn-secondary" style="margin-left:8px" onclick="clearJailDutyQueue(event)" disabled>Clear Queue</button>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
-                <label for="jail_action">Jail Action</label>
-                <select id="jail_action" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('gym','Gym'),('stuffing','Stuffing')] %}
-                  <option value="{{ v }}" {% if jail.get('action','gym') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <label class="inline-toggle setting-row" style="margin-top:8px">
-                Use Consumables
-                <label class="toggle-label">
-                  <input type="checkbox" id="jail_use_consumables" {% if jail.get('use_consumables') %}checked{% endif %} onchange="autoSave()">
-                  <span class="toggle"></span>
-                </label>
-              </label>
-            </div>
-          </div>
-        </div>
-        <div id="player-lists" class="tab-panel">
-          <div class="settings-groups">
-            <div class="settings-group">
-              <h3>General</h3>
-              <div class="setting-row">
-                <label for="player_list_enabled">Enable player list updates</label>
-                <input type="checkbox" id="player_list_enabled" onchange="markDirty()"
-                  {% if config.get('players', {}).get('enabled', True) %}checked{% endif %}>
-              </div>
-              <div class="setting-row">
-                <label for="player_refresh_interval">Refresh interval (minutes)</label>
-                <input type="number" id="player_refresh_interval" min="1" max="1440"
-                  value="{{ config.get('players', {}).get('refresh_interval_minutes', 30) }}"
-                  style="width:70px" oninput="markNumDirty(this)">
-                <button class="num-save-btn" id="save-player_refresh_interval" onclick="saveNum('player_refresh_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
-              </div>
-              <div class="setting-row" style="margin-top:10px">
-                <a href="/players" target="_blank" class="log-open-link">Manage Lists ↗</a>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div id="consumables-settings" class="tab-panel">
-          {% set cons = config.get('consumables', {}) %}
-          <div class="settings-groups">
-            <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>General</h3>
-              <label class="inline-toggle setting-row">Smart Consumables
-                <label class="toggle-label"><input type="checkbox" id="smart_consumables" {% if cons.get('smart_consumables') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <div class="setting-row">
-                <label for="consume_timer_limit">Timer Limit (mm:ss)</label>
-                <input type="text" id="consume_timer_limit" style="width:80px"
-                  value="{{ cons.get('timer_limit', '00:00') }}"
-                  placeholder="00:00" oninput="markNumDirty(this)">
-                <button class="num-save-btn" id="save-consume_timer_limit" onclick="saveNum('consume_timer_limit')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
-              </div>
-            </div>
-            <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>
-                Auto-Consume
-                <label class="toggle-label">
-                  <input type="checkbox" id="auto_consume" {% if cons.get('auto_consume') %}checked{% endif %} onchange="autoSave()">
-                  <span class="toggle"></span>
-                </label>
-              </h3>
-              <div class="setting-row">
-                <label for="auto_consumable">Consumable</label>
-                <select id="auto_consumable" style="width:160px" onchange="autoSave()">
-                  <option value="">— None —</option>
-                  {% for v, l in [('marijuana','Marijuana'),('cocaine','Cocaine'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('pice','P / Ice'),('heroin','Heroin')] %}
-                  <option value="{{ v }}" {% if cons.get('auto_consumable') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
-                <label for="consumable_limit">Daily Limit</label>
-                <select id="consumable_limit" style="width:100px" onchange="autoSave()">
-                  {% for v in [33, 66, 99, 132, 165] %}
-                  <option value="{{ v }}" {% if cons.get('consumable_limit', 33) == v %}selected{% endif %}>{{ v }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
-                <label for="consumable_buffer">Buffer</label>
-                <input type="number" id="consumable_buffer" min="0" style="width:80px"
-                  value="{{ cons.get('buffer', 0) }}"
-                  oninput="markNumDirty(this)">
-                <button class="num-save-btn" id="save-consumable_buffer" onclick="saveNum('consumable_buffer')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div id="misc" class="tab-panel">
-          <div class="settings-groups">
-            <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>General</h3>
-              <label class="inline-toggle setting-row">Log out when stopping bot
-                <label class="toggle-label"><input type="checkbox" id="logout_on_stop" {% if config.get('misc', {}).get('logout_on_stop', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <label class="inline-toggle setting-row">Re-log if auto-logged out
-                <label class="toggle-label"><input type="checkbox" id="relog_on_session_expire" {% if config.get('misc', {}).get('relog_on_session_expire', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <div class="setting-row">
-                <span>Min Cash on Hand</span>
-                <div style="display:flex;gap:6px;align-items:center;">
-                  <input type="number" id="min_cash_on_hand" value="{{ config.get('misc', {}).get('min_cash_on_hand', 0) }}" min="0" step="1000" style="width:120px;" onchange="autoSave()" oninput="markNumDirty(this)">
-                  <button id="save-min_cash_on_hand" class="num-save-btn" onclick="saveNum('min_cash_on_hand')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
-                </div>
-              </div>
-            </div>
-            <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>Character History</h3>
-              <label class="inline-toggle setting-row">Enable
-                <label class="toggle-label"><input type="checkbox" id="char_history_enabled" {% if config.get('character_history', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave(); toggleCharHistoryTab()"><span class="toggle"></span></label>
-              </label>
-              <div class="setting-row">
-                <span>Refresh Interval (minutes)</span>
-                <div style="display:flex;gap:6px;align-items:center;">
-                  <input type="number" id="char_history_interval" value="{{ config.get('character_history', {}).get('refresh_interval_minutes', 30) }}" min="5" step="5" style="width:80px;" onchange="autoSave()" oninput="markNumDirty(this)">
-                  <button id="save-char_history_interval" class="num-save-btn" onclick="saveNum('char_history_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div id="credentials" class="tab-panel">
-          <div class="settings-groups">
-            <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>Login</h3>
-              <div class="row">
-                <label>Email
-                  <div class="input-with-btn">
-                    <input type="password" id="email" value="{{ config.credentials.email }}" autocomplete="off" oninput="markCredsDirty()">
-                    <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('email', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
-                  </div>
-                </label>
-                <label>Password
-                  <div class="input-with-btn">
-                    <input type="password" id="password" value="{{ config.credentials.password }}" oninput="markCredsDirty()">
-                    <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('password', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
-                  </div>
-                </label>
-              </div>
-              <button id="creds-save-btn" class="num-save-btn" style="margin-top:10px" onclick="saveCredentials()"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <!-- Character History -->
     <section class="card" id="s-char-history" style="{% if not config.get('character_history', {}).get('enabled', False) %}display:none;{% endif %}">
