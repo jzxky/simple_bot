@@ -49,6 +49,7 @@ class GameState:
     snipe_top_job_promo_url: str = ""
     in_jail: bool = False
     jail_rank: str = ""
+    has_new_journals: bool = False
     jail_consumables: dict = field(default_factory=dict)
     hold_action_timer: bool = False
 
@@ -99,6 +100,11 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
 
     # AggPro active — red name background is the definitive signal
     s.agg_pro_active = bool(soup.find("div", id="display_top", class_="display_red"))
+
+    # New journals — any class other than plain "journal" means unread entries
+    journal_span = soup.find("span", id="journals_span_id")
+    if journal_span:
+        s.has_new_journals = journal_span.get("class", ["journal"]) != ["journal"]
 
     # Jail detection — body class mm-in-jail is definitive; also check nav_right for "Jail Rank"
     body_el = soup.find("body")

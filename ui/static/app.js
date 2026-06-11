@@ -60,8 +60,11 @@ function toggleAwayCrime() {
 }
 
 function showTab(id, btn) {
-  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  const section = btn.closest(".tabs-card") || btn.closest(".card");
+  if (section) {
+    section.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    section.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  }
   document.getElementById(id).classList.add("active");
   btn.classList.add("active");
 }
@@ -821,6 +824,22 @@ function onTaskChange() {
     document.getElementById("task-jailbreak").style.display = "";
     loadJbPopulation();
   }
+  if (val === "archive-journals") {
+    document.getElementById("task-archive-journals").style.display = "";
+  }
+}
+
+function submitArchiveJournals(all) {
+  const pages = all ? null : parseInt(document.getElementById("aj-pages").value, 10);
+  if (!all && (!pages || pages < 1)) { alert("Enter a valid page count."); return; }
+  fetch("/tasks/archive_journals", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pages: all ? null : pages }),
+  }).then(r => r.json()).then(d => {
+    if (d.error) alert("Error: " + d.error);
+    else alert("Archive task queued.");
+  });
 }
 
 function onJbActionChange() {
@@ -1177,4 +1196,92 @@ function toggleLockedTraits() {
   const hidden = panel.style.display === "none";
   panel.style.display = hidden ? "" : "none";
   if (btn) btn.textContent = hidden ? "Hide Locked" : "Show Locked";
+}
+
+// ── Communications & Journals ────────────────────────────────────────────────
+
+let _cjData = [];       // full sorted journal list
+let _cjFiltered = [];   // after search filter
+let _cjPage = 1;
+const CJ_PAGE_SIZE = 10;
+
+function cjInit() {
+  fetch("/journals")
+    .then(r => r.json())
+    .then(data => {
+      _cjData = Object.values(data).sort((a, b) => {
+        // sort newest first by parsing time string
+        return new Date(b.time) - new Date(a.time);
+      });
+      _cjFiltered = _cjData;
+      _cjPage = 1;
+      cjRender();
+    })
+    .catch(() => {});
+}
+
+function cjSearch() {
+  const q = (document.getElementById("cj-search").value || "").toLowerCase().trim();
+  if (!q) {
+    _cjFiltered = _cjData;
+  } else {
+    _cjFiltered = _cjData.filter(e =>
+      (e.title || "").toLowerCase().includes(q) ||
+      (e.text  || "").toLowerCase().includes(q) ||
+      (e.time  || "").toLowerCase().includes(q)
+    );
+  }
+  _cjPage = 1;
+  cjRender();
+}
+
+function cjRender() {
+  const list = document.getElementById("cj-list");
+  const pager = document.getElementById("cj-pagination");
+  if (!list || !pager) return;
+
+  if (_cjFiltered.length === 0) {
+    list.innerHTML = '<p class="cj-empty">No journals found.</p>';
+    pager.innerHTML = "";
+    return;
+  }
+
+  const totalPages = Math.ceil(_cjFiltered.length / CJ_PAGE_SIZE);
+  if (_cjPage > totalPages) _cjPage = totalPages;
+  const start = (_cjPage - 1) * CJ_PAGE_SIZE;
+  const slice = _cjFiltered.slice(start, start + CJ_PAGE_SIZE);
+
+  list.innerHTML = slice.map(e => `
+    <div class="cj-entry">
+      <span class="cj-entry-title">${escHtml(e.title || "")}</span>
+      <span class="cj-entry-time">${escHtml(e.time || "")}</span>
+      <div class="cj-entry-text">${escHtml(e.text || "")}</div>
+    </div>
+  `).join("");
+
+  // Pagination buttons
+  let btns = "";
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) {
+      btns += `<button onclick="cjGoPage(${i})" class="${i === _cjPage ? 'active' : ''}">${i}</button>`;
+    }
+  } else {
+    const pages = new Set([1, totalPages, _cjPage, _cjPage - 1, _cjPage + 1].filter(p => p >= 1 && p <= totalPages));
+    let prev = 0;
+    [...pages].sort((a,b) => a-b).forEach(p => {
+      if (prev && p - prev > 1) btns += `<button disabled>…</button>`;
+      btns += `<button onclick="cjGoPage(${p})" class="${p === _cjPage ? 'active' : ''}">${p}</button>`;
+      prev = p;
+    });
+  }
+  pager.innerHTML = btns;
+}
+
+function cjGoPage(n) {
+  _cjPage = n;
+  cjRender();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
