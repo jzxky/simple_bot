@@ -7,11 +7,11 @@ and the character is in their home city.
 import time
 import config as cfg
 import browser
+import urls
 from state import GameState, parse_state, SERVER_TIME_FMT
 from tasks.base import Task
-from tasks.check_top_job import TOP_JOB_MAP
+from tasks.check_top_job import _top_job_map
 
-PLAY_URL      = "https://mafiamatrix.com/main.asp"
 SNIPE_TIMEOUT = 30 * 60  # seconds
 
 
@@ -25,19 +25,19 @@ class SnipeTopJobTask(Task):
             and not state.in_jail
             and state.snipe_top_job_pending
             and bool(state.snipe_top_job_promo_url)
-            and state.occupation in TOP_JOB_MAP
+            and state.occupation in _top_job_map()
         )
 
     def run(self, state: GameState, executor):
         promo_url = state.snipe_top_job_promo_url
-        top_job = TOP_JOB_MAP.get(state.occupation, ("Unknown", ""))[0]
+        top_job = _top_job_map().get(state.occupation, ("Unknown", ""))[0]
         state.add_log(f"SnipeTopJob: starting — targeting {top_job}, hammering main.asp for up to 30 minutes.")
         deadline = time.monotonic() + SNIPE_TIMEOUT
         promoted = False
 
         while time.monotonic() < deadline:
             try:
-                html = browser.navigate(PLAY_URL)
+                html = browser.navigate(urls.BASE_URL + "/main.asp")
                 parse_state(html, browser.current_url(), state)
             except Exception as e:
                 state.add_log(f"SnipeTopJob: nav error: {e}")
@@ -92,7 +92,7 @@ class SnipeTopJobTask(Task):
 
         ts = state.server_time.strftime(SERVER_TIME_FMT) if state.server_time else "?"
         message = f"{state.own_name} - {top_job} - {ts}"
-        post_url = f"https://mafiamatrix.com/forum/postreply.asp?t={thread_id}"
+        post_url = urls.BASE_URL + f"/forum/postreply.asp?t={thread_id}"
         try:
             page = browser.page()
             page.goto(post_url, wait_until="domcontentloaded", timeout=15000)

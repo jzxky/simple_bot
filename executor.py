@@ -6,29 +6,15 @@ import json
 import re
 import time
 import config as cfg
+import urls
 from bs4 import BeautifulSoup
 from tasks.base import Action
 from state import GameState, parse_state
 import browser
 
-LOGIN_URL = "https://mafiamatrix.com/default.asp"
-PLAY_URL = "https://mafiamatrix.com/loggedin.asp?display=play"
-PROFILE_URL = "https://mafiamatrix.com/profile/default.asp"
-CRIME_URL = "https://mafiamatrix.com/income/agcrime.asp"
-EARN_URL = "https://mafiamatrix.com/income/earn.asp"
-CS_URL = "https://mafiamatrix.com/income/communityservice.asp"
-FD_URL = "https://mafiamatrix.com/income/fireduties.asp"
-DM_URL = "https://mafiamatrix.com/income/manufacture.asp"
-INCOME_URL = "https://mafiamatrix.com/income/income.asp"
-TRANSFER_URL = "https://mafiamatrix.com/income/bank.asp?option=transfers"
-USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
-BIZ_URL = "https://mafiamatrix.com/business/business.asp"
-HOSPITAL_CASES_URL = "https://mafiamatrix.com/localcity/hospital.asp?display=patients"
-JAIL_DUTIES_URL = "https://mafiamatrix.com/jail/duties.asp"
-JAIL_CONTRABAND_URL = "https://mafiamatrix.com/jail/contraband.asp"
-JAILBREAK_URL = "https://mafiamatrix.com/income/jailbreak.asp"
-JOURNAL_URL = "https://mafiamatrix.com/journal/journal.asp"
-DRUG_TRADE_URL = "https://mafiamatrix.com/income/drugtrade.asp"
+
+def _u(path: str) -> str:
+    return urls.BASE_URL + path
 
 _DRUG_TRADE_NAME_MAP = {
     "marijuana": "marijuana",
@@ -92,7 +78,7 @@ def _nav(url: str, state: GameState):
 
 def _check_session(state: GameState) -> bool:
     """Return True if still logged in, False if redirected to login page."""
-    if browser.current_url().rstrip("/") == "https://mafiamatrix.com/default.asp":
+    if browser.current_url().rstrip("/") == _u("/default.asp"):
         state.logged_in = False
         state.add_log("Session expired, will re-login.")
         return False
@@ -111,7 +97,7 @@ def handle_login(action: Action, state: GameState):
         state.logged_in = True
         return
 
-    page.goto(LOGIN_URL, wait_until="load")
+    page.goto(_u("/default.asp"), wait_until="load")
 
     try:
         page.wait_for_selector("form#loginForm", timeout=10000)
@@ -139,7 +125,7 @@ def handle_login(action: Action, state: GameState):
     # Click PLAY NOW if present
     play = soup.find("a", class_="btn-play")
     if play:
-        page.goto(PLAY_URL, wait_until="load")
+        page.goto(_u("/loggedin.asp?display=play"), wait_until="load")
         _refresh_state(state)
 
     state.logged_in = True
@@ -149,7 +135,7 @@ def handle_login(action: Action, state: GameState):
 def handle_check_earns(action: Action, state: GameState):
     earn_type = action.params["earn_type"]
     page = browser.page()
-    _nav(EARN_URL, state)
+    _nav(_u("/income/earn.asp"), state)
 
     if not _check_session(state):
         return
@@ -209,7 +195,7 @@ def handle_check_earns(action: Action, state: GameState):
 
 def handle_clear_earn_queue(action: Action, state: GameState):
     page = browser.page()
-    _nav(EARN_URL, state)
+    _nav(_u("/income/earn.asp"), state)
 
     if not _check_session(state):
         return
@@ -262,7 +248,7 @@ def _get_online_local_players(state: GameState) -> list:
 
 def _get_city_residents(city: str, own_name: str) -> list:
     """Fetch all players whose home city matches, via updateusers.php."""
-    browser.page().goto(USERS_URL, wait_until="domcontentloaded", timeout=15000)
+    browser.page().goto(_u("/skin/updateusers.php?q=1"), wait_until="domcontentloaded", timeout=15000)
     text = browser.page().inner_text("body")
     try:
         data = json.loads(text)
@@ -277,7 +263,7 @@ def _get_city_residents(city: str, own_name: str) -> list:
 def _nav_to_target_input(crime: str, state: GameState) -> bool:
     """Navigate to agcrime.asp, select crime, submit — returns True if text input found."""
     page = browser.page()
-    _nav(CRIME_URL, state)
+    _nav(_u("/income/agcrime.asp"), state)
     page.check(f"input[name='agcrime'][value='{crime}']")
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
@@ -419,7 +405,7 @@ def handle_do_crime(action: Action, state: GameState):
             if crime in ("pickpocket", "mugging", "breaking") and "recently survived" in fail_msg.lower():
                 continue
             _flush_fails()
-            _nav(PLAY_URL, state)
+            _nav(_u("/loggedin.asp?display=play"), state)
             return
 
     _flush_fails()
@@ -430,7 +416,7 @@ def handle_do_crime(action: Action, state: GameState):
 def handle_check_weapon(action: Action, state: GameState):
     crime = action.params["crime"]
     page = browser.page()
-    page.goto(PROFILE_URL, wait_until="load", timeout=30000)
+    page.goto(_u("/profile/default.asp"), wait_until="load", timeout=30000)
     parse_state(page.content(), browser.current_url(), state)
 
     if not _check_session(state):
@@ -471,7 +457,7 @@ def handle_check_weapon(action: Action, state: GameState):
             if action_td:
                 for a in action_td.find_all("a"):
                     if "Carry" in a.get_text() or "use" in a.get("href", ""):
-                        carry_link = "https://mafiamatrix.com" + a["href"]
+                        carry_link = urls.BASE_URL + a["href"]
                         break
             if carry_link:
                 stash_slots.append((weapon_name, carry_link))
@@ -514,7 +500,7 @@ _CONSUMABLE_NAMES = {
 def handle_consume(action: Action, state: GameState):
     consume_type = action.params["type"]
     count = int(action.params.get("count", 1))
-    url = f"https://mafiamatrix.com/profile/consumables.asp?action=consume&type={consume_type}"
+    url = f_u(f"/profile/consumables.asp?action=consume&type={consume_type}")
     display_name = _CONSUMABLE_NAMES.get(consume_type, consume_type.title())
 
     successes = 0
@@ -547,7 +533,7 @@ def handle_consume(action: Action, state: GameState):
 
 
 def handle_refresh_state(action: Action, state: GameState):
-    _nav(PLAY_URL, state)
+    _nav(_u("/loggedin.asp?display=play"), state)
 
 
 def handle_payback(action: Action, state: GameState):
@@ -555,7 +541,7 @@ def handle_payback(action: Action, state: GameState):
     target = action.params["target"]
     page = browser.page()
 
-    _nav(TRANSFER_URL, state)
+    _nav(_u("/income/bank.asp?option=transfers"), state)
     if not _check_session(state):
         return
 
@@ -578,7 +564,7 @@ def handle_payback(action: Action, state: GameState):
 def handle_community_service(action: Action, state: GameState):
     in_home = action.params["in_home_city"]
     page = browser.page()
-    _nav(CS_URL, state)
+    _nav(_u("/income/communityservice.asp"), state)
 
     if not _check_session(state):
         return
@@ -604,7 +590,7 @@ def handle_community_service(action: Action, state: GameState):
 
 def handle_fire_duties(action: Action, state: GameState):
     page = browser.page()
-    _nav(FD_URL, state)
+    _nav(_u("/income/fireduties.asp"), state)
 
     if not _check_session(state):
         return
@@ -667,7 +653,7 @@ def handle_career_training(action: Action, state: GameState):
 def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
     """Returns True if transfer succeeded, False otherwise."""
     page = browser.page()
-    _nav(TRANSFER_URL, state)
+    _nav(_u("/income/bank.asp?option=transfers"), state)
     if not _check_session(state):
         return False
     page.fill("input[name='transferamount']", str(amount))
@@ -691,7 +677,7 @@ def _payback_public_business(business_name: str, amount: int, state: GameState):
     if not job:
         state.add_log(f"No job mapping for {business_name}.")
         return
-    browser.page().goto(USERS_URL, wait_until="domcontentloaded", timeout=15000)
+    browser.page().goto(_u("/skin/updateusers.php?q=1"), wait_until="domcontentloaded", timeout=15000)
     try:
         data = json.loads(browser.page().inner_text("body"))
     except Exception:
@@ -709,7 +695,7 @@ def _payback_public_business(business_name: str, amount: int, state: GameState):
 
 
 def _payback_private_business(business_name: str, amount: int, state: GameState):
-    _nav(BIZ_URL, state)
+    _nav(_u("/business/business.asp"), state)
     soup = BeautifulSoup(browser.page().content(), "html.parser")
     owner = None
     for row in soup.select("table tr"):
@@ -735,7 +721,7 @@ def handle_armed_robbery(action: Action, state: GameState):
     page = browser.page()
 
     # Navigate to agcrime.asp and submit the armed robbery form
-    _nav(CRIME_URL, state)
+    _nav(_u("/income/agcrime.asp"), state)
     if not _check_session(state):
         return
     if state.in_jail:
@@ -768,7 +754,7 @@ def handle_armed_robbery(action: Action, state: GameState):
             select = soup.find("select", attrs={"name": "armed"})
             if not select:
                 state.add_log("Armed robbery: business select not found.")
-                _nav(PLAY_URL, state)
+                _nav(_u("/loggedin.asp?display=play"), state)
                 return
 
             target = None
@@ -820,7 +806,7 @@ def handle_armed_robbery(action: Action, state: GameState):
                     state.add_log(f"Armed robbery failed: {fail_msg}")
                 else:
                     state.add_log("Armed robbery: unexpected result page.")
-                _nav(PLAY_URL, state)
+                _nav(_u("/loggedin.asp?display=play"), state)
                 return
 
             state.add_log(f"No valid armed robbery target (pass {pass_num}, attempt {attempt + 1}/{ARMED_MAX_RETRIES}).")
@@ -829,19 +815,19 @@ def handle_armed_robbery(action: Action, state: GameState):
         state.add_log(f"Armed robbery: no targets after pass {pass_num}. Checking task queue...")
         if check_other_tasks and check_other_tasks():
             state.add_log("Another task is ready — yielding armed robbery.")
-            _nav(PLAY_URL, state)
+            _nav(_u("/loggedin.asp?display=play"), state)
             return
         state.add_log("No other tasks pending — retrying armed robbery.")
 
 
 def handle_drug_manufacturing(action: Action, state: GameState):
     page = browser.page()
-    _nav(DM_URL, state)
+    _nav(_u("/income/manufacture.asp"), state)
 
     if not _check_session(state):
         return
 
-    if INCOME_URL in browser.current_url():
+    if _u("/income/income.asp") in browser.current_url():
         state.add_log("Drug manufacturing redirected to income page — likely missing science degree or not in Gangster career.")
         return
 
@@ -886,7 +872,7 @@ def handle_check_hospital_cases(action: Action, state: GameState):
         and not (t["type"] == "dna" and not in_home)
     ]
 
-    _nav(HOSPITAL_CASES_URL, state)
+    _nav(_u("/localcity/hospital.asp?display=patients"), state)
 
     if not _check_session(state):
         return
@@ -915,7 +901,7 @@ def handle_check_hospital_cases(action: Action, state: GameState):
         if link and task_type not in available:
             href = link["href"]
             if not href.startswith("http"):
-                href = "https://mafiamatrix.com/localcity/" + href
+                href = _u("/localcity/") + href
             available[task_type] = (injury, href)
 
     # Check for a separate DNA table — look for any heading containing "DNA"
@@ -964,7 +950,7 @@ def handle_check_hospital_cases(action: Action, state: GameState):
 
 def handle_clear_jail_duty_queue(action: Action, state: GameState):
     page = browser.page()
-    _nav(JAIL_DUTIES_URL, state)
+    _nav(_u("/jail/duties.asp"), state)
 
     if not _check_session(state):
         return
@@ -994,7 +980,7 @@ def handle_clear_jail_duty_queue(action: Action, state: GameState):
 def handle_jail_duties(action: Action, state: GameState):
     duty = action.params["duty"]
     page = browser.page()
-    _nav(JAIL_DUTIES_URL, state)
+    _nav(_u("/jail/duties.asp"), state)
 
     if not _check_session(state):
         return
@@ -1049,7 +1035,7 @@ def handle_jail_duties(action: Action, state: GameState):
 def handle_jail_action(action: Action, state: GameState):
     jail_action = action.params["action"]
     page = browser.page()
-    _nav(JAIL_CONTRABAND_URL, state)
+    _nav(_u("/jail/contraband.asp"), state)
 
     if not _check_session(state):
         return
@@ -1080,7 +1066,7 @@ _JAIL_CONSUME_PRIORITY = ["porn", "booze", "cigarettes"]
 
 def handle_jail_consume(action: Action, state: GameState):
     page = browser.page()
-    _nav(JAIL_CONTRABAND_URL, state)
+    _nav(_u("/jail/contraband.asp"), state)
 
     if not _check_session(state):
         return
@@ -1120,7 +1106,7 @@ def handle_deposit(action: Action, state: GameState):
     if amount <= 0:
         state.add_log(f"Deposit: nothing to deposit (clean money {state.clean_money}, min {min_cash}).")
         return
-    DEPOSIT_URL = "https://mafiamatrix.com/income/bank.asp?option=deposit"
+    DEPOSIT_URL = _u("/income/bank.asp?option=deposit")
     page = browser.page()
     page.goto(DEPOSIT_URL, wait_until="domcontentloaded", timeout=15000)
     page.fill("input[name='deposit']", str(amount))
@@ -1135,7 +1121,7 @@ def handle_withdraw(action: Action, state: GameState):
     if amount <= 0:
         state.add_log("Withdraw: amount must be greater than zero.")
         return
-    WITHDRAW_URL = "https://mafiamatrix.com/income/bank.asp?option=withdrawal"
+    WITHDRAW_URL = _u("/income/bank.asp?option=withdrawal")
     page = browser.page()
     page.goto(WITHDRAW_URL, wait_until="domcontentloaded", timeout=15000)
     page.fill("input[name='withdrawal']", str(amount))
@@ -1166,7 +1152,7 @@ def handle_jailbreak_plan(action: Action, state: GameState):
     hold = action.params.get("hold_action_timer", False)
 
     page = browser.page()
-    page.goto(JAILBREAK_URL, wait_until="domcontentloaded", timeout=15000)
+    page.goto(_u("/income/jailbreak.asp"), wait_until="domcontentloaded", timeout=15000)
     url = browser.current_url()
 
     if "jailbreak.asp" not in url:
@@ -1210,7 +1196,7 @@ def handle_jailbreak_plan(action: Action, state: GameState):
 
 def handle_jailbreak_execute(action: Action, state: GameState):
     page = browser.page()
-    page.goto(JAILBREAK_URL, wait_until="domcontentloaded", timeout=15000)
+    page.goto(_u("/income/jailbreak.asp"), wait_until="domcontentloaded", timeout=15000)
     url = browser.current_url()
 
     if "jailbreak.asp" not in url:
@@ -1246,7 +1232,7 @@ def handle_jailbreak_execute(action: Action, state: GameState):
 
 def handle_jailbreak_calloff(action: Action, state: GameState):
     page = browser.page()
-    page.goto(JAILBREAK_URL, wait_until="domcontentloaded", timeout=15000)
+    page.goto(_u("/income/jailbreak.asp"), wait_until="domcontentloaded", timeout=15000)
     url = browser.current_url()
 
     if "jailbreak.asp" not in url:
@@ -1293,7 +1279,7 @@ def handle_check_drug_trade(action: Action, state: GameState):
 
     drug_cfg = autobuy.get("drugs", {})
 
-    _nav(DRUG_TRADE_URL, state)
+    _nav(_u("/income/drugtrade.asp"), state)
     if not _check_session(state):
         return
 
@@ -1314,7 +1300,7 @@ def handle_check_drug_trade(action: Action, state: GameState):
     state.add_log(f"Drug trade: found {len(offer_ids)} offer(s).")
 
     for offer_id in offer_ids:
-        offer_url = f"{DRUG_TRADE_URL}?display=offer&offerid={offer_id}"
+        offer_url = f"{_u("/income/drugtrade.asp")}?display=offer&offerid={offer_id}"
         _nav(offer_url, state)
         if not _check_session(state):
             return
@@ -1388,7 +1374,7 @@ def handle_check_drug_trade(action: Action, state: GameState):
         if total_willing < offer_price:
             reason = "; ".join(decline_reasons) if decline_reasons else "price too high"
             state.add_log(f"Drug trade offer {offer_id}: declining ({reason}).")
-            decline_url = f"{DRUG_TRADE_URL}?action=decline&offerid={offer_id}"
+            decline_url = f"{_u("/income/drugtrade.asp")}?action=decline&offerid={offer_id}"
             _nav(decline_url, state)
             continue
 
@@ -1404,7 +1390,7 @@ def handle_check_drug_trade(action: Action, state: GameState):
             return
 
         # Accept
-        accept_url = f"{DRUG_TRADE_URL}?action=accept&offerid={offer_id}"
+        accept_url = f"{_u("/income/drugtrade.asp")}?action=accept&offerid={offer_id}"
         _nav(accept_url, state)
         state.add_log(f"Drug trade offer {offer_id}: accepted [{item_summary}] for ${offer_price:,}.")
 
@@ -1424,7 +1410,7 @@ def handle_check_journals(action: Action, state: GameState):
         return
 
     data = _load_journals(char)
-    url = JOURNAL_URL
+    url = _u("/journal/journal.asp")
     changed = False
 
     while True:
@@ -1474,7 +1460,7 @@ def handle_archive_journals(action: Action, state: GameState):
 
     max_pages = action.params.get("pages")  # None = archive all
     data = _load_journals(char)
-    url = JOURNAL_URL
+    url = _u("/journal/journal.asp")
     page_num = 1
     changed = False
 

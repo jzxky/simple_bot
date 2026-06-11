@@ -9,10 +9,10 @@ import re
 from datetime import datetime
 from bs4 import BeautifulSoup
 import browser
+import urls
 import paths
 
 CACHE_PATH = os.path.join(paths.data_dir(), "character_history.json")
-STATS_URL = "https://mafiamatrix.com/stats/playerstats.asp"
 
 _CAREER_SECTIONS = {
     "Mayor", "Funeral Work", "Banking Work", "Customs Work",
@@ -150,7 +150,7 @@ def _parse(html: str) -> dict:
 
 
 def fetch_and_save() -> dict:
-    html = browser.navigate(STATS_URL)
+    html = browser.navigate(urls.BASE_URL + "/stats/playerstats.asp")
     data = _parse(html)
     os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
     with open(CACHE_PATH, "w", encoding="utf-8") as f:

@@ -91,6 +91,7 @@ def save():
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
     c["misc"]["min_cash_on_hand"] = int(data.get("min_cash_on_hand", 0))
+    c["misc"]["headless"] = data.get("headless", False)
 
     c.setdefault("character_history", {})
     c["character_history"]["enabled"] = data.get("char_history_enabled", False)

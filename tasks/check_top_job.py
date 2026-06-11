@@ -7,23 +7,29 @@ import json
 import time
 import config as cfg
 import browser
+import urls
 from state import GameState, parse_state
 from tasks.base import Task
 
-USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
-PLAY_URL  = "https://mafiamatrix.com/main.asp"
 _CHECK_INTERVAL = 5 * 60  # seconds
 
-# Maps prerequisite occupation → (top job title, promo URL)
-TOP_JOB_MAP = {
-    "Fire Fighter":   ("Fire Chief",           "https://mafiamatrix.com/promotion/firechief.asp"),
-    "Mortician":      ("Funeral Director",     "https://mafiamatrix.com/promotion/funeraldirector.asp"),
-    "Undertaker":     ("Funeral Director",     "https://mafiamatrix.com/promotion/funeraldirector.asp"),
-    "Loan Officer":   ("Bank Manager",         "https://mafiamatrix.com/promotion/bankmanager.asp"),
-    "Surgeon":        ("Hospital Director",    "https://mafiamatrix.com/promotion/hospitaldirector.asp"),
-    "Engineer":       ("Chief Engineer",       "https://mafiamatrix.com/promotion/chiefengineer.asp"),
-    "Superintendent": ("Commissioner-General", "https://mafiamatrix.com/promotion/commissionergeneral.asp"),
+# Maps prerequisite occupation → (top job title, promo path)
+_TOP_JOB_PATHS = {
+    "Fire Fighter":   ("Fire Chief",           "/promotion/firechief.asp"),
+    "Mortician":      ("Funeral Director",     "/promotion/funeraldirector.asp"),
+    "Undertaker":     ("Funeral Director",     "/promotion/funeraldirector.asp"),
+    "Loan Officer":   ("Bank Manager",         "/promotion/bankmanager.asp"),
+    "Surgeon":        ("Hospital Director",    "/promotion/hospitaldirector.asp"),
+    "Engineer":       ("Chief Engineer",       "/promotion/chiefengineer.asp"),
+    "Superintendent": ("Commissioner-General", "/promotion/commissionergeneral.asp"),
 }
+
+
+def _top_job_map() -> dict:
+    return {occ: (title, urls.BASE_URL + path) for occ, (title, path) in _TOP_JOB_PATHS.items()}
+
+
+TOP_JOB_MAP = _top_job_map()
 
 
 class CheckTopJobTask(Task):
@@ -40,7 +46,7 @@ class CheckTopJobTask(Task):
             return False
         if not cfg.load().get("promo", {}).get("monitor_top_job", False):
             return False
-        if state.occupation not in TOP_JOB_MAP:
+        if state.occupation not in _TOP_JOB_PATHS:
             return False
         if state.rank_progress < 100:
             return False
@@ -48,12 +54,12 @@ class CheckTopJobTask(Task):
 
     def run(self, state: GameState, executor):
         self._last_run = time.monotonic()
-        top_job, promo_url = TOP_JOB_MAP[state.occupation]
+        top_job, promo_url = _top_job_map()[state.occupation]
 
         try:
-            browser.page().goto(USERS_URL, wait_until="domcontentloaded", timeout=15000)
+            browser.page().goto(urls.BASE_URL + "/skin/updateusers.php?q=1", wait_until="domcontentloaded", timeout=15000)
             raw = json.loads(browser.page().inner_text("body"))
-            browser.page().goto(PLAY_URL, wait_until="domcontentloaded", timeout=15000)
+            browser.page().goto(urls.BASE_URL + "/main.asp", wait_until="domcontentloaded", timeout=15000)
             parse_state(browser.page().content(), browser.current_url(), state)
         except Exception as e:
             state.add_log(f"CheckTopJob: fetch error: {e}")

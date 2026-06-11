@@ -10,11 +10,11 @@ import time
 from datetime import datetime
 import paths
 import browser
+import urls
 import config as cfg
 from tasks.base import Task
 
 PLAYERS_PATH = os.path.join(paths.data_dir(), "players.json")
-USERS_URL = "https://mafiamatrix.com/skin/updateusers.php?q=1"
 DEAD_CITIES = {"heaven", "hell", "locked"}
 _DEFAULT_REFRESH_INTERVAL = 30 * 60  # seconds
 
@@ -49,9 +49,9 @@ def _save(store: dict):
 def refresh() -> int:
     """Fetch player list from game, merge with store. Returns number of active players."""
     try:
-        browser.page().goto(USERS_URL, wait_until="domcontentloaded", timeout=15000)
+        browser.page().goto(urls.BASE_URL + "/skin/updateusers.php?q=1", wait_until="domcontentloaded", timeout=15000)
         raw = json.loads(browser.page().inner_text("body"))
-        browser.page().goto("https://mafiamatrix.com/main.asp", wait_until="domcontentloaded", timeout=15000)
+        browser.page().goto(urls.BASE_URL + "/main.asp", wait_until="domcontentloaded", timeout=15000)
     except Exception:
         return 0
 
