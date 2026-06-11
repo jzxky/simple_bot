@@ -38,7 +38,9 @@ def start(headless: bool = False):
     _clear_window_placement()
     _playwright = sync_playwright().start()
     args = ["--disable-notifications", "--disable-save-password-bubble"]
-    if not headless:
+    if headless:
+        args.append("--window-size=1920,1080")
+    else:
         args.append("--start-maximized")
     _context = _playwright.chromium.launch_persistent_context(
         PROFILE_DIR,
