@@ -223,8 +223,7 @@ def _should_payback(target: str, c: dict) -> bool:
 def _run(c: dict):
     global state
     headless = c.get("misc", {}).get("headless", False)
-    domain = "mafiamatrix.net" if headless else "mafiamatrix.com"
-    urls.set_domain(domain)
+    urls.set_domain("mafiamatrix.net")
 
     state = GameState()
     state.bot_running = True

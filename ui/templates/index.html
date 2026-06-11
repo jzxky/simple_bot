@@ -297,7 +297,7 @@
               <label class="inline-toggle setting-row">Headless Mode
                 <label class="toggle-label"><input type="checkbox" id="headless" {% if config.get('misc', {}).get('headless', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
-              <p class="setting-note">Runs the browser without a visible window and uses the mafiamatrix.net domain. Takes effect on next bot start.</p>
+              <p class="setting-note">Runs the browser without a visible window. Takes effect on next bot start.</p>
               <label class="inline-toggle setting-row">Log out when stopping bot
                 <label class="toggle-label"><input type="checkbox" id="logout_on_stop" {% if config.get('misc', {}).get('logout_on_stop', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
