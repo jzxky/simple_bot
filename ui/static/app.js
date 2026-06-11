@@ -1325,11 +1325,13 @@ function cjSearch() {
 function cjRender() {
   const list = document.getElementById("cj-list");
   const pager = document.getElementById("cj-pagination");
+  const pagerTop = document.getElementById("cj-pagination-top");
   if (!list || !pager) return;
 
   if (_cjFiltered.length === 0) {
     list.innerHTML = '<p class="cj-empty">No journals found.</p>';
     pager.innerHTML = "";
+    if (pagerTop) pagerTop.innerHTML = "";
     return;
   }
 
@@ -1362,6 +1364,7 @@ function cjRender() {
     });
   }
   pager.innerHTML = btns;
+  if (pagerTop) pagerTop.innerHTML = btns;
 }
 
 function cjGoPage(n) {

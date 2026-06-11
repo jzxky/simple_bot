@@ -2,7 +2,11 @@
 
 ## Git Push Workflow
 
-After every `git push` to the feature branch (`claude/sleepy-pasteur-Beg5S`), automatically:
+Before pushing to the feature branch (`claude/sleepy-pasteur-Beg5S`):
+1. Ask the user whether to bump the version (patch/minor/major/skip)
+2. If not skipping, update the `VERSION` file, commit it, then push
+
+After every `git push` to the feature branch, automatically:
 1. Create a pull request from the pushed branch into `main` using `mcp__github__create_pull_request`
 2. Immediately squash-merge it using `mcp__github__merge_pull_request` with `merge_method: "squash"`
 
