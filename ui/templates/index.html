@@ -29,11 +29,6 @@
       <button id="toggle-btn" onclick="toggleBot()">Start Bot</button>
       <button id="pause-btn" onclick="togglePause()" disabled>Pause</button>
       <button id="screenshot-btn" onclick="takeScreenshot()">Screenshot</button>
-      <label class="toggle-label dashboard-toggle-label" title="Dashboard view">
-        <input type="checkbox" id="dashboard-toggle" onchange="setDashboardView(this.checked)">
-        <span class="toggle"></span>
-        <span class="dashboard-toggle-text">Dashboard</span>
-      </label>
     </div>
 
     <!-- Settings Tabs -->
@@ -323,9 +318,6 @@
         <div id="log-box"></div>
       </div>
     </section>
-
-    <!-- Flowing sections (wraps all cards below controls/log) -->
-    <div id="main-flow" class="main-flow">
 
     <!-- Character Stats -->
     <section class="card" id="s-character">
@@ -656,7 +648,6 @@
       </div>
     </section>
 
-    </div><!-- end #main-flow -->
   </main>
 </div>
 
@@ -672,7 +663,6 @@
   _updateEarnsPills();
   _updateActionsPills();
   if (document.getElementById("char_history_enabled").checked) loadCharHistory();
-  initDashboardView();
   pollStatus();
 </script>
 </body>
