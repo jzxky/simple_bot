@@ -117,6 +117,14 @@ function _doSave() {
     consumable_limit: parseInt(document.getElementById("consumable_limit").value) || 33,
     consumable_buffer: parseInt(document.getElementById("consumable_buffer").value) || 0,
     smart_consumables: document.getElementById("smart_consumables").checked,
+    autobuy_enabled: (document.getElementById("autobuy_enabled") || {checked:false}).checked,
+    ...["marijuana","ecstasy","acid","speed","pice","heroin","cocaine"].reduce((acc, k) => {
+      const p = document.getElementById(`autobuy_price_${k}`);
+      const q = document.getElementById(`autobuy_qty_${k}`);
+      if (p) acc[`autobuy_price_${k}`] = parseInt(p.value) || 0;
+      if (q) acc[`autobuy_qty_${k}`] = parseInt(q.value) || 0;
+      return acc;
+    }, {}),
   };
 
   return fetch("/save", {

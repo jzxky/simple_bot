@@ -119,9 +119,20 @@ def _next_page_url(soup) -> str | None:
     return None
 
 
+_drug_trade_queue: "queue.Queue | None" = None
+
+
+def set_drug_trade_queue(q: "queue.Queue"):
+    global _drug_trade_queue
+    _drug_trade_queue = q
+
+
 def dispatch_journal_action(entry: dict, state: GameState):
-    """Stub — future journal-triggered task dispatch goes here."""
-    pass
+    import config as cfg
+    if entry.get("title") == "Drug Trade Offer":
+        if cfg.load().get("autobuy", {}).get("enabled", False):
+            if _drug_trade_queue is not None:
+                _drug_trade_queue.put(True)
 
 
 # ---------------------------------------------------------------------------

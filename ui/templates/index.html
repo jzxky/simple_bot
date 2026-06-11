@@ -244,6 +244,51 @@
                 <button class="num-save-btn" id="save-consumable_buffer" onclick="saveNum('consumable_buffer')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               </div>
             </div>
+            {% set ab = config.get('autobuy', {}) %}
+            {% set ab_drugs = ab.get('drugs', {}) %}
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                Autobuy
+                <label class="toggle-label">
+                  <input type="checkbox" id="autobuy_enabled" {% if ab.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <p style="font-size:0.85em;color:var(--text-muted);margin:4px 0 10px">
+                When a Drug Trade Offer journal arrives, evaluate and accept/decline based on price and quantity limits below.
+              </p>
+              <table class="autobuy-table">
+                <thead>
+                  <tr>
+                    <th>Drug</th>
+                    <th>Max Price</th>
+                    <th>Max Qty to Hold</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for key, label in [('marijuana','Marijuana'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('pice','P/Ice'),('heroin','Heroin'),('cocaine','Cocaine')] %}
+                  {% set d = ab_drugs.get(key, {}) %}
+                  <tr>
+                    <td>{{ label }}</td>
+                    <td>
+                      <input type="number" id="autobuy_price_{{ key }}" min="0" step="100"
+                        value="{{ d.get('max_price', 0) }}" style="width:100px"
+                        oninput="markNumDirty(this)">
+                      <button class="num-save-btn" id="save-autobuy_price_{{ key }}"
+                        onclick="saveNum('autobuy_price_{{ key }}')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+                    </td>
+                    <td>
+                      <input type="number" id="autobuy_qty_{{ key }}" min="0" step="1"
+                        value="{{ d.get('max_qty', 0) }}" style="width:100px"
+                        oninput="markNumDirty(this)">
+                      <button class="num-save-btn" id="save-autobuy_qty_{{ key }}"
+                        onclick="saveNum('autobuy_qty_{{ key }}')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
         <div id="misc" class="tab-panel">

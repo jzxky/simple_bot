@@ -878,3 +878,24 @@ input.input-unsaved { color: var(--red) !important; }
   text-align: center;
   padding: 20px 0;
 }
+
+.autobuy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin-top: 4px;
+}
+.autobuy-table th {
+  text-align: left;
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.autobuy-table td {
+  padding: 5px 8px;
+  vertical-align: middle;
+}
+.autobuy-table tr:nth-child(even) td {
+  background: var(--bg-alt, rgba(255,255,255,0.03));
+}
