@@ -1286,9 +1286,8 @@ def handle_check_journals(action: Action, state: GameState):
     changed = False
 
     while True:
-        html = browser.navigate(url)
-        _refresh_state(state, html, url)
-        soup = BeautifulSoup(html, "html.parser")
+        _nav(url, state)
+        soup = BeautifulSoup(state.page_html, "html.parser")
 
         new_entries = _new_entries_on_page(soup)
         all_entries = _parse_journal_rows(soup)
@@ -1337,9 +1336,8 @@ def handle_archive_journals(action: Action, state: GameState):
     changed = False
 
     while True:
-        html = browser.navigate(url)
-        _refresh_state(state, html, url)
-        soup = BeautifulSoup(html, "html.parser")
+        _nav(url, state)
+        soup = BeautifulSoup(state.page_html, "html.parser")
 
         for e in _parse_journal_rows(soup):
             if e["id"] not in data:
