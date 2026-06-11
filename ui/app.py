@@ -344,6 +344,20 @@ def screenshot():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/page_snapshot")
+def page_snapshot():
+    import urls as _urls
+    html = bot.state.page_html
+    if not html:
+        return "No page loaded yet.", 204
+    base_tag = f'<base href="{_urls.BASE_URL}/">'
+    if "<head>" in html:
+        html = html.replace("<head>", f"<head>{base_tag}", 1)
+    else:
+        html = base_tag + html
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
 @app.route("/logs/list")
 def logs_list():
     logs_dir = os.path.join(paths.data_dir(), "logs")
