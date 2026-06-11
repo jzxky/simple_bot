@@ -500,7 +500,7 @@ _CONSUMABLE_NAMES = {
 def handle_consume(action: Action, state: GameState):
     consume_type = action.params["type"]
     count = int(action.params.get("count", 1))
-    url = f_u(f"/profile/consumables.asp?action=consume&type={consume_type}")
+    url = _u(f"/profile/consumables.asp?action=consume&type={consume_type}")
     display_name = _CONSUMABLE_NAMES.get(consume_type, consume_type.title())
 
     successes = 0
