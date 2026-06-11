@@ -1316,6 +1316,7 @@ def handle_check_journals(action: Action, state: GameState):
 
     if changed:
         _save_journals(char, data)
+        state.journals_updated_at = time.time()
 
     state.has_new_journals = False
 
@@ -1357,6 +1358,7 @@ def handle_archive_journals(action: Action, state: GameState):
 
     if changed:
         _save_journals(char, data)
+        state.journals_updated_at = time.time()
 
 
 # ---------------------------------------------------------------------------
