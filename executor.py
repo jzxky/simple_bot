@@ -1333,21 +1333,24 @@ def handle_check_drug_trade(action: Action, state: GameState):
             continue
 
         # Parse items (drug name + quantity)
+        # item_info and item_content are in consecutive <tr> rows, not siblings in the same row
         items = []
         for item_td in soup.find_all("td", class_="item_info"):
-            # Extract text after stripping img tags
             for img in item_td.find_all("img"):
                 img.decompose()
             raw_name = item_td.get_text(strip=True).lower()
             drug_key = _DRUG_TRADE_NAME_MAP.get(raw_name)
-            # Find paired item_content td for quantity
-            content_td = item_td.find_next_sibling("td", class_="item_content")
             qty = 0
-            if content_td:
-                try:
-                    qty = int(re.sub(r"[^0-9]", "", content_td.get_text()))
-                except ValueError:
-                    pass
+            next_tr = item_td.find_parent("tr")
+            if next_tr:
+                next_tr = next_tr.find_next_sibling("tr")
+            if next_tr:
+                content_td = next_tr.find("td", class_="item_content")
+                if content_td:
+                    try:
+                        qty = int(re.sub(r"[^0-9]", "", content_td.get_text()))
+                    except ValueError:
+                        pass
             items.append((raw_name, drug_key, qty))
 
         if not items:
