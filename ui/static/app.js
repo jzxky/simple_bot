@@ -385,9 +385,10 @@ function pollStatus() {
       // Case work auto-detect
       updateCaseWorkSection(d.occupation || "");
 
-      // Journals live feed — always refresh data when new journals arrive;
-      // cjRefreshData only re-renders if no filter is currently active.
-      if (d.has_new_journals) {
+      // Journals live feed — refresh when journals_updated_at advances.
+      // Avoids the race where has_new_journals clears before the next poll.
+      if ((d.journals_updated_at || 0) > _cjLastUpdated) {
+        _cjLastUpdated = d.journals_updated_at;
         const journalsTab = document.getElementById("cj-journals");
         if (journalsTab && journalsTab.classList.contains("active")) {
           cjRefreshData();
@@ -1209,9 +1210,10 @@ function toggleLockedTraits() {
 
 // ── Communications & Journals ────────────────────────────────────────────────
 
-let _cjData = [];       // full sorted journal list
-let _cjFiltered = [];   // after search filter
+let _cjData = [];         // full sorted journal list
+let _cjFiltered = [];     // after search filter
 let _cjPage = 1;
+let _cjLastUpdated = 0;   // last journals_updated_at seen from /status
 const CJ_PAGE_SIZE = 10;
 
 function cjInit() {

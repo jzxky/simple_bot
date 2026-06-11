@@ -50,6 +50,7 @@ class GameState:
     in_jail: bool = False
     jail_rank: str = ""
     has_new_journals: bool = False
+    journals_updated_at: float = 0.0
     jail_consumables: dict = field(default_factory=dict)
     hold_action_timer: bool = False
 
