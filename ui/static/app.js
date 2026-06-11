@@ -967,17 +967,25 @@ function _isZero(val) {
   return /^[\$\s]*0[\s,]*$/.test(s) || /^0\s+successful\s+out\s+of\s+0$/.test(s);
 }
 
-function _sectionHideZerosId(title) {
+function _hzKey(title) {
   return "ch-hz-" + title.replace(/[^a-zA-Z0-9]/g, "_");
 }
 
 function _isHideZeros(title) {
-  const el = document.getElementById(_sectionHideZerosId(title));
-  return el ? el.checked : false;
+  const stored = localStorage.getItem(_hzKey(title));
+  return stored === null ? true : stored === "true";
+}
+
+function _setHideZeros(title, val) {
+  localStorage.setItem(_hzKey(title), val ? "true" : "false");
+}
+
+function toggleHideZeros(title) {
+  _setHideZeros(title, !_isHideZeros(title));
+  reRenderCharHistory();
 }
 
 function _fmtVal(val) {
-  // Highlight money values
   if (typeof val === "string" && val.startsWith("$")) {
     return `<span class="ch-money">${val}</span>`;
   }
@@ -987,15 +995,15 @@ function _fmtVal(val) {
 // ── Section builders ──────────────────────────────────────────────────────────
 
 function _buildStatSection(sec) {
-  const hzId = _sectionHideZerosId(sec.title);
   const hideZeros = _isHideZeros(sec.title);
   const rows = hideZeros ? sec.rows.filter(r => !_isZero(r.value)) : sec.rows;
+  const toggle = _hzToggle(sec.title, hideZeros);
   if (!rows.length && hideZeros) return `<div class="ch-section ch-section-empty">
-    <div class="ch-section-head"><span class="ch-section-title">${sec.title}</span>${_hzToggle(hzId, sec.title)}</div>
+    <div class="ch-section-head"><span class="ch-section-title">${sec.title}</span>${toggle}</div>
     <p class="ch-empty-note">All values zero</p></div>`;
 
   let html = `<div class="ch-section">
-    <div class="ch-section-head"><span class="ch-section-title">${sec.title}</span>${_hzToggle(hzId, sec.title)}</div>
+    <div class="ch-section-head"><span class="ch-section-title">${sec.title}</span>${toggle}</div>
     <table class="ch-table">`;
   for (const row of rows) {
     html += `<tr><td class="ch-key">${row.key}</td><td class="ch-val">${_fmtVal(row.value)}</td></tr>`;
@@ -1003,10 +1011,12 @@ function _buildStatSection(sec) {
   return html + "</table></div>";
 }
 
-function _hzToggle(hzId, title) {
-  const checked = _isHideZeros(title) ? "checked" : "";
-  return `<label class="ch-hz-label" title="Hide zero values">
-    <input type="checkbox" id="${hzId}" ${checked} onchange="reRenderCharHistory()"> Hide zeros
+function _hzToggle(title, hideZeros) {
+  const checked = hideZeros ? "checked" : "";
+  const escaped = title.replace(/'/g, "\\'");
+  return `<label class="toggle-label ch-hz-toggle" title="Hide zero values">
+    <input type="checkbox" ${checked} onchange="toggleHideZeros('${escaped}')">
+    <span class="toggle"></span>
   </label>`;
 }
 
@@ -1051,12 +1061,11 @@ function renderCharHistory(data, reqs) {
 
   // ── Earn History ──────────────────────────────────────────────────────────
   if (data.earn_history && data.earn_history.length) {
-    const hzId = "ch-hz-earn_history";
     const hideZeros = _isHideZeros("earn_history");
     html += `<div class="ch-section ch-section-full">
       <div class="ch-section-head">
         <span class="ch-section-title">Earn History</span>
-        ${_hzToggle(hzId, "earn_history")}
+        ${_hzToggle("earn_history", hideZeros)}
       </div>
       <table class="ch-table ch-earn-table">`;
     for (const cat of data.earn_history) {
