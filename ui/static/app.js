@@ -385,13 +385,12 @@ function pollStatus() {
       // Case work auto-detect
       updateCaseWorkSection(d.occupation || "");
 
-      // Journals live feed — update only when tab is open and no filter is active
+      // Journals live feed — always refresh data when new journals arrive;
+      // cjRefreshData only re-renders if no filter is currently active.
       if (d.has_new_journals) {
         const journalsTab = document.getElementById("cj-journals");
-        const searchBox = document.getElementById("cj-search");
         if (journalsTab && journalsTab.classList.contains("active")) {
-          const q = (searchBox ? searchBox.value : "").trim();
-          if (!q) cjInit();
+          cjRefreshData();
         }
       }
 
@@ -1219,13 +1218,29 @@ function cjInit() {
   fetch("/journals")
     .then(r => r.json())
     .then(data => {
-      _cjData = Object.values(data).sort((a, b) => {
-        // sort newest first by parsing time string
-        return new Date(b.time) - new Date(a.time);
-      });
+      _cjData = Object.values(data).sort((a, b) => new Date(b.time) - new Date(a.time));
       _cjFiltered = _cjData;
       _cjPage = 1;
       cjRender();
+    })
+    .catch(() => {});
+}
+
+// Refresh underlying data without disturbing an active filter/view.
+// Called when has_new_journals fires while the tab is open.
+function cjRefreshData() {
+  fetch("/journals")
+    .then(r => r.json())
+    .then(data => {
+      _cjData = Object.values(data).sort((a, b) => new Date(b.time) - new Date(a.time));
+      const q = (document.getElementById("cj-search").value || "").toLowerCase().trim();
+      if (!q) {
+        // No filter — update the visible list too
+        _cjFiltered = _cjData;
+        cjRender();
+      }
+      // Filter active — _cjData is updated silently.
+      // cjSearch() will pick it up the moment the user clears the box.
     })
     .catch(() => {});
 }
