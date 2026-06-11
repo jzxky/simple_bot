@@ -251,27 +251,6 @@ let _botRunning = false;
 let _botPaused = false;
 let _prevEarnsEnabled = null;
 
-// ── Dashboard view ────────────────────────────────────────────────────────────
-
-function initDashboardView() {
-  const on = localStorage.getItem("dashboardView") === "true";
-  const cb = document.getElementById("dashboard-toggle");
-  if (cb) cb.checked = on;
-  _applyDashboardView(on);
-}
-
-function setDashboardView(on) {
-  localStorage.setItem("dashboardView", on ? "true" : "false");
-  _applyDashboardView(on);
-}
-
-function _applyDashboardView(on) {
-  const flow = document.getElementById("main-flow");
-  const container = document.querySelector(".container");
-  if (flow) flow.classList.toggle("main-flow-columns", on);
-  if (container) container.classList.toggle("container-wide", on);
-}
-
 function toggleBot() {
   if (_botRunning) {
     fetch("/stop", {method: "POST"})
