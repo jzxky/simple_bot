@@ -5,7 +5,8 @@ Flask web UI for bot configuration and control.
 import sys
 import os
 import base64
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+if not getattr(sys, "frozen", False):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, render_template, request, jsonify, abort
 import config as cfg
