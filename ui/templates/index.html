@@ -416,6 +416,7 @@
             <option value="">— Select a task —</option>
             <option value="jailbreak">Jail Break</option>
             <option value="archive-journals">Archive Journals</option>
+            <option value="warrants">Manage Warrants</option>
           </select>
         </div>
 
@@ -429,6 +430,14 @@
             </div>
             <p class="task-hint" style="margin:4px 0 8px 0;text-align:center;">— or —</p>
             <button class="btn-secondary task-submit-btn" onclick="submitArchiveJournals(true)">Archive All</button>
+          </div>
+        </div>
+
+        <!-- Warrants panel -->
+        <div id="task-warrants" class="task-panel" style="display:none;">
+          <div class="task-subpanel">
+            <button class="btn-primary task-submit-btn" onclick="checkWarrants()">Check Warrants</button>
+            <div id="warrants-result" style="margin-top:12px;"></div>
           </div>
         </div>
 

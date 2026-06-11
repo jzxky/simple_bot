@@ -60,6 +60,9 @@ _drug_trade_queue: queue.Queue = queue.Queue()
 set_drug_trade_queue(_drug_trade_queue)
 _jail_inmates_request: queue.Queue = queue.Queue(maxsize=1)
 _jail_inmates_result: queue.Queue = queue.Queue(maxsize=1)
+_warrants_request: queue.Queue = queue.Queue(maxsize=1)
+_warrants_result: queue.Queue = queue.Queue(maxsize=1)
+_turn_in_warrant_queue: queue.Queue = queue.Queue()
 _clear_earn_event = threading.Event()
 _clear_jail_duty_queue_event = threading.Event()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
@@ -302,6 +305,24 @@ def _run(c: dict):
                 except Exception as e:
                     _jail_inmates_result.put(e)
 
+            # Warrants check requests from the Flask thread
+            if not _warrants_request.empty():
+                try:
+                    _warrants_request.get_nowait()
+                    result_q = queue.Queue()
+                    executor.execute(Action("check_warrants", result_queue=result_q), state)
+                    _warrants_result.put(result_q.get(timeout=30))
+                except Exception as e:
+                    _warrants_result.put(e)
+
+            # Turn-in warrant requests
+            if not _turn_in_warrant_queue.empty():
+                try:
+                    params = _turn_in_warrant_queue.get_nowait()
+                    executor.execute(Action("turn_in_warrant", **params), state)
+                except Exception as e:
+                    state.add_log(f"Turn in warrant error: {e}")
+
             if _stop_event.is_set():
                 break
 
@@ -506,3 +527,17 @@ def request_screenshot(timeout: float = 10.0) -> bytes:
     if isinstance(result, Exception):
         raise result
     return result
+
+
+def request_warrants(timeout: float = 30.0) -> list:
+    while not _warrants_result.empty():
+        _warrants_result.get_nowait()
+    _warrants_request.put(True)
+    result = _warrants_result.get(timeout=timeout)
+    if isinstance(result, Exception):
+        raise result
+    return result
+
+
+def request_turn_in_warrant(url: str, case_id: str):
+    _turn_in_warrant_queue.put({"url": url, "case_id": case_id})

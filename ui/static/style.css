@@ -884,6 +884,29 @@ input.input-unsaved { color: var(--red) !important; }
   padding: 20px 0;
 }
 
+.warrant-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-top: 8px;
+}
+.warrant-table th {
+  text-align: left;
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.warrant-table td {
+  padding: 5px 8px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.warrant-table tr:nth-child(even) td {
+  background: var(--bg-alt, rgba(255,255,255,0.03));
+}
+
 .autobuy-table {
   width: 100%;
   border-collapse: collapse;
