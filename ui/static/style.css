@@ -23,40 +23,7 @@ body {
   min-height: 100vh;
 }
 
-.container { max-width: 860px; margin: 0 auto; padding: 20px; transition: max-width 0.2s; }
-.container-wide { max-width: 1400px; }
-
-/* ── Dashboard toggle in controls bar ── */
-.dashboard-toggle-label {
-  flex-direction: row;
-  align-items: center;
-  gap: 7px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  min-width: unset;
-  flex: none;
-  margin-left: auto;
-  cursor: pointer;
-}
-.dashboard-toggle-text { white-space: nowrap; }
-@media (max-width: 540px) {
-  .dashboard-toggle-label { display: none; }
-}
-
-/* ── Main section column flow ── */
-.main-flow-columns {
-  columns: 3 300px;
-  column-gap: 14px;
-}
-.main-flow-columns > .card,
-.main-flow-columns > section {
-  break-inside: avoid;
-  display: inline-block;
-  width: 100%;
-}
+.container { max-width: 860px; margin: 0 auto; padding: 20px; }
 
 header { margin-bottom: 20px; }
 header h1 {
