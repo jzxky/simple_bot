@@ -817,5 +817,7 @@ input.input-unsaved { color: var(--red) !important; }
   .task-row { flex-direction: column; align-items: flex-start; }
   .task-label { min-width: unset; }
   .card h2 { flex-wrap: wrap; }
-  .section-pills { flex-basis: 100%; margin-left: 0; }
+  /* Pills wrap to their own row; toggle stays on the title row via order */
+  .section-pills { flex-basis: 100%; margin-left: 0; order: 10; }
+  .card h2 > .toggle-label { order: 5; margin-left: auto; }
 }
