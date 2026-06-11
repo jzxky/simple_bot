@@ -91,6 +91,18 @@ DEFAULT_CONFIG = {
     "character_history": {
         "enabled": False,
         "refresh_interval_minutes": 30
+    },
+    "autobuy": {
+        "enabled": False,
+        "drugs": {
+            "marijuana": {"max_price": 1000,  "max_qty": 9999},
+            "ecstasy":   {"max_price": 5000,  "max_qty": 500},
+            "acid":      {"max_price": 1000,  "max_qty": 0},
+            "speed":     {"max_price": 1500,  "max_qty": 0},
+            "pice":      {"max_price": 2000,  "max_qty": 0},
+            "heroin":    {"max_price": 3000,  "max_qty": 400},
+            "cocaine":   {"max_price": 4500,  "max_qty": 500}
+        }
     }
 }
 

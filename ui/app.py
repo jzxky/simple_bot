@@ -96,6 +96,17 @@ def save():
     c["character_history"]["enabled"] = data.get("char_history_enabled", False)
     c["character_history"]["refresh_interval_minutes"] = int(data.get("char_history_interval", 30))
 
+    c.setdefault("autobuy", {})
+    c["autobuy"]["enabled"] = data.get("autobuy_enabled", False)
+    c["autobuy"].setdefault("drugs", {})
+    _AB_DRUGS = ["marijuana", "ecstasy", "acid", "speed", "pice", "heroin", "cocaine"]
+    for key in _AB_DRUGS:
+        c["autobuy"]["drugs"].setdefault(key, {})
+        if f"autobuy_price_{key}" in data:
+            c["autobuy"]["drugs"][key]["max_price"] = int(data[f"autobuy_price_{key}"])
+        if f"autobuy_qty_{key}" in data:
+            c["autobuy"]["drugs"][key]["max_qty"] = int(data[f"autobuy_qty_{key}"])
+
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
     c["case_work"].setdefault("hospital", {})

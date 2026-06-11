@@ -28,6 +28,19 @@ JAIL_DUTIES_URL = "https://mafiamatrix.com/jail/duties.asp"
 JAIL_CONTRABAND_URL = "https://mafiamatrix.com/jail/contraband.asp"
 JAILBREAK_URL = "https://mafiamatrix.com/income/jailbreak.asp"
 JOURNAL_URL = "https://mafiamatrix.com/journal/journal.asp"
+DRUG_TRADE_URL = "https://mafiamatrix.com/income/drugtrade.asp"
+
+_DRUG_TRADE_NAME_MAP = {
+    "marijuana": "marijuana",
+    "cocaine":   "cocaine",
+    "ecstasy":   "ecstasy",
+    "acid":      "acid",
+    "speed":     "speed",
+    "p/ice":     "pice",
+    "p / ice":   "pice",
+    "pice":      "pice",
+    "heroin":    "heroin",
+}
 
 JAIL_CONSUMABLE_NAMES = {
     "cigarettes": "Cigarettes",
@@ -1268,6 +1281,135 @@ def handle_jailbreak_calloff(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
+# Drug trade handler
+# ---------------------------------------------------------------------------
+
+def handle_check_drug_trade(action: Action, state: GameState):
+    import config as cfg
+    c = cfg.load()
+    autobuy = c.get("autobuy", {})
+    if not autobuy.get("enabled", False):
+        return
+
+    drug_cfg = autobuy.get("drugs", {})
+
+    _nav(DRUG_TRADE_URL, state)
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    # Collect offer IDs from the list page
+    offer_ids = []
+    for a in soup.find_all("a", class_="viewbutton_small"):
+        href = a.get("href", "")
+        m = re.search(r"offerid=(\d+)", href)
+        if m:
+            offer_ids.append(m.group(1))
+
+    if not offer_ids:
+        state.add_log("Drug trade: no offers found.")
+        return
+
+    state.add_log(f"Drug trade: found {len(offer_ids)} offer(s).")
+
+    for offer_id in offer_ids:
+        offer_url = f"{DRUG_TRADE_URL}?display=offer&offerid={offer_id}"
+        _nav(offer_url, state)
+        if not _check_session(state):
+            return
+
+        soup = BeautifulSoup(state.page_html, "html.parser")
+
+        # Parse price
+        price_tag = soup.find("font", attrs={"size": "5"})
+        if not price_tag:
+            state.add_log(f"Drug trade offer {offer_id}: price not found, skipping.")
+            continue
+        try:
+            offer_price = int(re.sub(r"[^0-9]", "", price_tag.get_text()))
+        except ValueError:
+            state.add_log(f"Drug trade offer {offer_id}: could not parse price, skipping.")
+            continue
+
+        # Parse items (drug name + quantity)
+        items = []
+        for item_td in soup.find_all("td", class_="item_info"):
+            # Extract text after stripping img tags
+            for img in item_td.find_all("img"):
+                img.decompose()
+            raw_name = item_td.get_text(strip=True).lower()
+            drug_key = _DRUG_TRADE_NAME_MAP.get(raw_name)
+            # Find paired item_content td for quantity
+            content_td = item_td.find_next_sibling("td", class_="item_content")
+            qty = 0
+            if content_td:
+                try:
+                    qty = int(re.sub(r"[^0-9]", "", content_td.get_text()))
+                except ValueError:
+                    pass
+            items.append((raw_name, drug_key, qty))
+
+        if not items:
+            state.add_log(f"Drug trade offer {offer_id}: no items parsed, skipping.")
+            continue
+
+        # Compute total willing-to-pay across all items in this offer
+        total_willing = 0
+        decline_reasons = []
+        for raw_name, drug_key, qty in items:
+            if drug_key is None:
+                state.add_log(f"Drug trade offer {offer_id}: unknown drug '{raw_name}' — treating as $0.")
+                decline_reasons.append(f"unknown drug '{raw_name}'")
+                continue
+
+            dcfg = drug_cfg.get(drug_key, {})
+            max_price = dcfg.get("max_price", 0)
+            max_qty = dcfg.get("max_qty", 0)
+            held = state.consumables.get(drug_key, 0)
+
+            if max_qty == 0:
+                decline_reasons.append(f"{drug_key} max_qty=0")
+                # willing stays $0
+            elif held >= max_qty:
+                decline_reasons.append(f"{drug_key} held {held}>={max_qty}")
+                # willing stays $0
+            else:
+                total_willing += max_price
+
+        item_summary = ", ".join(
+            f"{qty}x {raw_name}" for raw_name, _, qty in items
+        )
+        state.add_log(
+            f"Drug trade offer {offer_id} [{item_summary}] "
+            f"price=${offer_price:,} willing=${total_willing:,}"
+        )
+
+        if total_willing < offer_price:
+            reason = "; ".join(decline_reasons) if decline_reasons else "price too high"
+            state.add_log(f"Drug trade offer {offer_id}: declining ({reason}).")
+            decline_url = f"{DRUG_TRADE_URL}?action=decline&offerid={offer_id}"
+            _nav(decline_url, state)
+            continue
+
+        # Funding check — dirty money only
+        if state.dirty_money < offer_price:
+            state.add_log(
+                f"Drug trade: insufficient dirty money (have ${state.dirty_money:,}, "
+                f"need ${offer_price:,}) — disabling autobuy."
+            )
+            c2 = cfg.load()
+            c2.setdefault("autobuy", {})["enabled"] = False
+            cfg.save(c2)
+            return
+
+        # Accept
+        accept_url = f"{DRUG_TRADE_URL}?action=accept&offerid={offer_id}"
+        _nav(accept_url, state)
+        state.add_log(f"Drug trade offer {offer_id}: accepted [{item_summary}] for ${offer_price:,}.")
+
+
+# ---------------------------------------------------------------------------
 # Journal handlers
 # ---------------------------------------------------------------------------
 
@@ -1389,6 +1531,7 @@ HANDLERS = {
     "jailbreak_calloff": handle_jailbreak_calloff,
     "check_journals": handle_check_journals,
     "archive_journals": handle_archive_journals,
+    "check_drug_trade": handle_check_drug_trade,
 }
 
 
