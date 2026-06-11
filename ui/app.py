@@ -265,6 +265,30 @@ def tasks_jailbreak_calloff():
     return jsonify({"ok": True})
 
 
+@app.route("/tasks/archive_journals", methods=["POST"])
+def tasks_archive_journals():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    pages = data.get("pages")
+    if pages is not None:
+        try:
+            pages = int(pages)
+        except (ValueError, TypeError):
+            return jsonify({"error": "pages must be an integer"}), 400
+    bot.request_archive_journals(pages)
+    return jsonify({"ok": True})
+
+
+@app.route("/journals")
+def journals():
+    from tasks.journal import _load_journals
+    char = bot.state.own_name
+    if not char:
+        return jsonify({})
+    return jsonify(_load_journals(char))
+
+
 @app.route("/character_history")
 def character_history():
     return jsonify(ch.load())

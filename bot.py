@@ -35,6 +35,7 @@ from tasks.withdraw import WithdrawTask
 from tasks.maintain_cash import MaintainCashTask
 from tasks.character_history import CharacterHistoryTask
 from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJailBreakTask
+from tasks.journal import JournalCheckTask, ArchiveJournalsTask
 from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
@@ -52,6 +53,7 @@ _char_history_queue: queue.Queue = queue.Queue()
 _jailbreak_plan_queue: queue.Queue = queue.Queue()
 _jailbreak_execute_queue: queue.Queue = queue.Queue()
 _jailbreak_calloff_queue: queue.Queue = queue.Queue()
+_archive_journals_queue: queue.Queue = queue.Queue()
 _jail_inmates_request: queue.Queue = queue.Queue(maxsize=1)
 _jail_inmates_result: queue.Queue = queue.Queue(maxsize=1)
 _clear_earn_event = threading.Event()
@@ -141,6 +143,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(PlanJailBreakTask(_jailbreak_plan_queue))
     sched.add(ExecuteJailBreakTask(_jailbreak_execute_queue))
     sched.add(CallOffJailBreakTask(_jailbreak_calloff_queue))
+    sched.add(JournalCheckTask())
+    sched.add(ArchiveJournalsTask(_archive_journals_queue))
     sched.add(PlayerRefreshTask())
     sched.add(CheckTopJobTask())
     sched.add(SnipeTopJobTask())
@@ -411,6 +415,10 @@ def request_jailbreak_execute():
 
 def request_jailbreak_calloff():
     _jailbreak_calloff_queue.put(True)
+
+
+def request_archive_journals(pages: int | None = None):
+    _archive_journals_queue.put({"pages": pages})
 
 
 def request_jail_inmates(timeout: float = 15.0) -> dict:

@@ -821,3 +821,60 @@ input.input-unsaved { color: var(--red) !important; }
   .section-pills { flex-basis: 100%; margin-left: 0; order: 10; }
   .card h2 > .toggle-label { order: 5; margin-left: auto; }
 }
+
+/* ── Communications & Journals section ─────────── */
+.cj-search-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.cj-entry {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.cj-entry-title {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.88rem;
+}
+.cj-entry-time {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-left: 8px;
+}
+.cj-entry-text {
+  font-size: 0.83rem;
+  color: var(--text);
+  margin-top: 5px;
+  line-height: 1.4;
+}
+.cj-pager {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.cj-pager button {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.cj-pager button.active, .cj-pager button:hover {
+  background: var(--accent);
+  color: #1b2333;
+  border-color: var(--accent);
+}
+.cj-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 20px 0;
+}

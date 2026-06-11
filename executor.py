@@ -27,6 +27,7 @@ HOSPITAL_CASES_URL = "https://mafiamatrix.com/localcity/hospital.asp?display=pat
 JAIL_DUTIES_URL = "https://mafiamatrix.com/jail/duties.asp"
 JAIL_CONTRABAND_URL = "https://mafiamatrix.com/jail/contraband.asp"
 JAILBREAK_URL = "https://mafiamatrix.com/income/jailbreak.asp"
+JOURNAL_URL = "https://mafiamatrix.com/journal/journal.asp"
 
 JAIL_CONSUMABLE_NAMES = {
     "cigarettes": "Cigarettes",
@@ -1267,6 +1268,100 @@ def handle_jailbreak_calloff(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
+# Journal handlers
+# ---------------------------------------------------------------------------
+
+def handle_check_journals(action: Action, state: GameState):
+    from tasks.journal import (
+        _load_journals, _save_journals, _parse_journal_rows,
+        _new_entries_on_page, _is_last_page, _next_page_url,
+        dispatch_journal_action,
+    )
+    char = state.own_name
+    if not char:
+        return
+
+    data = _load_journals(char)
+    url = JOURNAL_URL
+    changed = False
+
+    while True:
+        html = browser.navigate(url)
+        _refresh_state(state, html, url)
+        soup = BeautifulSoup(html, "html.parser")
+
+        new_entries = _new_entries_on_page(soup)
+        all_entries = _parse_journal_rows(soup)
+
+        for e in new_entries:
+            if e["id"] not in data:
+                data[e["id"]] = e
+                changed = True
+                dispatch_journal_action(e, state)
+
+        all_new = len(new_entries) == len(all_entries) and len(all_entries) > 0
+        last = _is_last_page(soup)
+
+        if all_new and not last:
+            next_url = _next_page_url(soup)
+            if next_url:
+                url = next_url
+                continue
+
+        # Backfill non-new entries on this final page
+        for e in all_entries:
+            if e["id"] not in data:
+                data[e["id"]] = e
+                changed = True
+        break
+
+    if changed:
+        _save_journals(char, data)
+
+    state.has_new_journals = False
+
+
+def handle_archive_journals(action: Action, state: GameState):
+    from tasks.journal import (
+        _load_journals, _save_journals, _parse_journal_rows,
+        _is_last_page, _next_page_url,
+    )
+    char = state.own_name
+    if not char:
+        return
+
+    max_pages = action.params.get("pages")  # None = archive all
+    data = _load_journals(char)
+    url = JOURNAL_URL
+    page_num = 1
+    changed = False
+
+    while True:
+        html = browser.navigate(url)
+        _refresh_state(state, html, url)
+        soup = BeautifulSoup(html, "html.parser")
+
+        for e in _parse_journal_rows(soup):
+            if e["id"] not in data:
+                data[e["id"]] = e
+                changed = True
+
+        if _is_last_page(soup):
+            break
+        if max_pages is not None and page_num >= max_pages:
+            break
+
+        next_url = _next_page_url(soup)
+        if not next_url:
+            break
+        url = next_url
+        page_num += 1
+
+    if changed:
+        _save_journals(char, data)
+
+
+# ---------------------------------------------------------------------------
 
 HANDLERS = {
     "login": handle_login,
@@ -1292,6 +1387,8 @@ HANDLERS = {
     "jailbreak_plan": handle_jailbreak_plan,
     "jailbreak_execute": handle_jailbreak_execute,
     "jailbreak_calloff": handle_jailbreak_calloff,
+    "check_journals": handle_check_journals,
+    "archive_journals": handle_archive_journals,
 }
 
 
