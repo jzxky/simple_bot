@@ -171,6 +171,7 @@ def status():
         "jail_rank": s.jail_rank,
         "jail_consumables": s.jail_consumables,
         "hold_action_timer": s.hold_action_timer,
+        "has_new_journals": s.has_new_journals,
     })
 
 

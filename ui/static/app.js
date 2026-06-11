@@ -385,6 +385,16 @@ function pollStatus() {
       // Case work auto-detect
       updateCaseWorkSection(d.occupation || "");
 
+      // Journals live feed — update only when tab is open and no filter is active
+      if (d.has_new_journals) {
+        const journalsTab = document.getElementById("cj-journals");
+        const searchBox = document.getElementById("cj-search");
+        if (journalsTab && journalsTab.classList.contains("active")) {
+          const q = (searchBox ? searchBox.value : "").trim();
+          if (!q) cjInit();
+        }
+      }
+
       // Log — only update live view; switch back to live if first log file matches
       const logSel = document.getElementById("log-file-select");
       if (logSel && logSel.options.length && logSel.options[0].value === _logCurrentFile) {
@@ -1280,8 +1290,4 @@ function cjRender() {
 function cjGoPage(n) {
   _cjPage = n;
   cjRender();
-}
-
-function escHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
