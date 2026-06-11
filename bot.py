@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 import config as cfg
 import paths
+import urls
 import browser
 from state import GameState
 from scheduler import Scheduler
@@ -170,8 +171,8 @@ def _open_log_file() -> object:
 def _fetch_bar_threads() -> dict:
     import re as _re
     from bs4 import BeautifulSoup as _BS
-    BAR_URL = "https://mafiamatrix.com/localcity/bar.asp"
-    MAIN_URL = "https://mafiamatrix.com/main.asp"
+    BAR_URL = urls.BASE_URL + "/localcity/bar.asp"
+    MAIN_URL = urls.BASE_URL + "/main.asp"
     html = browser.navigate(BAR_URL)
     url = browser.current_url()
     if "local.asp" in url:
@@ -191,8 +192,8 @@ def _fetch_bar_threads() -> dict:
 
 def _fetch_jail_inmates() -> dict:
     from bs4 import BeautifulSoup as _BS
-    JAIL_URL = "https://mafiamatrix.com/localcity/jail.asp"
-    MAIN_URL = "https://mafiamatrix.com/main.asp"
+    JAIL_URL = urls.BASE_URL + "/localcity/jail.asp"
+    MAIN_URL = urls.BASE_URL + "/main.asp"
     html = browser.navigate(JAIL_URL)
     soup = _BS(html, "html.parser")
     inmates = []
@@ -221,6 +222,10 @@ def _should_payback(target: str, c: dict) -> bool:
 
 def _run(c: dict):
     global state
+    headless = c.get("misc", {}).get("headless", False)
+    domain = "mafiamatrix.net" if headless else "mafiamatrix.com"
+    urls.set_domain(domain)
+
     state = GameState()
     state.bot_running = True
     executor = ActionExecutor()
@@ -238,7 +243,7 @@ def _run(c: dict):
 
     try:
         state.add_log("Starting browser...")
-        browser.start()
+        browser.start(headless=headless)
         state.add_log("Browser started.")
     except Exception as e:
         state.add_log(f"Browser failed to start: {e}")
@@ -264,7 +269,7 @@ def _run(c: dict):
                 continue
 
             # Detect session expiry on every tick
-            if state.logged_in and browser.current_url().rstrip("/") == "https://mafiamatrix.com/default.asp" and not browser.is_cloudflare_challenge():
+            if state.logged_in and browser.current_url().rstrip("/") == urls.BASE_URL + "/default.asp" and not browser.is_cloudflare_challenge():
                 state.logged_in = False
                 if c.get("misc", {}).get("relog_on_session_expire", True):
                     state.add_log("Session expired — will re-login.")
@@ -337,7 +342,7 @@ def _run(c: dict):
         try:
             if state.logged_in and c.get("misc", {}).get("logout_on_stop", True):
                 state.add_log("Logging out...")
-                browser.navigate("https://mafiamatrix.com/default.asp?action=logout")
+                browser.navigate(urls.BASE_URL + "/default.asp?action=logout")
         except Exception:
             pass
         browser.stop()

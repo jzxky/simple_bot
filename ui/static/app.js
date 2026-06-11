@@ -100,6 +100,7 @@ function _doSave() {
     jail_duty: document.getElementById("jail_duty").value,
     jail_action: document.getElementById("jail_action").value,
     jail_use_consumables: document.getElementById("jail_use_consumables").checked,
+    headless: document.getElementById("headless").checked,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
     min_cash_on_hand: parseInt(document.getElementById("min_cash_on_hand").value) || 0,

@@ -14,8 +14,7 @@ from pathlib import Path
 from tasks.base import Task, Action
 from state import GameState
 
-BASE_URL = "https://mafiamatrix.com"
-JOURNAL_URL = f"{BASE_URL}/journal/journal.asp"
+import urls as _urls
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +114,7 @@ def _next_page_url(soup) -> str | None:
         if re.search(r"journal\.asp\?p=\d+", href) and a.get_text(strip=True) == "Next":
             if href.startswith("http"):
                 return href
-            return BASE_URL + "/journal/" + href
+            return _urls.BASE_URL + "/journal/" + href
     return None
 
 

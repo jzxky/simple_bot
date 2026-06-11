@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
 from bs4 import BeautifulSoup
+import urls
 
 SERVER_TIME_FMT = "%m/%d/%Y %I:%M:%S %p"
 
@@ -264,6 +265,6 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
                 break
 
     # Login state
-    s.logged_in = url.rstrip("/") != "https://mafiamatrix.com/default.asp"
+    s.logged_in = url.rstrip("/") != urls.BASE_URL + "/default.asp"
 
     return s

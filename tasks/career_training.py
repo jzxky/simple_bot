@@ -2,13 +2,14 @@
 Performs career training when the action timer is ready.
 """
 
+import urls
 from tasks.base import Task, Action
 from state import GameState
 
-CAREER_URLS = {
-    "fire":    "https://mafiamatrix.com/localcity/fire.asp",
-    "customs": "https://mafiamatrix.com/localcity/customs.asp",
-    "police":  "https://mafiamatrix.com/localcity/policerecruit.asp",
+_CAREER_PATHS = {
+    "fire":    "/localcity/fire.asp",
+    "customs": "/localcity/customs.asp",
+    "police":  "/localcity/policerecruit.asp",
 }
 
 
@@ -24,8 +25,9 @@ class CareerTrainingTask(Task):
                 and state.in_home_city() and not state.hold_action_timer)
 
     def run(self, state: GameState, executor):
-        url = CAREER_URLS.get(self.career)
-        if not url:
+        path = _CAREER_PATHS.get(self.career)
+        if not path:
             state.add_log(f"Unknown career: {self.career}")
             return
+        url = urls.BASE_URL + path
         executor.execute(Action("do_career_training", career=self.career, url=url), state)

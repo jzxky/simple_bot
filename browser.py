@@ -32,23 +32,22 @@ def _clear_window_placement():
         pass
 
 
-def start():
+def start(headless: bool = False):
     global _playwright, _context, _page
     os.makedirs(PROFILE_DIR, exist_ok=True)
     _clear_window_placement()
     _playwright = sync_playwright().start()
+    args = ["--disable-notifications", "--disable-save-password-bubble"]
+    if not headless:
+        args.append("--start-maximized")
     _context = _playwright.chromium.launch_persistent_context(
         PROFILE_DIR,
         channel="chrome",
-        headless=False,
+        headless=headless,
         no_viewport=True,
         locale="en-US",
         timezone_id="America/New_York",
-        args=[
-            "--start-maximized",
-            "--disable-notifications",
-            "--disable-save-password-bubble",
-        ],
+        args=args,
     )
     _page = _context.pages[0] if _context.pages else _context.new_page()
     print("[browser] Browser launched.")

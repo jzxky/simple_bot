@@ -347,6 +347,11 @@ button {
 }
 .setting-row:last-child { border-bottom: none; }
 .setting-row .toggle-label { flex-shrink: 0; }
+.setting-note {
+  font-size: 0.8rem;
+  color: var(--text-muted, #6b7e99);
+  margin: -4px 0 6px;
+}
 
 /* Case work priority table */
 .priority-table {
