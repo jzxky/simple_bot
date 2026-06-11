@@ -344,6 +344,30 @@ def screenshot():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/tasks/check_warrants", methods=["POST"])
+def tasks_check_warrants():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    try:
+        warrants = bot.request_warrants(timeout=30.0)
+        return jsonify({"warrants": warrants})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/tasks/turn_in_warrant", methods=["POST"])
+def tasks_turn_in_warrant():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    data = request.get_json()
+    url = data.get("url", "").strip()
+    case_id = data.get("case_id", "").strip()
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    bot.request_turn_in_warrant(url, case_id)
+    return jsonify({"ok": True})
+
+
 @app.route("/page_snapshot")
 def page_snapshot():
     import urls as _urls

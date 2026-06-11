@@ -842,6 +842,61 @@ function onTaskChange() {
   if (val === "archive-journals") {
     document.getElementById("task-archive-journals").style.display = "";
   }
+  if (val === "warrants") {
+    document.getElementById("task-warrants").style.display = "";
+  }
+}
+
+function checkWarrants() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  const out = document.getElementById("warrants-result");
+  out.innerHTML = "";
+  fetch("/tasks/check_warrants", { method: "POST" })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { out.innerHTML = `<p class="task-hint-block" style="color:var(--red)">${escHtml(d.error)}</p>`; return; }
+      const ws = d.warrants;
+      if (!ws.length) { out.innerHTML = `<p class="task-hint-block">No active warrants.</p>`; return; }
+      let html = `<table class="warrant-table">
+        <thead><tr>
+          <th>Case #</th><th>Crime</th><th>Victim</th><th>Fine</th>
+          <th>Jail Time</th><th>CS's</th><th>Defense</th><th></th>
+        </tr></thead><tbody>`;
+      for (const w of ws) {
+        html += `<tr>
+          <td>${escHtml(w.case_id)}</td>
+          <td>${escHtml(w.crime)}</td>
+          <td>${escHtml(w.victim)}</td>
+          <td>${escHtml(w.fine)}</td>
+          <td>${escHtml(w.jail_time)}</td>
+          <td>${escHtml(w.css)}</td>
+          <td>${escHtml(w.defense)}</td>
+          <td><button class="num-save-btn" onclick="turnInWarrant(this,'${escHtml(w.turn_in_url)}','${escHtml(w.case_id)}')">Turn In</button></td>
+        </tr>`;
+      }
+      html += `</tbody></table>`;
+      out.innerHTML = html;
+    })
+    .catch(e => { out.innerHTML = `<p class="task-hint-block" style="color:var(--red)">${escHtml(String(e))}</p>`; })
+    .finally(() => { btn.disabled = false; btn.textContent = "Check Warrants"; });
+}
+
+function turnInWarrant(btn, url, caseId) {
+  btn.disabled = true;
+  btn.textContent = "...";
+  fetch("/tasks/turn_in_warrant", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, case_id: caseId }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert("Turn in failed: " + d.error); btn.disabled = false; btn.textContent = "Turn In"; return; }
+      btn.textContent = "Queued";
+    })
+    .catch(e => { alert("Error: " + e); btn.disabled = false; btn.textContent = "Turn In"; });
 }
 
 function submitArchiveJournals(all) {

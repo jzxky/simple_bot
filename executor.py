@@ -1490,6 +1490,61 @@ def handle_archive_journals(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
+# Warrant handlers
+# ---------------------------------------------------------------------------
+
+def handle_check_warrants(action: Action, state: GameState):
+    result_queue = action.params.get("result_queue")
+    _nav(_u("/localcity/warrants.asp"), state)
+    if not _check_session(state):
+        if result_queue is not None:
+            result_queue.put([])
+        return
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    table = soup.find("table", class_="mm-list-table")
+    warrants = []
+    if table:
+        for row in table.find_all("tr"):
+            cells = row.find_all("td", class_="display_border")
+            if len(cells) < 6:
+                continue
+            turn_in_a = row.find("a", class_="box")
+            href = turn_in_a["href"] if turn_in_a else ""
+            if href and not href.startswith("http"):
+                href = urls.BASE_URL + href
+            warrants.append({
+                "case_id":   cells[0].get_text(strip=True),
+                "crime":     cells[1].get_text(strip=True),
+                "victim":    cells[2].get_text(strip=True),
+                "fine":      cells[3].get_text(strip=True),
+                "jail_time": cells[4].get_text(strip=True),
+                "css":       cells[5].get_text(strip=True),
+                "defense":   cells[6].get_text(strip=True) if len(cells) > 6 else "",
+                "turn_in_url": href,
+            })
+
+    state.add_log(f"Warrants: found {len(warrants)} active warrant(s).")
+    if result_queue is not None:
+        result_queue.put(warrants)
+
+
+def handle_turn_in_warrant(action: Action, state: GameState):
+    url = action.params["url"]
+    case_id = action.params.get("case_id", "")
+    _nav(url, state)
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    success = soup.find("div", id="success")
+    fail = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Warrant {case_id}: turned in — {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Warrant {case_id}: failed — {fail.get_text(strip=True)}")
+    else:
+        state.add_log(f"Warrant {case_id}: submitted.")
+
+
+# ---------------------------------------------------------------------------
 
 HANDLERS = {
     "login": handle_login,
@@ -1518,6 +1573,8 @@ HANDLERS = {
     "check_journals": handle_check_journals,
     "archive_journals": handle_archive_journals,
     "check_drug_trade": handle_check_drug_trade,
+    "check_warrants": handle_check_warrants,
+    "turn_in_warrant": handle_turn_in_warrant,
 }
 
 
