@@ -273,21 +273,20 @@
                     <td>
                       <input type="number" id="autobuy_price_{{ key }}" min="0" step="100"
                         value="{{ d.get('max_price', 0) }}" style="width:100px"
-                        oninput="markNumDirty(this)">
-                      <button class="num-save-btn" id="save-autobuy_price_{{ key }}"
-                        onclick="saveNum('autobuy_price_{{ key }}')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+                        oninput="autobuyMarkDirty()">
                     </td>
                     <td>
                       <input type="number" id="autobuy_qty_{{ key }}" min="0" step="1"
                         value="{{ d.get('max_qty', 0) }}" style="width:100px"
-                        oninput="markNumDirty(this)">
-                      <button class="num-save-btn" id="save-autobuy_qty_{{ key }}"
-                        onclick="saveNum('autobuy_qty_{{ key }}')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+                        oninput="autobuyMarkDirty()">
                     </td>
                   </tr>
                   {% endfor %}
                 </tbody>
               </table>
+              <div style="margin-top:10px">
+                <button class="num-save-btn" id="save-autobuy" onclick="autobuyS()"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg> Save</button>
+              </div>
             </div>
           </div>
         </div>

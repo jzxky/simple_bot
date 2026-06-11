@@ -118,13 +118,20 @@ function _doSave() {
     consumable_buffer: parseInt(document.getElementById("consumable_buffer").value) || 0,
     smart_consumables: document.getElementById("smart_consumables").checked,
     autobuy_enabled: (document.getElementById("autobuy_enabled") || {checked:false}).checked,
-    ...["marijuana","ecstasy","acid","speed","pice","heroin","cocaine"].reduce((acc, k) => {
-      const p = document.getElementById(`autobuy_price_${k}`);
-      const q = document.getElementById(`autobuy_qty_${k}`);
-      if (p) acc[`autobuy_price_${k}`] = parseInt(p.value) || 0;
-      if (q) acc[`autobuy_qty_${k}`] = parseInt(q.value) || 0;
-      return acc;
-    }, {}),
+    autobuy_price_marijuana: parseInt((document.getElementById("autobuy_price_marijuana")||{value:0}).value)||0,
+    autobuy_qty_marijuana:   parseInt((document.getElementById("autobuy_qty_marijuana")||{value:0}).value)||0,
+    autobuy_price_ecstasy:   parseInt((document.getElementById("autobuy_price_ecstasy")||{value:0}).value)||0,
+    autobuy_qty_ecstasy:     parseInt((document.getElementById("autobuy_qty_ecstasy")||{value:0}).value)||0,
+    autobuy_price_acid:      parseInt((document.getElementById("autobuy_price_acid")||{value:0}).value)||0,
+    autobuy_qty_acid:        parseInt((document.getElementById("autobuy_qty_acid")||{value:0}).value)||0,
+    autobuy_price_speed:     parseInt((document.getElementById("autobuy_price_speed")||{value:0}).value)||0,
+    autobuy_qty_speed:       parseInt((document.getElementById("autobuy_qty_speed")||{value:0}).value)||0,
+    autobuy_price_pice:      parseInt((document.getElementById("autobuy_price_pice")||{value:0}).value)||0,
+    autobuy_qty_pice:        parseInt((document.getElementById("autobuy_qty_pice")||{value:0}).value)||0,
+    autobuy_price_heroin:    parseInt((document.getElementById("autobuy_price_heroin")||{value:0}).value)||0,
+    autobuy_qty_heroin:      parseInt((document.getElementById("autobuy_qty_heroin")||{value:0}).value)||0,
+    autobuy_price_cocaine:   parseInt((document.getElementById("autobuy_price_cocaine")||{value:0}).value)||0,
+    autobuy_qty_cocaine:     parseInt((document.getElementById("autobuy_qty_cocaine")||{value:0}).value)||0,
   };
 
   return fetch("/save", {
@@ -170,6 +177,18 @@ function saveNum(id) {
     const el = document.getElementById(id);
     if (el) el.classList.remove("input-unsaved");
     const btn = document.getElementById("save-" + id);
+    if (btn) btn.classList.remove("needed");
+  });
+}
+
+function autobuyMarkDirty() {
+  const btn = document.getElementById("save-autobuy");
+  if (btn) btn.classList.add("needed");
+}
+
+function autobuyS() {
+  _doSave().then(() => {
+    const btn = document.getElementById("save-autobuy");
     if (btn) btn.classList.remove("needed");
   });
 }
