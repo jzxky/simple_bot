@@ -39,6 +39,7 @@ from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJail
 from tasks.journal import JournalCheckTask, ArchiveJournalsTask, set_drug_trade_queue, set_illness_queue
 from tasks.drug_trade import DrugTradeTask
 from tasks.illness import IllnessTask
+from tasks.gym import GymTask
 from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
@@ -157,6 +158,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(ArchiveJournalsTask(_archive_journals_queue))
     sched.add(DrugTradeTask(_drug_trade_queue))
     sched.add(IllnessTask(_illness_queue))
+    sched.add(GymTask())
     sched.add(PlayerRefreshTask())
     sched.add(CheckTopJobTask())
     sched.add(SnipeTopJobTask())

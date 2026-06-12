@@ -83,7 +83,35 @@
             </div>
           </div>
         </div>
-        <div id="business"  class="tab-panel"><p class="placeholder">Business settings — coming soon.</p></div>
+        <div id="business" class="tab-panel">
+          {% set gym = config.get('gym', {}) %}
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                Gym
+                <label class="toggle-label">
+                  <input type="checkbox" id="gym_enabled" {% if gym.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <div class="setting-row">
+                <label for="gym_activity">Activity</label>
+                <select id="gym_activity" style="width:200px" onchange="autoSave()">
+                  {% for v, l in [('weights','Hit the weights'),('pool','Do some lengths in the pool'),('treadmill','Work the treadmill'),('spa','Have a spa/sauna')] %}
+                  <option value="{{ v }}" {% if gym.get('activity','weights') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <label class="inline-toggle setting-row">Auto-Travel to Chicago
+                <label class="toggle-label"><input type="checkbox" id="gym_auto_travel" {% if gym.get('auto_travel') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row" style="margin-top:6px">
+                <span class="stat-label">Last gym use</span>
+                <span id="gym-timer" class="stat-value" style="margin-left:8px">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
         <div id="promotion" class="tab-panel">
           {% set promo = config.get('promo', {}) %}
           <div class="settings-groups">

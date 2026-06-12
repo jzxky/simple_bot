@@ -108,6 +108,11 @@ def save():
         if f"autobuy_qty_{key}" in data:
             c["autobuy"]["drugs"][key]["max_qty"] = int(data[f"autobuy_qty_{key}"])
 
+    c.setdefault("gym", {})
+    c["gym"]["enabled"] = data.get("gym_enabled", False)
+    c["gym"]["activity"] = data.get("gym_activity", "weights")
+    c["gym"]["auto_travel"] = data.get("gym_auto_travel", False)
+
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
     c["case_work"].setdefault("hospital", {})
@@ -145,6 +150,14 @@ def pause():
 def resume():
     bot.resume()
     return jsonify({"running": True, "paused": False})
+
+
+def _get_last_gym_use() -> float:
+    try:
+        from tasks.gym import load_last_gym_use
+        return load_last_gym_use()
+    except Exception:
+        return 0.0
 
 
 @app.route("/status")
@@ -186,6 +199,7 @@ def status():
         "hold_action_timer": s.hold_action_timer,
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
+        "last_gym_use": _get_last_gym_use(),
     })
 
 
