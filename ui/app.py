@@ -218,6 +218,8 @@ def status():
         "journals_updated_at": s.journals_updated_at,
         "last_gym_use": _get_last_gym_use(),
         "is_git_repo": _is_git_repo(),
+        "flight_departs_at": s.flight_departs_at,
+        "vehicle_health": s.vehicle_health,
     })
 
 
