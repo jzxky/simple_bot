@@ -410,7 +410,7 @@ function pollStatus() {
 
       // Timers
       _lastEnergy = d.energy;
-      updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null);
+      updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null, d.flight_departs_at || null);
       _updateCharPills();
 
       // Show check-for-updates row only when running inside a git repo
@@ -506,8 +506,9 @@ function _fmtCountdown(secs) {
 // _aggProActive tracks latest agg_pro_active from status for always-visible tile
 let _aggProActive = false;
 let _jailReleaseEndMs = null;
+let _flightDepartsAtMs = null;
 
-function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs) {
+function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs, flightDepartsAt) {
   _aggProActive = aggProActive;
 
   // Jail release timer — re-anchor on every poll since it's a raw seconds value
@@ -515,6 +516,18 @@ function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs) {
     _jailReleaseEndMs = Date.now() + jailReleaseSecs * 1000;
   } else if (jailReleaseSecs == null) {
     _jailReleaseEndMs = null;
+  }
+
+  // Flight timer — flightDepartsAt is a Unix timestamp from the server
+  if (flightDepartsAt != null) {
+    const msLeft = flightDepartsAt * 1000 - Date.now();
+    if (msLeft > 0) {
+      _flightDepartsAtMs = flightDepartsAt * 1000;
+    } else {
+      _flightDepartsAtMs = null;
+    }
+  } else {
+    _flightDepartsAtMs = null;
   }
 
   // Only re-anchor countdowns when server_time changes (fresh state refresh).
@@ -550,7 +563,7 @@ function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs) {
   }
 
   _renderTimers();
-  if ((Object.keys(_activeTimers).length > 0 || _jailReleaseEndMs != null) && !_timerInterval) {
+  if ((Object.keys(_activeTimers).length > 0 || _jailReleaseEndMs != null || _flightDepartsAtMs != null) && !_timerInterval) {
     _timerInterval = setInterval(_tickTimers, 1000);
   }
 }
@@ -567,11 +580,15 @@ function _tickTimers() {
   if (_activeTimers["aggpro"] && Math.floor((_activeTimers["aggpro"].endMs - now) / 1000) <= 0) {
     delete _activeTimers["aggpro"];
   }
+  // Clear flight timer once it passes
+  if (_flightDepartsAtMs != null && Date.now() >= _flightDepartsAtMs) {
+    _flightDepartsAtMs = null;
+  }
   _renderTimers();
   _updateCharPills();
-  // Keep interval running as long as there are countdown timers, AggPro, or jail release
+  // Keep interval running as long as there are countdown timers, AggPro, jail release, or flight
   const countdownKeys = Object.keys(_activeTimers).filter(k => k !== "aggpro");
-  if (countdownKeys.length === 0 && !_aggProActive && _jailReleaseEndMs == null) {
+  if (countdownKeys.length === 0 && !_aggProActive && _jailReleaseEndMs == null && _flightDepartsAtMs == null) {
     clearInterval(_timerInterval);
     _timerInterval = null;
   }
@@ -586,6 +603,12 @@ function _renderTimers() {
   if (_jailReleaseEndMs != null) {
     const secs = Math.max(0, Math.floor((_jailReleaseEndMs - now) / 1000));
     tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">Release</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
+  }
+
+  // Flight departure countdown
+  if (_flightDepartsAtMs != null) {
+    const secs = Math.max(0, Math.floor((_flightDepartsAtMs - now) / 1000));
+    tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">Flight</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
   }
 
   // AggPro always shown

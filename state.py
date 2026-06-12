@@ -55,6 +55,8 @@ class GameState:
     jail_consumables: dict = field(default_factory=dict)
     jail_release_secs: "int | None" = None
     hold_action_timer: bool = False
+    vehicle_health: "int | None" = None
+    flight_departs_at: "float | None" = None
 
     def agg_fail_count(self) -> int:
         cutoff = datetime.now() - timedelta(minutes=30)

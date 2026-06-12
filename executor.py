@@ -1564,16 +1564,163 @@ def handle_test_illness_journal(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
-# Gym handler
+# Travel / vehicle handlers
 # ---------------------------------------------------------------------------
 
 _GYM_URL = "/localcity/businesses.asp?name=Gym"
 _TRAVEL_URL = "/travel/travel.asp"
+_REPAIRS_URL = "/localcity/repairs.asp"
+_DEPART_URL = "/travel/depart.asp"
+_AIRPORT_URL = "/travel/airport.asp"
 _CHICAGO = "Chicago"
+_NO_VEHICLE_TEXT = "you don't own a vehicle, it's parked or it's stashed in your vehicles vault"
+
+
+def handle_check_vehicle(action: Action, state: GameState) -> int:
+    _nav(_u(_REPAIRS_URL), state)
+    if not _check_session(state):
+        return 0
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    if _NO_VEHICLE_TEXT in state.page_html.lower():
+        state.add_log("Check vehicle: no vehicle available.")
+        state.vehicle_health = None
+        return 0
+    bar = soup.find("div", id="respect_bar")
+    if not bar:
+        state.add_log("Check vehicle: could not find health bar.")
+        state.vehicle_health = None
+        return 0
+    m = re.search(r"(\d+)", bar.get_text())
+    pct = int(m.group(1)) if m else 0
+    state.vehicle_health = pct
+    state.add_log(f"Check vehicle: health {pct}%.")
+    return pct
+
+
+def handle_repair_vehicle(action: Action, state: GameState) -> bool:
+    if _REPAIRS_URL not in (state.current_url or ""):
+        _nav(_u(_REPAIRS_URL), state)
+    if not _check_session(state):
+        return False
+    if _NO_VEHICLE_TEXT in state.page_html.lower():
+        state.add_log("Repair vehicle: no vehicle to repair.")
+        return False
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    # Check and withdraw funds if needed
+    cost_font = soup.find("font", color="gold")
+    if cost_font:
+        cost_m = re.search(r"\$([\d,]+)", cost_font.get_text())
+        if cost_m:
+            cost = int(cost_m.group(1).replace(",", ""))
+            if state.clean_money < cost:
+                needed = cost - state.clean_money
+                state.add_log(f"Repair vehicle: need ${cost:,}, withdrawing ${needed:,}.")
+                handle_withdraw(Action("withdraw", amount=needed), state)
+                if state.clean_money < cost:
+                    state.add_log("Repair vehicle: insufficient funds — skipping.")
+                    return False
+    page = browser.page()
+    page.select_option("select[name='display']", "Yes")
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    if _NO_VEHICLE_TEXT in state.page_html.lower():
+        state.add_log("Repair vehicle: booking failed.")
+        return False
+    state.add_log("Repair vehicle: repair booked successfully.")
+    return True
+
+
+def handle_travel(action: Action, state: GameState) -> int:
+    from datetime import datetime
+    target = action.params.get("target_city", "")
+    method = action.params.get("method", "airport")
+
+    if not target:
+        state.add_log("Travel: no target city specified.")
+        return 0
+
+    if state.current_city.lower() == target.lower():
+        state.add_log(f"Travel: already in {target}.")
+        return 1
+
+    if method == "own_vehicle":
+        pct = handle_check_vehicle(Action("check_vehicle"), state)
+        if state.vehicle_health is None:
+            return 0
+        if pct == 0:
+            ok = handle_repair_vehicle(Action("repair_vehicle"), state)
+            return 1 if ok else 0
+        _nav(_u(_DEPART_URL) + f"?destination={target}", state)
+        if not _check_session(state):
+            return 0
+        state.add_log(f"Travel: departing to {target} by vehicle.")
+        return 1
+
+    # Airport method
+    _nav(_u(_AIRPORT_URL), state)
+    if not _check_session(state):
+        return 0
+    if "local.asp" in browser.current_url():
+        state.add_log(f"Travel: airport not available (redirected to local).")
+        return 0
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    # Check if already booked
+    for td in soup.find_all("td"):
+        if state.own_name and state.own_name.lower() in td.get_text(strip=True).lower():
+            state.add_log(f"Travel: flight already booked.")
+            _set_flight_timer(soup, state)
+            return 1
+
+    dest_select = soup.find("select", attrs={"name": "destination"})
+    if not dest_select:
+        state.add_log("Travel: could not find destination selector.")
+        return 0
+
+    available = {o.get("value", ""): o for o in dest_select.find_all("option") if o.get("value") and o.get("value") != "0"}
+    match = next((v for v in available if v.lower() == target.lower()), None)
+    if not match:
+        state.add_log(f"Travel: {target} not available in airport dropdown.")
+        return 0
+
+    minutes = available[match].get("data-minutes", "?")
+    page = browser.page()
+    page.select_option("select[name='destination']", match)
+    page.click("input[name='action']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+    _set_flight_timer(soup, state)
+    state.add_log(f"Travel: flight to {target} booked ({minutes} min travel time).")
+    return 1
+
+
+def _set_flight_timer(soup, state: GameState):
+    """Parse data-date-end from the airport timer div and store in state."""
+    from state import SERVER_TIME_FMT
+    import time as _time
+    timer_div = soup.find(attrs={"data-date-end": True, "data-text-end": True})
+    if not timer_div:
+        return
+    end_str = timer_div.get("data-date-end", "").strip()
+    try:
+        from datetime import datetime
+        end_dt = datetime.strptime(end_str, SERVER_TIME_FMT)
+        if state.server_time:
+            delta = (end_dt - state.server_time).total_seconds()
+            state.flight_departs_at = _time.time() + delta
+    except (ValueError, TypeError):
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Gym handler
+# ---------------------------------------------------------------------------
 
 
 def handle_gym(action: Action, state: GameState):
-    import re as _re
     import config as cfg
     import time
     from tasks.gym import save_last_gym_use
@@ -1588,23 +1735,12 @@ def handle_gym(action: Action, state: GameState):
             state.add_log("Gym: not in Chicago and auto-travel is off — skipping.")
             return
         state.add_log("Gym: travelling to Chicago...")
-        _nav(_u(_TRAVEL_URL), state)
-        if not _check_session(state):
+        result = handle_travel(Action("travel", target_city=_CHICAGO, method="airport"), state)
+        if result == 0:
+            state.add_log("Gym: travel to Chicago failed — skipping.")
             return
-        page = browser.page()
-        # Click the Chicago flight link
-        soup = BeautifulSoup(state.page_html, "html.parser")
-        chicago_link = None
-        for a in soup.find_all("a", href=True):
-            if "chicago" in a.get_text(strip=True).lower() and "book" in a.get("href", "").lower():
-                chicago_link = a["href"]
-                break
-        if not chicago_link:
-            state.add_log("Gym: could not find Chicago flight link.")
-            return
-        _nav(_u(chicago_link) if not chicago_link.startswith("http") else chicago_link, state)
         if state.current_city != _CHICAGO:
-            state.add_log(f"Gym: still not in Chicago after travel attempt ({state.current_city}).")
+            state.add_log(f"Gym: still not in Chicago after travel ({state.current_city}) — skipping.")
             return
 
     # Navigate to gym page
@@ -1697,6 +1833,9 @@ HANDLERS = {
     "turn_in_warrant": handle_turn_in_warrant,
     "test_illness_journal": handle_test_illness_journal,
     "do_gym": handle_gym,
+    "check_vehicle": handle_check_vehicle,
+    "repair_vehicle": handle_repair_vehicle,
+    "travel": handle_travel,
 }
 
 
