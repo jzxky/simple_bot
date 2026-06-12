@@ -236,20 +236,28 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     # Jail consumables — parsed whenever contraband.asp is loaded
     if "contraband.asp" in url:
         _JAIL_ITEM_MAP = {
-            "Cigarettes": "cigarettes", "Booze": "booze",
-            "Heroin": "heroin", "Porn": "porn", "Shanks": "shanks",
+            "Cigarettes:": "cigarettes", "Cigarettes": "cigarettes",
+            "Booze:": "booze", "Booze": "booze",
+            "Heroin:": "heroin", "Heroin": "heroin",
+            "Porn:": "porn", "Porn": "porn",
+            "Shanks:": "shanks", "Shanks": "shanks",
         }
         jail_cons = {}
         for row in soup.find_all("tr"):
-            cells = row.find_all("td", class_="display_border")
-            if len(cells) >= 2:
-                name = cells[0].get_text(strip=True)
-                key = _JAIL_ITEM_MAP.get(name)
+            tds = row.find_all("td")
+            # Each row has pairs: label td, value td (display_border), repeated
+            i = 0
+            while i < len(tds) - 1:
+                label = tds[i].get_text(strip=True)
+                key = _JAIL_ITEM_MAP.get(label)
                 if key:
                     try:
-                        jail_cons[key] = int(cells[1].get_text(strip=True))
+                        jail_cons[key] = int(tds[i + 1].get_text(strip=True))
                     except (ValueError, TypeError):
                         jail_cons[key] = 0
+                    i += 2
+                else:
+                    i += 1
         if jail_cons:
             s.jail_consumables = jail_cons
 
