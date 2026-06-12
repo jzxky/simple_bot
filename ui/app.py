@@ -636,6 +636,24 @@ def tasks_travel():
     return jsonify({"ok": True})
 
 
+@app.route("/restart", methods=["POST"])
+def restart():
+    import sys
+    import threading as _threading
+    def _do_restart():
+        import time as _time
+        bot.stop()
+        _time.sleep(2)
+        if sys.platform == "win32":
+            import subprocess as _sp
+            _sp.Popen([sys.executable] + sys.argv)
+            os._exit(0)
+        else:
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+    _threading.Thread(target=_do_restart, daemon=True).start()
+    return jsonify({"ok": True})
+
+
 @app.route("/check_update")
 def check_update():
     if not _is_git_repo():

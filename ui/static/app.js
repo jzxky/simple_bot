@@ -692,10 +692,37 @@ function applyUpdate() {
     .then(d => {
       document.getElementById("update-modal").style.display = "none";
       if (d.error) { alert("Update failed: " + d.error); return; }
-      alert("Update applied. Please restart the bot.\n\n" + (d.output || ""));
+      if (confirm("Update applied. Restart now?\n\n" + (d.output || ""))) {
+        restartBot();
+      }
     })
     .catch(() => alert("Could not reach server."))
     .finally(() => { applyBtn.disabled = false; applyBtn.textContent = "Install Update"; });
+}
+
+function restartBot() {
+  const btn = document.getElementById("restart-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Restarting…"; }
+  fetch("/restart", {method: "POST"})
+    .then(() => _pollUntilBack())
+    .catch(() => _pollUntilBack());
+}
+
+function _pollUntilBack() {
+  const MAX = 60;
+  let attempts = 0;
+  const interval = setInterval(() => {
+    attempts++;
+    fetch("/status")
+      .then(r => { if (r.ok) { clearInterval(interval); location.reload(); } })
+      .catch(() => {});
+    if (attempts >= MAX) {
+      clearInterval(interval);
+      const btn = document.getElementById("restart-btn");
+      if (btn) { btn.disabled = false; btn.textContent = "Restart"; }
+      alert("Server did not come back after 60 seconds.");
+    }
+  }, 1000);
 }
 
 function consumeItem(type) {
