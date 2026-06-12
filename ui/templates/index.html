@@ -343,7 +343,7 @@
               </div>
               <div class="setting-row" id="update-row" style="display:none">
                 <span>Software Update</span>
-                <div style="display:flex;gap:8px;align-items:center;">
+                <div class="setting-btn-row">
                   <button id="check-update-btn" class="action-btn" onclick="checkForUpdates()">Check for Updates</button>
                   <button id="restart-btn" class="action-btn" onclick="restartBot()">Restart</button>
                 </div>
@@ -532,7 +532,7 @@
       <div class="card-body">
         <div class="tab-bar">
           <button class="tab-btn active" id="income-tab-earns" onclick="showTab('income-earns', this)">Earns</button>
-          <button class="tab-btn" id="income-tab-crimes" onclick="showTab('income-crimes', this)">Aggravated Crimes</button>
+          <button class="tab-btn" id="income-tab-crimes" onclick="showTab('income-crimes', this)"><span class="tab-label-short">Aggs</span><span class="tab-label-long">Aggravated Crimes</span></button>
           <button class="tab-btn" id="income-tab-actions" onclick="showTab('income-actions', this)">Actions</button>
         </div>
 
