@@ -119,11 +119,19 @@ def _next_page_url(soup) -> str | None:
 
 
 _drug_trade_queue: "queue.Queue | None" = None
+_illness_queue: "queue.Queue | None" = None
+
+_FLU_TEXT = "you have a slightly nauseous feeling in your stomach"
 
 
 def set_drug_trade_queue(q: "queue.Queue"):
     global _drug_trade_queue
     _drug_trade_queue = q
+
+
+def set_illness_queue(q: "queue.Queue"):
+    global _illness_queue
+    _illness_queue = q
 
 
 def dispatch_journal_action(entry: dict, state: GameState):
@@ -132,6 +140,10 @@ def dispatch_journal_action(entry: dict, state: GameState):
         if cfg.load().get("autobuy", {}).get("enabled", False):
             if _drug_trade_queue is not None:
                 _drug_trade_queue.put(True)
+    if entry.get("title") == "Illness":
+        if _FLU_TEXT in entry.get("text", "").lower():
+            if _illness_queue is not None:
+                _illness_queue.put(True)
 
 
 # ---------------------------------------------------------------------------

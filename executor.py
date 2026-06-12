@@ -1545,6 +1545,22 @@ def handle_turn_in_warrant(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
+# Illness handler
+# ---------------------------------------------------------------------------
+
+def handle_test_illness_journal(action: Action, state: GameState):
+    import paths
+    from pathlib import Path
+    _nav(_u("/localcity/hospital.asp?display=apply"), state)
+    if not _check_session(state):
+        return
+    site_map_dir = Path(paths.data_dir()) / "site_map"
+    site_map_dir.mkdir(exist_ok=True)
+    (site_map_dir / "hospital_apply.html").write_text(state.page_html, encoding="utf-8")
+    state.add_log("Illness: saved hospital apply page to site_map/hospital_apply.html")
+
+
+# ---------------------------------------------------------------------------
 
 HANDLERS = {
     "login": handle_login,
@@ -1575,6 +1591,7 @@ HANDLERS = {
     "check_drug_trade": handle_check_drug_trade,
     "check_warrants": handle_check_warrants,
     "turn_in_warrant": handle_turn_in_warrant,
+    "test_illness_journal": handle_test_illness_journal,
 }
 
 
