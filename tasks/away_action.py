@@ -5,6 +5,7 @@ Supported types: drug_manufacturing, community_service, dog_trains.
 
 from tasks.base import Task, Action
 from state import GameState
+from action_cooldowns import ACTION_COOLDOWNS, should_skip_action_for_armed_robbery
 
 
 class AwayActionTask(Task):
@@ -15,8 +16,12 @@ class AwayActionTask(Task):
         self.action_type = action_type
 
     def can_run(self, state: GameState) -> bool:
-        return (state.logged_in and not state.in_jail and state.action_available()
-                and not state.in_home_city() and not state.hold_action_timer)
+        if not (state.logged_in and not state.in_jail and state.action_available()
+                and not state.in_home_city() and not state.hold_action_timer):
+            return False
+        cooldown_key = "community_service_away" if self.action_type == "community_service" else self.action_type
+        cooldown = ACTION_COOLDOWNS.get(cooldown_key, 10)
+        return not should_skip_action_for_armed_robbery(state, cooldown)
 
     def run(self, state: GameState, executor):
         if self.action_type == "community_service":
