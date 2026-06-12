@@ -117,20 +117,24 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
         for d in soup.find_all("div", id="display_top")
     )
 
-    # Jail release countdown — parse donation_auctiontimer span present on all jail pages
-    release_span = soup.find("span", class_="donation_auctiontimer")
-    if s.in_jail and release_span:
-        raw = release_span.get_text(" ", strip=True)  # e.g. "43m, 45s" or "1h, 2m, 3s"
-        total = 0
-        for num, unit in re.findall(r"(\d+)\s*([hms])", raw):
-            n = int(num)
-            if unit == "h":
-                total += n * 3600
-            elif unit == "m":
-                total += n * 60
-            else:
-                total += n
-        s.jail_release_secs = total if total > 0 else None
+    # Jail release countdown — find the div with data-date-end adjacent to donation_auctiontimer
+    # that contains "until release" text. The span itself is JS-populated (empty in raw HTML).
+    if s.in_jail and s.server_time:
+        release_div = None
+        for span in soup.find_all("span", class_="donation_auctiontimer"):
+            parent = span.find_parent("div")
+            if parent and "until release" in parent.get_text(strip=True).lower():
+                release_div = parent
+                break
+        if release_div:
+            end_str = release_div.get("data-date-end", "").strip()
+            if end_str:
+                try:
+                    end_dt = datetime.strptime(end_str, SERVER_TIME_FMT)
+                    secs = int((end_dt - s.server_time).total_seconds())
+                    s.jail_release_secs = max(secs, 0) if secs >= 0 else None
+                except ValueError:
+                    pass
     elif not s.in_jail:
         s.jail_release_secs = None
 
