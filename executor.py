@@ -1377,7 +1377,7 @@ def handle_check_drug_trade(action: Action, state: GameState):
         if total_willing < offer_price:
             reason = "; ".join(decline_reasons) if decline_reasons else "price too high"
             state.add_log(f"Drug trade offer {offer_id}: declining ({reason}).")
-            decline_url = f"{_u("/income/drugtrade.asp")}?action=decline&offerid={offer_id}"
+            decline_url = _u("/income/drugtrade.asp") + f"?action=decline&offerid={offer_id}"
             _nav(decline_url, state)
             continue
 
@@ -1393,7 +1393,7 @@ def handle_check_drug_trade(action: Action, state: GameState):
             return
 
         # Accept
-        accept_url = f"{_u("/income/drugtrade.asp")}?action=accept&offerid={offer_id}"
+        accept_url = _u("/income/drugtrade.asp") + f"?action=accept&offerid={offer_id}"
         _nav(accept_url, state)
         state.add_log(f"Drug trade offer {offer_id}: accepted [{item_summary}] for ${offer_price:,}.")
 
@@ -1664,6 +1664,9 @@ def handle_gym(action: Action, state: GameState):
     _refresh_state(state)
     save_last_gym_use(time.time())
     state.add_log(f"Gym: completed activity '{activity}'.")
+
+
+HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
     "clear_earn_queue": handle_clear_earn_queue,
