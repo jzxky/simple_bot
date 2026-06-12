@@ -936,6 +936,34 @@ input.input-unsaved { color: var(--red) !important; }
   background: var(--bg-alt, rgba(255,255,255,0.03));
 }
 
+
+/* ── Mobile overflow fixes ───────────────────────── */
+.card { overflow: hidden; }
+
+.setting-btn-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .setting-row { flex-wrap: wrap; }
+  .setting-row select { width: auto !important; flex: 1; min-width: 120px; }
+  .setting-btn-row { width: 100%; }
+}
+
+/* Eliminate 300ms tap delay on all interactive elements */
+button, [onclick] { touch-action: manipulation; }
+
+/* Responsive tab label — short on mobile, full on desktop */
+.tab-label-short { display: none; }
+.tab-label-long  { display: inline; }
+@media (max-width: 600px) {
+  .tab-label-short { display: inline; }
+  .tab-label-long  { display: none; }
+}
+
 /* ── Income section — 3-row pills in header ─────── */
 .income-h2 { align-items: flex-start !important; }
 .income-pills-block {

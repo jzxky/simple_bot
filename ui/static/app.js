@@ -947,7 +947,10 @@ function closeThreadOverlay(event) {
 
 // ── Cash overlay ──────────────────────────────────────────────────────────────
 
+let _cashOpenedAt = 0;
+
 function openCashOverlay() {
+  _cashOpenedAt = Date.now();
   document.getElementById("cash-step-action").style.display = "";
   document.getElementById("cash-step-withdraw").style.display = "none";
   document.getElementById("cash-custom-input").style.display = "none";
@@ -959,6 +962,7 @@ function openCashOverlay() {
 
 function closeCashOverlay(event) {
   if (event && event.target !== document.getElementById("cash-overlay")) return;
+  if (Date.now() - _cashOpenedAt < 300) return; // ignore tap-delay ghost click on iOS
   document.getElementById("cash-overlay").style.display = "none";
 }
 
