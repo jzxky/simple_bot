@@ -58,6 +58,8 @@ class GameState:
     vehicle_health: "int | None" = None
     flight_departs_at: "float | None" = None
     char_history_updated_at: float = 0.0
+    in_hospital: bool = False
+    hospital_release_at: "float | None" = None
 
     def agg_fail_count(self) -> int:
         cutoff = datetime.now() - timedelta(minutes=30)
@@ -140,6 +142,26 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
                     pass
     elif not s.in_jail:
         s.jail_release_secs = None
+
+    # Hospital detection — URL contains hospital.asp
+    if "hospital.asp" in url:
+        s.in_hospital = True
+        if s.server_time and s.hospital_release_at is None:
+            # Look for "You will be released at:" followed by a datetime string
+            text = soup.get_text(" ", strip=True)
+            m = re.search(r"You will be released at[:\s]+(\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s+[AP]M)", text, re.IGNORECASE)
+            if m:
+                try:
+                    release_dt = datetime.strptime(m.group(1).strip(), SERVER_TIME_FMT)
+                    # Anchor using server_time offset from real time
+                    offset = (release_dt - s.server_time).total_seconds()
+                    import time as _time
+                    s.hospital_release_at = _time.time() + offset
+                except ValueError:
+                    pass
+    else:
+        s.in_hospital = False
+        s.hospital_release_at = None
 
     # nav_right fields — walk display_top labels
     for top in soup.find_all("div", id="display_top"):

@@ -741,6 +741,10 @@ def handle_armed_robbery(action: Action, state: GameState):
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
+    if state.in_hospital:
+        state.add_log("Armed robbery: redirected to hospital — injured by falling debris. Tasks paused until release.")
+        return
+
     check_other_tasks = action.params.get("check_other_tasks")
     pass_num = 0
 
@@ -786,6 +790,10 @@ def handle_armed_robbery(action: Action, state: GameState):
                 page.click("input[type='submit'][name='B1']")
                 page.wait_for_load_state("domcontentloaded")
                 _refresh_state(state)
+
+                if state.in_hospital:
+                    state.add_log("Armed robbery: redirected to hospital — injured by falling debris. Tasks paused until release.")
+                    return
 
                 result_soup = BeautifulSoup(page.content(), "html.parser")
                 success_div = result_soup.find("div", id="success")

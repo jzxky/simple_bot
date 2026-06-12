@@ -12,6 +12,7 @@ from state import GameState
 class RefreshTask(Task):
     priority = 1
     label = 'Refresh'
+    run_in_hospital = True
 
     def __init__(self, interval_seconds: int = 60):
         self._interval = interval_seconds

@@ -17,6 +17,7 @@ class Action:
 class Task(ABC):
     priority: int = 0
     label: str = ""  # display name shown in UI; defaults to class name if empty
+    run_in_hospital: bool = False  # if False, task is paused while in_hospital
 
     def can_run(self, state) -> bool:
         return True

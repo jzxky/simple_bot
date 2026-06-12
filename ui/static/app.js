@@ -410,7 +410,7 @@ function pollStatus() {
 
       // Timers
       _lastEnergy = d.energy;
-      updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null, d.flight_departs_at || null);
+      updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null, d.flight_departs_at || null, d.hospital_release_at || null);
       _updateCharPills();
 
       // Show check-for-updates row only when running inside a git repo
@@ -516,8 +516,9 @@ function _fmtCountdown(secs) {
 let _aggProActive = false;
 let _jailReleaseEndMs = null;
 let _flightDepartsAtMs = null;
+let _hospitalReleaseAtMs = null;
 
-function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs, flightDepartsAt) {
+function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs, flightDepartsAt, hospitalReleaseAt) {
   _aggProActive = aggProActive;
 
   // Jail release timer — re-anchor on every poll since it's a raw seconds value
@@ -537,6 +538,18 @@ function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs, flig
     }
   } else {
     _flightDepartsAtMs = null;
+  }
+
+  // Hospital release timer — hospitalReleaseAt is a Unix timestamp from the server
+  if (hospitalReleaseAt != null) {
+    const msLeft = hospitalReleaseAt * 1000 - Date.now();
+    if (msLeft > 0) {
+      _hospitalReleaseAtMs = hospitalReleaseAt * 1000;
+    } else {
+      _hospitalReleaseAtMs = null;
+    }
+  } else {
+    _hospitalReleaseAtMs = null;
   }
 
   // Only re-anchor countdowns when server_time changes (fresh state refresh).
@@ -572,7 +585,7 @@ function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs, flig
   }
 
   _renderTimers();
-  if ((Object.keys(_activeTimers).length > 0 || _jailReleaseEndMs != null || _flightDepartsAtMs != null) && !_timerInterval) {
+  if ((Object.keys(_activeTimers).length > 0 || _jailReleaseEndMs != null || _flightDepartsAtMs != null || _hospitalReleaseAtMs != null) && !_timerInterval) {
     _timerInterval = setInterval(_tickTimers, 1000);
   }
 }
@@ -593,11 +606,15 @@ function _tickTimers() {
   if (_flightDepartsAtMs != null && Date.now() >= _flightDepartsAtMs) {
     _flightDepartsAtMs = null;
   }
+  // Clear hospital timer once it passes
+  if (_hospitalReleaseAtMs != null && Date.now() >= _hospitalReleaseAtMs) {
+    _hospitalReleaseAtMs = null;
+  }
   _renderTimers();
   _updateCharPills();
-  // Keep interval running as long as there are countdown timers, AggPro, jail release, or flight
+  // Keep interval running as long as there are countdown timers, AggPro, jail release, flight, or hospital
   const countdownKeys = Object.keys(_activeTimers).filter(k => k !== "aggpro");
-  if (countdownKeys.length === 0 && !_aggProActive && _jailReleaseEndMs == null && _flightDepartsAtMs == null) {
+  if (countdownKeys.length === 0 && !_aggProActive && _jailReleaseEndMs == null && _flightDepartsAtMs == null && _hospitalReleaseAtMs == null) {
     clearInterval(_timerInterval);
     _timerInterval = null;
   }
@@ -618,6 +635,12 @@ function _renderTimers() {
   if (_flightDepartsAtMs != null) {
     const secs = Math.max(0, Math.floor((_flightDepartsAtMs - now) / 1000));
     tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">Flight</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
+  }
+
+  // Hospital release countdown
+  if (_hospitalReleaseAtMs != null) {
+    const secs = Math.max(0, Math.floor((_hospitalReleaseAtMs - now) / 1000));
+    tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">Hospital</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
   }
 
   // AggPro always shown

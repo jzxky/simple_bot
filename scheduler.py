@@ -16,6 +16,8 @@ class Scheduler:
 
     def tick(self, state, executor):
         for task in self._tasks:
+            if state.in_hospital and not task.run_in_hospital:
+                continue
             if task.can_run(state):
                 state.current_task = task.label or type(task).__name__
                 try:
