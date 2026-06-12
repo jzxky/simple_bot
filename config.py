@@ -134,18 +134,17 @@ def _load_env() -> dict:
 
 
 def get_env_var(key: str, default: str = "") -> str:
-    """Read a single variable from the .env file."""
-    if not os.path.exists(ENV_PATH):
-        return default
-    with open(ENV_PATH) as f:
-        for line in f:
-            line = line.strip()
-            if "=" not in line or line.startswith("#"):
-                continue
-            k, _, v = line.partition("=")
-            if k.strip() == key:
-                return v.strip()
-    return default
+    """Read a single variable from the .env file, falling back to os.environ."""
+    if os.path.exists(ENV_PATH):
+        with open(ENV_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if "=" not in line or line.startswith("#"):
+                    continue
+                k, _, v = line.partition("=")
+                if k.strip() == key:
+                    return v.strip()
+    return os.environ.get(key, default)
 
 
 def save_env(email: str, password: str):
