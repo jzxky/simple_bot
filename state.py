@@ -57,6 +57,7 @@ class GameState:
     hold_action_timer: bool = False
     vehicle_health: "int | None" = None
     flight_departs_at: "float | None" = None
+    char_history_updated_at: float = 0.0
 
     def agg_fail_count(self) -> int:
         cutoff = datetime.now() - timedelta(minutes=30)
