@@ -533,7 +533,10 @@ def handle_consume(action: Action, state: GameState):
 
 
 def handle_refresh_state(action: Action, state: GameState):
-    _nav(_u("/loggedin.asp?display=play"), state)
+    if state.in_jail:
+        _nav(_u("/jail/contraband.asp"), state)
+    else:
+        _nav(_u("/loggedin.asp?display=play"), state)
 
 
 def handle_payback(action: Action, state: GameState):
