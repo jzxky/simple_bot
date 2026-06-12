@@ -149,10 +149,31 @@ def get_env_var(key: str, default: str = "") -> str:
 
 
 def save_env(email: str, password: str):
+    # Read existing .env, update only MM_EMAIL/MM_PASSWORD, preserve all other lines
+    lines = []
+    if os.path.exists(ENV_PATH):
+        with open(ENV_PATH) as f:
+            lines = f.readlines()
+    managed = {"MM_EMAIL": email, "MM_PASSWORD": password}
+    seen = set()
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            new_lines.append(line)
+            continue
+        key = stripped.split("=", 1)[0].strip()
+        if key in managed:
+            new_lines.append(f"{key}={managed[key]}\n")
+            seen.add(key)
+        else:
+            new_lines.append(line)
+    for key, val in managed.items():
+        if key not in seen:
+            new_lines.append(f"{key}={val}\n")
     with _lock:
         with open(ENV_PATH, "w") as f:
-            f.write(f"MM_EMAIL={email}\n")
-            f.write(f"MM_PASSWORD={password}\n")
+            f.writelines(new_lines)
 
 
 def load():
