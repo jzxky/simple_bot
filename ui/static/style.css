@@ -689,26 +689,26 @@ input.input-unsaved { color: var(--red) !important; }
 
 /* Earn History table */
 .ch-earn-table td { vertical-align: top; padding: 5px 10px; }
+.ch-earn-table td.ch-earn-cat { vertical-align: middle; }
 .ch-earn-cat {
   font-size: 0.68rem; font-weight: 700; color: var(--accent);
   text-transform: uppercase; letter-spacing: 0.05em;
-  white-space: nowrap; width: 90px; vertical-align: middle;
+  white-space: nowrap; width: 90px;
 }
-.ch-earn-entries { line-height: 1.8; }
+.ch-earn-entries { line-height: 2; }
 .ch-earn-item {
-  display: inline-block;
-  margin-right: 12px;
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-right: 8px; margin-bottom: 2px;
   font-size: 0.8rem;
+  background: var(--card-bg, #1e1e2e);
+  border: 1px solid var(--border, #333);
+  border-radius: 5px;
+  padding: 1px 8px 1px 8px;
 }
 .ch-earn-label { color: var(--muted); }
 .ch-earn-count {
   color: var(--text); font-weight: 600;
   display: inline-block; text-align: right;
-  background: var(--card-bg, #1e1e2e);
-  border: 1px solid var(--border, #333);
-  border-radius: 4px;
-  padding: 0 5px;
-  margin-left: 4px;
 }
 
 /* Promotion History */
