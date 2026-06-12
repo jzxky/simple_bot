@@ -413,6 +413,10 @@ function pollStatus() {
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null);
       _updateCharPills();
 
+      // Show check-for-updates row only when running inside a git repo
+      const updateRow = document.getElementById("update-row");
+      if (updateRow) updateRow.style.display = d.is_git_repo ? "" : "none";
+
       // Gym timer
       const gymTimerEl = document.getElementById("gym-timer");
       if (gymTimerEl) {
@@ -626,6 +630,40 @@ function toggleFieldVisibility(id, btn) {
     el.type = "password";
     if (slash) slash.style.display = "";
   }
+}
+
+function checkForUpdates() {
+  const btn = document.getElementById("check-update-btn");
+  btn.disabled = true;
+  btn.textContent = "Checking…";
+  fetch("/check_update")
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert("Update check failed: " + d.error); return; }
+      if (d.up_to_date) { alert("You are up to date."); return; }
+      const modal = document.getElementById("update-modal");
+      document.getElementById("update-modal-title").textContent =
+        `Update Available (${d.commits_behind} commit${d.commits_behind !== 1 ? "s" : ""} behind)`;
+      document.getElementById("update-modal-body").textContent = d.log || "";
+      modal.style.display = "flex";
+    })
+    .catch(() => alert("Could not reach server."))
+    .finally(() => { btn.disabled = false; btn.textContent = "Check for Updates"; });
+}
+
+function applyUpdate() {
+  const applyBtn = document.getElementById("apply-update-btn");
+  applyBtn.disabled = true;
+  applyBtn.textContent = "Installing…";
+  fetch("/apply_update", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById("update-modal").style.display = "none";
+      if (d.error) { alert("Update failed: " + d.error); return; }
+      alert("Update applied. Please restart the bot.\n\n" + (d.output || ""));
+    })
+    .catch(() => alert("Could not reach server."))
+    .finally(() => { applyBtn.disabled = false; applyBtn.textContent = "Install Update"; });
 }
 
 function consumeItem(type) {

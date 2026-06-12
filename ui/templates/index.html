@@ -339,6 +339,10 @@
                   <button id="save-min_cash_on_hand" class="num-save-btn" onclick="saveNum('min_cash_on_hand')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
                 </div>
               </div>
+              <div class="setting-row" id="update-row" style="display:none">
+                <span>Software Update</span>
+                <button id="check-update-btn" class="action-btn" onclick="checkForUpdates()">Check for Updates</button>
+              </div>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Character History</h3>
@@ -794,5 +798,17 @@
   if (document.getElementById("char_history_enabled").checked) loadCharHistory();
   pollStatus();
 </script>
+
+<!-- Update modal -->
+<div id="update-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--card-bg,#1e1e2e);border:1px solid var(--border,#333);border-radius:10px;padding:24px;max-width:520px;width:90%;color:var(--text,#cdd6f4);">
+    <h3 style="margin:0 0 12px" id="update-modal-title">Update Available</h3>
+    <p id="update-modal-body" style="margin:0 0 12px;font-size:.9em;white-space:pre-wrap;font-family:monospace;max-height:220px;overflow:auto;background:rgba(0,0,0,.3);padding:10px;border-radius:6px;"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="action-btn" onclick="document.getElementById('update-modal').style.display='none'">Cancel</button>
+      <button class="action-btn" id="apply-update-btn" onclick="applyUpdate()" style="background:var(--accent,#89b4fa);color:#000">Install Update</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
