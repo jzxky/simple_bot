@@ -1303,7 +1303,7 @@ def handle_check_drug_trade(action: Action, state: GameState):
     state.add_log(f"Drug trade: found {len(offer_ids)} offer(s).")
 
     for offer_id in offer_ids:
-        offer_url = f"{_u("/income/drugtrade.asp")}?display=offer&offerid={offer_id}"
+        offer_url = _u("/income/drugtrade.asp") + f"?display=offer&offerid={offer_id}"
         _nav(offer_url, state)
         if not _check_session(state):
             return
