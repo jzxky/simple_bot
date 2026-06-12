@@ -932,6 +932,10 @@ function requestWithdraw() {
 function onTaskChange() {
   const val = document.getElementById("task-selector").value;
   document.querySelectorAll(".task-panel").forEach(p => p.style.display = "none");
+  if (val === "travel") {
+    document.getElementById("task-travel").style.display = "";
+    onTravelMethodChange();
+  }
   if (val === "jailbreak") {
     document.getElementById("task-jailbreak").style.display = "";
     loadJbPopulation();
@@ -942,6 +946,68 @@ function onTaskChange() {
   if (val === "warrants") {
     document.getElementById("task-warrants").style.display = "";
   }
+}
+
+// ── Travel ────────────────────────────────────────────────────────────────────
+
+let _travelDests = [];
+
+function onTravelMethodChange() {
+  const method = document.getElementById("travel-method").value;
+  const destSel = document.getElementById("travel-destination");
+  destSel.innerHTML = '<option value="">— Loading... —</option>';
+  document.getElementById("travel-dest-meta").textContent = "";
+  document.getElementById("travel-error").style.display = "none";
+  fetch("/tasks/travel_destinations?method=" + method)
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) {
+        document.getElementById("travel-error").textContent = d.error;
+        document.getElementById("travel-error").style.display = "";
+        destSel.innerHTML = '<option value="">— Unavailable —</option>';
+        return;
+      }
+      _travelDests = d.destinations || [];
+      destSel.innerHTML = '<option value="">— Select destination —</option>' +
+        _travelDests.map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join("");
+      destSel.onchange = _onTravelDestChange;
+      _onTravelDestChange();
+    })
+    .catch(() => {
+      destSel.innerHTML = '<option value="">— Error —</option>';
+    });
+}
+
+function _onTravelDestChange() {
+  const val = document.getElementById("travel-destination").value;
+  const dest = _travelDests.find(o => o.value === val);
+  const meta = document.getElementById("travel-dest-meta");
+  if (dest && dest.costs) {
+    meta.textContent = dest.costs + (dest.minutes ? "  ·  " + dest.minutes + " min" : "");
+  } else {
+    meta.textContent = "";
+  }
+}
+
+function submitTravel() {
+  const method = document.getElementById("travel-method").value;
+  const target = document.getElementById("travel-destination").value;
+  const errEl = document.getElementById("travel-error");
+  errEl.style.display = "none";
+  if (!target) { errEl.textContent = "Select a destination."; errEl.style.display = ""; return; }
+  const btn = event.target;
+  btn.disabled = true;
+  fetch("/tasks/travel", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({target_city: target, method}),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { errEl.textContent = d.error; errEl.style.display = ""; }
+    })
+    .catch(() => { errEl.textContent = "Request failed."; errEl.style.display = ""; })
+    .finally(() => { btn.disabled = false; });
 }
 
 function checkWarrants() {

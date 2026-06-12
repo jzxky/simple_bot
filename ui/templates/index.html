@@ -446,10 +446,33 @@
           <label class="task-label">Task</label>
           <select id="task-selector" class="task-select" onchange="onTaskChange()">
             <option value="">— Select a task —</option>
+            <option value="travel">Travel</option>
             <option value="jailbreak">Jail Break</option>
             <option value="archive-journals">Archive Journals</option>
             <option value="warrants">Manage Warrants</option>
           </select>
+        </div>
+
+        <!-- Travel panel -->
+        <div id="task-travel" class="task-panel" style="display:none;">
+          <div class="task-subpanel">
+            <div class="task-row">
+              <label class="task-label">Transportation</label>
+              <select id="travel-method" class="task-select" onchange="onTravelMethodChange()">
+                <option value="airport">Airport</option>
+                <option value="own_vehicle">Own Vehicle</option>
+              </select>
+            </div>
+            <div class="task-row">
+              <label class="task-label">Destination</label>
+              <select id="travel-destination" class="task-select">
+                <option value="">— Loading... —</option>
+              </select>
+              <span id="travel-dest-meta" style="font-size:.8em;color:var(--text-muted,#888);margin-left:8px;white-space:nowrap;"></span>
+            </div>
+            <div id="travel-error" style="display:none;color:#f38ba8;font-size:.85em;margin-top:4px;"></div>
+            <button class="btn-primary task-submit-btn" onclick="submitTravel()">Travel</button>
+          </div>
         </div>
 
         <!-- Archive Journals panel -->

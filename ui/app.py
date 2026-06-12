@@ -582,6 +582,59 @@ def players_import():
     return jsonify({"assigned": len(matched), "matched": matched, "unmatched": unmatched})
 
 
+@app.route("/tasks/travel_destinations")
+def tasks_travel_destinations():
+    method = request.args.get("method", "airport")
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    import browser as _browser
+    from bs4 import BeautifulSoup as _BS
+    import urls as _urls
+    try:
+        if method == "own_vehicle":
+            html = _browser.navigate(_urls.BASE_URL + "/travel/travel.asp")
+            soup = _BS(html, "html.parser")
+            sel = soup.find("select", attrs={"name": "vehicletravel"})
+            if not sel:
+                return jsonify({"destinations": []})
+            opts = [
+                {"value": o["value"], "label": o.get_text(strip=True)}
+                for o in sel.find_all("option") if o.get("value")
+            ]
+        else:
+            html = _browser.navigate(_urls.BASE_URL + "/travel/airport.asp")
+            soup = _BS(html, "html.parser")
+            sel = soup.find("select", attrs={"name": "destination"})
+            if not sel:
+                return jsonify({"destinations": []})
+            opts = [
+                {
+                    "value": o["value"],
+                    "label": o.get_text(strip=True),
+                    "costs": o.get("data-costs", ""),
+                    "minutes": o.get("data-minutes", ""),
+                }
+                for o in sel.find_all("option")
+                if o.get("value") and o.get("value") != "0"
+            ]
+        return jsonify({"destinations": opts})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/tasks/travel", methods=["POST"])
+def tasks_travel():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    data = request.get_json()
+    target = data.get("target_city", "").strip()
+    method = data.get("method", "airport")
+    if not target:
+        return jsonify({"error": "target_city is required."}), 400
+    bot.request_travel(target, method)
+    return jsonify({"ok": True})
+
+
 @app.route("/check_update")
 def check_update():
     if not _is_git_repo():
