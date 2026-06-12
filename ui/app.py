@@ -5,6 +5,7 @@ Flask web UI for bot configuration and control.
 import sys
 import os
 import base64
+import subprocess
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -152,6 +153,22 @@ def resume():
     return jsonify({"running": True, "paused": False})
 
 
+def _is_git_repo() -> bool:
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, cwd=paths.resource_dir(),
+        )
+        return r.returncode == 0
+    except FileNotFoundError:
+        return False
+
+
+def _git_run(*args) -> "tuple[int, str]":
+    r = subprocess.run(["git", *args], capture_output=True, text=True, cwd=paths.resource_dir())
+    return r.returncode, (r.stdout + r.stderr).strip()
+
+
 def _get_last_gym_use() -> float:
     try:
         from tasks.gym import load_last_gym_use
@@ -200,6 +217,7 @@ def status():
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
         "last_gym_use": _get_last_gym_use(),
+        "is_git_repo": _is_git_repo(),
     })
 
 
@@ -560,6 +578,35 @@ def players_import():
             unmatched.append(name)
 
     return jsonify({"assigned": len(matched), "matched": matched, "unmatched": unmatched})
+
+
+@app.route("/check_update")
+def check_update():
+    if not _is_git_repo():
+        return jsonify({"error": "Not a git repository."}), 400
+    rc, out = _git_run("fetch", "origin")
+    if rc != 0:
+        return jsonify({"error": f"git fetch failed: {out}"}), 500
+    rc, behind = _git_run("rev-list", "--count", "HEAD..origin/main")
+    if rc != 0:
+        return jsonify({"error": "Could not compare versions."}), 500
+    count = int(behind.strip() or "0")
+    if count == 0:
+        return jsonify({"up_to_date": True, "commits_behind": 0})
+    rc, log = _git_run("log", "--oneline", f"HEAD..origin/main")
+    return jsonify({"up_to_date": False, "commits_behind": count, "log": log})
+
+
+@app.route("/apply_update", methods=["POST"])
+def apply_update():
+    if not _is_git_repo():
+        return jsonify({"error": "Not a git repository."}), 400
+    if bot.is_running():
+        return jsonify({"error": "Stop the bot before applying an update."}), 400
+    rc, out = _git_run("pull", "--ff-only", "origin", "main")
+    if rc != 0:
+        return jsonify({"error": f"git pull failed: {out}"}), 500
+    return jsonify({"ok": True, "output": out})
 
 
 def run():
