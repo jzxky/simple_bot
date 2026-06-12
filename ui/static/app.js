@@ -147,9 +147,8 @@ function _doSave() {
 
 function autoSave() {
   _doSave();
-  _updateCrimePills();
-  _updateEarnsPills();
-  _updateActionsPills();
+  _updateIncomePills();
+  _updateIncomeTabColors();
 }
 
 // ── Credentials save ──────────────────────────────────────────────────────────
@@ -240,8 +239,10 @@ function _selText(id) {
 }
 
 function _updateCrimePills() {
-  const el = document.getElementById("pills-s-crimes");
+  const el = document.getElementById("pills-income-crimes");
   if (!el) return;
+  const enabled = document.getElementById("crimes_enabled")?.checked;
+  if (!enabled) { el.innerHTML = _pill("Aggravated Crimes: Disabled"); return; }
   const crime = document.getElementById("primary_crime").value;
   const thresh = parseFloat(document.getElementById("primary_threshold").value);
   const pills = [_pill(`${_selText("primary_crime")} // ${thresh}%`)];
@@ -253,16 +254,39 @@ function _updateCrimePills() {
 }
 
 function _updateEarnsPills() {
-  const el = document.getElementById("pills-s-earns");
+  const el = document.getElementById("pills-income-earns");
   if (!el) return;
+  const enabled = document.getElementById("earns_enabled")?.checked;
+  if (!enabled) { el.innerHTML = _pill("Earns: Disabled"); return; }
   const label = _selText("earn_type");
   el.innerHTML = label ? _pill(label) : "";
 }
 
 function _updateActionsPills() {
-  const el = document.getElementById("pills-s-actions");
+  const el = document.getElementById("pills-income-actions");
   if (!el) return;
+  const enabled = document.getElementById("action_enabled")?.checked;
+  if (!enabled) { el.innerHTML = _pill("Actions: Disabled"); return; }
   el.innerHTML = _pill(_selText("action_type")) + _pill(_selText("away_action_type"));
+}
+
+function _updateIncomePills() {
+  _updateEarnsPills();
+  _updateCrimePills();
+  _updateActionsPills();
+}
+
+function _updateIncomeTabColors() {
+  const tabs = [
+    ["income-tab-earns",   "earns_enabled"],
+    ["income-tab-crimes",  "crimes_enabled"],
+    ["income-tab-actions", "action_enabled"],
+  ];
+  tabs.forEach(([tabId, toggleId]) => {
+    const tab = document.getElementById(tabId);
+    const toggle = document.getElementById(toggleId);
+    if (tab && toggle) tab.classList.toggle("tab-disabled", !toggle.checked);
+  });
 }
 
 let _lastEnergy = null;
