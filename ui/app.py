@@ -588,36 +588,8 @@ def tasks_travel_destinations():
     method = request.args.get("method", "airport")
     if not bot.is_running():
         return jsonify({"error": "Bot must be running."}), 400
-    import browser as _browser
-    from bs4 import BeautifulSoup as _BS
-    import urls as _urls
     try:
-        if method == "own_vehicle":
-            html = _browser.navigate(_urls.BASE_URL + "/travel/travel.asp")
-            soup = _BS(html, "html.parser")
-            sel = soup.find("select", attrs={"name": "vehicletravel"})
-            if not sel:
-                return jsonify({"destinations": []})
-            opts = [
-                {"value": o["value"], "label": o.get_text(strip=True)}
-                for o in sel.find_all("option") if o.get("value")
-            ]
-        else:
-            html = _browser.navigate(_urls.BASE_URL + "/travel/airport.asp")
-            soup = _BS(html, "html.parser")
-            sel = soup.find("select", attrs={"name": "destination"})
-            if not sel:
-                return jsonify({"destinations": []})
-            opts = [
-                {
-                    "value": o["value"],
-                    "label": o.get_text(strip=True),
-                    "costs": o.get("data-costs", ""),
-                    "minutes": o.get("data-minutes", ""),
-                }
-                for o in sel.find_all("option")
-                if o.get("value") and o.get("value") != "0"
-            ]
+        opts = bot.request_travel_dests(method, timeout=15.0)
         return jsonify({"destinations": opts})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

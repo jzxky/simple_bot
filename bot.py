@@ -68,6 +68,8 @@ _warrants_request: queue.Queue = queue.Queue(maxsize=1)
 _warrants_result: queue.Queue = queue.Queue(maxsize=1)
 _turn_in_warrant_queue: queue.Queue = queue.Queue()
 _travel_queue: queue.Queue = queue.Queue()
+_travel_dests_request: queue.Queue = queue.Queue(maxsize=1)
+_travel_dests_result: queue.Queue = queue.Queue(maxsize=1)
 _clear_earn_event = threading.Event()
 _clear_jail_duty_queue_event = threading.Event()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
@@ -338,6 +340,14 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Travel error: {e}")
 
+            # Travel destination fetch (for UI dropdowns)
+            if not _travel_dests_request.empty():
+                try:
+                    method = _travel_dests_request.get_nowait()
+                    _travel_dests_result.put(_fetch_travel_dests(method))
+                except Exception as e:
+                    _travel_dests_result.put(e)
+
             if _stop_event.is_set():
                 break
 
@@ -560,3 +570,44 @@ def request_turn_in_warrant(url: str, case_id: str):
 
 def request_travel(target_city: str, method: str):
     _travel_queue.put({"target_city": target_city, "method": method})
+
+
+def _fetch_travel_dests(method: str) -> list:
+    from bs4 import BeautifulSoup as _BS
+    import urls as _urls
+    if method == "own_vehicle":
+        html = browser.navigate(_urls.BASE_URL + "/travel/travel.asp")
+        soup = _BS(html, "html.parser")
+        sel = soup.find("select", attrs={"name": "vehicletravel"})
+        if not sel:
+            return []
+        return [
+            {"value": o["value"], "label": o.get_text(strip=True)}
+            for o in sel.find_all("option") if o.get("value")
+        ]
+    else:
+        html = browser.navigate(_urls.BASE_URL + "/travel/airport.asp")
+        soup = _BS(html, "html.parser")
+        sel = soup.find("select", attrs={"name": "destination"})
+        if not sel:
+            return []
+        return [
+            {
+                "value": o["value"],
+                "label": o.get_text(strip=True),
+                "costs": o.get("data-costs", ""),
+                "minutes": o.get("data-minutes", ""),
+            }
+            for o in sel.find_all("option")
+            if o.get("value") and o.get("value") != "0"
+        ]
+
+
+def request_travel_dests(method: str, timeout: float = 15.0) -> list:
+    while not _travel_dests_result.empty():
+        _travel_dests_result.get_nowait()
+    _travel_dests_request.put(method)
+    result = _travel_dests_result.get(timeout=timeout)
+    if isinstance(result, Exception):
+        raise result
+    return result
