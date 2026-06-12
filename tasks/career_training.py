@@ -5,6 +5,7 @@ Performs career training when the action timer is ready.
 import urls
 from tasks.base import Task, Action
 from state import GameState
+from action_cooldowns import ACTION_COOLDOWNS, should_skip_action_for_armed_robbery
 
 _CAREER_PATHS = {
     "fire":    "/localcity/fire.asp",
@@ -21,8 +22,10 @@ class CareerTrainingTask(Task):
         self.career = career
 
     def can_run(self, state: GameState) -> bool:
-        return (state.logged_in and not state.in_jail and state.action_available()
-                and state.in_home_city() and not state.hold_action_timer)
+        if not (state.logged_in and not state.in_jail and state.action_available()
+                and state.in_home_city() and not state.hold_action_timer):
+            return False
+        return not should_skip_action_for_armed_robbery(state, ACTION_COOLDOWNS["career_training"])
 
     def run(self, state: GameState, executor):
         path = _CAREER_PATHS.get(self.career)
