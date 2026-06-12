@@ -220,6 +220,7 @@ def status():
         "is_git_repo": _is_git_repo(),
         "flight_departs_at": s.flight_departs_at,
         "vehicle_health": s.vehicle_health,
+        "char_history_updated_at": s.char_history_updated_at,
     })
 
 

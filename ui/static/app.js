@@ -449,6 +449,15 @@ function pollStatus() {
         }
       }
 
+      // Character history live reload — refresh when char_history_updated_at advances
+      if ((d.char_history_updated_at || 0) > _chLastUpdated) {
+        _chLastUpdated = d.char_history_updated_at;
+        if (document.getElementById("s-char-history") &&
+            document.getElementById("s-char-history").style.display !== "none") {
+          loadCharHistory();
+        }
+      }
+
       // Log — only update live view; switch back to live if first log file matches
       const logSel = document.getElementById("log-file-select");
       if (logSel && logSel.options.length && logSel.options[0].value === _logCurrentFile) {
@@ -1314,6 +1323,16 @@ function renderCharHistory(data, reqs) {
   // ── Earn History ──────────────────────────────────────────────────────────
   if (data.earn_history && data.earn_history.length) {
     const hideZeros = _isHideZeros("earn_history");
+
+    // Find max formatted count length across all entries for uniform pill width
+    let maxCountLen = 1;
+    for (const cat of data.earn_history) {
+      for (const e of cat.entries) {
+        maxCountLen = Math.max(maxCountLen, e.count.toLocaleString().length);
+      }
+    }
+    const pillW = `${maxCountLen + 0.4}ch`;
+
     html += `<div class="ch-section ch-section-full">
       <div class="ch-section-head">
         <span class="ch-section-title">Earn History</span>
@@ -1327,7 +1346,7 @@ function renderCharHistory(data, reqs) {
         <td class="ch-earn-cat">${cat.category}</td>
         <td class="ch-earn-entries">`;
       for (const e of entries) {
-        html += `<span class="ch-earn-item"><span class="ch-earn-label">${e.type}</span> <span class="ch-earn-count">${e.count.toLocaleString()}</span></span>`;
+        html += `<span class="ch-earn-item"><span class="ch-earn-label">${e.type}</span><span class="ch-earn-count" style="min-width:${pillW}">${e.count.toLocaleString()}</span></span>`;
       }
       html += `</td></tr>`;
     }
@@ -1437,6 +1456,7 @@ let _cjData = [];         // full sorted journal list
 let _cjFiltered = [];     // after search filter
 let _cjPage = 1;
 let _cjLastUpdated = 0;   // last journals_updated_at seen from /status
+let _chLastUpdated = 0;   // last char_history_updated_at seen from /status
 const CJ_PAGE_SIZE = 10;
 
 function cjInit() {

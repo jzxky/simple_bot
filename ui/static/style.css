@@ -692,7 +692,7 @@ input.input-unsaved { color: var(--red) !important; }
 .ch-earn-cat {
   font-size: 0.68rem; font-weight: 700; color: var(--accent);
   text-transform: uppercase; letter-spacing: 0.05em;
-  white-space: nowrap; width: 90px;
+  white-space: nowrap; width: 90px; vertical-align: middle;
 }
 .ch-earn-entries { line-height: 1.8; }
 .ch-earn-item {
@@ -701,7 +701,15 @@ input.input-unsaved { color: var(--red) !important; }
   font-size: 0.8rem;
 }
 .ch-earn-label { color: var(--muted); }
-.ch-earn-count { color: var(--text); font-weight: 600; }
+.ch-earn-count {
+  color: var(--text); font-weight: 600;
+  display: inline-block; text-align: right;
+  background: var(--card-bg, #1e1e2e);
+  border: 1px solid var(--border, #333);
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-left: 4px;
+}
 
 /* Promotion History */
 .ch-table-scroll { overflow-x: auto; }
