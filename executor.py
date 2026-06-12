@@ -1564,8 +1564,106 @@ def handle_test_illness_journal(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
+# Gym handler
+# ---------------------------------------------------------------------------
 
-HANDLERS = {
+_GYM_URL = "/localcity/businesses.asp?name=Gym"
+_TRAVEL_URL = "/travel/travel.asp"
+_CHICAGO = "Chicago"
+
+
+def handle_gym(action: Action, state: GameState):
+    import re as _re
+    import config as cfg
+    import time
+    from tasks.gym import save_last_gym_use
+
+    gym_cfg = cfg.load().get("gym", {})
+    activity = gym_cfg.get("activity", "weights")
+    auto_travel = gym_cfg.get("auto_travel", False)
+
+    # Travel to Chicago if needed
+    if state.current_city != _CHICAGO:
+        if not auto_travel:
+            state.add_log("Gym: not in Chicago and auto-travel is off — skipping.")
+            return
+        state.add_log("Gym: travelling to Chicago...")
+        _nav(_u(_TRAVEL_URL), state)
+        if not _check_session(state):
+            return
+        page = browser.page()
+        # Click the Chicago flight link
+        soup = BeautifulSoup(state.page_html, "html.parser")
+        chicago_link = None
+        for a in soup.find_all("a", href=True):
+            if "chicago" in a.get_text(strip=True).lower() and "book" in a.get("href", "").lower():
+                chicago_link = a["href"]
+                break
+        if not chicago_link:
+            state.add_log("Gym: could not find Chicago flight link.")
+            return
+        _nav(_u(chicago_link) if not chicago_link.startswith("http") else chicago_link, state)
+        if state.current_city != _CHICAGO:
+            state.add_log(f"Gym: still not in Chicago after travel attempt ({state.current_city}).")
+            return
+
+    # Navigate to gym page
+    _nav(_u(_GYM_URL), state)
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    # Check if membership purchase form is shown
+    membership_form = soup.find("select", attrs={"name": "option"})
+    if membership_form and any(
+        o.get("value") == "purchase" for o in membership_form.find_all("option")
+    ):
+        # Parse cost
+        cost = 0
+        cost_p = soup.find("p", string=_re.compile(r"current cost", _re.I))
+        if cost_p:
+            m = _re.search(r"\$([\d,]+)", cost_p.get_text())
+            if m:
+                cost = int(m.group(1).replace(",", ""))
+
+        if cost > 0 and state.clean_money < cost:
+            needed = cost - state.clean_money
+            state.add_log(f"Gym: need ${cost:,} for membership, have ${state.clean_money:,} — withdrawing ${needed:,}.")
+            handle_withdraw(Action("withdraw", amount=needed), state)
+            if state.clean_money < cost:
+                state.add_log("Gym: still insufficient funds after withdrawal — skipping.")
+                return
+
+        # Purchase membership
+        page = browser.page()
+        page.select_option("select[name='option']", "purchase")
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+        state.add_log(f"Gym: purchased membership (${cost:,}).")
+
+        # Navigate back to gym activity page
+        _nav(_u(_GYM_URL), state)
+        if not _check_session(state):
+            return
+        soup = BeautifulSoup(state.page_html, "html.parser")
+
+    # Do the activity
+    activity_select = soup.find("select", attrs={"name": "option"})
+    if not activity_select or not any(
+        o.get("value") == activity for o in activity_select.find_all("option")
+    ):
+        state.add_log(f"Gym: activity '{activity}' not available on page.")
+        return
+
+    page = browser.page()
+    page.select_option("select[name='option']", activity)
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    save_last_gym_use(time.time())
+    state.add_log(f"Gym: completed activity '{activity}'.")
     "login": handle_login,
     "check_earns": handle_check_earns,
     "clear_earn_queue": handle_clear_earn_queue,
@@ -1595,6 +1693,7 @@ HANDLERS = {
     "check_warrants": handle_check_warrants,
     "turn_in_warrant": handle_turn_in_warrant,
     "test_illness_journal": handle_test_illness_journal,
+    "do_gym": handle_gym,
 }
 
 

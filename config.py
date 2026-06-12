@@ -70,6 +70,11 @@ DEFAULT_CONFIG = {
         "enabled": True,
         "refresh_interval_minutes": 30
     },
+    "gym": {
+        "enabled": False,
+        "activity": "weights",
+        "auto_travel": False,
+    },
     "promo": {
         "monitor_top_job": False,
         "top_job_thread_id": ""

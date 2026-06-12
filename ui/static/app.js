@@ -133,6 +133,9 @@ function _doSave() {
     autobuy_qty_heroin:      parseInt((document.getElementById("autobuy_qty_heroin")||{value:0}).value)||0,
     autobuy_price_cocaine:   parseInt((document.getElementById("autobuy_price_cocaine")||{value:0}).value)||0,
     autobuy_qty_cocaine:     parseInt((document.getElementById("autobuy_qty_cocaine")||{value:0}).value)||0,
+    gym_enabled:    (document.getElementById("gym_enabled")||{checked:false}).checked,
+    gym_activity:   (document.getElementById("gym_activity")||{value:"weights"}).value,
+    gym_auto_travel:(document.getElementById("gym_auto_travel")||{checked:false}).checked,
   };
 
   return fetch("/save", {
@@ -409,6 +412,25 @@ function pollStatus() {
       _lastEnergy = d.energy;
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null);
       _updateCharPills();
+
+      // Gym timer
+      const gymTimerEl = document.getElementById("gym-timer");
+      if (gymTimerEl) {
+        if (d.last_gym_use && d.last_gym_use > 0) {
+          const nextGym = d.last_gym_use + 12 * 3600;
+          const secsLeft = Math.round(nextGym - Date.now() / 1000);
+          if (secsLeft <= 0) {
+            gymTimerEl.textContent = "Ready";
+          } else {
+            const h = Math.floor(secsLeft / 3600);
+            const m = Math.floor((secsLeft % 3600) / 60);
+            const s = secsLeft % 60;
+            gymTimerEl.textContent = h + "h " + String(m).padStart(2,"0") + "m " + String(s).padStart(2,"0") + "s";
+          }
+        } else {
+          gymTimerEl.textContent = "Ready";
+        }
+      }
 
       // Case work auto-detect
       updateCaseWorkSection(d.occupation || "");
