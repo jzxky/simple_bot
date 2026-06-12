@@ -407,7 +407,7 @@ function pollStatus() {
 
       // Timers
       _lastEnergy = d.energy;
-      updateTimers(d.timers || {}, d.server_time, d.agg_pro_active);
+      updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null);
       _updateCharPills();
 
       // Case work auto-detect
@@ -479,9 +479,17 @@ function _fmtCountdown(secs) {
 
 // _aggProActive tracks latest agg_pro_active from status for always-visible tile
 let _aggProActive = false;
+let _jailReleaseEndMs = null;
 
-function updateTimers(timers, serverTimeStr, aggProActive) {
+function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs) {
   _aggProActive = aggProActive;
+
+  // Jail release timer — re-anchor on every poll since it's a raw seconds value
+  if (jailReleaseSecs != null && jailReleaseSecs > 0) {
+    _jailReleaseEndMs = Date.now() + jailReleaseSecs * 1000;
+  } else if (jailReleaseSecs == null) {
+    _jailReleaseEndMs = null;
+  }
 
   // Only re-anchor countdowns when server_time changes (fresh state refresh).
   // Between polls the wall-clock countdowns keep ticking uninterrupted.
@@ -516,7 +524,7 @@ function updateTimers(timers, serverTimeStr, aggProActive) {
   }
 
   _renderTimers();
-  if (Object.keys(_activeTimers).length > 0 && !_timerInterval) {
+  if ((Object.keys(_activeTimers).length > 0 || _jailReleaseEndMs != null) && !_timerInterval) {
     _timerInterval = setInterval(_tickTimers, 1000);
   }
 }
@@ -535,9 +543,9 @@ function _tickTimers() {
   }
   _renderTimers();
   _updateCharPills();
-  // Keep interval running as long as there are countdown timers or AggPro is shown
+  // Keep interval running as long as there are countdown timers, AggPro, or jail release
   const countdownKeys = Object.keys(_activeTimers).filter(k => k !== "aggpro");
-  if (countdownKeys.length === 0 && !_aggProActive) {
+  if (countdownKeys.length === 0 && !_aggProActive && _jailReleaseEndMs == null) {
     clearInterval(_timerInterval);
     _timerInterval = null;
   }
@@ -547,6 +555,12 @@ function _renderTimers() {
   const grid = document.getElementById("stat-timers-grid");
   const now = Date.now();
   const tiles = [];
+
+  // Jail release countdown — shown first while in jail
+  if (_jailReleaseEndMs != null) {
+    const secs = Math.max(0, Math.floor((_jailReleaseEndMs - now) / 1000));
+    tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">Release</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
+  }
 
   // AggPro always shown
   if (_activeTimers["aggpro"]) {

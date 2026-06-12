@@ -53,6 +53,7 @@ class GameState:
     has_new_journals: bool = False
     journals_updated_at: float = 0.0
     jail_consumables: dict = field(default_factory=dict)
+    jail_release_secs: "int | None" = None
     hold_action_timer: bool = False
 
     def agg_fail_count(self) -> int:
@@ -115,6 +116,23 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
         "Jail Rank" in d.get_text(strip=True)
         for d in soup.find_all("div", id="display_top")
     )
+
+    # Jail release countdown — parse donation_auctiontimer span present on all jail pages
+    release_span = soup.find("span", class_="donation_auctiontimer")
+    if s.in_jail and release_span:
+        raw = release_span.get_text(" ", strip=True)  # e.g. "43m, 45s" or "1h, 2m, 3s"
+        total = 0
+        for num, unit in re.findall(r"(\d+)\s*([hms])", raw):
+            n = int(num)
+            if unit == "h":
+                total += n * 3600
+            elif unit == "m":
+                total += n * 60
+            else:
+                total += n
+        s.jail_release_secs = total if total > 0 else None
+    elif not s.in_jail:
+        s.jail_release_secs = None
 
     # nav_right fields — walk display_top labels
     for top in soup.find_all("div", id="display_top"):

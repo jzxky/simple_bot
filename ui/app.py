@@ -182,6 +182,7 @@ def status():
         "in_jail": s.in_jail,
         "jail_rank": s.jail_rank,
         "jail_consumables": s.jail_consumables,
+        "jail_release_secs": s.jail_release_secs,
         "hold_action_timer": s.hold_action_timer,
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
