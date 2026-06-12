@@ -85,7 +85,7 @@ echo.
 call venv\Scripts\activate.bat
 
 if /i "!LAUNCH_UI!"=="Y" (
-    start http://localhost:5000
+    python main.py
+) else (
+    python main.py --noui
 )
-
-python main.py
