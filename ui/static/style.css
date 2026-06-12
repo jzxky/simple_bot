@@ -935,3 +935,29 @@ input.input-unsaved { color: var(--red) !important; }
 .autobuy-table tr:nth-child(even) td {
   background: var(--bg-alt, rgba(255,255,255,0.03));
 }
+
+/* ── Income section — 3-row pills in header ─────── */
+.income-h2 { align-items: flex-start !important; }
+.income-pills-block {
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  margin-left: 4px;
+  padding-top: 1px;
+}
+.is-collapsed .income-pills-block { display: flex; }
+.income-pills-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 18px;
+}
+.income-pills-row:empty { display: none; }
+
+/* ── Disabled tab coloring ───────────────────────── */
+.tab-btn.tab-disabled { color: var(--red); border-color: rgba(204,42,42,0.5); }
+.tab-btn.tab-disabled:hover { color: var(--red-hover); border-color: var(--red); }
+.tab-btn.tab-disabled.active { color: var(--red); border-color: var(--red); border-bottom-color: var(--surface); }
