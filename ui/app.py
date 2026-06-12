@@ -549,4 +549,6 @@ def players_import():
 
 
 def run():
-    app.run(host="0.0.0.0", port=8080, debug=False)
+    import os
+    port = int(os.getenv("UI_PORT", "8080"))
+    app.run(host="0.0.0.0", port=port, debug=False)

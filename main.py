@@ -8,7 +8,10 @@ import threading
 import webbrowser
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-PORT = 8080
+from dotenv import load_dotenv
+load_dotenv()
+
+PORT = int(os.getenv("UI_PORT", "8080"))
 
 
 def _open_browser():
