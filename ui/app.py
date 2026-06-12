@@ -221,6 +221,7 @@ def status():
         "flight_departs_at": s.flight_departs_at,
         "vehicle_health": s.vehicle_health,
         "char_history_updated_at": s.char_history_updated_at,
+        "hospital_release_at": s.hospital_release_at,
     })
 
 
