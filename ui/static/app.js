@@ -85,8 +85,6 @@ function _doSave() {
     away_threshold: document.getElementById("away_threshold").value,
     armed_agg_private: document.getElementById("armed_agg_private").checked,
     armed_agg_drug_house: document.getElementById("armed_agg_drug_house").checked,
-    armed_payback_private: document.getElementById("armed_payback_private").checked,
-    armed_payback_public: document.getElementById("armed_payback_public").checked,
     action_enabled: document.getElementById("action_enabled").checked,
     action_type: document.getElementById("action_type").value,
     action_sub: document.getElementById("action_sub").value,
@@ -297,6 +295,10 @@ function _updateCharPills() {
   const pills = [];
   if (_lastEnergy != null) pills.push(_pill(`⚡ ${_lastEnergy}%`));
   const now = Date.now();
+  if (_jailReleaseEndMs != null) {
+    const secs = Math.max(0, Math.floor((_jailReleaseEndMs - now) / 1000));
+    if (secs > 0) pills.push(_pill(`Release: ${_fmtCountdown(secs)}`));
+  }
   for (const [key, t] of Object.entries(_activeTimers)) {
     const secs = Math.max(0, Math.floor((t.endMs - now) / 1000));
     if (secs > 0) pills.push(_pill(`${t.label}: ${_fmtCountdown(secs)}`));
@@ -848,19 +850,6 @@ function updateCaseWorkSection(occupation) {
   document.getElementById("cw-none").style.display = hasWork ? "none" : "";
   document.getElementById("cw-hospital").style.display = isHospital ? "" : "none";
   document.getElementById("cw-fire").style.display = isFire ? "" : "none";
-
-  const pills = document.getElementById("pills-s-casework");
-  if (pills) {
-    if (isHospital) {
-      const interval = document.getElementById("hospital_poll_interval").value;
-      pills.innerHTML = _pill("Hospital") + _pill(`${interval}s`);
-    } else if (isFire) {
-      const interval = document.getElementById("fire_poll_interval").value;
-      pills.innerHTML = _pill("Fire") + _pill(`${interval}s`);
-    } else {
-      pills.innerHTML = "";
-    }
-  }
 }
 
 function _serializePriorityTable(tbodyId) {
@@ -1109,7 +1098,7 @@ function checkWarrants() {
       if (d.error) { out.innerHTML = `<p class="task-hint-block" style="color:var(--red)">${escHtml(d.error)}</p>`; return; }
       const ws = d.warrants;
       if (!ws.length) { out.innerHTML = `<p class="task-hint-block">No active warrants.</p>`; return; }
-      let html = `<table class="warrant-table">
+      let html = `<div style="overflow-x:auto"><table class="warrant-table">
         <thead><tr>
           <th>Case #</th><th>Crime</th><th>Victim</th><th>Fine</th>
           <th>Jail Time</th><th>CS's</th><th>Defense</th><th></th>
@@ -1123,10 +1112,10 @@ function checkWarrants() {
           <td>${escHtml(w.jail_time)}</td>
           <td>${escHtml(w.css)}</td>
           <td>${escHtml(w.defense)}</td>
-          <td><button class="num-save-btn" onclick="turnInWarrant(this,'${escHtml(w.turn_in_url)}','${escHtml(w.case_id)}')">Turn In</button></td>
+          <td><button class="btn-secondary" style="white-space:nowrap;padding:4px 10px" onclick="turnInWarrant(this,'${escHtml(w.turn_in_url)}','${escHtml(w.case_id)}')">Turn In</button></td>
         </tr>`;
       }
-      html += `</tbody></table>`;
+      html += `</tbody></table></div>`;
       out.innerHTML = html;
     })
     .catch(e => { out.innerHTML = `<p class="task-hint-block" style="color:var(--red)">${escHtml(String(e))}</p>`; })
@@ -1363,6 +1352,38 @@ function reRenderCharHistory() {
   if (_chData) renderCharHistory(_chData, _chReqs);
 }
 
+const _AGG_CRIME_KEYS = new Set([
+  "Pickpocketing", "Muggings", "GTAs", "Break & Enters",
+  "Torches", "Armed Robberies", "Bank Robberies", "Hacking",
+]);
+
+function _buildCrimesSection(sec) {
+  const hideZeros = _isHideZeros(sec.title);
+  const toggle = _hzToggle(sec.title, hideZeros);
+  const rows = hideZeros ? sec.rows.filter(r => !_isZero(r.value)) : sec.rows;
+
+  let aggTotal = 0;
+  for (const r of sec.rows) {
+    if (_AGG_CRIME_KEYS.has(r.key)) {
+      const n = parseInt(String(r.value).replace(/,/g, ""), 10);
+      if (!isNaN(n)) aggTotal += n;
+    }
+  }
+
+  if (!rows.length && hideZeros) return `<div class="ch-section ch-section-empty">
+    <div class="ch-section-head"><span class="ch-section-title">${sec.title}</span>${toggle}</div>
+    <p class="ch-empty-note">All values zero</p></div>`;
+
+  let html = `<div class="ch-section">
+    <div class="ch-section-head"><span class="ch-section-title">${sec.title}</span>${toggle}</div>
+    <table class="ch-table">`;
+  for (const row of rows) {
+    html += `<tr><td class="ch-key">${row.key}</td><td class="ch-val">${_fmtVal(row.value)}</td></tr>`;
+  }
+  html += `<tr style="border-top:1px solid var(--border)"><td class="ch-key" style="font-weight:600">Total Aggravated</td><td class="ch-val" style="font-weight:600">${aggTotal.toLocaleString()}</td></tr>`;
+  return html + "</table></div>";
+}
+
 // ── Main render ───────────────────────────────────────────────────────────────
 
 function renderCharHistory(data, reqs) {
@@ -1394,7 +1415,8 @@ function renderCharHistory(data, reqs) {
   const secs = SECTION_ORDER.map(t => byTitle[t]).filter(Boolean);
   html += `<div class="ch-grid">`;
   for (const sec of secs) {
-    html += `<div class="ch-grid-item">${_buildStatSection(sec)}</div>`;
+    const built = sec.title === "Crimes Committed" ? _buildCrimesSection(sec) : _buildStatSection(sec);
+    html += `<div class="ch-grid-item">${built}</div>`;
   }
   html += `</div>`;
 

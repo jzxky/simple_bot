@@ -22,7 +22,6 @@ class AggCrimeTask(Task):
     def __init__(self, primary_crime: str, primary_threshold: int,
                  away_crime: str, away_threshold: int,
                  armed_agg_private: bool = False, armed_agg_drug_house: bool = False,
-                 armed_payback_private: bool = False, armed_payback_public: bool = False,
                  fallback_to_away: bool = False):
         self.primary_crime = primary_crime
         self.primary_threshold = primary_threshold
@@ -30,8 +29,6 @@ class AggCrimeTask(Task):
         self.away_threshold = away_threshold
         self.armed_agg_private = armed_agg_private
         self.armed_agg_drug_house = armed_agg_drug_house
-        self.armed_payback_private = armed_payback_private
-        self.armed_payback_public = armed_payback_public
         self.fallback_to_away = fallback_to_away
         self._cooldown_until: float = 0.0
         self._hack_exhausted: bool = False
@@ -91,8 +88,6 @@ class AggCrimeTask(Task):
                 threshold=threshold,
                 agg_private=self.armed_agg_private,
                 agg_drug_house=self.armed_agg_drug_house,
-                payback_private=self.armed_payback_private,
-                payback_public=self.armed_payback_public,
                 check_other_tasks=lambda: self._other_task_ready(state),
             ), state)
         else:

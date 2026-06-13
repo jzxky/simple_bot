@@ -116,8 +116,6 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             away_threshold=away.get("energy_threshold", 50),
             armed_agg_private=armed.get("agg_private", False),
             armed_agg_drug_house=armed.get("agg_drug_house", False),
-            armed_payback_private=armed.get("payback_private", False),
-            armed_payback_public=armed.get("payback_public", False),
             fallback_to_away=ac.get("fallback_to_away", False),
         )
         agg_task.scheduler = sched

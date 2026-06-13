@@ -675,50 +675,44 @@ def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
     return False
 
 
-def _payback_public_business(business_name: str, amount: int, state: GameState):
+def _get_public_business_owner(business_name: str, state: GameState) -> "str | None":
     job = PUBLIC_JOB_MAP.get(business_name)
     if not job:
         state.add_log(f"No job mapping for {business_name}.")
-        return
+        return None
     browser.page().goto(_u("/skin/updateusers.php?q=1"), wait_until="domcontentloaded", timeout=15000)
     try:
         data = json.loads(browser.page().inner_text("body"))
     except Exception:
         state.add_log("Failed to parse users for public business payback.")
-        return
-    recipient = next(
+        return None
+    owner = next(
         (p["userName"] for p in data
          if p.get("userHomeCity") == state.home_city and p.get("userOccupation") == job),
         None,
     )
-    if not recipient:
+    if not owner:
         state.add_log(f"No {job} found in {state.home_city} for payback.")
-        return
-    _do_transfer(recipient, amount, state)
+    return owner
 
 
-def _payback_private_business(business_name: str, amount: int, state: GameState):
+def _get_private_business_owner(business_name: str, state: GameState) -> "str | None":
     _nav(_u("/business/business.asp"), state)
     soup = BeautifulSoup(browser.page().content(), "html.parser")
-    owner = None
     for row in soup.select("table tr"):
         cells = row.find_all("td", class_="display_border")
         if len(cells) >= 2 and cells[0].get_text(strip=True) == business_name:
             a = cells[1].find("a")
             if a:
-                owner = a.get_text(strip=True)
+                return a.get_text(strip=True)
             break
-    if not owner:
-        state.add_log(f"Owner of {business_name} not found (may be Hidden).")
-        return
-    _do_transfer(owner, amount, state)
+    state.add_log(f"Owner of {business_name} not found (may be Hidden).")
+    return None
 
 
 def handle_armed_robbery(action: Action, state: GameState):
     agg_private = action.params.get("agg_private", False)
     agg_drug_house = action.params.get("agg_drug_house", False)
-    payback_private = action.params.get("payback_private", False)
-    payback_public = action.params.get("payback_public", False)
     threshold = action.params.get("threshold", 0)
 
     page = browser.page()
@@ -803,10 +797,14 @@ def handle_armed_robbery(action: Action, state: GameState):
                     amounts = re.findall(r"\$([\d,]+)", msg)
                     stolen = int(amounts[0].replace(",", "")) if amounts else 0
                     if stolen > 0:
-                        if is_public and payback_public:
-                            _payback_public_business(name, stolen, state)
-                        elif is_private and not is_drug_house and payback_private:
-                            _payback_private_business(name, stolen, state)
+                        owner = None
+                        if is_public:
+                            owner = _get_public_business_owner(name, state)
+                        elif is_private and not is_drug_house:
+                            owner = _get_private_business_owner(name, state)
+                        if owner:
+                            state._last_crime_victim = owner
+                            state._last_crime_amount = stolen
                     return
 
                 fail_div = result_soup.find("div", id="fail")
