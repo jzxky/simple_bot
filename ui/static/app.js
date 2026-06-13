@@ -690,7 +690,7 @@ function _renderTimers() {
 }
 
 function takeScreenshot() {
-  window.open("/page_snapshot", "_blank");
+  window.open("/screenshot", "_blank");
 }
 
 function clearEarnQueue() {

@@ -90,6 +90,9 @@ def page() -> Page:
     return _page
 
 
+SCREENSHOT_PATH = os.path.join(paths.data_dir(), "last_screenshot.png")
+
+
 def navigate(url: str) -> str:
     for attempt in range(2):
         try:
@@ -97,10 +100,13 @@ def navigate(url: str) -> str:
             break
         except Exception as e:
             if "ERR_ABORTED" in str(e) and attempt == 0:
-                # Server redirect aborted the navigation — retry once
                 continue
             raise
     _wait_for_cloudflare()
+    try:
+        _page.screenshot(path=SCREENSHOT_PATH, full_page=False)
+    except Exception:
+        pass
     return _page.content()
 
 
