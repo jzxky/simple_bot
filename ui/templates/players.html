@@ -26,6 +26,7 @@
     border:1px solid var(--border); border-radius:3px;
     padding:3px 5px; font-size:11px;
   }
+  .priority-table .col-filter-row select { width:100%; box-sizing:border-box; background:var(--surface2,#1e2a3a); color:var(--text); border:1px solid var(--border); border-radius:3px; padding:3px 5px; font-size:11px; }
 
   /* Player row group highlight */
   .player-row { border-left: 3px solid transparent; }
@@ -186,29 +187,6 @@
       </div>
 
       {% macro player_table(context, tid, groups) %}
-      <!-- Mass apply bar -->
-      <div class="mass-apply-bar">
-        <span>For group</span>
-        <select id="mass-group-{{ tid }}">
-          {% for g in groups %}
-          <option value="{{ g.name }}">{{ g.name }}</option>
-          {% endfor %}
-        </select>
-        <span>set</span>
-        <select id="mass-context-{{ tid }}">
-          <option value="agg_crimes">Aggravated Crimes</option>
-          <option value="case_work">Case Work</option>
-        </select>
-        <span>to</span>
-        <select id="mass-assignment-{{ tid }}">
-          <option value="whitelist">Whitelist</option>
-          <option value="blacklist">Blacklist</option>
-          <option value="">Clear</option>
-        </select>
-        <button class="action-btn" onclick="massAssign('{{ tid }}')">Apply</button>
-        <span id="mass-result-{{ tid }}" style="font-size:12px;color:var(--ok,#4ade80);display:none"></span>
-      </div>
-
       <table class="priority-table" style="font-size:12px" id="{{ tid }}">
         <thead>
           <tr>
@@ -221,11 +199,26 @@
           </tr>
           <tr class="col-filter-row">
             <th><input type="text" placeholder="Name…" oninput="applyFilters()" data-filter="name"></th>
-            <th class="col-homecity"><input type="text" placeholder="City…" oninput="applyFilters()" data-filter="homecity"></th>
-            <th class="col-occupation"><input type="text" placeholder="Occupation…" oninput="applyFilters()" data-filter="occupation"></th>
-            <th class="col-rank"><input type="text" placeholder="Rank…" oninput="applyFilters()" data-filter="rank"></th>
-            <th><input type="text" placeholder="Group…" oninput="applyFilters()" data-filter="group"></th>
-            <th><input type="text" placeholder="Assignment…" oninput="applyFilters()" data-filter="assignment"></th>
+            <th class="col-homecity"><select onchange="applyFilters()" data-filter="homecity"><option value="">All cities</option></select></th>
+            <th class="col-occupation"><select onchange="applyFilters()" data-filter="occupation"><option value="">All</option></select></th>
+            <th class="col-rank"><select onchange="applyFilters()" data-filter="rank"><option value="">All</option></select></th>
+            <th>
+              <select onchange="applyFilters()" data-filter="group">
+                <option value="">All</option>
+                <option value="__none__">None</option>
+                {% for g in groups %}
+                <option value="{{ g.name | lower }}">{{ g.name }}</option>
+                {% endfor %}
+              </select>
+            </th>
+            <th>
+              <select onchange="applyFilters()" data-filter="assignment">
+                <option value="">All</option>
+                <option value="__none__">None</option>
+                <option value="whitelist">Whitelist</option>
+                <option value="blacklist">Blacklist</option>
+              </select>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -301,9 +294,39 @@ function showTab(id, btn) {
   applyFilters();
 }
 
+// ── Column select population ─────────────────────────────────────────────────
+function buildColumnSelects() {
+  const dynamicCols = ["homecity", "occupation", "rank"];
+  const allValues = {};
+  dynamicCols.forEach(c => { allValues[c] = new Set(); });
+
+  // Collect unique values from all player rows across both tables
+  document.querySelectorAll(".player-row").forEach(row => {
+    dynamicCols.forEach(col => {
+      const v = (row.dataset[col] || "").trim();
+      if (v) allValues[col].add(v);
+    });
+  });
+
+  const titleCase = s => s.replace(/\b\w/g, c => c.toUpperCase());
+
+  document.querySelectorAll(".col-filter-row select[data-filter]").forEach(sel => {
+    const col = sel.dataset.filter;
+    if (!dynamicCols.includes(col)) return; // group and assignment are hardcoded
+    const firstOption = sel.options[0];
+    sel.innerHTML = "";
+    sel.appendChild(firstOption);
+    [...allValues[col]].sort().forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = titleCase(v);
+      sel.appendChild(opt);
+    });
+  });
+}
+
 // ── Filtering ────────────────────────────────────────────────────────────────
 function applyFilters() {
-  const globalQ = "";
   const hideUnemployed = document.getElementById("hide-unemployed").checked;
   const groupFilter = document.getElementById("filter-group").value;
 
@@ -311,18 +334,27 @@ function applyFilters() {
   if (!panel) return;
 
   const colFilters = {};
-  panel.querySelectorAll(".col-filter-row input[data-filter]").forEach(inp => {
-    colFilters[inp.dataset.filter] = inp.value.toLowerCase();
+  panel.querySelectorAll(".col-filter-row [data-filter]").forEach(el => {
+    colFilters[el.dataset.filter] = el.value;
   });
 
   panel.querySelectorAll(".player-row").forEach(row => {
     const d = row.dataset;
     if (hideUnemployed && d.occupation === "unemployed") { row.style.display = "none"; return; }
-    if (globalQ && !d.name.includes(globalQ)) { row.style.display = "none"; return; }
     if (groupFilter === "__ungrouped__" && d.groupRaw) { row.style.display = "none"; return; }
     if (groupFilter && groupFilter !== "__ungrouped__" && d.groupRaw !== groupFilter) { row.style.display = "none"; return; }
     for (const [col, q] of Object.entries(colFilters)) {
-      if (q && !(d[col] || "").includes(q)) { row.style.display = "none"; return; }
+      if (!q) continue;
+      const val = (d[col] || "").toLowerCase();
+      let match;
+      if (col === "name") {
+        match = val.includes(q.toLowerCase());
+      } else if (q === "__none__") {
+        match = val === "";
+      } else {
+        match = val === q.toLowerCase();
+      }
+      if (!match) { row.style.display = "none"; return; }
     }
     row.style.display = "";
   });
@@ -385,41 +417,6 @@ function setPlayerGroup(username, group, selectEl) {
   });
 }
 
-// ── Mass assign ───────────────────────────────────────────────────────────────
-function massAssign(tid) {
-  const group = document.getElementById(`mass-group-${tid}`).value;
-  const context = document.getElementById(`mass-context-${tid}`).value;
-  const assignment = document.getElementById(`mass-assignment-${tid}`).value;
-  if (!group) return;
-
-  fetch("/players/group_mass_assign", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({group, context, assignment}),
-  })
-    .then(r => r.json())
-    .then(d => {
-      // Update selects in-page for the affected table
-      const table = document.getElementById(tid);
-      if (table) {
-        table.querySelectorAll(".player-row").forEach(row => {
-          if (row.dataset.groupRaw === group) {
-            const sel = row.querySelectorAll("select")[1]; // assignment select
-            if (sel) sel.value = assignment;
-            row.dataset.assignment = assignment.toLowerCase();
-          }
-        });
-        applyFilters();
-      }
-      const msg = document.getElementById(`mass-result-${tid}`);
-      if (msg) {
-        msg.textContent = `Applied to ${d.count} player(s).`;
-        msg.style.display = "";
-        setTimeout(() => { msg.style.display = "none"; }, 3000);
-      }
-    });
-}
-
 // ── Group management ──────────────────────────────────────────────────────────
 function toggleGroups() {
   document.getElementById("group-body").classList.toggle("open");
@@ -446,7 +443,6 @@ function createGroup() {
       }
       errEl.style.display = "none";
       document.getElementById("new-group-name").value = "";
-      // Reload page so selectors and filter dropdown update
       location.reload();
     });
 }
@@ -543,6 +539,7 @@ function runImport() {
 
 initSortHeaders();
 applyGroupColors();
+buildColumnSelects();
 </script>
 </body>
 </html>
