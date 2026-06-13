@@ -1654,3 +1654,306 @@ function cjGoPage(n) {
   _cjPage = n;
   cjRender();
 }
+
+// =============================================================================
+// Player Section
+// =============================================================================
+
+let _plData = [];       // full player list from API
+let _plFiltered = [];   // after filters
+let _plExpanded = {};   // username → true if expanded
+let _plGroups = [];     // group list from API
+
+function loadPlayers() {
+  fetch("/api/players")
+    .then(r => r.json())
+    .then(data => {
+      _plData = (data.players || []).map(p => ({ ...p, group: p.group_name ?? p.group ?? "" }));
+      _plGroups = data.groups || [];
+      _plRebuildGroupFilter();
+      _plRender();
+      _plRenderGroupsTab(data.groups);
+      // update section pill
+      const pill = document.getElementById("pills-s-players");
+      if (pill) {
+        const active = _plData.filter(p => p.active).length;
+        pill.innerHTML = _pill(`👥 ${active}`);
+      }
+    })
+    .catch(() => {});
+}
+
+function _plGroupColorMap() {
+  const m = {};
+  _plGroups.forEach(g => { m[g.name] = g.color; });
+  return m;
+}
+
+function _plRebuildGroupFilter() {
+  const sel = document.getElementById("pl-filter-group");
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Groups</option>' +
+    _plGroups.map(g => `<option value="${escHtml(g.name)}">${escHtml(g.name)}</option>`).join("");
+  if (cur) sel.value = cur;
+}
+
+function plFilter() {
+  const search = (document.getElementById("pl-search")?.value || "").toLowerCase();
+  const group  = document.getElementById("pl-filter-group")?.value || "";
+  const agg    = document.getElementById("pl-filter-agg")?.value || "";
+  const activeOnly = document.getElementById("pl-filter-active")?.checked ?? true;
+  _plFiltered = _plData.filter(p => {
+    if (activeOnly && !p.active) return false;
+    if (group && p.group !== group) return false;
+    if (agg && p.agg_crimes !== agg) return false;
+    if (search && !p.username.toLowerCase().includes(search) &&
+        !(p.occupation||"").toLowerCase().includes(search) &&
+        !(p.homecity||"").toLowerCase().includes(search)) return false;
+    return true;
+  });
+  _plRender();
+}
+
+function _plRender() {
+  plFilter();
+}
+
+function _plRenderList() {
+  const list = document.getElementById("pl-list");
+  if (!list) return;
+  const colorMap = _plGroupColorMap();
+  if (_plFiltered.length === 0) {
+    list.innerHTML = '<p style="padding:12px;color:var(--muted)">No players found.</p>';
+    return;
+  }
+  list.innerHTML = _plFiltered.map(p => _plRowHtml(p, colorMap)).join("");
+}
+
+function _plRowHtml(p, colorMap) {
+  const color = colorMap[p.group] || null;
+  const groupBadge = p.group
+    ? `<span class="pl-group-badge" style="background:${color||'#888'}">${escHtml(p.group)}</span>` : "";
+  const tags = (p.tags||[]).map(t => `<span class="pl-tag">${escHtml(t)}</span>`).join("");
+  const meta = [p.rank, p.occupation, p.homecity].filter(Boolean).join(" · ");
+  const expanded = _plExpanded[p.username];
+  return `
+<div class="pl-row" id="plrow-${escHtml(p.username)}">
+  <div class="pl-row-head" onclick="plToggleRow('${escHtml(p.username)}')">
+    <span class="pl-chevron">${expanded ? "▾" : "▸"}</span>
+    <span class="pl-name">${escHtml(p.username)}</span>
+    ${groupBadge}
+    <span class="pl-tags">${tags}</span>
+    <span class="pl-meta">${escHtml(meta)}</span>
+  </div>
+  <div class="pl-detail" id="pldetail-${escHtml(p.username)}" style="display:${expanded?'block':'none'}">
+    ${expanded ? _plDetailHtml(p) : ""}
+  </div>
+</div>`;
+}
+
+function plToggleRow(username) {
+  const detail = document.getElementById(`pldetail-${username}`);
+  const row = document.getElementById(`plrow-${username}`);
+  if (!detail) return;
+  const opening = detail.style.display === "none";
+  _plExpanded[username] = opening;
+  detail.style.display = opening ? "block" : "none";
+  // update chevron
+  const chevron = row?.querySelector(".pl-chevron");
+  if (chevron) chevron.textContent = opening ? "▾" : "▸";
+  if (opening && !detail.dataset.loaded) {
+    const p = _plData.find(x => x.username === username);
+    if (p) detail.innerHTML = _plDetailHtml(p);
+    detail.dataset.loaded = "1";
+  }
+}
+
+function _plDetailHtml(p) {
+  const histId = `plhist-${p.username}`;
+  const groupOpts = _plGroups.map(g =>
+    `<option value="${escHtml(g.name)}" ${p.group===g.name?'selected':''}>${escHtml(g.name)}</option>`
+  ).join("");
+  return `
+<div class="pl-detail-grid">
+  <div class="pl-detail-item"><span class="pl-detail-label">Rank</span>${escHtml(p.rank||"—")}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Occupation</span>${escHtml(p.occupation||"—")}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Home City</span>${escHtml(p.homecity||"—")}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Status</span>${p.active?"Active":"Inactive"}</div>
+  <div class="pl-detail-item">
+    <span class="pl-detail-label">Group</span>
+    <select onchange="plSetGroup('${escHtml(p.username)}', this.value, this)">
+      <option value="">— none —</option>${groupOpts}
+    </select>
+  </div>
+  <div class="pl-detail-item">
+    <span class="pl-detail-label">Agg Crimes</span>
+    <select onchange="plSetAssignment('${escHtml(p.username)}', 'agg_crimes', this.value)">
+      <option value="" ${!p.agg_crimes?'selected':''}>— none —</option>
+      <option value="whitelist" ${p.agg_crimes==='whitelist'?'selected':''}>Whitelist</option>
+      <option value="blacklist" ${p.agg_crimes==='blacklist'?'selected':''}>Blacklist</option>
+    </select>
+  </div>
+  <div class="pl-detail-item">
+    <span class="pl-detail-label">Case Work</span>
+    <select onchange="plSetAssignment('${escHtml(p.username)}', 'case_work', this.value)">
+      <option value="" ${!p.case_work?'selected':''}>— none —</option>
+      <option value="whitelist" ${p.case_work==='whitelist'?'selected':''}>Whitelist</option>
+      <option value="blacklist" ${p.case_work==='blacklist'?'selected':''}>Blacklist</option>
+    </select>
+  </div>
+</div>
+<div class="pl-history-toggle" onclick="plLoadHistory('${escHtml(p.username)}', '${histId}', this)">
+  ▸ Show Career History
+</div>
+<div id="${histId}" style="display:none"></div>`;
+}
+
+function plLoadHistory(username, containerId, toggleEl) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (container.style.display !== "none") {
+    container.style.display = "none";
+    if (toggleEl) toggleEl.textContent = "▸ Show Career History";
+    return;
+  }
+  if (container.dataset.loaded) {
+    container.style.display = "block";
+    if (toggleEl) toggleEl.textContent = "▾ Hide Career History";
+    return;
+  }
+  container.innerHTML = '<p style="color:var(--muted);padding:8px">Loading…</p>';
+  container.style.display = "block";
+  if (toggleEl) toggleEl.textContent = "▾ Hide Career History";
+  fetch(`/api/players/${encodeURIComponent(username)}/history`)
+    .then(r => r.json())
+    .then(resp => { const rows = resp.history ?? resp;
+      if (!rows.length) {
+        container.innerHTML = '<p style="color:var(--muted);padding:8px">No history.</p>';
+        return;
+      }
+      container.innerHTML = `
+<table class="pl-history-table">
+  <thead><tr><th>Date</th><th>Rank</th><th>Occupation</th><th>City</th></tr></thead>
+  <tbody>${rows.map(r => `
+    <tr>
+      <td>${escHtml(r.ts||"")}</td>
+      <td>${escHtml(r.rank||"")}</td>
+      <td>${escHtml(r.occupation||"")}</td>
+      <td>${escHtml(r.homecity||"")}</td>
+    </tr>`).join("")}
+  </tbody>
+</table>`;
+      container.dataset.loaded = "1";
+    })
+    .catch(() => { container.innerHTML = '<p style="color:var(--muted);padding:8px">Failed to load.</p>'; });
+}
+
+function plSetAssignment(username, context, value) {
+  fetch("/players/assign", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username, context, value}),
+  }).catch(() => {});
+}
+
+function plSetGroup(username, group, el) {
+  fetch("/players/set_group", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username, group}),
+  }).then(() => {
+    const p = _plData.find(x => x.username === username);
+    if (p) p.group = group;
+  }).catch(() => {});
+}
+
+function plRefresh() {
+  const btn = document.getElementById("pl-refresh-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Refreshing…"; }
+  fetch("/players/refresh", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      loadPlayers();
+      if (btn) { btn.disabled = false; btn.textContent = "Refresh Players"; }
+    })
+    .catch(() => { if (btn) { btn.disabled = false; btn.textContent = "Refresh Players"; } });
+}
+
+function plRunImport() {
+  const textarea = document.getElementById("pl-import-text");
+  const context  = document.getElementById("pl-import-context")?.value;
+  const assign   = document.getElementById("pl-import-assignment")?.value;
+  const btn      = document.document.querySelector("#pl-tab-import .action-btn");
+  if (!textarea || !context || !assign) return;
+  const names = textarea.value.split("\n").map(s => s.trim()).filter(Boolean);
+  if (!names.length) return;
+  if (btn) { btn.disabled = true; btn.textContent = "Importing…"; }
+  fetch("/players/import", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({names, context, assignment: assign}),
+  }).then(r => r.json())
+    .then(d => {
+      loadPlayers();
+      if (btn) { btn.disabled = false; btn.textContent = "Import"; }
+      textarea.value = "";
+    })
+    .catch(() => { if (btn) { btn.disabled = false; btn.textContent = "Import"; } });
+}
+
+// Groups tab
+function _plRenderGroupsTab(groups) {
+  const container = document.getElementById("pl-group-chips");
+  if (!container) return;
+  if (!groups || !groups.length) {
+    container.innerHTML = '<p style="color:var(--muted)">No groups yet.</p>';
+    return;
+  }
+  container.innerHTML = groups.map(g => `
+<div class="pl-group-chip" id="plgchip-${escHtml(g.name)}">
+  <input type="color" value="${escHtml(g.color||'#888888')}"
+    onchange="plUpdateGroupColor('${escHtml(g.name)}', this.value)"
+    title="Color for ${escHtml(g.name)}">
+  <span class="pl-group-badge" style="background:${escHtml(g.color||'#888888')}">${escHtml(g.name)}</span>
+  <button class="btn btn-danger btn-sm" onclick="plDeleteGroup('${escHtml(g.name)}')">✕</button>
+</div>`).join("");
+}
+
+function plCreateGroup() {
+  const nameEl  = document.getElementById("pl-new-group-name");
+  const colorEl = document.getElementById("pl-new-group-color");
+  const name  = nameEl?.value.trim();
+  const color = colorEl?.value || "#888888";
+  if (!name) return;
+  fetch("/players/groups/create", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name, color}),
+  }).then(r => r.json())
+    .then(() => { if (nameEl) nameEl.value = ""; loadPlayers(); })
+    .catch(() => {});
+}
+
+function plDeleteGroup(name) {
+  if (!confirm(`Delete group "${name}"?`)) return;
+  fetch("/players/groups/delete", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name}),
+  }).then(() => loadPlayers())
+    .catch(() => {});
+}
+
+function plUpdateGroupColor(name, color) {
+  fetch("/players/groups/update_color", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name, color}),
+  }).then(() => loadPlayers())
+    .catch(() => {});
+}
+
+
+
+

@@ -467,19 +467,21 @@ def logs_viewer(filename):
                            lines=lines, line_count=len(lines))
 
 
-@app.route("/players")
-def players_page():
-    store = pl.load()
-    active_count = sum(1 for p in store["players"].values() if p.get("active"))
-    groups = store.get("groups", [])
-    return render_template(
-        "players.html",
-        players=store["players"],
-        lists=store["lists"],
-        groups=groups,
-        last_updated=store.get("last_updated"),
-        active_count=active_count,
-    )
+@app.route("/api/players")
+def api_players():
+    import player_db as _db
+    return jsonify({
+        "players": _db.get_all_players(),
+        "groups": _db.get_groups(),
+        "last_updated": _db.get_last_updated(),
+        "active_count": _db.get_active_count(),
+    })
+
+
+@app.route("/api/players/<username>/history")
+def api_player_history(username):
+    import player_db as _db
+    return jsonify({"history": _db.get_career_history(username)})
 
 
 @app.route("/players/refresh", methods=["POST"])
@@ -551,8 +553,8 @@ def players_import():
     context = data.get("context", "agg_crimes")
     assignment = data.get("assignment", "blacklist")
 
-    store = pl.load()
-    known = {k.lower(): k for k in store["players"]}
+    import player_db as _db
+    known = {u.lower(): u for u in _db.get_usernames()}
 
     matched = []
     unmatched = []
