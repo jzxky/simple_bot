@@ -30,9 +30,18 @@ _DRUG_TRADE_NAME_MAP = {
 
 JAIL_CONSUMABLE_NAMES = {
     "cigarettes": "Cigarettes",
-    "booze": "Booze",
-    "porn": "Porn",
-    "shanks": "Shanks",
+    "booze":      "Booze",
+    "porn":       "Porn",
+    "heroin":     "Heroin",
+    "shanks":     "Shanks",
+}
+
+# Maps state key → actual radio button value on contraband.asp
+_JAIL_RADIO_VALUE = {
+    "porn":       "porn",
+    "booze":      "drink",
+    "cigarettes": "cigarettes",
+    "heroin":     "chasing",
 }
 
 ONLINE_CRIMES = {"pickpocket", "mugging"}
@@ -1070,7 +1079,7 @@ def handle_jail_action(action: Action, state: GameState):
         state.add_log(f"Jail action ({jail_action}): submitted.")
 
 
-_JAIL_CONSUME_PRIORITY = ["porn", "booze", "cigarettes"]
+_JAIL_CONSUME_PRIORITY = ["porn", "booze", "cigarettes", "heroin"]
 
 
 def handle_jail_consume(action: Action, state: GameState):
@@ -1084,15 +1093,16 @@ def handle_jail_consume(action: Action, state: GameState):
     jcons = state.jail_consumables or {}
     consumable = next((c for c in _JAIL_CONSUME_PRIORITY if jcons.get(c, 0) > 0), None)
     if not consumable:
-        state.add_log("Jail consume: no suitable consumables available (porn/booze/cigarettes).")
+        state.add_log("Jail consume: no suitable consumables available.")
         return
 
-    radio = page.query_selector(f"input[type='radio'][value='{consumable}']")
+    radio_value = _JAIL_RADIO_VALUE.get(consumable, consumable)
+    radio = page.query_selector(f"input[type='radio'][value='{radio_value}']")
     if not radio:
-        state.add_log(f"Jail consume: radio for '{consumable}' not found on page.")
+        state.add_log(f"Jail consume: radio for '{consumable}' ({radio_value}) not found on page.")
         return
 
-    page.check(f"input[type='radio'][value='{consumable}']")
+    page.check(f"input[type='radio'][value='{radio_value}']")
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
