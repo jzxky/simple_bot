@@ -75,10 +75,13 @@ def refresh() -> int:
         if not is_dead:
             seen.add(name)
 
-    # Mark players absent from this fetch as inactive (not removed)
+    # Mark players absent from this fetch as inactive only if confirmed dead
+    # Players in jail or otherwise missing from the fetch keep their last known status
     for name, entry in players.items():
         if name not in seen and entry.get("active", True):
-            entry["active"] = False
+            city = entry.get("homecity", "").lower()
+            if city in DEAD_CITIES:
+                entry["active"] = False
 
     store["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     _save(store)
