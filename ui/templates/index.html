@@ -217,9 +217,6 @@
                   style="width:70px" oninput="markNumDirty(this)">
                 <button class="num-save-btn" id="save-player_refresh_interval" onclick="saveNum('player_refresh_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               </div>
-              <div class="setting-row" style="margin-top:10px">
-                <a href="/players" target="_blank" class="log-open-link">Manage Lists ↗</a>
-              </div>
             </div>
           </div>
         </div>
@@ -780,6 +777,78 @@
       </div>
     </section>
 
+    <!-- Players -->
+    <section class="card tabs-card" id="s-players">
+      <h2>
+        <button class="collapse-btn" onclick="toggleSection('s-players')">▾</button>
+        Players
+        <span class="section-pills" id="pills-s-players"></span>
+      </h2>
+      <div class="card-body">
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Player List</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-groups', this)">Groups</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-import', this)">Import</button>
+        </div>
+
+        <!-- Player List tab -->
+        <div id="pl-tab-list" class="tab-panel active">
+          <div class="pl-toolbar">
+            <input type="text" id="pl-search" class="task-select" placeholder="Search…" oninput="plFilter()" style="flex:1;min-width:100px;max-width:220px">
+            <select id="pl-filter-group" class="task-select" onchange="plFilter()" style="min-width:110px"></select>
+            <select id="pl-filter-agg" class="task-select" onchange="plFilter()" style="min-width:120px">
+              <option value="">Agg: All</option>
+              <option value="__none__">Agg: None</option>
+              <option value="whitelist">Agg: Whitelist</option>
+              <option value="blacklist">Agg: Blacklist</option>
+            </select>
+            <label class="inline-toggle" style="white-space:nowrap">Active only
+              <label class="toggle-label">
+                <input type="checkbox" id="pl-filter-active" checked onchange="plFilter()">
+                <span class="toggle"></span>
+              </label>
+            </label>
+            <button class="btn-secondary" onclick="plRefresh()" id="pl-refresh-btn">Refresh</button>
+            <span id="pl-status" style="font-size:0.8rem;color:var(--text-muted)"></span>
+          </div>
+          <div id="pl-list" style="margin-top:8px"></div>
+        </div>
+
+        <!-- Groups tab -->
+        <div id="pl-tab-groups" class="tab-panel">
+          <div class="group-chips" id="pl-group-chips"></div>
+          <div class="group-create-row">
+            <input type="text" id="pl-new-group-name" placeholder="Group name…"
+              onkeydown="if(event.key==='Enter')plCreateGroup()">
+            <input type="color" id="pl-new-group-color" value="#888888">
+            <button class="action-btn" onclick="plCreateGroup()">Create Group</button>
+            <span id="pl-group-create-error" style="font-size:12px;color:var(--error,#f87171);display:none"></span>
+          </div>
+        </div>
+
+        <!-- Import tab -->
+        <div id="pl-tab-import" class="tab-panel">
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">
+            Paste one username per line. Matched players are assigned to the selected list.
+          </p>
+          <textarea id="pl-import-text" class="pl-import-textarea"
+            placeholder="Player1&#10;Player2&#10;Player3"></textarea>
+          <div class="import-row" style="margin-top:8px">
+            <select id="pl-import-context">
+              <option value="agg_crimes">Aggravated Crimes</option>
+              <option value="case_work">Case Work</option>
+            </select>
+            <select id="pl-import-assignment">
+              <option value="whitelist">Whitelist</option>
+              <option value="blacklist">Blacklist</option>
+            </select>
+            <button class="action-btn" onclick="plRunImport()">Import</button>
+          </div>
+          <div id="pl-import-report" class="import-report" style="display:none"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- Character History -->
     <section class="card" id="s-char-history" style="{% if not config.get('character_history', {}).get('enabled', False) %}display:none;{% endif %}">
       <h2>
@@ -811,6 +880,7 @@
   _updateIncomePills();
   _updateIncomeTabColors();
   if (document.getElementById("char_history_enabled").checked) loadCharHistory();
+  loadPlayers();
   pollStatus();
 </script>
 
