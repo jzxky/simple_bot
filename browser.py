@@ -38,19 +38,34 @@ def start(headless: bool = False):
     _clear_window_placement()
     _playwright = sync_playwright().start()
     args = ["--disable-notifications", "--disable-save-password-bubble"]
+    DESKTOP_UA = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/136.0.0.0 Safari/537.36"
+    )
     if headless:
         args.append("--window-size=1920,1080")
+        _context = _playwright.chromium.launch_persistent_context(
+            PROFILE_DIR,
+            channel="chrome",
+            headless=True,
+            viewport={"width": 1920, "height": 1080},
+            user_agent=DESKTOP_UA,
+            locale="en-US",
+            timezone_id="America/New_York",
+            args=args,
+        )
     else:
         args.append("--start-maximized")
-    _context = _playwright.chromium.launch_persistent_context(
-        PROFILE_DIR,
-        channel="chrome",
-        headless=headless,
-        no_viewport=True,
-        locale="en-US",
-        timezone_id="America/New_York",
-        args=args,
-    )
+        _context = _playwright.chromium.launch_persistent_context(
+            PROFILE_DIR,
+            channel="chrome",
+            headless=False,
+            no_viewport=True,
+            locale="en-US",
+            timezone_id="America/New_York",
+            args=args,
+        )
     _page = _context.pages[0] if _context.pages else _context.new_page()
     print("[browser] Browser launched.")
 
