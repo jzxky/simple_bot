@@ -4,12 +4,11 @@ Flask web UI for bot configuration and control.
 
 import sys
 import os
-import base64
 import subprocess
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, render_template, request, jsonify, abort
+from flask import Flask, render_template, request, jsonify, abort, send_file
 import config as cfg
 import bot
 import paths
@@ -369,14 +368,12 @@ def character_history_refresh():
 
 @app.route("/screenshot")
 def screenshot():
-    if not bot.is_running():
-        return jsonify({"error": "Bot is not running."}), 400
-    try:
-        png = bot.request_screenshot(timeout=10.0)
-        data = base64.b64encode(png).decode()
-        return jsonify({"image": f"data:image/png;base64,{data}"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    import paths as _paths
+    import browser as _browser
+    path = _browser.SCREENSHOT_PATH
+    if not os.path.exists(path):
+        return "No screenshot yet.", 204
+    return send_file(path, mimetype="image/png")
 
 
 @app.route("/tasks/check_warrants", methods=["POST"])
@@ -403,18 +400,6 @@ def tasks_turn_in_warrant():
     return jsonify({"ok": True})
 
 
-@app.route("/page_snapshot")
-def page_snapshot():
-    import urls as _urls
-    html = bot.state.page_html
-    if not html:
-        return "No page loaded yet.", 204
-    base_tag = f'<base href="{_urls.BASE_URL}/">'
-    if "<head>" in html:
-        html = html.replace("<head>", f"<head>{base_tag}", 1)
-    else:
-        html = base_tag + html
-    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 @app.route("/logs/list")

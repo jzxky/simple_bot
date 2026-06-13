@@ -48,8 +48,6 @@ _pause_event = threading.Event()
 _reload_event = threading.Event()
 _reload_requested_at: float = 0.0
 _RELOAD_DEBOUNCE = 2.0  # seconds
-_screenshot_request: queue.Queue = queue.Queue(maxsize=1)
-_screenshot_result: queue.Queue = queue.Queue(maxsize=1)
 _consume_queue: queue.Queue = queue.Queue()
 _deposit_queue: queue.Queue = queue.Queue()
 _withdraw_queue: queue.Queue = queue.Queue()
@@ -286,15 +284,6 @@ def _run(c: dict):
                     state.add_log("Session expired — re-login disabled, pausing.")
                     state.relog_suppressed = True
                     _pause_event.set()
-
-            # Screenshot requests from the Flask thread
-            if not _screenshot_request.empty():
-                try:
-                    _screenshot_request.get_nowait()
-                    png = browser.page().screenshot(full_page=True)
-                    _screenshot_result.put(png)
-                except Exception as e:
-                    _screenshot_result.put(e)
 
             # Bar threads requests from the Flask thread
             if not _bar_threads_request.empty():
@@ -541,15 +530,6 @@ def request_bar_threads(timeout: float = 15.0) -> dict:
         raise result
     return result
 
-
-def request_screenshot(timeout: float = 10.0) -> bytes:
-    while not _screenshot_result.empty():
-        _screenshot_result.get_nowait()
-    _screenshot_request.put(True)
-    result = _screenshot_result.get(timeout=timeout)
-    if isinstance(result, Exception):
-        raise result
-    return result
 
 
 def request_warrants(timeout: float = 30.0) -> list:
