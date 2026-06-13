@@ -49,8 +49,6 @@ def save():
     c["aggravated_crimes"].setdefault("armed", {})
     c["aggravated_crimes"]["armed"]["agg_private"] = data.get("armed_agg_private", False)
     c["aggravated_crimes"]["armed"]["agg_drug_house"] = data.get("armed_agg_drug_house", False)
-    c["aggravated_crimes"]["armed"]["payback_private"] = data.get("armed_payback_private", False)
-    c["aggravated_crimes"]["armed"]["payback_public"] = data.get("armed_payback_public", False)
     c["aggravated_crimes"]["fallback_to_away"] = data.get("fallback_to_away", False)
 
     c["action"]["enabled"] = data.get("action_enabled", False)
