@@ -1691,16 +1691,26 @@ def handle_check_drug_trade(action: Action, state: GameState):
             state.add_log(f"Drug trade offer {offer_id}: not accepting ({reason}).")
             continue
 
-        # Funding check — dirty money only
-        if state.dirty_money < offer_price:
+        # Funding check — prefer dirty money, top up with clean money if needed
+        total_available = state.dirty_money + state.clean_money + state.bank_balance
+        if total_available < offer_price:
             state.add_log(
-                f"Drug trade: insufficient dirty money (have ${state.dirty_money:,}, "
-                f"need ${offer_price:,}) — disabling autobuy."
+                f"Drug trade: insufficient funds (dirty=${state.dirty_money:,}, "
+                f"clean=${state.clean_money:,}, bank=${state.bank_balance:,}, "
+                f"need=${offer_price:,}) — disabling autobuy."
             )
             c2 = cfg.load()
             c2.setdefault("autobuy", {})["enabled"] = False
             cfg.save(c2)
             return
+        if state.dirty_money < offer_price:
+            needed = offer_price - state.dirty_money
+            shortfall_from_bank = max(0, needed - state.clean_money)
+            if shortfall_from_bank > 0:
+                state.add_log(
+                    f"Drug trade: withdrawing ${shortfall_from_bank:,} from bank to cover offer."
+                )
+                handle_withdraw(Action("withdraw", amount=shortfall_from_bank), state)
 
         # Accept
         accept_url = _u("/income/drugtrade.asp") + f"?action=accept&offerid={offer_id}"
