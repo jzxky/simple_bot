@@ -1290,19 +1290,20 @@ def handle_deposit(action: Action, state: GameState):
 
 
 def handle_check_bionics(action: Action, state: GameState):
+    from tasks.bionics import BIONIC_PRICES, REVERSE_ORDER, _ingame_mins
     import config as cfg
-    b_cfg = cfg.load().get("bionics", {})
-    wanted = b_cfg.get("wanted_items", [])
-    auto_restock = b_cfg.get("auto_restock", False)
-    task = action.params.get("_task")  # BionicsTask instance for stock tracking
+    wanted = cfg.load().get("bionics", {}).get("wanted_items", [])
+    task = action.params.get("_task")
+
     if not wanted:
         state.add_log("Bionics: no wanted items configured.")
         return
 
+    # Items to consider in reverse price order
+    ordered_wanted = [i for i in REVERSE_ORDER if i in wanted]
     page = browser.page()
 
     def _parse_store() -> dict:
-        """Return {item_value: {"price": int, "stock": int}} from bionics.asp."""
         soup = BeautifulSoup(page.content(), "html.parser")
         items = {}
         for row in soup.select("table tr"):
@@ -1313,15 +1314,12 @@ def handle_check_bionics(action: Action, state: GameState):
             tds = row.find_all("td")
             if len(tds) < 4:
                 continue
-            price_text = tds[2].get_text(strip=True).replace("$", "").replace(",", "")
             stock_text = tds[3].get_text(strip=True)
             try:
-                price = int(price_text)
                 stock = int(stock_text)
             except ValueError:
                 continue
-            items[item_val] = {"price": price, "stock": stock}
-        # Parse visit count and store on task
+            items[item_val] = {"price": BIONIC_PRICES.get(item_val, 0), "stock": stock}
         if task is not None:
             views_p = soup.find("p", class_="center")
             if views_p:
@@ -1333,51 +1331,51 @@ def handle_check_bionics(action: Action, state: GameState):
     def _nav_to_store():
         _nav(_u("/localcity/bionics.asp"), state)
 
+    def _withdraw_for(price: int):
+        if state.clean_money < price:
+            needed = min(price - state.clean_money, state.bank_balance)
+            if needed > 0:
+                state.add_log(f"Bionics: withdrawing ${needed:,}.")
+                handle_withdraw(Action("withdraw", amount=needed), state)
+
+    def _in_stock_affordable():
+        return [i for i in ordered_wanted
+                if store.get(i, {}).get("stock", 0) > 0
+                and BIONIC_PRICES[i] <= state.clean_money + state.bank_balance]
+
+    # Step 4: Pre-withdraw for most expensive wanted item using fixed prices
+    max_wanted_price = max((BIONIC_PRICES[i] for i in ordered_wanted), default=0)
+    _withdraw_for(max_wanted_price)
+
+    # Step 5: Navigate to store
     _nav_to_store()
     if not _check_session(state):
         return
 
+    # Step 6: Parse store, record last_checked
     store = _parse_store()
-    # Record stock for restock detection
-    new_stock = {i: store.get(i, {}).get("stock", 0) for i in ["arms", "legs", "eyes", "brain", "heart"]}
     if task is not None:
-        task.record_stock(new_stock, auto_restock)
+        ingame = _ingame_mins(page.content())
+        if ingame is not None:
+            task.last_checked_ingame = ingame
 
-    available = [i for i in wanted if store.get(i, {}).get("stock", 0) > 0]
-    if not available:
+    # Step 7: Filter wanted items in stock (reverse order)
+    can_buy = _in_stock_affordable()
+    if not [i for i in ordered_wanted if store.get(i, {}).get("stock", 0) > 0]:
         state.add_log("Bionics: no wanted items in stock.")
         return
 
-    # Determine which items the player can afford (cash on hand + bank)
-    total_funds = state.clean_money + state.bank_balance
-    affordable = [i for i in available if store[i]["price"] <= total_funds]
-    if not affordable:
-        prices = ", ".join(f"{i}=${store[i]['price']:,}" for i in available)
-        state.add_log(f"Bionics: wanted items in stock but cannot afford any. ({prices})")
+    # Step 8: Affordability
+    if not can_buy:
+        in_stock = [i for i in ordered_wanted if store.get(i, {}).get("stock", 0) > 0]
+        state.add_log(f"Bionics: in stock but cannot afford — {', '.join(f'{i} ${BIONIC_PRICES[i]:,}' for i in in_stock)}.")
         return
 
-    # Withdraw enough for the most expensive affordable item if needed
-    most_expensive_price = max(store[i]["price"] for i in affordable)
-    if state.clean_money < most_expensive_price:
-        needed = most_expensive_price - state.clean_money
-        state.add_log(f"Bionics: withdrawing ${needed:,} for purchase.")
-        handle_withdraw(Action("withdraw", amount=needed), state)
-        _nav_to_store()
-        if not _check_session(state):
-            return
-        store = _parse_store()
-
-    # Purchase loop
+    # Step 9: Purchase loop
     purchased = []
-    while True:
-        # Re-filter in case stock changed
-        available = [i for i in wanted if store.get(i, {}).get("stock", 0) > 0]
-        can_buy = [i for i in available if store[i]["price"] <= state.clean_money]
-        if not can_buy:
-            break
-
+    while can_buy:
         target = can_buy[0]
-        price = store[target]["price"]
+        price = BIONIC_PRICES[target]
         state.add_log(f"Bionics: purchasing {target} for ${price:,}.")
         page.check(f"input[name='bionic'][value='{target}']")
         page.click("input[type='submit'][name='B1'][value='Purchase']")
@@ -1386,12 +1384,12 @@ def handle_check_bionics(action: Action, state: GameState):
 
         result_soup = BeautifulSoup(page.content(), "html.parser")
         success_div = result_soup.find("div", id="success")
-        fail_div = result_soup.find("div", id="fail")
+        fail_div    = result_soup.find("div", id="fail")
 
         if success_div:
-            msg = success_div.get_text(strip=True)
-            state.add_log(f"Bionics: purchased {target} — {msg}")
+            state.add_log(f"Bionics: purchased {target} — {success_div.get_text(strip=True)}")
             purchased.append(target)
+            store[target] = {"price": price, "stock": 0}
         elif fail_div:
             state.add_log(f"Bionics: purchase failed — {fail_div.get_text(strip=True)}")
             break
@@ -1399,48 +1397,38 @@ def handle_check_bionics(action: Action, state: GameState):
             state.add_log("Bionics: unexpected page after purchase — aborting.")
             break
 
-        # Check if more wanted items are still in stock
-        store = _parse_store() if page.url.endswith("bionics.asp") else {}
-        remaining = [i for i in wanted if store.get(i, {}).get("stock", 0) > 0
-                     and store[i]["price"] <= state.clean_money + state.bank_balance]
-        if not remaining:
+        can_buy = _in_stock_affordable()
+        if not can_buy:
             break
 
-        # Stash current item before buying next
+        # Stash before next purchase
         _nav(_u("/profile/default.asp"), state)
         stash_link = page.query_selector("a[href='/weapons.asp?action=stash1']")
         if not stash_link:
-            state.add_log("Bionics: stash #1 link not found or unavailable — stopping.")
+            state.add_log("Bionics: stash #1 not available — stopping.")
             break
         stash_link.click()
         page.wait_for_load_state("domcontentloaded")
         stash_soup = BeautifulSoup(page.content(), "html.parser")
-        stash_fail = stash_soup.find("div", id="fail")
-        if stash_fail:
-            state.add_log(f"Bionics: stash failed — {stash_fail.get_text(strip=True)} — stopping.")
+        if stash_soup.find("div", id="fail"):
+            state.add_log(f"Bionics: stash failed — stopping.")
             break
-        state.add_log("Bionics: stashed item in slot #1, waiting 30s before next purchase.")
+        state.add_log("Bionics: stashed in slot #1.")
+
+        # Withdraw for next item, then wait 30s, then navigate back
+        next_price = BIONIC_PRICES[can_buy[0]]
+        _withdraw_for(next_price)
+        state.add_log("Bionics: waiting 30s before next purchase.")
         time.sleep(30)
 
         _nav_to_store()
         if not _check_session(state):
             break
         store = _parse_store()
-
-        # Withdraw again if needed for next item
-        next_affordable = [i for i in wanted if store.get(i, {}).get("stock", 0) > 0
-                           and store[i]["price"] <= state.clean_money + state.bank_balance]
-        if next_affordable:
-            next_price = max(store[i]["price"] for i in next_affordable)
-            if state.clean_money < next_price:
-                needed = next_price - state.clean_money
-                state.add_log(f"Bionics: withdrawing ${needed:,} for next purchase.")
-                handle_withdraw(Action("withdraw", amount=needed), state)
-                _nav_to_store()
-                store = _parse_store()
+        can_buy = _in_stock_affordable()
 
     if purchased:
-        state.add_log(f"Bionics: session complete — purchased: {', '.join(purchased)}.")
+        state.add_log(f"Bionics session complete — purchased: {', '.join(purchased)}.")
 
 
 def handle_withdraw(action: Action, state: GameState):
