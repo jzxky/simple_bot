@@ -794,13 +794,23 @@
         <!-- Player List tab -->
         <div id="pl-tab-list" class="tab-panel active">
           <div class="pl-toolbar">
-            <input type="text" id="pl-search" class="task-select" placeholder="Search…" oninput="plFilter()" style="flex:1;min-width:100px;max-width:220px">
-            <select id="pl-filter-group" class="task-select" onchange="plFilter()" style="min-width:110px"></select>
-            <select id="pl-filter-agg" class="task-select" onchange="plFilter()" style="min-width:120px">
+            <input type="text" id="pl-search" class="task-select" placeholder="Name…" oninput="plFilter()" style="min-width:100px;max-width:180px">
+            <select id="pl-filter-rank"       class="task-select" onchange="plFilter()"><option value="">Rank: All</option></select>
+            <select id="pl-filter-occupation" class="task-select" onchange="plFilter()"><option value="">Occupation: All</option></select>
+            <select id="pl-filter-homecity"   class="task-select" onchange="plFilter()"><option value="">City: All</option></select>
+            <select id="pl-filter-group"      class="task-select" onchange="plFilter()"><option value="">Group: All</option></select>
+            <select id="pl-filter-tag"        class="task-select" onchange="plFilter()"><option value="">Tag: All</option></select>
+            <select id="pl-filter-agg"        class="task-select" onchange="plFilter()">
               <option value="">Agg: All</option>
               <option value="__none__">Agg: None</option>
               <option value="whitelist">Agg: Whitelist</option>
               <option value="blacklist">Agg: Blacklist</option>
+            </select>
+            <select id="pl-filter-casework"   class="task-select" onchange="plFilter()">
+              <option value="">Case: All</option>
+              <option value="__none__">Case: None</option>
+              <option value="whitelist">Case: Whitelist</option>
+              <option value="blacklist">Case: Blacklist</option>
             </select>
             <label class="inline-toggle" style="white-space:nowrap">Active only
               <label class="toggle-label">

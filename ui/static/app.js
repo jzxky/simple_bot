@@ -1672,7 +1672,7 @@ function loadPlayers() {
     .then(data => {
       _plData = (data.players || []).map(p => ({ ...p, group: p.group_name ?? p.group ?? "" }));
       _plGroups = data.groups || [];
-      _plRebuildGroupFilter();
+      _plRebuildFilters();
       plFilter();
       _plRenderGroupsTab(data.groups);
       const pill = document.getElementById("pills-s-players");
@@ -1690,30 +1690,54 @@ function _plGroupColorMap() {
   return m;
 }
 
-function _plRebuildGroupFilter() {
-  const sel = document.getElementById("pl-filter-group");
-  if (!sel) return;
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">All Groups</option>' +
-    _plGroups.map(g => `<option value="${escHtml(g.name)}">${escHtml(g.name)}</option>`).join("");
-  if (cur) sel.value = cur;
+function _plRebuildFilters() {
+  // Collect unique values from _plData for each column
+  const uniq = col => [...new Set(_plData.map(p => p[col] || "").filter(Boolean))].sort((a,b) => a.localeCompare(b));
+  const uniqTags = [...new Set(_plData.flatMap(p => p.tags || []))].sort();
+
+  const specs = [
+    { id: "pl-filter-rank",       label: "Rank",       vals: uniq("rank") },
+    { id: "pl-filter-occupation", label: "Occupation",  vals: uniq("occupation") },
+    { id: "pl-filter-homecity",   label: "City",        vals: uniq("homecity") },
+    { id: "pl-filter-group",      label: "Group",       vals: uniq("group") },
+    { id: "pl-filter-tag",        label: "Tag",         vals: uniqTags },
+  ];
+  specs.forEach(({ id, label, vals }) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${label}: All</option>` +
+      vals.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join("");
+    if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
+  });
 }
+
+// kept for legacy call sites
+function _plRebuildGroupFilter() { _plRebuildFilters(); }
 
 function plFilter() {
   const search    = (document.getElementById("pl-search")?.value || "").toLowerCase();
+  const rank      = document.getElementById("pl-filter-rank")?.value || "";
+  const occ       = document.getElementById("pl-filter-occupation")?.value || "";
+  const city      = document.getElementById("pl-filter-homecity")?.value || "";
   const group     = document.getElementById("pl-filter-group")?.value || "";
+  const tag       = document.getElementById("pl-filter-tag")?.value || "";
   const agg       = document.getElementById("pl-filter-agg")?.value || "";
+  const cw        = document.getElementById("pl-filter-casework")?.value || "";
   const activeOnly = document.getElementById("pl-filter-active")?.checked ?? true;
 
   _plFiltered = _plData.filter(p => {
     if (activeOnly && !p.active) return false;
+    if (search && !p.username.toLowerCase().includes(search)) return false;
+    if (rank && p.rank !== rank) return false;
+    if (occ  && p.occupation !== occ) return false;
+    if (city && p.homecity !== city) return false;
     if (group && p.group !== group) return false;
+    if (tag && !(p.tags||[]).includes(tag)) return false;
     if (agg === "__none__" && p.agg_crimes) return false;
     if (agg && agg !== "__none__" && p.agg_crimes !== agg) return false;
-    if (search && !p.username.toLowerCase().includes(search) &&
-        !(p.occupation||"").toLowerCase().includes(search) &&
-        !(p.homecity||"").toLowerCase().includes(search) &&
-        !(p.rank||"").toLowerCase().includes(search)) return false;
+    if (cw === "__none__" && p.case_work) return false;
+    if (cw && cw !== "__none__" && p.case_work !== cw) return false;
     return true;
   });
 
