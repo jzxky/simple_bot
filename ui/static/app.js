@@ -1659,22 +1659,40 @@ function cjGoPage(n) {
 // Player Section
 // =============================================================================
 
-let _plData = [];
+const PL_SWATCH_COLORS = ["#e74c3c","#e67e22","#f1c40f","#2ecc71","#3498db","#9b59b6","#e91e8c","#1abc9c","#aaaaaa","#555555"];
+
+let _plData     = [];
 let _plFiltered = [];
 let _plExpanded = {};
-let _plGroups = [];
-let _plSortCol = "username";
-let _plSortAsc = true;
+let _plGroups   = [];
+let _plSortCol  = "username";
+let _plSortAsc  = true;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function _plGroupColorMap() {
+  const m = {};
+  _plGroups.forEach(g => { m[g.name] = g.color; });
+  return m;
+}
+
+function _fmtAge(mins) {
+  if (!mins) return "—";
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+// ── Load & rebuild filters ────────────────────────────────────────────────────
 
 function loadPlayers() {
   fetch("/api/players")
     .then(r => r.json())
     .then(data => {
-      _plData = (data.players || []).map(p => ({ ...p, group: p.group_name ?? p.group ?? "" }));
+      _plData   = (data.players || []).map(p => ({ ...p, group: p.group_name ?? p.group ?? "" }));
       _plGroups = data.groups || [];
       _plRebuildFilters();
       plFilter();
-      _plRenderGroupsTab(data.groups);
+      _plRenderGroupsTab(_plGroups);
       const pill = document.getElementById("pills-s-players");
       if (pill) {
         const active = _plData.filter(p => p.active).length;
@@ -1684,36 +1702,28 @@ function loadPlayers() {
     .catch(() => {});
 }
 
-function _plGroupColorMap() {
-  const m = {};
-  _plGroups.forEach(g => { m[g.name] = g.color; });
-  return m;
-}
-
 function _plRebuildFilters() {
-  // Collect unique values from _plData for each column
   const uniq = col => [...new Set(_plData.map(p => p[col] || "").filter(Boolean))].sort((a,b) => a.localeCompare(b));
   const uniqTags = [...new Set(_plData.flatMap(p => p.tags || []))].sort();
 
   const specs = [
-    { id: "pl-filter-rank",       label: "Rank",       vals: uniq("rank") },
-    { id: "pl-filter-occupation", label: "Occupation",  vals: uniq("occupation") },
-    { id: "pl-filter-homecity",   label: "City",        vals: uniq("homecity") },
-    { id: "pl-filter-group",      label: "Group",       vals: uniq("group") },
-    { id: "pl-filter-tag",        label: "Tag",         vals: uniqTags },
+    { id: "pl-filter-rank",       vals: uniq("rank") },
+    { id: "pl-filter-occupation", vals: uniq("occupation") },
+    { id: "pl-filter-homecity",   vals: uniq("homecity") },
+    { id: "pl-filter-group",      vals: uniq("group") },
+    { id: "pl-filter-tag",        vals: uniqTags },
   ];
-  specs.forEach(({ id, label, vals }) => {
+  specs.forEach(({ id, vals }) => {
     const sel = document.getElementById(id);
     if (!sel) return;
     const cur = sel.value;
-    sel.innerHTML = `<option value="">${label}: All</option>` +
+    sel.innerHTML = `<option value="">All</option>` +
       vals.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join("");
     if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
   });
 }
 
-// kept for legacy call sites
-function _plRebuildGroupFilter() { _plRebuildFilters(); }
+// ── Filter & sort ─────────────────────────────────────────────────────────────
 
 function plFilter() {
   const search    = (document.getElementById("pl-search")?.value || "").toLowerCase();
@@ -1729,42 +1739,33 @@ function plFilter() {
   _plFiltered = _plData.filter(p => {
     if (activeOnly && !p.active) return false;
     if (search && !p.username.toLowerCase().includes(search)) return false;
-    if (rank && p.rank !== rank) return false;
-    if (occ  && p.occupation !== occ) return false;
-    if (city && p.homecity !== city) return false;
+    if (rank  && p.rank !== rank) return false;
+    if (occ   && p.occupation !== occ) return false;
+    if (city  && p.homecity !== city) return false;
     if (group && p.group !== group) return false;
-    if (tag && !(p.tags||[]).includes(tag)) return false;
+    if (tag   && !(p.tags||[]).includes(tag)) return false;
     if (agg === "__none__" && p.agg_crimes) return false;
     if (agg && agg !== "__none__" && p.agg_crimes !== agg) return false;
     if (cw === "__none__" && p.case_work) return false;
     if (cw && cw !== "__none__" && p.case_work !== cw) return false;
     return true;
   });
-
   _plApplySort();
   _plRenderTable();
 }
 
 function plSort(col) {
-  if (_plSortCol === col) {
-    _plSortAsc = !_plSortAsc;
-  } else {
-    _plSortCol = col;
-    _plSortAsc = true;
-  }
+  if (_plSortCol === col) _plSortAsc = !_plSortAsc;
+  else { _plSortCol = col; _plSortAsc = true; }
   _plApplySort();
   _plRenderTable();
 }
 
 function _plApplySort() {
-  const col = _plSortCol;
-  const asc = _plSortAsc ? 1 : -1;
-  _plFiltered = [..._plFiltered].sort((a, b) => {
-    const av = (a[col] || "").toLowerCase();
-    const bv = (b[col] || "").toLowerCase();
-    return asc * av.localeCompare(bv);
-  });
-  // Update sort icons
+  const col = _plSortCol, asc = _plSortAsc ? 1 : -1;
+  _plFiltered = [..._plFiltered].sort((a, b) =>
+    asc * (a[col] || "").toLowerCase().localeCompare((b[col] || "").toLowerCase())
+  );
   document.querySelectorAll(".pl-th[data-col]").forEach(th => {
     const icon = th.querySelector(".pl-sort-icon");
     if (!icon) return;
@@ -1777,6 +1778,8 @@ function _plApplySort() {
     }
   });
 }
+
+// ── Render player table ───────────────────────────────────────────────────────
 
 function _plRenderTable() {
   const tbody = document.getElementById("pl-tbody");
@@ -1794,9 +1797,9 @@ function _plRenderTable() {
     const groupCell = p.group
       ? `<span class="pl-group-badge" style="background:${color||'#888'}">${escHtml(p.group)}</span>`
       : `<span style="color:var(--muted)">—</span>`;
-    const tags = (p.tags||[]).map(t => `<span class="pl-tag">${escHtml(t)}</span>`).join(" ");
-    const aggCell  = p.agg_crimes  ? `<span class="pl-assign-badge pl-assign-${p.agg_crimes}">${p.agg_crimes}</span>`  : "—";
-    const cwCell   = p.case_work   ? `<span class="pl-assign-badge pl-assign-${p.case_work}">${p.case_work}</span>`   : "—";
+    const tags    = (p.tags||[]).map(t => `<span class="pl-tag">${escHtml(t)}</span>`).join(" ");
+    const aggCell = p.agg_crimes ? `<span class="pl-assign-badge pl-assign-${p.agg_crimes}">${p.agg_crimes}</span>` : "—";
+    const cwCell  = p.case_work  ? `<span class="pl-assign-badge pl-assign-${p.case_work}">${p.case_work}</span>`   : "—";
     const expanded = _plExpanded[p.username];
 
     rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow('${escHtml(p.username)}')" style="cursor:pointer">
@@ -1820,21 +1823,18 @@ function _plRenderTable() {
 function plToggleRow(username) {
   _plExpanded[username] = !_plExpanded[username];
   _plRenderTable();
-  if (_plExpanded[username]) {
-    // Load history lazily
-    const p = _plData.find(x => x.username === username);
-    // detail is rendered inline; history loads on demand via button click
-  }
 }
 
 function _plDetailHtml(p) {
-  const histId = `plhist-${p.username}`;
+  const histId    = `plhist-${p.username}`;
   const groupOpts = _plGroups.map(g =>
     `<option value="${escHtml(g.name)}" ${p.group===g.name?'selected':''}>${escHtml(g.name)}</option>`
   ).join("");
   return `
 <div class="pl-detail-grid">
   <div class="pl-detail-item"><span class="pl-detail-label">Status</span>${p.active?"Active":"Inactive"}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Character Age</span>${_fmtAge(p.character_age||0)}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Jail Age</span>${_fmtAge(p.jail_age||0)}</div>
   <div class="pl-detail-item">
     <span class="pl-detail-label">Group</span>
     <select onchange="plSetGroup('${escHtml(p.username)}', this.value, this)" onclick="event.stopPropagation()">
@@ -1891,24 +1891,21 @@ function plLoadHistory(username, containerId, toggleEl) {
       container.innerHTML = `
 <table class="pl-history-table">
   <thead><tr><th>Date</th><th>Rank</th><th>Occupation</th><th>City</th></tr></thead>
-  <tbody>${rows.map(r => `
-    <tr>
-      <td>${escHtml(r.ts||"")}</td>
-      <td>${escHtml(r.rank||"")}</td>
-      <td>${escHtml(r.occupation||"")}</td>
-      <td>${escHtml(r.homecity||"")}</td>
-    </tr>`).join("")}
-  </tbody>
+  <tbody>${rows.map(r => `<tr>
+    <td>${escHtml(r.ts||"")}</td><td>${escHtml(r.rank||"")}</td>
+    <td>${escHtml(r.occupation||"")}</td><td>${escHtml(r.homecity||"")}</td>
+  </tr>`).join("")}</tbody>
 </table>`;
       container.dataset.loaded = "1";
     })
     .catch(() => { container.innerHTML = '<p style="color:var(--muted);padding:8px">Failed to load.</p>'; });
 }
 
+// ── Assignments & groups ──────────────────────────────────────────────────────
+
 function plSetAssignment(username, context, value) {
   fetch("/players/assign", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
+    method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({username, context, value}),
   }).then(() => {
     const p = _plData.find(x => x.username === username);
@@ -1919,8 +1916,7 @@ function plSetAssignment(username, context, value) {
 
 function plSetGroup(username, group, el) {
   fetch("/players/set_group", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
+    method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({username, group}),
   }).then(() => {
     const p = _plData.find(x => x.username === username);
@@ -1929,8 +1925,25 @@ function plSetGroup(username, group, el) {
   }).catch(() => {});
 }
 
+function plWhitelistBolds() {
+  const btn    = document.getElementById("pl-bolds-btn");
+  const status = document.getElementById("pl-bolds-status");
+  if (btn) btn.disabled = true;
+  fetch("/players/whitelist_bolds", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      if (btn) btn.disabled = false;
+      if (status) status.textContent = `Whitelisted ${d.count} player(s).`;
+      setTimeout(() => { if (status) status.textContent = ""; }, 4000);
+      loadPlayers();
+    })
+    .catch(() => { if (btn) btn.disabled = false; });
+}
+
+// ── Refresh & import ──────────────────────────────────────────────────────────
+
 function plRefresh() {
-  const btn = document.getElementById("pl-refresh-btn");
+  const btn    = document.getElementById("pl-refresh-btn");
   const status = document.getElementById("pl-refresh-status");
   if (btn) { btn.disabled = true; btn.textContent = "Refreshing…"; }
   if (status) status.textContent = "";
@@ -1938,10 +1951,7 @@ function plRefresh() {
     .then(r => r.json())
     .then(d => {
       if (btn) { btn.disabled = false; btn.textContent = "Refresh"; }
-      if (d.error) {
-        if (status) status.textContent = d.error;
-        return;
-      }
+      if (d.error) { if (status) status.textContent = d.error; return; }
       loadPlayers();
     })
     .catch(() => {
@@ -1960,8 +1970,7 @@ function plRunImport() {
   if (!names.length) return;
   if (btn) { btn.disabled = true; btn.textContent = "Importing…"; }
   fetch("/players/import", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
+    method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({names, context, assignment: assign}),
   }).then(r => r.json())
     .then(d => {
@@ -1977,54 +1986,175 @@ function plRunImport() {
     .catch(() => { if (btn) { btn.disabled = false; btn.textContent = "Import"; } });
 }
 
+// ── Groups tab ────────────────────────────────────────────────────────────────
+
+let _plGroupExpanded = {};
+
 function _plRenderGroupsTab(groups) {
-  const container = document.getElementById("pl-group-chips");
-  if (!container) return;
+  const tbody = document.getElementById("pl-groups-tbody");
+  if (!tbody) return;
   if (!groups || !groups.length) {
-    container.innerHTML = '<p style="color:var(--muted)">No groups yet.</p>';
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:12px;color:var(--muted);text-align:center">No groups yet.</td></tr>`;
     return;
   }
-  container.innerHTML = groups.map(g => `
-<div class="pl-group-chip">
-  <input type="color" value="${escHtml(g.color||'#888888')}"
-    onchange="plUpdateGroupColor('${escHtml(g.name)}', this.value)"
-    title="Color for ${escHtml(g.name)}">
-  <span class="pl-group-badge" style="background:${escHtml(g.color||'#888888')}">${escHtml(g.name)}</span>
-  <button class="btn btn-danger btn-sm" onclick="plDeleteGroup('${escHtml(g.name)}')">✕</button>
-</div>`).join("");
+
+  const rows = [];
+  groups.forEach(g => {
+    const typeClass = g.type === "friendly" ? "pl-type-friendly" : g.type === "enemy" ? "pl-type-enemy" : "pl-type-neutral";
+    const swatches  = PL_SWATCH_COLORS.map(c =>
+      `<span class="pl-swatch${c===g.color?' selected':''}" data-color="${c}" style="background:${c}"
+        onclick="plUpdateGroupColor('${escHtml(g.name)}', '${c}'); event.stopPropagation()"></span>`
+    ).join("");
+    const aggSel = ["","whitelist","blacklist"].map(v =>
+      `<option value="${v}" ${g.agg_crimes===v?'selected':''}>${v||"—"}</option>`).join("");
+    const cwSel = ["","whitelist","blacklist"].map(v =>
+      `<option value="${v}" ${g.case_work===v?'selected':''}>${v||"—"}</option>`).join("");
+    const typeSel = ["neutral","friendly","enemy"].map(v =>
+      `<option value="${v}" ${g.type===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join("");
+    const expanded = _plGroupExpanded[g.name];
+
+    rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleGroup('${escHtml(g.name)}')" style="cursor:pointer">
+      <td><span class="pl-chevron">${expanded?'▾':'▸'}</span>
+        <span class="pl-group-badge" style="background:${g.color}">${escHtml(g.name)}</span>
+      </td>
+      <td onclick="event.stopPropagation()">
+        <select class="pl-filter-input" onchange="plUpdateGroupType('${escHtml(g.name)}', this.value)">${typeSel}</select>
+      </td>
+      <td onclick="event.stopPropagation()"><div class="pl-swatches">${swatches}</div></td>
+      <td onclick="event.stopPropagation()">
+        <select class="pl-filter-input" onchange="plUpdateGroupAssignment('${escHtml(g.name)}', 'agg_crimes', this.value)">${aggSel}</select>
+      </td>
+      <td onclick="event.stopPropagation()">
+        <select class="pl-filter-input" onchange="plUpdateGroupAssignment('${escHtml(g.name)}', 'case_work', this.value)">${cwSel}</select>
+      </td>
+      <td>${g.member_count||0}</td>
+      <td onclick="event.stopPropagation()">
+        <button class="btn-secondary" style="padding:2px 8px;font-size:0.75rem"
+          onclick="plDeleteGroup('${escHtml(g.name)}')">Delete</button>
+      </td>
+    </tr>`);
+
+    if (expanded) {
+      rows.push(`<tr class="pl-detail-row"><td colspan="7">
+        <div class="pl-detail" id="plgdetail-${escHtml(g.name)}">
+          <div id="plgmembers-${escHtml(g.name)}" style="color:var(--muted);font-size:0.83rem">Loading…</div>
+        </div>
+      </td></tr>`);
+    }
+  });
+  tbody.innerHTML = rows.join("");
+
+  // Load members for expanded groups
+  groups.forEach(g => {
+    if (_plGroupExpanded[g.name]) _plLoadGroupMembers(g.name);
+  });
+
+  // Wire up swatch selection in create row
+  document.querySelectorAll("#pl-new-group-swatches .pl-swatch").forEach(s => {
+    s.onclick = () => {
+      document.querySelectorAll("#pl-new-group-swatches .pl-swatch").forEach(x => x.classList.remove("selected"));
+      s.classList.add("selected");
+      document.getElementById("pl-new-group-swatches").dataset.selected = s.dataset.color;
+    };
+  });
+}
+
+function plToggleGroup(name) {
+  _plGroupExpanded[name] = !_plGroupExpanded[name];
+  _plRenderGroupsTab(_plGroups);
+}
+
+function _plLoadGroupMembers(groupName) {
+  const container = document.getElementById(`plgmembers-${groupName}`);
+  if (!container) return;
+  fetch(`/api/players/group/${encodeURIComponent(groupName)}`)
+    .then(r => r.json())
+    .then(data => {
+      const members = (data.players || []).map(p => ({ ...p, group: p.group_name ?? "" }));
+      if (!members.length) {
+        container.innerHTML = '<p style="color:var(--muted);padding:4px 0">No members.</p>';
+        return;
+      }
+      const colorMap = _plGroupColorMap();
+      container.innerHTML = `<table class="pl-history-table" style="width:100%">
+        <thead><tr>
+          <th>Name</th><th>Rank</th><th>Occupation</th><th>City</th>
+          <th>Agg (individual)</th><th>Case Work (individual)</th>
+        </tr></thead>
+        <tbody>${members.map(p => {
+          const aggBadge = p.agg_crimes ? `<span class="pl-assign-badge pl-assign-${p.agg_crimes}">${p.agg_crimes}</span>` : "—";
+          const cwBadge  = p.case_work  ? `<span class="pl-assign-badge pl-assign-${p.case_work}">${p.case_work}</span>`   : "—";
+          return `<tr>
+            <td>${escHtml(p.username)}</td>
+            <td>${escHtml(p.rank||"—")}</td>
+            <td>${escHtml(p.occupation||"—")}</td>
+            <td>${escHtml(p.homecity||"—")}</td>
+            <td>${aggBadge}</td><td>${cwBadge}</td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table>`;
+    })
+    .catch(() => { container.innerHTML = '<p style="color:var(--muted)">Failed to load.</p>'; });
 }
 
 function plCreateGroup() {
   const nameEl  = document.getElementById("pl-new-group-name");
-  const colorEl = document.getElementById("pl-new-group-color");
-  const name  = nameEl?.value.trim();
-  const color = colorEl?.value || "#888888";
+  const typeEl  = document.getElementById("pl-new-group-type");
+  const swatchEl = document.getElementById("pl-new-group-swatches");
+  const errEl   = document.getElementById("pl-group-create-error");
+  const name    = nameEl?.value.trim();
+  const color   = swatchEl?.dataset.selected || "#3498db";
+  const type    = typeEl?.value || "neutral";
   if (!name) return;
   fetch("/players/groups/create", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name, color}),
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name, color, group_type: type}),
   }).then(r => r.json())
-    .then(() => { if (nameEl) nameEl.value = ""; loadPlayers(); })
+    .then(d => {
+      if (!d.ok) { if (errEl) { errEl.textContent = d.error || "Error"; errEl.style.display = ""; } return; }
+      if (errEl) errEl.style.display = "none";
+      if (nameEl) nameEl.value = "";
+      loadPlayers();
+    })
     .catch(() => {});
 }
 
 function plDeleteGroup(name) {
   if (!confirm(`Delete group "${name}"?`)) return;
   fetch("/players/groups/delete", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
+    method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({name}),
-  }).then(() => loadPlayers())
-    .catch(() => {});
+  }).then(() => loadPlayers()).catch(() => {});
 }
 
 function plUpdateGroupColor(name, color) {
   fetch("/players/groups/update_color", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
+    method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({name, color}),
-  }).then(() => loadPlayers())
-    .catch(() => {});
+  }).then(() => {
+    const g = _plGroups.find(x => x.name === name);
+    if (g) g.color = color;
+    _plRenderGroupsTab(_plGroups);
+  }).catch(() => {});
+}
+
+function plUpdateGroupType(name, group_type) {
+  fetch("/players/groups/update_type", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name, group_type}),
+  }).then(() => {
+    const g = _plGroups.find(x => x.name === name);
+    if (g) g.type = group_type;
+  }).catch(() => {});
+}
+
+function plUpdateGroupAssignment(name, context, value) {
+  fetch("/players/groups/update_assignment", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name, context, value}),
+  }).then(() => {
+    const g = _plGroups.find(x => x.name === name);
+    if (g) g[context] = value;
+  }).catch(() => {});
 }
 
