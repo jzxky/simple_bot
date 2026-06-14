@@ -846,6 +846,9 @@ def _get_public_business_owner(business_name: str, state: GameState) -> "str | N
     if not job:
         state.add_log(f"No job mapping for {business_name}.")
         return None
+    # The owner is whoever holds the top job in the city where the robbery
+    # was performed (the bot's current city), not necessarily its home city.
+    city = state.current_city or state.home_city
     browser.page().goto(_u("/skin/updateusers.php?q=1"), wait_until="domcontentloaded", timeout=15000)
     try:
         data = json.loads(browser.page().inner_text("body"))
@@ -854,11 +857,11 @@ def _get_public_business_owner(business_name: str, state: GameState) -> "str | N
         return None
     owner = next(
         (p["userName"] for p in data
-         if p.get("userHomeCity") == state.home_city and p.get("userOccupation") == job),
+         if p.get("userHomeCity") == city and p.get("userOccupation") == job),
         None,
     )
     if not owner:
-        state.add_log(f"No {job} found in {state.home_city} for payback.")
+        state.add_log(f"No {job} found in {city} for payback.")
     return owner
 
 
