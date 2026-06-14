@@ -46,6 +46,7 @@ from tasks.bionics import BionicsTask
 from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
+_bionics_task = None
 _stop_event = threading.Event()
 _pause_event = threading.Event()
 _reload_event = threading.Event()
@@ -163,7 +164,9 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(IllnessTask(_illness_queue))
     sched.add(GymTask())
     sched.add(OnlineAgeTask())
-    sched.add(BionicsTask())
+    global _bionics_task
+    _bionics_task = BionicsTask()
+    sched.add(_bionics_task)
     sched.add(PlayerRefreshTask())
     sched.add(CheckTopJobTask())
     sched.add(SnipeTopJobTask())
@@ -416,6 +419,10 @@ def resume():
     state.relog_suppressed = False
     _pause_event.clear()
     state.add_log("Bot resumed.")
+
+
+def get_bionics_task():
+    return _bionics_task
 
 
 def is_running() -> bool:

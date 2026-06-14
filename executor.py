@@ -1321,6 +1321,13 @@ def handle_check_bionics(action: Action, state: GameState):
             except ValueError:
                 continue
             items[item_val] = {"price": price, "stock": stock}
+        # Parse visit count and store on task
+        if task is not None:
+            views_p = soup.find("p", class_="center")
+            if views_p:
+                vm = re.search(r"Current Views:\s*(\d+)\s*/\s*(\d+)", views_p.get_text())
+                if vm:
+                    task.last_views = (int(vm.group(1)), int(vm.group(2)))
         return items
 
     def _nav_to_store():

@@ -115,6 +115,7 @@ def save():
     c["bionics"]["enabled"] = data.get("bionics_enabled", False)
     c["bionics"]["wanted_items"] = data.get("bionics_wanted_items", [])
     c["bionics"]["check_interval_minutes"] = max(1, int(data.get("bionics_interval", 5)))
+    c["bionics"]["use_time_window"] = data.get("bionics_use_time_window", False)
     c["bionics"]["window_start"] = data.get("bionics_window_start", "00:00")
     c["bionics"]["window_end"] = data.get("bionics_window_end", "23:59")
     c["bionics"]["auto_restock"] = data.get("bionics_auto_restock", False)
@@ -473,6 +474,15 @@ def logs_viewer(filename):
         lines = []
     return render_template("log.html", filename=safe, log_files=files,
                            lines=lines, line_count=len(lines))
+
+
+@app.route("/api/bionics/status")
+def api_bionics_status():
+    views = None
+    task = bot.get_bionics_task()
+    if task and task.last_views:
+        views = {"current": task.last_views[0], "max": task.last_views[1]}
+    return jsonify({"views": views})
 
 
 @app.route("/api/players")

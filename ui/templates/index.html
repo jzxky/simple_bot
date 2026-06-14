@@ -114,6 +114,10 @@
               </div>
               <div class="setting-row">
                 <label>Check window</label>
+                <label class="toggle-label" style="margin-right:8px">
+                  <input type="checkbox" id="bionics_use_time_window" {% if bionics_cfg.get('use_time_window') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
                 <input type="time" id="bionics_window_start" value="{{ bionics_cfg.get('window_start', '00:00') }}" onchange="autoSave()">
                 <span style="margin:0 6px">to</span>
                 <input type="time" id="bionics_window_end" value="{{ bionics_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
@@ -124,6 +128,10 @@
                   <span class="toggle"></span>
                 </label>
               </label>
+              <div class="setting-row" style="margin-top:6px">
+                <span class="stat-label">Store visits</span>
+                <span id="bionics-views" class="stat-value" style="margin-left:8px">--</span>
+              </div>
             </div>
           </div>
           <div class="settings-groups">
