@@ -1243,7 +1243,7 @@ def handle_jail_action(action: Action, state: GameState):
         state.add_log(f"Jail action ({jail_action}): submitted.")
 
 
-_JAIL_CONSUME_PRIORITY = ["porn", "booze", "cigarettes", "heroin"]
+_JAIL_CONSUME_PRIORITY = ["porn", "booze", "cigarettes"]
 
 
 def handle_jail_consume(action: Action, state: GameState):
