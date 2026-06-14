@@ -85,7 +85,47 @@
         </div>
 
         <div id="business" class="tab-panel active">
+          {% set bionics_cfg = config.get('bionics', {}) %}
           {% set gym = config.get('gym', {}) %}
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                Bionics Store (Chicago)
+                <label class="toggle-label">
+                  <input type="checkbox" id="bionics_enabled" {% if bionics_cfg.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <div class="setting-row">
+                <label>Wanted Items</label>
+                <div style="display:flex;gap:12px;flex-wrap:wrap">
+                  {% for item, label in [('arms','Bionic Arms ($10k)'),('legs','Bionic Legs ($20k)'),('eyes','Bionic Eyes ($35k)'),('brain','Bionic Brain ($50k)'),('heart','Bionic Heart ($50k)')] %}
+                  <label class="inline-toggle">
+                    <input type="checkbox" id="bionics_want_{{ item }}" {% if item in bionics_cfg.get('wanted_items', []) %}checked{% endif %} onchange="autoSave()">
+                    {{ label }}
+                  </label>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="setting-row">
+                <label for="bionics_interval">Check every</label>
+                <input type="number" id="bionics_interval" min="1" max="60" style="width:70px"
+                  value="{{ bionics_cfg.get('check_interval_minutes', 5) }}" onchange="autoSave()"> minutes
+              </div>
+              <div class="setting-row">
+                <label>Check window</label>
+                <input type="time" id="bionics_window_start" value="{{ bionics_cfg.get('window_start', '00:00') }}" onchange="autoSave()">
+                <span style="margin:0 6px">to</span>
+                <input type="time" id="bionics_window_end" value="{{ bionics_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
+              </div>
+              <label class="inline-toggle setting-row">Auto-restock detection
+                <label class="toggle-label">
+                  <input type="checkbox" id="bionics_auto_restock" {% if bionics_cfg.get('auto_restock') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+            </div>
+          </div>
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>
