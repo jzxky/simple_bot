@@ -111,6 +111,14 @@ def save():
     c["gym"]["activity"] = data.get("gym_activity", "weights")
     c["gym"]["auto_travel"] = data.get("gym_auto_travel", False)
 
+    c.setdefault("bionics", {})
+    c["bionics"]["enabled"] = data.get("bionics_enabled", False)
+    c["bionics"]["wanted_items"] = data.get("bionics_wanted_items", [])
+    c["bionics"]["check_interval_minutes"] = max(1, int(data.get("bionics_interval", 5)))
+    c["bionics"]["window_start"] = data.get("bionics_window_start", "00:00")
+    c["bionics"]["window_end"] = data.get("bionics_window_end", "23:59")
+    c["bionics"]["auto_restock"] = data.get("bionics_auto_restock", False)
+
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
     c["case_work"].setdefault("hospital", {})
