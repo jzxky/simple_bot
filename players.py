@@ -94,8 +94,8 @@ def set_player_group(username: str, group_name: str):
     _db.set_player_group(username, group_name)
 
 
-def create_group(name: str, color: str) -> bool:
-    return _db.create_group(name, color)
+def create_group(name: str, color: str, group_type: str = "neutral") -> bool:
+    return _db.create_group(name, color, group_type)
 
 
 def delete_group(name: str):

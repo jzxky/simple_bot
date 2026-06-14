@@ -794,25 +794,9 @@
         <!-- Player List tab -->
         <div id="pl-tab-list" class="tab-panel active">
           <div class="pl-toolbar">
-            <input type="text" id="pl-search" class="task-select" placeholder="Name…" oninput="plFilter()" style="min-width:100px;max-width:180px">
-            <select id="pl-filter-rank"       class="task-select" onchange="plFilter()"><option value="">Rank: All</option></select>
-            <select id="pl-filter-occupation" class="task-select" onchange="plFilter()"><option value="">Occupation: All</option></select>
-            <select id="pl-filter-homecity"   class="task-select" onchange="plFilter()"><option value="">City: All</option></select>
-            <select id="pl-filter-group"      class="task-select" onchange="plFilter()"><option value="">Group: All</option></select>
-            <select id="pl-filter-tag"        class="task-select" onchange="plFilter()"><option value="">Tag: All</option></select>
-            <select id="pl-filter-agg"        class="task-select" onchange="plFilter()">
-              <option value="">Agg: All</option>
-              <option value="__none__">Agg: None</option>
-              <option value="whitelist">Agg: Whitelist</option>
-              <option value="blacklist">Agg: Blacklist</option>
-            </select>
-            <select id="pl-filter-casework"   class="task-select" onchange="plFilter()">
-              <option value="">Case: All</option>
-              <option value="__none__">Case: None</option>
-              <option value="whitelist">Case: Whitelist</option>
-              <option value="blacklist">Case: Blacklist</option>
-            </select>
-            <label class="inline-toggle" style="white-space:nowrap">Active only
+            <button class="btn-secondary" onclick="plWhitelistBolds()" id="pl-bolds-btn" title="Whitelist all Boss / Don / Godfather / Capo di tutti capi">Whitelist Bolds</button>
+            <span id="pl-bolds-status" style="font-size:0.8rem;color:var(--text-muted)"></span>
+            <label class="inline-toggle" style="white-space:nowrap;margin-left:auto">Active only
               <label class="toggle-label">
                 <input type="checkbox" id="pl-filter-active" checked onchange="plFilter()">
                 <span class="toggle"></span>
@@ -825,31 +809,81 @@
             <table class="pl-table" id="pl-table">
               <thead>
                 <tr>
-                  <th class="pl-th" onclick="plSort('username')" data-col="username">Name <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th" onclick="plSort('rank')" data-col="rank">Rank <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th" onclick="plSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th" onclick="plSort('homecity')" data-col="homecity">City <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th" onclick="plSort('group')" data-col="group">Group <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th">Tags</th>
-                  <th class="pl-th" onclick="plSort('agg_crimes')" data-col="agg_crimes">Agg <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('username')" data-col="username">Name <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('rank')" data-col="rank">Rank <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('homecity')" data-col="homecity">City <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('group')" data-col="group">Group <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter">Tags</th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('agg_crimes')" data-col="agg_crimes">Agg <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
+                </tr>
+                <tr id="pl-filter-row">
+                  <th class="pl-filter-cell"><input type="text" id="pl-search" class="pl-filter-input" placeholder="Name…" oninput="plFilter()"></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-rank" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-occupation" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-homecity" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-tag" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-agg" class="pl-filter-input" onchange="plFilter()">
+                    <option value="">All</option>
+                    <option value="__none__">None</option>
+                    <option value="whitelist">Whitelist</option>
+                    <option value="blacklist">Blacklist</option>
+                  </select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-casework" class="pl-filter-input" onchange="plFilter()">
+                    <option value="">All</option>
+                    <option value="__none__">None</option>
+                    <option value="whitelist">Whitelist</option>
+                    <option value="blacklist">Blacklist</option>
+                  </select></th>
                 </tr>
               </thead>
               <tbody id="pl-tbody"></tbody>
             </table>
           </div>
-          <div id="pl-list"></div>
         </div>
 
         <!-- Groups tab -->
         <div id="pl-tab-groups" class="tab-panel">
-          <div class="group-chips" id="pl-group-chips"></div>
-          <div class="group-create-row">
-            <input type="text" id="pl-new-group-name" placeholder="Group name…"
-              onkeydown="if(event.key==='Enter')plCreateGroup()">
-            <input type="color" id="pl-new-group-color" value="#888888">
+          <div class="pl-toolbar" style="margin-bottom:10px">
+            <input type="text" id="pl-new-group-name" class="task-select" placeholder="Group name…"
+              onkeydown="if(event.key==='Enter')plCreateGroup()" style="min-width:140px">
+            <select id="pl-new-group-type" class="task-select">
+              <option value="neutral">Neutral</option>
+              <option value="friendly">Friendly</option>
+              <option value="enemy">Enemy</option>
+            </select>
+            <div class="pl-swatches" id="pl-new-group-swatches" data-selected="#3498db">
+              <span class="pl-swatch selected" data-color="#e74c3c" style="background:#e74c3c"></span>
+              <span class="pl-swatch" data-color="#e67e22" style="background:#e67e22"></span>
+              <span class="pl-swatch" data-color="#f1c40f" style="background:#f1c40f"></span>
+              <span class="pl-swatch" data-color="#2ecc71" style="background:#2ecc71"></span>
+              <span class="pl-swatch" data-color="#3498db" style="background:#3498db"></span>
+              <span class="pl-swatch" data-color="#9b59b6" style="background:#9b59b6"></span>
+              <span class="pl-swatch" data-color="#e91e8c" style="background:#e91e8c"></span>
+              <span class="pl-swatch" data-color="#1abc9c" style="background:#1abc9c"></span>
+              <span class="pl-swatch" data-color="#aaaaaa" style="background:#aaaaaa"></span>
+              <span class="pl-swatch" data-color="#555555" style="background:#555555"></span>
+            </div>
             <button class="action-btn" onclick="plCreateGroup()">Create Group</button>
-            <span id="pl-group-create-error" style="font-size:12px;color:var(--error,#f87171);display:none"></span>
+            <span id="pl-group-create-error" style="font-size:12px;color:var(--error,#f87171)"></span>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="pl-table" id="pl-groups-table">
+              <thead>
+                <tr>
+                  <th class="pl-th">Name</th>
+                  <th class="pl-th">Type</th>
+                  <th class="pl-th">Colour</th>
+                  <th class="pl-th">Agg Assignment</th>
+                  <th class="pl-th">Case Work Assignment</th>
+                  <th class="pl-th">Members</th>
+                  <th class="pl-th"></th>
+                </tr>
+              </thead>
+              <tbody id="pl-groups-tbody"></tbody>
+            </table>
           </div>
         </div>
 

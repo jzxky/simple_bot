@@ -528,8 +528,41 @@ def players_groups_delete():
 @app.route("/players/groups/update_color", methods=["POST"])
 def players_groups_update_color():
     data = request.get_json()
-    pl.update_group_color(data.get("name", ""), data.get("color", "#888888"))
+    pl.update_group_color(data.get("name", ""), data.get("color", "#3498db"))
     return jsonify({"ok": True})
+
+
+@app.route("/players/groups/update_type", methods=["POST"])
+def players_groups_update_type():
+    data = request.get_json()
+    import player_db as _db
+    _db.update_group_type(data.get("name", ""), data.get("group_type", "neutral"))
+    return jsonify({"ok": True})
+
+
+@app.route("/players/groups/update_assignment", methods=["POST"])
+def players_groups_update_assignment():
+    data = request.get_json()
+    import player_db as _db
+    _db.update_group_assignment(data.get("name", ""), data.get("context", "agg_crimes"), data.get("value", ""))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/players/group/<group_name>")
+def api_players_by_group(group_name):
+    import player_db as _db
+    return jsonify({"players": _db.get_players_by_group(group_name)})
+
+
+@app.route("/players/whitelist_bolds", methods=["POST"])
+def players_whitelist_bolds():
+    import player_db as _db
+    BOLD_RANKS = {"Boss", "Don", "Godfather", "Capo di tutti capi"}
+    all_players = _db.get_all_players()
+    targets = [p["username"] for p in all_players if p.get("rank", "") in BOLD_RANKS]
+    if targets:
+        _db.bulk_set_assignment(targets, "agg_crimes", "whitelist")
+    return jsonify({"ok": True, "count": len(targets), "players": targets})
 
 
 @app.route("/players/set_group", methods=["POST"])

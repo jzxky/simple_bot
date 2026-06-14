@@ -41,6 +41,7 @@ from tasks.drug_trade import DrugTradeTask
 from tasks.illness import IllnessTask
 from tasks.gym import GymTask
 from tasks.cs_punishment import CSPunishmentTask
+from tasks.online_age import OnlineAgeTask
 from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
@@ -160,6 +161,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(DrugTradeTask(_drug_trade_queue))
     sched.add(IllnessTask(_illness_queue))
     sched.add(GymTask())
+    sched.add(OnlineAgeTask())
     sched.add(PlayerRefreshTask())
     sched.add(CheckTopJobTask())
     sched.add(SnipeTopJobTask())
