@@ -358,24 +358,27 @@ def handle_breaking_entering(action: Action, state: GameState):
             state.add_log(f"B&E run: {total} fail{'s' if total != 1 else ''} — {parts} (fail count: {state.agg_fail_count()}/3)")
             fail_counts.clear()
 
+        def _ensure_dropdown() -> bool:
+            if page.query_selector("select[name='breaking']"):
+                return True
+            _nav(_u("/income/agcrime.asp"), state)
+            if not _check_session(state):
+                return False
+            page.check("input[name='agcrime'][value='breaking']")
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
+            return bool(page.query_selector("select[name='breaking']"))
+
         for target in options:
             if threshold and state.energy < threshold:
                 _flush_fails()
                 state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — stopping.")
                 return
 
-            # Ensure we're on the dropdown page
-            if not page.query_selector("select[name='breaking']"):
-                _nav(_u("/income/agcrime.asp"), state)
-                if not _check_session(state):
-                    return
-                page.check("input[name='agcrime'][value='breaking']")
-                page.click("input[type='submit'][name='B1']")
-                page.wait_for_load_state("domcontentloaded")
-                if not page.query_selector("select[name='breaking']"):
-                    _flush_fails()
-                    state.add_log("Breaking & Entering: lost dropdown mid-loop. Aborting.")
-                    return
+            if not _ensure_dropdown():
+                _flush_fails()
+                state.add_log("Breaking & Entering: lost dropdown mid-loop. Aborting.")
+                return
 
             page.select_option("select[name='breaking']", value=target)
             page.click("input[type='submit'][name='B1'][value='Commit Crime']")
@@ -400,14 +403,17 @@ def handle_breaking_entering(action: Action, state: GameState):
             fail_div = result_soup.find("div", id="fail")
             if fail_div:
                 fail_msg = fail_div.get_text(strip=True)
+                fail_counts[fail_msg] = fail_counts.get(fail_msg, 0) + 1
+
                 if "failed" in fail_msg.lower():
                     state.record_agg_fail()
-                fail_counts[fail_msg] = fail_counts.get(fail_msg, 0) + 1
-                if "recently survived" in fail_msg.lower():
-                    continue
-                _flush_fails()
-                _nav(_u("/loggedin.asp?display=play"), state)
-                return
+                    _flush_fails()
+                    _nav(_u("/loggedin.asp?display=play"), state)
+                    return
+
+                # Soft fail (no apartment, recently survived, etc.) — go back, next target
+                page.go_back(wait_until="domcontentloaded")
+                continue
 
         _flush_fails()
         state._agg_targets_exhausted = True
