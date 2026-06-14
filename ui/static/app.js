@@ -469,11 +469,21 @@ function pollStatus() {
         }
       }
 
-      // Bionics store visits
+      // Bionics store visits + next check
       const bionicsViewsEl = document.getElementById("bionics-views");
-      if (bionicsViewsEl) {
+      const bionicsNextEl  = document.getElementById("bionics-next-check");
+      if (bionicsViewsEl || bionicsNextEl) {
         fetch("/api/bionics/status").then(r => r.json()).then(b => {
-          bionicsViewsEl.textContent = b.views ? `${b.views.current} / ${b.views.max}` : "--";
+          if (bionicsViewsEl) bionicsViewsEl.textContent = b.views ? `${b.views.current} / ${b.views.max}` : "--";
+          if (bionicsNextEl) {
+            if (b.seconds_until_next != null) {
+              const s = Math.max(0, Math.round(b.seconds_until_next));
+              const m = Math.floor(s / 60), sec = s % 60;
+              bionicsNextEl.textContent = m + "m " + String(sec).padStart(2,"0") + "s";
+            } else {
+              bionicsNextEl.textContent = "--";
+            }
+          }
         }).catch(() => {});
       }
 
