@@ -145,3 +145,35 @@ class PlayerRefreshTask(Task):
         self._last_run = time.monotonic()
         count = refresh()
         state.add_log(f"Player list refreshed: {count} active players.")
+
+
+class SyncTask(Task):
+    priority = 6
+    label = "Player Sync"
+
+    def __init__(self):
+        self._last_run: float = 0.0
+
+    def _sync_cfg(self) -> dict:
+        return cfg.load().get("sync", {})
+
+    def can_run(self, state) -> bool:
+        sc = self._sync_cfg()
+        if not sc.get("enabled") or not sc.get("server_url", "").strip():
+            return False
+        interval = max(1, int(sc.get("interval_minutes", 2))) * 60
+        return time.monotonic() - self._last_run >= interval
+
+    def run(self, state, executor):
+        import sync_client
+        self._last_run = time.monotonic()
+        sc = self._sync_cfg()
+        url = sc.get("server_url", "").strip()
+        try:
+            sync_client.push_changes(url)
+        except Exception as e:
+            state.add_log(f"Sync push failed: {e}")
+        try:
+            sync_client.pull_changes(url)
+        except Exception as e:
+            state.add_log(f"Sync pull failed: {e}")

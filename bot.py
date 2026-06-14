@@ -43,7 +43,7 @@ from tasks.gym import GymTask
 from tasks.cs_punishment import CSPunishmentTask
 from tasks.online_age import OnlineAgeTask
 from tasks.bionics import BionicsTask
-from players import PlayerRefreshTask
+from players import PlayerRefreshTask, SyncTask
 
 _thread: threading.Thread = None
 _bionics_task = None
@@ -171,6 +171,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     _bionics_task = BionicsTask()
     sched.add(_bionics_task)
     sched.add(PlayerRefreshTask())
+    sched.add(SyncTask())
     sched.add(CheckTopJobTask())
     sched.add(SnipeTopJobTask())
     sched.add(JailDutiesTask())

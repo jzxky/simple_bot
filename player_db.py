@@ -12,7 +12,7 @@ import os
 import json
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 
 import paths
 
@@ -65,11 +65,15 @@ CREATE INDEX IF NOT EXISTS idx_career_username ON career_history(username);
 
 # Columns added after initial release — applied via ALTER TABLE if missing
 _MIGRATIONS = [
-    ("players",  "character_age", "INTEGER DEFAULT 0"),
-    ("players",  "jail_age",      "INTEGER DEFAULT 0"),
-    ("groups",   "type",          "TEXT DEFAULT 'neutral'"),
-    ("groups",   "agg_crimes",    "TEXT DEFAULT ''"),
-    ("groups",   "case_work",     "TEXT DEFAULT ''"),
+    ("players",  "character_age",          "INTEGER DEFAULT 0"),
+    ("players",  "jail_age",               "INTEGER DEFAULT 0"),
+    ("groups",   "type",                   "TEXT DEFAULT 'neutral'"),
+    ("groups",   "agg_crimes",             "TEXT DEFAULT ''"),
+    ("groups",   "case_work",              "TEXT DEFAULT ''"),
+    # Sync timestamps
+    ("players",  "assignments_updated_at", "TEXT DEFAULT ''"),
+    ("players",  "scraped_at",             "TEXT DEFAULT ''"),
+    ("groups",   "updated_at",             "TEXT DEFAULT ''"),
 ]
 
 
@@ -322,10 +326,15 @@ def get_player_group(username: str) -> str:
 # Writes
 # ---------------------------------------------------------------------------
 
+def _utcnow() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def upsert_players(player_list: list):
     """Update player records. Skips Heaven/Hell players entirely.
     Appends career_history when rank/occupation/homecity changes."""
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    scraped_at = _utcnow()
     with _lock:
         con = _conn()
         try:
@@ -347,14 +356,15 @@ def upsert_players(player_list: list):
                            cur["rank"] != rank)
 
                 con.execute(
-                    """INSERT INTO players (username, homecity, occupation, rank, active)
-                       VALUES (?, ?, ?, ?, ?)
+                    """INSERT INTO players (username, homecity, occupation, rank, active, scraped_at)
+                       VALUES (?, ?, ?, ?, ?, ?)
                        ON CONFLICT(username) DO UPDATE SET
                            homecity=excluded.homecity,
                            occupation=excluded.occupation,
                            rank=excluded.rank,
-                           active=excluded.active""",
-                    (name, homecity, occupation, rank, active),
+                           active=excluded.active,
+                           scraped_at=excluded.scraped_at""",
+                    (name, homecity, occupation, rank, active, scraped_at),
                 )
                 if changed:
                     con.execute(
@@ -405,10 +415,14 @@ def increment_ages(online_names: set, jailed_names: set, minutes: int = 30):
 
 def set_assignment(username: str, context: str, value: str):
     col = "agg_crimes" if context == "agg_crimes" else "case_work"
+    ts = _utcnow()
     with _lock:
         con = _conn()
         try:
-            con.execute(f"UPDATE players SET {col}=? WHERE username=?", (value, username))
+            con.execute(
+                f"UPDATE players SET {col}=?, assignments_updated_at=? WHERE username=?",
+                (value, ts, username),
+            )
             con.commit()
         finally:
             con.close()
@@ -416,12 +430,13 @@ def set_assignment(username: str, context: str, value: str):
 
 def bulk_set_assignment(usernames: list, context: str, value: str):
     col = "agg_crimes" if context == "agg_crimes" else "case_work"
+    ts = _utcnow()
     with _lock:
         con = _conn()
         try:
             con.executemany(
-                f"UPDATE players SET {col}=? WHERE username=?",
-                [(value, u) for u in usernames],
+                f"UPDATE players SET {col}=?, assignments_updated_at=? WHERE username=?",
+                [(value, ts, u) for u in usernames],
             )
             con.commit()
         finally:
@@ -429,23 +444,28 @@ def bulk_set_assignment(usernames: list, context: str, value: str):
 
 
 def set_player_group(username: str, group_name: str):
+    ts = _utcnow()
     with _lock:
         con = _conn()
         try:
-            con.execute("UPDATE players SET group_name=? WHERE username=?", (group_name, username))
+            con.execute(
+                "UPDATE players SET group_name=?, assignments_updated_at=? WHERE username=?",
+                (group_name, ts, username),
+            )
             con.commit()
         finally:
             con.close()
 
 
 def create_group(name: str, color: str, group_type: str = "neutral") -> bool:
+    ts = _utcnow()
     with _lock:
         con = _conn()
         try:
             try:
                 con.execute(
-                    "INSERT INTO groups (name, color, type) VALUES (?, ?, ?)",
-                    (name, color or "#3498db", group_type),
+                    "INSERT INTO groups (name, color, type, updated_at) VALUES (?, ?, ?, ?)",
+                    (name, color or "#3498db", group_type, ts),
                 )
                 con.commit()
                 return True
@@ -467,20 +487,22 @@ def delete_group(name: str):
 
 
 def update_group_color(name: str, color: str):
+    ts = _utcnow()
     with _lock:
         con = _conn()
         try:
-            con.execute("UPDATE groups SET color=? WHERE name=?", (color, name))
+            con.execute("UPDATE groups SET color=?, updated_at=? WHERE name=?", (color, ts, name))
             con.commit()
         finally:
             con.close()
 
 
 def update_group_type(name: str, group_type: str):
+    ts = _utcnow()
     with _lock:
         con = _conn()
         try:
-            con.execute("UPDATE groups SET type=? WHERE name=?", (group_type, name))
+            con.execute("UPDATE groups SET type=?, updated_at=? WHERE name=?", (group_type, ts, name))
             con.commit()
         finally:
             con.close()
@@ -488,10 +510,220 @@ def update_group_type(name: str, group_type: str):
 
 def update_group_assignment(name: str, context: str, value: str):
     col = "agg_crimes" if context == "agg_crimes" else "case_work"
+    ts = _utcnow()
     with _lock:
         con = _conn()
         try:
-            con.execute(f"UPDATE groups SET {col}=? WHERE name=?", (value, name))
+            con.execute(f"UPDATE groups SET {col}=?, updated_at=? WHERE name=?", (value, ts, name))
+            con.commit()
+        finally:
+            con.close()
+
+
+# ---------------------------------------------------------------------------
+# Sync helpers — read changed rows / apply pulled rows without re-stamping
+# ---------------------------------------------------------------------------
+
+_EPOCH = "1970-01-01T00:00:00Z"
+
+
+def get_players_since(ts: str) -> list:
+    """Return player rows modified (scraped or assignment-changed) since ts."""
+    since = ts or _EPOCH
+    with _lock:
+        con = _conn()
+        try:
+            rows = con.execute(
+                """SELECT username, homecity, occupation, rank, active,
+                          group_name, agg_crimes, case_work,
+                          character_age, jail_age,
+                          assignments_updated_at, scraped_at
+                   FROM players
+                   WHERE COALESCE(assignments_updated_at, '') > ?
+                      OR COALESCE(scraped_at, '') > ?""",
+                (since, since),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            con.close()
+
+
+def get_groups_since(ts: str) -> list:
+    """Return group rows modified since ts."""
+    since = ts or _EPOCH
+    with _lock:
+        con = _conn()
+        try:
+            rows = con.execute(
+                """SELECT name, color, type, agg_crimes, case_work, updated_at
+                   FROM groups WHERE COALESCE(updated_at, '') > ?""",
+                (since,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            con.close()
+
+
+def get_career_since(ts: str) -> list:
+    """Return career_history rows with ts > since."""
+    since = ts or _EPOCH
+    with _lock:
+        con = _conn()
+        try:
+            rows = con.execute(
+                "SELECT username, ts, rank, occupation, homecity FROM career_history WHERE ts > ?",
+                (since,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            con.close()
+
+
+def apply_synced_players(rows: list):
+    """Merge pulled player rows without re-stamping timestamps (prevents echo loops).
+    Ages use MAX; scrape fields use scraped_at gating; assignment fields use
+    assignments_updated_at gating."""
+    with _lock:
+        con = _conn()
+        try:
+            for r in rows:
+                name = r.get("username")
+                if not name:
+                    continue
+                cur = con.execute(
+                    """SELECT homecity, occupation, rank, active,
+                              group_name, agg_crimes, case_work,
+                              character_age, jail_age,
+                              assignments_updated_at, scraped_at
+                       FROM players WHERE username=?""",
+                    (name,),
+                ).fetchone()
+
+                incoming_scraped = r.get("scraped_at") or ""
+                incoming_assign  = r.get("assignments_updated_at") or ""
+
+                if cur is None:
+                    # New player — insert everything as-is
+                    con.execute(
+                        """INSERT INTO players
+                           (username, homecity, occupation, rank, active,
+                            group_name, agg_crimes, case_work,
+                            character_age, jail_age,
+                            assignments_updated_at, scraped_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (name,
+                         r.get("homecity", ""), r.get("occupation", ""),
+                         r.get("rank", ""), r.get("active", 1),
+                         r.get("group_name", ""), r.get("agg_crimes", ""),
+                         r.get("case_work", ""),
+                         r.get("character_age", 0), r.get("jail_age", 0),
+                         incoming_assign, incoming_scraped),
+                    )
+                else:
+                    local_scraped = cur["scraped_at"] or ""
+                    local_assign  = cur["assignments_updated_at"] or ""
+
+                    # Scrape fields: only overwrite if incoming scraped_at is newer
+                    if incoming_scraped > local_scraped:
+                        con.execute(
+                            """UPDATE players SET homecity=?, occupation=?, rank=?, active=?,
+                               scraped_at=? WHERE username=?""",
+                            (r.get("homecity", cur["homecity"]),
+                             r.get("occupation", cur["occupation"]),
+                             r.get("rank", cur["rank"]),
+                             r.get("active", cur["active"]),
+                             incoming_scraped, name),
+                        )
+
+                    # Assignment fields: only overwrite if incoming is newer
+                    if incoming_assign > local_assign:
+                        con.execute(
+                            """UPDATE players SET group_name=?, agg_crimes=?, case_work=?,
+                               assignments_updated_at=? WHERE username=?""",
+                            (r.get("group_name", cur["group_name"]),
+                             r.get("agg_crimes", cur["agg_crimes"]),
+                             r.get("case_work", cur["case_work"]),
+                             incoming_assign, name),
+                        )
+
+                    # Ages: always take MAX
+                    new_char = max(cur["character_age"] or 0, r.get("character_age") or 0)
+                    new_jail = max(cur["jail_age"] or 0, r.get("jail_age") or 0)
+                    if new_char != cur["character_age"] or new_jail != cur["jail_age"]:
+                        con.execute(
+                            "UPDATE players SET character_age=?, jail_age=? WHERE username=?",
+                            (new_char, new_jail, name),
+                        )
+            con.commit()
+        finally:
+            con.close()
+
+
+def apply_synced_groups(rows: list):
+    """Merge pulled group rows without re-stamping updated_at."""
+    with _lock:
+        con = _conn()
+        try:
+            for r in rows:
+                name = r.get("name")
+                if not name:
+                    continue
+                incoming_ts = r.get("updated_at") or ""
+                cur = con.execute(
+                    "SELECT color, type, agg_crimes, case_work, updated_at FROM groups WHERE name=?",
+                    (name,),
+                ).fetchone()
+                if cur is None:
+                    con.execute(
+                        "INSERT INTO groups (name, color, type, agg_crimes, case_work, updated_at) VALUES (?,?,?,?,?,?)",
+                        (name, r.get("color", "#3498db"), r.get("type", "neutral"),
+                         r.get("agg_crimes", ""), r.get("case_work", ""), incoming_ts),
+                    )
+                elif incoming_ts > (cur["updated_at"] or ""):
+                    con.execute(
+                        "UPDATE groups SET color=?, type=?, agg_crimes=?, case_work=?, updated_at=? WHERE name=?",
+                        (r.get("color", cur["color"]), r.get("type", cur["type"]),
+                         r.get("agg_crimes", cur["agg_crimes"]),
+                         r.get("case_work", cur["case_work"]),
+                         incoming_ts, name),
+                    )
+            con.commit()
+        finally:
+            con.close()
+
+
+def apply_synced_career(rows: list):
+    """Merge career history rows — INSERT OR IGNORE by (username, ts) PK."""
+    with _lock:
+        con = _conn()
+        try:
+            for r in rows:
+                con.execute(
+                    """INSERT OR IGNORE INTO career_history (username, ts, rank, occupation, homecity)
+                       VALUES (?,?,?,?,?)""",
+                    (r.get("username", ""), r.get("ts", ""),
+                     r.get("rank", ""), r.get("occupation", ""), r.get("homecity", "")),
+                )
+            con.commit()
+        finally:
+            con.close()
+
+
+def get_sync_meta(key: str) -> str:
+    with _lock:
+        con = _conn()
+        try:
+            row = con.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+            return row["value"] if row else ""
+        finally:
+            con.close()
+
+
+def set_sync_meta(key: str, value: str):
+    with _lock:
+        con = _conn()
+        try:
+            con.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", (key, value))
             con.commit()
         finally:
             con.close()
