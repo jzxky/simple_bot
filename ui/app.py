@@ -478,11 +478,28 @@ def logs_viewer(filename):
 
 @app.route("/api/bionics/status")
 def api_bionics_status():
+    import config as cfg
+    import browser as _browser
+    from tasks.bionics import _ingame_mins
     views = None
+    seconds_until_next = None
     task = bot.get_bionics_task()
-    if task and task.last_views:
-        views = {"current": task.last_views[0], "max": task.last_views[1]}
-    return jsonify({"views": views})
+    if task:
+        if task.last_views:
+            views = {"current": task.last_views[0], "max": task.last_views[1]}
+        if task.last_checked_ingame is not None and bot.is_running():
+            try:
+                interval_mins = int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5))
+                current_ingame = _ingame_mins(_browser.page().content())
+                if current_ingame is not None:
+                    next_check = (task.last_checked_ingame + interval_mins) % 1440
+                    diff = next_check - current_ingame
+                    if diff < 0:
+                        diff += 1440
+                    seconds_until_next = diff * 60
+            except Exception:
+                pass
+    return jsonify({"views": views, "seconds_until_next": seconds_until_next})
 
 
 @app.route("/api/players")

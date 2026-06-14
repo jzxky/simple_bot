@@ -135,9 +135,13 @@
                 <span class="stat-label">Store visits</span>
                 <span id="bionics-views" class="stat-value" style="margin-left:8px">--</span>
               </div>
+              <div class="setting-row">
+                <span class="stat-label">Next check</span>
+                <span id="bionics-next-check" class="stat-value" style="margin-left:8px">--</span>
+              </div>
             </div>
           </div>
-          <div class="settings-groups">
+          <div class="settings-groups" style="margin-top:16px">
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>
                 Gym
@@ -158,7 +162,7 @@
                 <label class="toggle-label"><input type="checkbox" id="gym_auto_travel" {% if gym.get('auto_travel') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
               <div class="setting-row" style="margin-top:6px">
-                <span class="stat-label">Last gym use</span>
+                <span class="stat-label">Next gym use</span>
                 <span id="gym-timer" class="stat-value" style="margin-left:8px">--</span>
               </div>
             </div>
