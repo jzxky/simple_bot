@@ -1691,26 +1691,23 @@ def handle_check_drug_trade(action: Action, state: GameState):
             state.add_log(f"Drug trade offer {offer_id}: not accepting ({reason}).")
             continue
 
-        # Funding check — prefer dirty money, top up with clean money if needed
-        total_available = state.dirty_money + state.clean_money + state.bank_balance
-        if total_available < offer_price:
-            state.add_log(
-                f"Drug trade: insufficient funds (dirty=${state.dirty_money:,}, "
-                f"clean=${state.clean_money:,}, bank=${state.bank_balance:,}, "
-                f"need=${offer_price:,}) — disabling autobuy."
-            )
-            c2 = cfg.load()
-            c2.setdefault("autobuy", {})["enabled"] = False
-            cfg.save(c2)
-            return
+        # Funding check — use dirty money; if short, withdraw clean money from bank
         if state.dirty_money < offer_price:
-            needed = offer_price - state.dirty_money
-            shortfall_from_bank = max(0, needed - state.clean_money)
-            if shortfall_from_bank > 0:
+            needed = offer_price - state.dirty_money - state.clean_money
+            withdraw_amount = max(needed, 0)
+            if withdraw_amount > 0:
                 state.add_log(
-                    f"Drug trade: withdrawing ${shortfall_from_bank:,} from bank to cover offer."
+                    f"Drug trade: dirty money short (${state.dirty_money:,}), "
+                    f"withdrawing ${withdraw_amount:,} from bank."
                 )
-                handle_withdraw(Action("withdraw", amount=shortfall_from_bank), state)
+                handle_withdraw(Action("withdraw", amount=withdraw_amount), state)
+            if state.dirty_money + state.clean_money < offer_price:
+                state.add_log(
+                    f"Drug trade offer {offer_id}: insufficient funds after withdrawal "
+                    f"(have dirty=${state.dirty_money:,} clean=${state.clean_money:,}, "
+                    f"need=${offer_price:,}) — skipping offer."
+                )
+                continue
 
         # Accept
         accept_url = _u("/income/drugtrade.asp") + f"?action=accept&offerid={offer_id}"
