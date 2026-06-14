@@ -102,6 +102,7 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "wanted_items": [],
         "check_interval_minutes": 5,
+        "use_time_window": False,
         "window_start": "00:00",
         "window_end": "23:59",
         "auto_restock": False

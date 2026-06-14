@@ -134,6 +134,7 @@ function _doSave() {
     bionics_enabled: (document.getElementById("bionics_enabled")||{checked:false}).checked,
     bionics_wanted_items: ["arms","legs","eyes","brain","heart"].filter(i => (document.getElementById("bionics_want_"+i)||{checked:false}).checked),
     bionics_interval: parseInt((document.getElementById("bionics_interval")||{value:5}).value)||5,
+    bionics_use_time_window: (document.getElementById("bionics_use_time_window")||{checked:false}).checked,
     bionics_window_start: (document.getElementById("bionics_window_start")||{value:"00:00"}).value,
     bionics_window_end:   (document.getElementById("bionics_window_end")||{value:"23:59"}).value,
     bionics_auto_restock: (document.getElementById("bionics_auto_restock")||{checked:false}).checked,
@@ -466,6 +467,14 @@ function pollStatus() {
         } else {
           gymTimerEl.textContent = "Ready";
         }
+      }
+
+      // Bionics store visits
+      const bionicsViewsEl = document.getElementById("bionics-views");
+      if (bionicsViewsEl) {
+        fetch("/api/bionics/status").then(r => r.json()).then(b => {
+          bionicsViewsEl.textContent = b.views ? `${b.views.current} / ${b.views.max}` : "--";
+        }).catch(() => {});
       }
 
       // Case work auto-detect
