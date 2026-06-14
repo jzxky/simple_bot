@@ -61,7 +61,6 @@ class GameState:
     in_hospital: bool = False
     hospital_release_at: "float | None" = None
     cs_sentence: int = 0      # community services still owed as agg-crime punishment
-    cs_completed: int = 0     # services completed toward current sentence
 
     def agg_fail_count(self) -> int:
         cutoff = datetime.now() - timedelta(minutes=30)
