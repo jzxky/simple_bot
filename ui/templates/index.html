@@ -811,7 +811,24 @@
             <button class="btn-secondary" onclick="plRefresh()" id="pl-refresh-btn">Refresh</button>
             <span id="pl-refresh-status" style="font-size:0.8rem;color:var(--error,#f87171)"></span>
           </div>
-          <div id="pl-list" style="margin-top:8px"></div>
+          <div style="overflow-x:auto;margin-top:8px">
+            <table class="pl-table" id="pl-table">
+              <thead>
+                <tr>
+                  <th class="pl-th" onclick="plSort('username')" data-col="username">Name <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th" onclick="plSort('rank')" data-col="rank">Rank <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th" onclick="plSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th" onclick="plSort('homecity')" data-col="homecity">City <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th" onclick="plSort('group')" data-col="group">Group <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th">Tags</th>
+                  <th class="pl-th" onclick="plSort('agg_crimes')" data-col="agg_crimes">Agg <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
+                </tr>
+              </thead>
+              <tbody id="pl-tbody"></tbody>
+            </table>
+          </div>
+          <div id="pl-list"></div>
         </div>
 
         <!-- Groups tab -->
