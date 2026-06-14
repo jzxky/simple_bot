@@ -120,6 +120,11 @@ DEFAULT_CONFIG = {
             "heroin":    {"max_price": 3000,  "max_qty": 400},
             "cocaine":   {"max_price": 4500,  "max_qty": 500}
         }
+    },
+    "sync": {
+        "enabled": False,
+        "server_url": "",
+        "interval_minutes": 2,
     }
 }
 
