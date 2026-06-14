@@ -143,6 +143,9 @@ function _doSave() {
     gym_enabled:    (document.getElementById("gym_enabled")||{checked:false}).checked,
     gym_activity:   (document.getElementById("gym_activity")||{value:"weights"}).value,
     gym_auto_travel:(document.getElementById("gym_auto_travel")||{checked:false}).checked,
+    sync_enabled:       (document.getElementById("sync_enabled")||{checked:false}).checked,
+    sync_server_url:    (document.getElementById("sync_server_url")||{value:""}).value.trim(),
+    sync_interval:      parseInt((document.getElementById("sync_interval")||{value:"2"}).value)||2,
   };
 
   return fetch("/save", {

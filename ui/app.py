@@ -93,6 +93,11 @@ def save():
     c["misc"]["show_scheduler"] = data.get("show_scheduler", False)
     c["misc"]["debug_logging"] = data.get("debug_logging", False)
 
+    c.setdefault("sync", {})
+    c["sync"]["enabled"]          = data.get("sync_enabled", False)
+    c["sync"]["server_url"]       = data.get("sync_server_url", "").strip()
+    c["sync"]["interval_minutes"] = int(data.get("sync_interval", 2))
+
     c.setdefault("character_history", {})
     c["character_history"]["enabled"] = data.get("char_history_enabled", False)
     c["character_history"]["refresh_interval_minutes"] = int(data.get("char_history_interval", 30))

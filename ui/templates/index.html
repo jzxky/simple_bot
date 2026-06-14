@@ -406,6 +406,28 @@
               </div>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                Player List Sync
+                <label class="toggle-label">
+                  <input type="checkbox" id="sync_enabled" {% if config.get('sync', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <p class="setting-note">Sync player assignments, groups and career history across multiple devices via a shared sync server.</p>
+              <div class="setting-row">
+                <label for="sync_server_url">Server URL</label>
+                <input type="text" id="sync_server_url" value="{{ config.get('sync', {}).get('server_url', '') }}" placeholder="http://192.168.1.x:9090" style="width:220px" onchange="autoSave()">
+              </div>
+              <div class="setting-row">
+                <label for="sync_interval">Sync every</label>
+                <select id="sync_interval" onchange="autoSave()">
+                  {% for m in [1, 2, 5, 10, 15, 30] %}
+                  <option value="{{ m }}" {% if config.get('sync', {}).get('interval_minutes', 2) == m %}selected{% endif %}>{{ m }} min</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Character History</h3>
               <label class="inline-toggle setting-row">Enable
                 <label class="toggle-label"><input type="checkbox" id="char_history_enabled" {% if config.get('character_history', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave(); toggleCharHistoryTab()"><span class="toggle"></span></label>
