@@ -1688,9 +1688,7 @@ def handle_check_drug_trade(action: Action, state: GameState):
 
         if total_willing < offer_price:
             reason = "; ".join(decline_reasons) if decline_reasons else "price too high"
-            state.add_log(f"Drug trade offer {offer_id}: declining ({reason}).")
-            decline_url = _u("/income/drugtrade.asp") + f"?action=decline&offerid={offer_id}"
-            _nav(decline_url, state)
+            state.add_log(f"Drug trade offer {offer_id}: not accepting ({reason}).")
             continue
 
         # Funding check — dirty money only
