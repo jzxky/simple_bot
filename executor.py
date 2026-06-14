@@ -2186,5 +2186,15 @@ class ActionExecutor:
                 handler(action, state)
             except Exception as e:
                 state.add_log(f"Error executing {action.kind}: {e}")
+                if "Page crashed" in str(e):
+                    state.add_log("Page crashed — restarting browser.")
+                    try:
+                        headless = cfg.load().get("misc", {}).get("headless", False)
+                        browser.stop()
+                        browser.start(headless=headless)
+                        state.add_log("Browser restarted after crash.")
+                        state.logged_in = False
+                    except Exception as restart_err:
+                        state.add_log(f"Browser restart failed: {restart_err}")
         else:
             state.add_log(f"No handler for action: {action.kind}")
