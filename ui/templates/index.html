@@ -377,6 +377,9 @@
               <label class="inline-toggle setting-row">Show Scheduler
                 <label class="toggle-label"><input type="checkbox" id="show_scheduler" {% if config.get('misc', {}).get('show_scheduler', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+              <label class="inline-toggle setting-row">Debug Logging
+                <label class="toggle-label"><input type="checkbox" id="debug_logging" {% if config.get('misc', {}).get('debug_logging', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
               <label class="inline-toggle setting-row">Headless Mode
                 <label class="toggle-label"><input type="checkbox" id="headless" {% if config.get('misc', {}).get('headless', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>

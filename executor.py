@@ -80,7 +80,14 @@ def _refresh_state(state: GameState):
     parse_state(html, url, state)
 
 
+def _dbg(state: GameState, msg: str):
+    import config as _cfg
+    if _cfg.load().get("misc", {}).get("debug_logging", False):
+        state.add_log(f"[DEBUG] {msg}")
+
+
 def _nav(url: str, state: GameState):
+    _dbg(state, f"→ {url}")
     html = browser.navigate(url)
     parse_state(html, browser.current_url(), state)
 
@@ -1355,11 +1362,9 @@ def handle_check_bionics(action: Action, state: GameState):
     # Step 6: Parse store, record last_checked
     store = _parse_store()
     if task is not None:
-        if state.ingame_mins is not None:
-            task.last_checked_ingame = state.ingame_mins
-        interval_mins = int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5))
-        task.next_check_at = time.time() + interval_mins * 60
-        task._save()
+        from tasks.bionics import save_last_bionics_check
+        task.last_checked_at = time.time()
+        save_last_bionics_check(task.last_checked_at)
 
     # Step 7: Filter wanted items in stock (reverse order)
     can_buy = _in_stock_affordable()

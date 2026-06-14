@@ -91,6 +91,7 @@ def save():
     c["misc"]["min_cash_on_hand"] = int(data.get("min_cash_on_hand", 0))
     c["misc"]["headless"] = data.get("headless", False)
     c["misc"]["show_scheduler"] = data.get("show_scheduler", False)
+    c["misc"]["debug_logging"] = data.get("debug_logging", False)
 
     c.setdefault("character_history", {})
     c["character_history"]["enabled"] = data.get("char_history_enabled", False)
@@ -224,7 +225,8 @@ def status():
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
         "last_gym_use": _get_last_gym_use(),
-        "bionics_next_check_at": (bot.get_bionics_task().next_check_at if bot.get_bionics_task() else None),
+        "last_bionics_check": (bot.get_bionics_task().last_checked_at if bot.get_bionics_task() else 0),
+        "bionics_interval_mins": int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5)),
         "is_git_repo": _is_git_repo(),
         "flight_departs_at": s.flight_departs_at,
         "vehicle_health": s.vehicle_health,
