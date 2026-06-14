@@ -313,8 +313,115 @@ def _back_to_target_input(crime: str, state: GameState) -> bool:
     return _nav_to_target_input(crime, state)
 
 
+_MOBILE_UA = (
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
+    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+)
+
+
+def handle_breaking_entering(action: Action, state: GameState):
+    """Breaking & Entering — uses mobile UA so the dropdown form is served."""
+    threshold = action.params.get("threshold", 0)
+    page = browser.page()
+
+    page.set_extra_http_headers({"User-Agent": _MOBILE_UA})
+    try:
+        _nav(_u("/income/agcrime.asp"), state)
+        if not _check_session(state):
+            return
+
+        page.check("input[name='agcrime'][value='breaking']")
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+
+        soup = BeautifulSoup(page.content(), "html.parser")
+        select = soup.find("select", {"name": "breaking", "class": "dropdown"})
+        if not select:
+            if not _check_cs_punishment(state):
+                state.add_log("Breaking & Entering: dropdown not found after crime selection.")
+            return
+
+        options = [o["value"] for o in select.find_all("option") if o.get("value")]
+        if not options:
+            state.add_log("Breaking & Entering: no targets in dropdown.")
+            return
+
+        state.add_log(f"Breaking & Entering: {len(options)} targets found.")
+
+        fail_counts: dict = {}
+
+        def _flush_fails():
+            if not fail_counts:
+                return
+            total = sum(fail_counts.values())
+            parts = ", ".join(f"{n}x {msg}" for msg, n in fail_counts.items())
+            state.add_log(f"B&E run: {total} fail{'s' if total != 1 else ''} — {parts} (fail count: {state.agg_fail_count()}/3)")
+            fail_counts.clear()
+
+        for target in options:
+            if threshold and state.energy < threshold:
+                _flush_fails()
+                state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — stopping.")
+                return
+
+            # Ensure we're on the dropdown page
+            if not page.query_selector("select[name='breaking']"):
+                _nav(_u("/income/agcrime.asp"), state)
+                if not _check_session(state):
+                    return
+                page.check("input[name='agcrime'][value='breaking']")
+                page.click("input[type='submit'][name='B1']")
+                page.wait_for_load_state("domcontentloaded")
+                if not page.query_selector("select[name='breaking']"):
+                    _flush_fails()
+                    state.add_log("Breaking & Entering: lost dropdown mid-loop. Aborting.")
+                    return
+
+            page.select_option("select[name='breaking']", value=target)
+            page.click("input[type='submit'][name='B1'][value='Commit Crime']")
+            page.wait_for_load_state("domcontentloaded")
+            _refresh_state(state)
+
+            result_soup = BeautifulSoup(page.content(), "html.parser")
+
+            success_div = result_soup.find("div", id="success")
+            if success_div:
+                msg = success_div.get_text(strip=True)
+                _flush_fails()
+                state.add_log(f"B&E success vs {target}: {msg}")
+                amounts = re.findall(r"\$([\d,]+)", msg)
+                stolen = int(amounts[0].replace(",", "")) if amounts else 0
+                if stolen > 0:
+                    state._last_crime_victim = target
+                    state._last_crime_amount = stolen
+                    state.add_log(f"Stolen: ${stolen:,} from {target}")
+                return
+
+            fail_div = result_soup.find("div", id="fail")
+            if fail_div:
+                fail_msg = fail_div.get_text(strip=True)
+                if "failed" in fail_msg.lower():
+                    state.record_agg_fail()
+                fail_counts[fail_msg] = fail_counts.get(fail_msg, 0) + 1
+                if "recently survived" in fail_msg.lower():
+                    continue
+                _flush_fails()
+                _nav(_u("/loggedin.asp?display=play"), state)
+                return
+
+        _flush_fails()
+        state._agg_targets_exhausted = True
+        state.add_log("Breaking & Entering: all targets exhausted.")
+    finally:
+        page.set_extra_http_headers({})
+
+
 def handle_do_crime(action: Action, state: GameState):
     crime = action.params["crime"]
+    if crime == "breaking":
+        handle_breaking_entering(action, state)
+        return
+
     threshold = action.params.get("threshold", 0)
     page = browser.page()
 
