@@ -485,9 +485,8 @@ function pollStatus() {
         bionicsViewsEl.textContent = d.bionics_views ? `${d.bionics_views.current} / ${d.bionics_views.max}` : "--";
       }
       if (bionicsNextEl) {
-        if (d.last_bionics_check && d.last_bionics_check > 0) {
-          const nextAt = d.last_bionics_check + d.bionics_interval_mins * 60;
-          const secsLeft = Math.max(0, Math.round(nextAt - Date.now() / 1000));
+        if (d.bionics_next_check_at) {
+          const secsLeft = Math.max(0, Math.round(d.bionics_next_check_at - Date.now() / 1000));
           if (secsLeft <= 0) {
             bionicsNextEl.textContent = "Ready";
           } else {

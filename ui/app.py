@@ -185,6 +185,33 @@ def _get_last_gym_use() -> float:
         return 0.0
 
 
+def _get_bionics_next_check_at(state) -> "float | None":
+    import time as _time
+    task = bot.get_bionics_task()
+    if not task or task.last_checked_at <= 0:
+        return None
+    b = cfg.load().get("bionics", {})
+    interval_secs = int(b.get("check_interval_minutes", 5)) * 60
+    next_at = task.last_checked_at + interval_secs
+
+    if b.get("use_time_window", False) and state.server_time is not None:
+        start = b.get("window_start", "00:00")
+        end   = b.get("window_end",   "23:59")
+        start_mins = int(start[:2]) * 60 + int(start[3:])
+        end_mins   = int(end[:2])   * 60 + int(end[3:])
+        ingame = state.ingame_mins
+        if ingame is not None and not (start_mins < ingame < end_mins):
+            # Outside window — next check is at window start
+            ingame_secs_now = (state.server_time.hour * 3600
+                               + state.server_time.minute * 60
+                               + state.server_time.second)
+            secs_until_start = start_mins * 60 - ingame_secs_now
+            if secs_until_start <= 0:
+                secs_until_start += 86400  # rolls over to tomorrow
+            next_at = _time.time() + secs_until_start
+
+    return next_at
+
 @app.route("/status")
 def status():
     s = bot.state
@@ -228,8 +255,7 @@ def status():
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
         "last_gym_use": _get_last_gym_use(),
-        "last_bionics_check": (bot.get_bionics_task().last_checked_at if bot.get_bionics_task() else 0),
-        "bionics_interval_mins": int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5)),
+        "bionics_next_check_at": _get_bionics_next_check_at(s),
         "bionics_views": ({"current": bot.get_bionics_task().last_views[0], "max": bot.get_bionics_task().last_views[1]} if bot.get_bionics_task() and bot.get_bionics_task().last_views else None),
         "is_git_repo": _is_git_repo(),
         "flight_departs_at": s.flight_departs_at,
