@@ -269,6 +269,31 @@ def _get_city_residents(city: str, own_name: str) -> list:
     ]
 
 
+def _check_cs_punishment(state: GameState) -> bool:
+    """
+    Call after navigating to agcrime.asp when no target input is found.
+    If the page is income.asp with a CS-punishment fail message, parse the
+    sentence count, store it in state, and return True.
+    """
+    url = browser.current_url()
+    if "/income/income.asp" not in url and "/income/agcrime.asp" not in url:
+        return False
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    fail_div = soup.find("div", id="fail")
+    if not fail_div:
+        return False
+    text = fail_div.get_text(strip=True)
+    # Message: "You cannot commit an aggravated crime until you have completed another N Services..."
+    m = re.search(r"complete(?:d)? another (\d+) Services?", text, re.IGNORECASE)
+    if not m:
+        return False
+    n = int(m.group(1))
+    state.cs_sentence = n
+    state.cs_completed = 0
+    state.add_log(f"Agg crime blocked: CS punishment — must complete {n} community service(s).")
+    return True
+
+
 def _nav_to_target_input(crime: str, state: GameState) -> bool:
     """Navigate to agcrime.asp, select crime, submit — returns True if text input found."""
     page = browser.page()
@@ -305,7 +330,8 @@ def handle_do_crime(action: Action, state: GameState):
         return
 
     if not _nav_to_target_input(crime, state):
-        state.add_log("Target input not found after crime selection. Aborting.")
+        if not _check_cs_punishment(state):
+            state.add_log("Target input not found after crime selection. Aborting.")
         return
     if not _check_session(state):
         return
@@ -737,7 +763,8 @@ def handle_armed_robbery(action: Action, state: GameState):
         state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — aborting.")
         return
     if not page.query_selector("input[name='agcrime'][value='armed']"):
-        state.add_log("Armed crime option not available — aborting.")
+        if not _check_cs_punishment(state):
+            state.add_log("Armed crime option not available — aborting.")
         return
     page.check("input[name='agcrime'][value='armed']")
     page.click("input[type='submit'][name='B1']")
@@ -746,6 +773,9 @@ def handle_armed_robbery(action: Action, state: GameState):
 
     if state.in_hospital:
         state.add_log("Armed robbery: redirected to hospital — injured by falling debris. Tasks paused until release.")
+        return
+
+    if _check_cs_punishment(state):
         return
 
     check_other_tasks = action.params.get("check_other_tasks")
