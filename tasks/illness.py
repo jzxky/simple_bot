@@ -25,4 +25,4 @@ class IllnessTask(Task):
             self._queue.get_nowait()
         except Exception:
             return
-        executor.execute(Action("test_illness_journal"), state)
+        executor.execute(Action("apply_illness_treatment"), state)
