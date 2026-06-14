@@ -1870,14 +1870,23 @@ function plSetGroup(username, group, el) {
 
 function plRefresh() {
   const btn = document.getElementById("pl-refresh-btn");
+  const status = document.getElementById("pl-refresh-status");
   if (btn) { btn.disabled = true; btn.textContent = "Refreshing…"; }
+  if (status) status.textContent = "";
   fetch("/players/refresh", {method: "POST"})
     .then(r => r.json())
     .then(d => {
-      loadPlayers();
       if (btn) { btn.disabled = false; btn.textContent = "Refresh Players"; }
+      if (d.error) {
+        if (status) status.textContent = d.error;
+        return;
+      }
+      loadPlayers();
     })
-    .catch(() => { if (btn) { btn.disabled = false; btn.textContent = "Refresh Players"; } });
+    .catch(() => {
+      if (btn) { btn.disabled = false; btn.textContent = "Refresh Players"; }
+      if (status) status.textContent = "Refresh failed.";
+    });
 }
 
 function plRunImport() {
