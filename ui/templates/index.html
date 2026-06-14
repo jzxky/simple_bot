@@ -98,7 +98,7 @@
               </h3>
               <div class="setting-row">
                 <label>Wanted Items</label>
-                <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <div style="display:flex;flex-direction:column;gap:6px">
                   {% for item, label in [('arms','Bionic Arms ($10k)'),('legs','Bionic Legs ($20k)'),('eyes','Bionic Eyes ($35k)'),('brain','Bionic Brain ($50k)'),('heart','Bionic Heart ($50k)')] %}
                   <label class="inline-toggle">
                     <input type="checkbox" id="bionics_want_{{ item }}" {% if item in bionics_cfg.get('wanted_items', []) %}checked{% endif %} onchange="autoSave()">
