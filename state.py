@@ -151,8 +151,9 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     elif not s.in_jail:
         s.jail_release_secs = None
 
-    # Hospital detection — URL contains hospital.asp
-    if "hospital.asp" in url:
+    # Hospital detection — only the root-level hospital page, not localcity/hospital.asp
+    import urls as _urls
+    if url.rstrip("/") == _urls.BASE_URL + "/hospital.asp":
         s.in_hospital = True
         if s.server_time and s.hospital_release_at is None:
             # Look for "You will be released at:" followed by a datetime string
