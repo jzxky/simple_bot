@@ -473,19 +473,23 @@ function pollStatus() {
       // Bionics store visits + next check
       const bionicsViewsEl = document.getElementById("bionics-views");
       const bionicsNextEl  = document.getElementById("bionics-next-check");
-      if (bionicsViewsEl || bionicsNextEl) {
+      if (bionicsViewsEl) {
         fetch("/api/bionics/status").then(r => r.json()).then(b => {
-          if (bionicsViewsEl) bionicsViewsEl.textContent = b.views ? `${b.views.current} / ${b.views.max}` : "--";
-          if (bionicsNextEl) {
-            if (b.seconds_until_next != null) {
-              const s = Math.max(0, Math.round(b.seconds_until_next));
-              const m = Math.floor(s / 60), sec = s % 60;
-              bionicsNextEl.textContent = m + "m " + String(sec).padStart(2,"0") + "s";
-            } else {
-              bionicsNextEl.textContent = "--";
-            }
-          }
+          bionicsViewsEl.textContent = b.views ? `${b.views.current} / ${b.views.max}` : "--";
         }).catch(() => {});
+      }
+      if (bionicsNextEl) {
+        if (d.bionics_next_check_at) {
+          const secsLeft = Math.max(0, Math.round(d.bionics_next_check_at - Date.now() / 1000));
+          if (secsLeft <= 0) {
+            bionicsNextEl.textContent = "Ready";
+          } else {
+            const m = Math.floor(secsLeft / 60), s = secsLeft % 60;
+            bionicsNextEl.textContent = m + "m " + String(s).padStart(2, "0") + "s";
+          }
+        } else {
+          bionicsNextEl.textContent = "--";
+        }
       }
 
       // Case work auto-detect
