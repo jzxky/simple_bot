@@ -98,6 +98,7 @@ function _doSave() {
     jail_duty: document.getElementById("jail_duty").value,
     jail_action: document.getElementById("jail_action").value,
     jail_use_consumables: document.getElementById("jail_use_consumables").checked,
+    show_scheduler: (document.getElementById("show_scheduler")||{checked:false}).checked,
     headless: document.getElementById("headless").checked,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
@@ -519,6 +520,19 @@ function pollStatus() {
         box.innerHTML = [...d.log].reverse()
           .map(l => `<div class="log-line">${escHtml(l)}</div>`)
           .join("");
+      }
+
+      // Scheduler visualization
+      const schedBody = document.getElementById("scheduler-body");
+      if (schedBody) {
+        fetch("/api/scheduler").then(r => r.json()).then(s => {
+          schedBody.innerHTML = (s.tasks || []).map(t => {
+            const dot = t.ready
+              ? '<span style="color:var(--accent)">● Ready</span>'
+              : '<span style="color:var(--muted-text)">○ Blocked</span>';
+            return `<tr><td>${escHtml(t.label)}</td><td>${t.priority}</td><td>${dot}</td></tr>`;
+          }).join("");
+        }).catch(() => {});
       }
     })
     .catch(() => {})

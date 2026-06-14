@@ -47,6 +47,7 @@ from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
 _bionics_task = None
+_scheduler_snapshot: list = []
 _stop_event = threading.Event()
 _pause_event = threading.Event()
 _reload_event = threading.Event()
@@ -355,6 +356,7 @@ def _run(c: dict):
                 state.add_log("Config reloaded.")
 
             sched.tick(state, executor)
+            _scheduler_snapshot = sched.snapshot(state)
 
             # Clear earn queue if requested from UI
             if _clear_earn_event.is_set():
@@ -423,6 +425,10 @@ def resume():
 
 def get_bionics_task():
     return _bionics_task
+
+
+def get_scheduler_snapshot() -> list:
+    return _scheduler_snapshot
 
 
 def is_running() -> bool:

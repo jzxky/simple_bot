@@ -48,7 +48,8 @@ DEFAULT_CONFIG = {
         "logout_on_stop": True,
         "relog_on_session_expire": True,
         "min_cash_on_hand": 0,
-        "headless": False
+        "headless": False,
+        "show_scheduler": False
     },
     "case_work": {
         "enabled": False,
