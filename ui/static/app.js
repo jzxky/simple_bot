@@ -782,7 +782,6 @@ function _updateStatPanel() {
     row("In Jail",            b.in_jail ? "Yes" : "No",           b.in_jail),
     row("In Hospital",        b.in_hospital ? "Yes" : "No",       b.in_hospital),
     row("Outside Home City",  outsideHome ? "Yes" : "No",         outsideHome),
-    row("Action Timer Ready", b.action_ready ? "Yes" : "No",      false),
     row("Hold Action Timer",  b.hold_action_timer ? "Yes" : "No", b.hold_action_timer),
     row("CS Sentence",        b.cs_sentence,                       b.cs_sentence > 0),
     row("Agg Fail Count",     `${b.agg_fail_count} / 3`,          b.agg_fail_count >= 3),
