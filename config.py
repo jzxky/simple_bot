@@ -49,7 +49,8 @@ DEFAULT_CONFIG = {
         "relog_on_session_expire": True,
         "min_cash_on_hand": 0,
         "headless": False,
-        "show_scheduler": False
+        "show_scheduler": False,
+        "debug_logging": False
     },
     "case_work": {
         "enabled": False,

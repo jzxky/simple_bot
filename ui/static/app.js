@@ -99,6 +99,7 @@ function _doSave() {
     jail_action: document.getElementById("jail_action").value,
     jail_use_consumables: document.getElementById("jail_use_consumables").checked,
     show_scheduler: (document.getElementById("show_scheduler")||{checked:false}).checked,
+    debug_logging: (document.getElementById("debug_logging")||{checked:false}).checked,
     headless: document.getElementById("headless").checked,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
@@ -479,8 +480,9 @@ function pollStatus() {
         }).catch(() => {});
       }
       if (bionicsNextEl) {
-        if (d.bionics_next_check_at) {
-          const secsLeft = Math.max(0, Math.round(d.bionics_next_check_at - Date.now() / 1000));
+        if (d.last_bionics_check && d.last_bionics_check > 0) {
+          const nextAt = d.last_bionics_check + d.bionics_interval_mins * 60;
+          const secsLeft = Math.max(0, Math.round(nextAt - Date.now() / 1000));
           if (secsLeft <= 0) {
             bionicsNextEl.textContent = "Ready";
           } else {

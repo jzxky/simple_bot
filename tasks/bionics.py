@@ -2,16 +2,14 @@
 Checks the Chicago bionics store for wanted items and purchases them.
 
 Runs when: logged in, not in jail/hospital, in Chicago, enabled in config,
-enough in-game time has passed since last check, and (if use_time_window)
+enough wall-clock time has passed since last check, and (if use_time_window)
 in-game time is within the configured window.
 
 Purchase order: heart → brain → eyes → legs → arms (most expensive first).
 Withdraws cash before each navigation to the store.
 """
 
-import json
 import time
-from pathlib import Path
 from tasks.base import Task, Action
 from state import GameState
 
@@ -19,32 +17,18 @@ from state import GameState
 BIONIC_PRICES = {"arms": 10000, "legs": 20000, "eyes": 35000, "brain": 50000, "heart": 50000}
 REVERSE_ORDER  = ["heart", "brain", "eyes", "legs", "arms"]
 
-_DATA_FILE = "bionics_data.json"
+
+def load_last_bionics_check() -> float:
+    """Return the Unix timestamp of the last bionics check, or 0 if never."""
+    import config as cfg
+    return float(cfg.load().get("bionics_state", {}).get("last_checked_at", 0))
 
 
-def _data_path() -> Path:
-    from paths import data_dir
-    return Path(data_dir()) / _DATA_FILE
-
-
-def _load_bionics_data() -> dict:
-    p = _data_path()
-    if p.exists():
-        try:
-            return json.loads(p.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return {}
-
-
-def _save_bionics_data(data: dict):
-    _data_path().write_text(json.dumps(data), encoding="utf-8")
-
-
-
-def _mins_elapsed(last: int, now: int) -> int:
-    diff = now - last
-    return diff if diff >= 0 else diff + 1440  # midnight wrap
+def save_last_bionics_check(ts: float):
+    import config as cfg
+    c = cfg.load()
+    c.setdefault("bionics_state", {})["last_checked_at"] = ts
+    cfg.save(c)
 
 
 class BionicsTask(Task):
@@ -52,16 +36,8 @@ class BionicsTask(Task):
     label = "Bionics Store"
 
     def __init__(self):
-        d = _load_bionics_data()
-        self.last_checked_ingame: "int | None" = d.get("last_checked_ingame")
-        self.next_check_at: "float | None" = d.get("next_check_at")
+        self.last_checked_at: float = load_last_bionics_check()
         self.last_views: "tuple[int,int] | None" = None
-
-    def _save(self):
-        _save_bionics_data({
-            "last_checked_ingame": self.last_checked_ingame,
-            "next_check_at": self.next_check_at,
-        })
 
     def can_run(self, state: GameState) -> bool:
         import config as cfg
@@ -73,15 +49,12 @@ class BionicsTask(Task):
         if not b.get("enabled", False):
             return False
 
-        ingame = state.ingame_mins
-        interval_mins = int(b.get("check_interval_minutes", 5))
-
-        # Interval check (in-game time based)
-        if ingame is not None and self.last_checked_ingame is not None:
-            if _mins_elapsed(self.last_checked_ingame, ingame) < interval_mins:
-                return False
+        interval_secs = int(b.get("check_interval_minutes", 5)) * 60
+        if self.last_checked_at > 0 and time.time() - self.last_checked_at < interval_secs:
+            return False
 
         # Time window check
+        ingame = state.ingame_mins
         if b.get("use_time_window", False) and ingame is not None:
             start = b.get("window_start", "00:00")
             end   = b.get("window_end",   "23:59")
