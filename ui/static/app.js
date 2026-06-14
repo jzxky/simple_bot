@@ -446,6 +446,13 @@ function pollStatus() {
       // Timers
       _lastEnergy = d.energy;
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null, d.flight_departs_at || null, d.hospital_release_at || null);
+      _botState = {
+        logged_in: !!d.logged_in, in_jail: !!d.in_jail, in_hospital: !!d.in_hospital,
+        action_ready: !!d.action_ready, hold_action_timer: !!d.hold_action_timer,
+        city: d.city || "", home_city: d.home_city || "",
+        cs_sentence: d.cs_sentence || 0, agg_fail_count: d.agg_fail_count || 0,
+      };
+      _updateStatPanel();
       _updateCharPills();
 
       // Show check-for-updates row only when running inside a git repo
@@ -589,6 +596,13 @@ let _jailReleaseEndMs = null;
 let _flightDepartsAtMs = null;
 let _hospitalReleaseAtMs = null;
 
+// Bot state flags for status chips and state panel
+let _botState = {
+  logged_in: false, in_jail: false, in_hospital: false,
+  action_ready: false, hold_action_timer: false,
+  city: "", home_city: "", cs_sentence: 0, agg_fail_count: 0,
+};
+
 function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs, flightDepartsAt, hospitalReleaseAt) {
   _aggProActive = aggProActive;
 
@@ -731,7 +745,46 @@ function _renderTimers() {
     tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">${escHtml(t.label)}</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
   }
 
+  // State chips
+  const chip = (label, active, warn) => {
+    const col = warn ? "var(--danger,#e05252)" : active ? "var(--accent)" : "var(--muted-text)";
+    return `<div class="stat-item"><span class="stat-label" style="color:${col}">● ${label}</span></div>`;
+  };
+  const b = _botState;
+  tiles.push(chip(b.logged_in ? "Online" : "Offline", b.logged_in, !b.logged_in));
+  if (b.in_jail)           tiles.push(chip("In Jail",       false, true));
+  if (b.in_hospital)       tiles.push(chip("In Hospital",   false, true));
+  if (b.city && b.home_city && b.city !== b.home_city)
+                           tiles.push(chip("Away",          false, false));
+  tiles.push(chip("Action Ready", b.action_ready, false));
+  if (b.hold_action_timer) tiles.push(chip("Hold Action",   false, true));
+  if (b.cs_sentence > 0)   tiles.push(chip(`CS ×${b.cs_sentence}`, false, true));
+  if (b.agg_fail_count > 0) tiles.push(chip(`Agg Fails ${b.agg_fail_count}/3`, b.agg_fail_count < 3, b.agg_fail_count >= 3));
+
   grid.innerHTML = tiles.join("");
+}
+
+function _updateStatPanel() {
+  const panel = document.getElementById("state-panel-body");
+  if (!panel) return;
+  const b = _botState;
+  const row = (label, value, warn) => {
+    const col = warn ? "var(--danger,#e05252)" : "var(--muted-text)";
+    return `<div class="setting-row" style="padding:4px 0;border-bottom:1px solid var(--border)">
+      <span class="stat-label">${escHtml(label)}</span>
+      <span class="stat-value" style="color:${col}">${escHtml(String(value))}</span>
+    </div>`;
+  };
+  panel.innerHTML = [
+    row("Logged In",      b.logged_in ? "Yes" : "No",           !b.logged_in),
+    row("In Jail",        b.in_jail ? "Yes" : "No",             b.in_jail),
+    row("In Hospital",    b.in_hospital ? "Yes" : "No",         b.in_hospital),
+    row("City",           b.city || "--",                        b.city && b.home_city && b.city !== b.home_city),
+    row("Action Ready",   b.action_ready ? "Yes" : "No",        !b.action_ready),
+    row("Hold Action",    b.hold_action_timer ? "Yes" : "No",   b.hold_action_timer),
+    row("CS Sentence",    b.cs_sentence,                         b.cs_sentence > 0),
+    row("Agg Fail Count", `${b.agg_fail_count} / 3`,            b.agg_fail_count >= 3),
+  ].join("");
 }
 
 function takeScreenshot() {
