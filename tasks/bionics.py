@@ -9,9 +9,7 @@ Purchase order: heart → brain → eyes → legs → arms (most expensive first
 Withdraws cash before each navigation to the store.
 """
 
-import re
 import time
-from datetime import datetime
 from tasks.base import Task, Action
 from state import GameState
 
@@ -19,20 +17,6 @@ from state import GameState
 BIONIC_PRICES = {"arms": 10000, "legs": 20000, "eyes": 35000, "brain": 50000, "heart": 50000}
 REVERSE_ORDER  = ["heart", "brain", "eyes", "legs", "arms"]
 
-
-def _ingame_mins(page_content: str) -> "int | None":
-    """Parse div.serverTime and return minutes-since-midnight, or None."""
-    m = re.search(r'class="serverTime"[^>]*>([^<]+)<', page_content)
-    if not m:
-        return None
-    parts = m.group(1).strip().split(" ", 1)
-    if len(parts) < 2:
-        return None
-    try:
-        dt = datetime.strptime(parts[1], "%I:%M:%S %p")
-        return dt.hour * 60 + dt.minute
-    except ValueError:
-        return None
 
 
 def _mins_elapsed(last: int, now: int) -> int:
@@ -50,7 +34,6 @@ class BionicsTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         import config as cfg
-        import browser
         if not state.logged_in or state.in_jail or state.in_hospital:
             return False
         if state.current_city.lower() != "chicago":
@@ -59,11 +42,8 @@ class BionicsTask(Task):
         if not b.get("enabled", False):
             return False
 
+        ingame = state.ingame_mins
         interval_mins = int(b.get("check_interval_minutes", 5))
-        try:
-            ingame = _ingame_mins(browser.page().content())
-        except Exception:
-            ingame = None
 
         # Interval check (in-game time based)
         if ingame is not None and self.last_checked_ingame is not None:

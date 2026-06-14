@@ -1290,7 +1290,7 @@ def handle_deposit(action: Action, state: GameState):
 
 
 def handle_check_bionics(action: Action, state: GameState):
-    from tasks.bionics import BIONIC_PRICES, REVERSE_ORDER, _ingame_mins
+    from tasks.bionics import BIONIC_PRICES, REVERSE_ORDER
     import config as cfg
     wanted = cfg.load().get("bionics", {}).get("wanted_items", [])
     task = action.params.get("_task")
@@ -1354,10 +1354,8 @@ def handle_check_bionics(action: Action, state: GameState):
 
     # Step 6: Parse store, record last_checked
     store = _parse_store()
-    if task is not None:
-        ingame = _ingame_mins(page.content())
-        if ingame is not None:
-            task.last_checked_ingame = ingame
+    if task is not None and state.ingame_mins is not None:
+        task.last_checked_ingame = state.ingame_mins
 
     # Step 7: Filter wanted items in stock (reverse order)
     can_buy = _in_stock_affordable()
