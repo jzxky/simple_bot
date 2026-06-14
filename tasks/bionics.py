@@ -29,7 +29,8 @@ class BionicsTask(Task):
     label = "Bionics Store"
 
     def __init__(self):
-        self.last_checked_ingame: "int | None" = None
+        self.last_checked_ingame: "int | None" = None  # minutes since midnight
+        self.last_checked_secs: "int | None" = None    # seconds since midnight
         self.last_views: "tuple[int,int] | None" = None
 
     def can_run(self, state: GameState) -> bool:

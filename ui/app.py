@@ -492,15 +492,15 @@ def api_bionics_status():
     if task:
         if task.last_views:
             views = {"current": task.last_views[0], "max": task.last_views[1]}
-        if task.last_checked_ingame is not None and state is not None:
-            current_ingame = state.ingame_mins
-            if current_ingame is not None:
-                interval_mins = int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5))
-                next_check = (task.last_checked_ingame + interval_mins) % 1440
-                diff = next_check - current_ingame
+        if task.last_checked_secs is not None and state is not None:
+            current_secs = state.ingame_secs
+            if current_secs is not None:
+                interval_secs = int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5)) * 60
+                next_check = (task.last_checked_secs + interval_secs) % 86400
+                diff = next_check - current_secs
                 if diff < 0:
-                    diff += 1440
-                seconds_until_next = diff * 60
+                    diff += 86400
+                seconds_until_next = diff
     return jsonify({"views": views, "seconds_until_next": seconds_until_next})
 
 
