@@ -989,13 +989,20 @@
     </section>
 
   {% if config.get('misc', {}).get('show_scheduler', False) %}
-  <section class="card" id="scheduler-section" style="margin:16px">
-    <h2 class="card-header">
-      <span>Scheduler</span>
+  <section class="card" id="scheduler-section">
+    <h2>
+      <button class="collapse-btn" onclick="toggleSection('scheduler-section')">▾</button>
+      Scheduler
     </h2>
-    <div class="card-body" style="display:grid;grid-template-columns:200px 1fr;gap:0;padding:0">
-      <div id="state-panel-body" style="border-right:1px solid var(--border);padding:12px;font-size:0.85rem"></div>
-      <table class="data-table" style="width:100%;align-self:start">
+    <div class="card-body">
+      <table class="data-table" style="width:100%;margin-bottom:16px">
+        <thead><tr>
+          <th>State</th>
+          <th style="width:120px;text-align:right">Value</th>
+        </tr></thead>
+        <tbody id="state-panel-body"></tbody>
+      </table>
+      <table class="data-table" style="width:100%">
         <thead><tr>
           <th>Task</th>
           <th style="width:80px;text-align:center">Priority</th>
