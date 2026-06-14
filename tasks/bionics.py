@@ -60,7 +60,10 @@ class BionicsTask(Task):
             return False
 
         interval_mins = int(b.get("check_interval_minutes", 5))
-        ingame = _ingame_mins(browser.page().content())
+        try:
+            ingame = _ingame_mins(browser.page().content())
+        except Exception:
+            ingame = None
 
         # Interval check (in-game time based)
         if ingame is not None and self.last_checked_ingame is not None:
