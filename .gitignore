@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 site_map/
 venv/
+data/
+*.db
+last_screenshot.png
