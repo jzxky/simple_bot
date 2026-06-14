@@ -68,11 +68,6 @@ class GameState:
             return None
         return self.server_time.hour * 60 + self.server_time.minute
 
-    @property
-    def ingame_secs(self) -> "int | None":
-        if self.server_time is None:
-            return None
-        return self.server_time.hour * 3600 + self.server_time.minute * 60 + self.server_time.second
 
     def agg_fail_count(self) -> int:
         cutoff = datetime.now() - timedelta(minutes=30)

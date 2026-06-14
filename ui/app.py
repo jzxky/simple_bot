@@ -224,6 +224,7 @@ def status():
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
         "last_gym_use": _get_last_gym_use(),
+        "bionics_next_check_at": (bot.get_bionics_task().next_check_at if bot.get_bionics_task() else None),
         "is_git_repo": _is_git_repo(),
         "flight_departs_at": s.flight_departs_at,
         "vehicle_health": s.vehicle_health,
@@ -484,24 +485,11 @@ def api_scheduler():
 
 @app.route("/api/bionics/status")
 def api_bionics_status():
-    import config as cfg
     views = None
-    seconds_until_next = None
     task = bot.get_bionics_task()
-    state = bot.get_state()
-    if task:
-        if task.last_views:
-            views = {"current": task.last_views[0], "max": task.last_views[1]}
-        if task.last_checked_secs is not None and state is not None:
-            current_secs = state.ingame_secs
-            if current_secs is not None:
-                interval_secs = int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5)) * 60
-                next_check = (task.last_checked_secs + interval_secs) % 86400
-                diff = next_check - current_secs
-                if diff < 0:
-                    diff += 86400
-                seconds_until_next = diff
-    return jsonify({"views": views, "seconds_until_next": seconds_until_next})
+    if task and task.last_views:
+        views = {"current": task.last_views[0], "max": task.last_views[1]}
+    return jsonify({"views": views})
 
 
 @app.route("/api/players")

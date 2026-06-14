@@ -30,7 +30,7 @@ class BionicsTask(Task):
 
     def __init__(self):
         self.last_checked_ingame: "int | None" = None  # minutes since midnight
-        self.last_checked_secs: "int | None" = None    # seconds since midnight
+        self.next_check_at: "float | None" = None      # Unix timestamp
         self.last_views: "tuple[int,int] | None" = None
 
     def can_run(self, state: GameState) -> bool:

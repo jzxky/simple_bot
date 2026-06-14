@@ -1354,9 +1354,11 @@ def handle_check_bionics(action: Action, state: GameState):
 
     # Step 6: Parse store, record last_checked
     store = _parse_store()
-    if task is not None and state.ingame_mins is not None:
-        task.last_checked_ingame = state.ingame_mins
-        task.last_checked_secs = state.ingame_secs
+    if task is not None:
+        if state.ingame_mins is not None:
+            task.last_checked_ingame = state.ingame_mins
+        interval_mins = int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5))
+        task.next_check_at = time.time() + interval_mins * 60
 
     # Step 7: Filter wanted items in stock (reverse order)
     can_buy = _in_stock_affordable()
