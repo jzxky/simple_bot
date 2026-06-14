@@ -2,7 +2,7 @@ import config as cfg
 from tasks.base import Task, Action
 from state import GameState
 
-_PRIORITY = ["porn", "booze", "cigarettes", "heroin"]
+_PRIORITY = ["porn", "booze", "cigarettes"]
 
 
 class JailConsumeTask(Task):
