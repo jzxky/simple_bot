@@ -40,6 +40,7 @@ from tasks.journal import JournalCheckTask, ArchiveJournalsTask, set_drug_trade_
 from tasks.drug_trade import DrugTradeTask
 from tasks.illness import IllnessTask
 from tasks.gym import GymTask
+from tasks.cs_punishment import CSPunishmentTask
 from players import PlayerRefreshTask
 
 _thread: threading.Thread = None
@@ -118,6 +119,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
         )
         agg_task.scheduler = sched
         sched.add(agg_task)
+        sched.add(CSPunishmentTask())
 
     action_cfg = c.get("action", {})
     if action_cfg.get("enabled", False):
