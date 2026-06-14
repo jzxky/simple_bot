@@ -1676,7 +1676,7 @@ def handle_check_drug_trade(action: Action, state: GameState):
                 decline_reasons.append(f"{drug_key} held {held}>={max_qty}")
                 # willing stays $0
             else:
-                total_willing += max_price
+                total_willing += max_price * qty
 
         item_summary = ", ".join(
             f"{qty}x {raw_name}" for raw_name, _, qty in items
