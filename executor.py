@@ -1356,6 +1356,7 @@ def handle_check_bionics(action: Action, state: GameState):
     store = _parse_store()
     if task is not None and state.ingame_mins is not None:
         task.last_checked_ingame = state.ingame_mins
+        task.last_checked_secs = state.ingame_secs
 
     # Step 7: Filter wanted items in stock (reverse order)
     can_buy = _in_stock_affordable()
