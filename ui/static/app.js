@@ -482,9 +482,7 @@ function pollStatus() {
       const bionicsViewsEl = document.getElementById("bionics-views");
       const bionicsNextEl  = document.getElementById("bionics-next-check");
       if (bionicsViewsEl) {
-        fetch("/api/bionics/status").then(r => r.json()).then(b => {
-          bionicsViewsEl.textContent = b.views ? `${b.views.current} / ${b.views.max}` : "--";
-        }).catch(() => {});
+        bionicsViewsEl.textContent = d.bionics_views ? `${d.bionics_views.current} / ${d.bionics_views.max}` : "--";
       }
       if (bionicsNextEl) {
         if (d.last_bionics_check && d.last_bionics_check > 0) {

@@ -230,6 +230,7 @@ def status():
         "last_gym_use": _get_last_gym_use(),
         "last_bionics_check": (bot.get_bionics_task().last_checked_at if bot.get_bionics_task() else 0),
         "bionics_interval_mins": int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5)),
+        "bionics_views": ({"current": bot.get_bionics_task().last_views[0], "max": bot.get_bionics_task().last_views[1]} if bot.get_bionics_task() and bot.get_bionics_task().last_views else None),
         "is_git_repo": _is_git_repo(),
         "flight_departs_at": s.flight_departs_at,
         "vehicle_health": s.vehicle_health,
@@ -487,14 +488,6 @@ def logs_viewer(filename):
 def api_scheduler():
     return jsonify({"tasks": bot.get_scheduler_snapshot()})
 
-
-@app.route("/api/bionics/status")
-def api_bionics_status():
-    views = None
-    task = bot.get_bionics_task()
-    if task and task.last_views:
-        views = {"current": task.last_views[0], "max": task.last_views[1]}
-    return jsonify({"views": views})
 
 
 @app.route("/api/players")
