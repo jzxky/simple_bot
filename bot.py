@@ -477,6 +477,8 @@ def request_char_history_refresh():
 
 
 def request_jailbreak_plan(target: str, partner: str, hold_action_timer: bool):
+    if hold_action_timer and _state is not None:
+        _state.hold_action_timer = True
     _jailbreak_plan_queue.put({
         "target": target,
         "partner": partner,
