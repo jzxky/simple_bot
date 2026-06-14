@@ -9,13 +9,36 @@ Purchase order: heart → brain → eyes → legs → arms (most expensive first
 Withdraws cash before each navigation to the store.
 """
 
+import json
 import time
+from pathlib import Path
 from tasks.base import Task, Action
 from state import GameState
 
 # Known fixed prices — used for pre-withdrawal decisions
 BIONIC_PRICES = {"arms": 10000, "legs": 20000, "eyes": 35000, "brain": 50000, "heart": 50000}
 REVERSE_ORDER  = ["heart", "brain", "eyes", "legs", "arms"]
+
+_DATA_FILE = "bionics_data.json"
+
+
+def _data_path() -> Path:
+    from paths import data_dir
+    return Path(data_dir()) / _DATA_FILE
+
+
+def _load_bionics_data() -> dict:
+    p = _data_path()
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def _save_bionics_data(data: dict):
+    _data_path().write_text(json.dumps(data), encoding="utf-8")
 
 
 
@@ -29,9 +52,16 @@ class BionicsTask(Task):
     label = "Bionics Store"
 
     def __init__(self):
-        self.last_checked_ingame: "int | None" = None  # minutes since midnight
-        self.next_check_at: "float | None" = None      # Unix timestamp
+        d = _load_bionics_data()
+        self.last_checked_ingame: "int | None" = d.get("last_checked_ingame")
+        self.next_check_at: "float | None" = d.get("next_check_at")
         self.last_views: "tuple[int,int] | None" = None
+
+    def _save(self):
+        _save_bionics_data({
+            "last_checked_ingame": self.last_checked_ingame,
+            "next_check_at": self.next_check_at,
+        })
 
     def can_run(self, state: GameState) -> bool:
         import config as cfg
