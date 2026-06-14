@@ -109,8 +109,11 @@
               </div>
               <div class="setting-row">
                 <label for="bionics_interval">Check every</label>
-                <input type="number" id="bionics_interval" min="1" max="60" style="width:70px"
-                  value="{{ bionics_cfg.get('check_interval_minutes', 5) }}" onchange="autoSave()"> minutes
+                <select id="bionics_interval" onchange="autoSave()">
+                  {% for m in range(1, 31) %}
+                  <option value="{{ m }}" {% if bionics_cfg.get('check_interval_minutes', 5) == m %}selected{% endif %}>{{ m }} min</option>
+                  {% endfor %}
+                </select>
               </div>
               <div class="setting-row">
                 <label>Check window</label>
