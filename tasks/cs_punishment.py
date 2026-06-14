@@ -3,14 +3,12 @@ Handles the community-service punishment that blocks aggravated crimes.
 
 When the bot receives a "complete another N Services" message from agcrime.asp,
 state.cs_sentence is set to N. This task then:
-  - Blocks until the action timer is ready and the character is in home city
-  - Performs community service and increments state.cs_completed
-  - Resets both counters once cs_completed reaches cs_sentence
+  - Probes agcrime.asp — if it loads without redirect, CS is no longer required
+  - Otherwise performs community service
+  - Probes agcrime.asp again — if it loads, clears cs_sentence and re-enables aggs
 
-Priority is set above AggCrimeTask (50) so CS punishment is always preferred
-over attempting agg crimes while a sentence is active. AggCrimeTask.can_run
-also returns False when cs_sentence > 0, ensuring the gangster stays idle
-(and does not attempt aggs) while away from home city waiting to serve CS.
+Priority is set above AggCrimeTask (50) so CS punishment is always preferred.
+AggCrimeTask.can_run also returns False when cs_sentence > 0.
 """
 
 from tasks.base import Task, Action
@@ -30,24 +28,23 @@ class CSPunishmentTask(Task):
             return False
         if state.hold_action_timer:
             return False
-        # Must be in home city to do community service
         if not state.in_home_city():
             return False
         return True
 
     def run(self, state: GameState, executor):
+        # Verify CS is still required
+        executor.execute(Action("probe_agcrime"), state)
+        if state.cs_sentence <= 0:
+            state.add_log("CS punishment: agcrime.asp loaded — no CS required. Re-enabling aggs.")
+            return
+
+        # Do community service
         executor.execute(Action("do_community_service", in_home_city=True), state)
-        state.cs_completed += 1
-        remaining = state.cs_sentence - state.cs_completed
-        if remaining <= 0:
-            state.add_log(
-                f"CS punishment complete — served {state.cs_sentence} service(s). "
-                "Aggravated crimes re-enabled."
-            )
-            state.cs_sentence = 0
-            state.cs_completed = 0
+
+        # Check if CS is now cleared
+        executor.execute(Action("probe_agcrime"), state)
+        if state.cs_sentence <= 0:
+            state.add_log("CS punishment complete — aggravated crimes re-enabled.")
         else:
-            state.add_log(
-                f"CS punishment: {state.cs_completed}/{state.cs_sentence} done, "
-                f"{remaining} remaining."
-            )
+            state.add_log(f"CS punishment: {state.cs_sentence} service(s) still required.")

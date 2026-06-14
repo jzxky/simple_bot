@@ -289,7 +289,6 @@ def _check_cs_punishment(state: GameState) -> bool:
         return False
     n = int(m.group(1))
     state.cs_sentence = n
-    state.cs_completed = 0
     state.add_log(f"Agg crime blocked: CS punishment — must complete {n} community service(s).")
     return True
 
@@ -710,6 +709,18 @@ def handle_payback(action: Action, state: GameState):
 
     _refresh_state(state)
     state.add_log(f"Payback sent: ${amount:,} to {target}.")
+
+
+def handle_probe_agcrime(action: Action, state: GameState):
+    """Navigate to agcrime.asp — if it redirects, CS is still required; if it loads, CS is done."""
+    _nav(_u("/income/agcrime.asp"), state)
+    url = browser.current_url()
+    if "/income/agcrime.asp" in url:
+        # Loaded fine — CS no longer blocking
+        state.cs_sentence = 0
+    else:
+        # Redirected — still blocked; refresh sentence count from page
+        _check_cs_punishment(state)
 
 
 def handle_community_service(action: Action, state: GameState):
@@ -1970,6 +1981,7 @@ HANDLERS = {
     "consume": handle_consume,
     "refresh_state": handle_refresh_state,
     "payback": handle_payback,
+    "probe_agcrime":        handle_probe_agcrime,
     "do_community_service": handle_community_service,
     "do_fire_duties": handle_fire_duties,
     "do_career_training": handle_career_training,
