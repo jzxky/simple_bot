@@ -1712,11 +1712,11 @@ function plFilter() {
         !(p.homecity||"").toLowerCase().includes(search)) return false;
     return true;
   });
-  _plRender();
+  _plRenderList();
 }
 
 function _plRender() {
-  plFilter();
+  _plRenderList();
 }
 
 function _plRenderList() {
