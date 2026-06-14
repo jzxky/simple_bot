@@ -62,6 +62,12 @@ class GameState:
     hospital_release_at: "float | None" = None
     cs_sentence: int = 0      # community services still owed as agg-crime punishment
 
+    @property
+    def ingame_mins(self) -> "int | None":
+        if self.server_time is None:
+            return None
+        return self.server_time.hour * 60 + self.server_time.minute
+
     def agg_fail_count(self) -> int:
         cutoff = datetime.now() - timedelta(minutes=30)
         self.agg_fail_times = [t for t in self.agg_fail_times if t > cutoff]

@@ -433,6 +433,10 @@ def get_bionics_task():
     return _bionics_task
 
 
+def get_state():
+    return _state
+
+
 def get_scheduler_snapshot() -> list:
     if _sched is not None and _state is not None:
         try:
