@@ -1359,6 +1359,7 @@ def handle_check_bionics(action: Action, state: GameState):
             task.last_checked_ingame = state.ingame_mins
         interval_mins = int(cfg.load().get("bionics", {}).get("check_interval_minutes", 5))
         task.next_check_at = time.time() + interval_mins * 60
+        task._save()
 
     # Step 7: Filter wanted items in stock (reverse order)
     can_buy = _in_stock_affordable()
