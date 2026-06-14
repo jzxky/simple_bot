@@ -38,9 +38,9 @@ class OnlineAgeTask(Task):
         self._last_run = time.monotonic()
 
         soup = BeautifulSoup(browser.page().content(), "html.parser")
-        cell = soup.find("div", id="whosonlinecell")
+        cell = soup.find("div", id="whosonlinecell", class_=lambda c: c and "global" in c)
         if not cell:
-            state.add_log("Online age tracker: #whosonlinecell not found on current page.")
+            state.add_log("Online age tracker: #whosonlinecell (global) not found on current page.")
             return
 
         known = set(_db.get_usernames())

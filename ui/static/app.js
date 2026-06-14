@@ -1990,6 +1990,16 @@ function plRunImport() {
 
 let _plGroupExpanded = {};
 
+function _plColorSelect(selected, onchange) {
+  const opts = [
+    ["#e74c3c","Red"],["#e67e22","Orange"],["#f1c40f","Yellow"],
+    ["#2ecc71","Green"],["#3498db","Blue"],["#9b59b6","Purple"],
+    ["#e91e8c","Pink"],["#1abc9c","Teal"],["#aaaaaa","Light Grey"],["#555555","Dark Grey"],
+  ].map(([v,l]) => `<option value="${v}" ${selected===v?'selected':''}>&#9679; ${l}</option>`).join("");
+  return `<select class="pl-filter-input pl-color-select" style="--pl-sel-color:${selected||'#3498db'}"
+    onchange="${onchange};this.style.setProperty('--pl-sel-color',this.value)">${opts}</select>`;
+}
+
 function _plRenderGroupsTab(groups) {
   const tbody = document.getElementById("pl-groups-tbody");
   if (!tbody) return;
@@ -1998,29 +2008,26 @@ function _plRenderGroupsTab(groups) {
     return;
   }
 
+  const TRASH = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+  const PLUS  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+
   const rows = [];
   groups.forEach(g => {
-    const typeClass = g.type === "friendly" ? "pl-type-friendly" : g.type === "enemy" ? "pl-type-enemy" : "pl-type-neutral";
-    const swatches  = PL_SWATCH_COLORS.map(c =>
-      `<span class="pl-swatch${c===g.color?' selected':''}" data-color="${c}" style="background:${c}"
-        onclick="plUpdateGroupColor('${escHtml(g.name)}', '${c}'); event.stopPropagation()"></span>`
-    ).join("");
     const aggSel = ["","whitelist","blacklist"].map(v =>
       `<option value="${v}" ${g.agg_crimes===v?'selected':''}>${v||"—"}</option>`).join("");
     const cwSel = ["","whitelist","blacklist"].map(v =>
       `<option value="${v}" ${g.case_work===v?'selected':''}>${v||"—"}</option>`).join("");
     const typeSel = ["neutral","friendly","enemy"].map(v =>
       `<option value="${v}" ${g.type===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join("");
+    const colorSel = _plColorSelect(g.color, `plUpdateGroupColor('${escHtml(g.name)}', this.value)`);
     const expanded = _plGroupExpanded[g.name];
 
     rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleGroup('${escHtml(g.name)}')" style="cursor:pointer">
-      <td><span class="pl-chevron">${expanded?'▾':'▸'}</span>
-        <span class="pl-group-badge" style="background:${g.color}">${escHtml(g.name)}</span>
-      </td>
+      <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(g.name)}</td>
       <td onclick="event.stopPropagation()">
         <select class="pl-filter-input" onchange="plUpdateGroupType('${escHtml(g.name)}', this.value)">${typeSel}</select>
       </td>
-      <td onclick="event.stopPropagation()"><div class="pl-swatches">${swatches}</div></td>
+      <td onclick="event.stopPropagation()">${colorSel}</td>
       <td onclick="event.stopPropagation()">
         <select class="pl-filter-input" onchange="plUpdateGroupAssignment('${escHtml(g.name)}', 'agg_crimes', this.value)">${aggSel}</select>
       </td>
@@ -2028,9 +2035,9 @@ function _plRenderGroupsTab(groups) {
         <select class="pl-filter-input" onchange="plUpdateGroupAssignment('${escHtml(g.name)}', 'case_work', this.value)">${cwSel}</select>
       </td>
       <td>${g.member_count||0}</td>
-      <td onclick="event.stopPropagation()">
-        <button class="btn-secondary" style="padding:2px 8px;font-size:0.75rem"
-          onclick="plDeleteGroup('${escHtml(g.name)}')">Delete</button>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        <button class="pl-icon-btn" title="Add members" onclick="plOpenAddMembersModal('${escHtml(g.name)}')">${PLUS}</button>
+        <button class="pl-icon-btn pl-icon-btn-danger" title="Delete group" onclick="plOpenDeleteModal('${escHtml(g.name)}')">${TRASH}</button>
       </td>
     </tr>`);
 
@@ -2043,21 +2050,10 @@ function _plRenderGroupsTab(groups) {
     }
   });
   tbody.innerHTML = rows.join("");
-
-  // Load members for expanded groups
-  groups.forEach(g => {
-    if (_plGroupExpanded[g.name]) _plLoadGroupMembers(g.name);
-  });
-
-  // Wire up swatch selection in create row
-  document.querySelectorAll("#pl-new-group-swatches .pl-swatch").forEach(s => {
-    s.onclick = () => {
-      document.querySelectorAll("#pl-new-group-swatches .pl-swatch").forEach(x => x.classList.remove("selected"));
-      s.classList.add("selected");
-      document.getElementById("pl-new-group-swatches").dataset.selected = s.dataset.color;
-    };
-  });
+  groups.forEach(g => { if (_plGroupExpanded[g.name]) _plLoadGroupMembers(g.name); });
 }
+
+
 
 function plToggleGroup(name) {
   _plGroupExpanded[name] = !_plGroupExpanded[name];
@@ -2100,10 +2096,10 @@ function _plLoadGroupMembers(groupName) {
 function plCreateGroup() {
   const nameEl  = document.getElementById("pl-new-group-name");
   const typeEl  = document.getElementById("pl-new-group-type");
-  const swatchEl = document.getElementById("pl-new-group-swatches");
+  const colorEl = document.getElementById("pl-new-group-color");
   const errEl   = document.getElementById("pl-group-create-error");
   const name    = nameEl?.value.trim();
-  const color   = swatchEl?.dataset.selected || "#3498db";
+  const color   = colorEl?.value || "#3498db";
   const type    = typeEl?.value || "neutral";
   if (!name) return;
   fetch("/players/groups/create", {
@@ -2111,21 +2107,84 @@ function plCreateGroup() {
     body: JSON.stringify({name, color, group_type: type}),
   }).then(r => r.json())
     .then(d => {
-      if (!d.ok) { if (errEl) { errEl.textContent = d.error || "Error"; errEl.style.display = ""; } return; }
-      if (errEl) errEl.style.display = "none";
+      if (!d.ok) { if (errEl) errEl.textContent = d.error || "Error"; return; }
+      if (errEl) errEl.textContent = "";
       if (nameEl) nameEl.value = "";
       loadPlayers();
     })
     .catch(() => {});
 }
 
-function plDeleteGroup(name) {
-  if (!confirm(`Delete group "${name}"?`)) return;
-  fetch("/players/groups/delete", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name}),
-  }).then(() => loadPlayers()).catch(() => {});
+// ── Delete modal ──────────────────────────────────────────────────────────────
+function plOpenDeleteModal(name) {
+  const modal = document.getElementById("pl-delete-modal");
+  const msg   = document.getElementById("pl-delete-modal-msg");
+  const btn   = document.getElementById("pl-delete-modal-confirm");
+  if (!modal) return;
+  msg.textContent = `Are you sure you want to delete "${name}"? This cannot be undone.`;
+  btn.onclick = () => {
+    fetch("/players/groups/delete", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name}),
+    }).then(() => { plCloseDeleteModal(); loadPlayers(); }).catch(() => {});
+  };
+  modal.style.display = "flex";
 }
+function plCloseDeleteModal() {
+  const m = document.getElementById("pl-delete-modal");
+  if (m) m.style.display = "none";
+}
+
+// ── Add members modal ─────────────────────────────────────────────────────────
+function plOpenAddMembersModal(groupName) {
+  const modal  = document.getElementById("pl-addmembers-modal");
+  const title  = document.getElementById("pl-addmembers-title");
+  const text   = document.getElementById("pl-addmembers-text");
+  const result = document.getElementById("pl-addmembers-result");
+  const btn    = document.getElementById("pl-addmembers-confirm");
+  if (!modal) return;
+  title.textContent = `Add Members to "${groupName}"`;
+  if (text) text.value = "";
+  if (result) result.textContent = "";
+  btn.onclick = () => _plDoAddMembers(groupName);
+  modal.style.display = "flex";
+  setTimeout(() => text?.focus(), 50);
+}
+function plCloseAddMembersModal() {
+  const m = document.getElementById("pl-addmembers-modal");
+  if (m) m.style.display = "none";
+}
+function _plDoAddMembers(groupName) {
+  const text   = document.getElementById("pl-addmembers-text");
+  const result = document.getElementById("pl-addmembers-result");
+  const btn    = document.getElementById("pl-addmembers-confirm");
+  const names  = (text?.value || "").split("\n").map(s => s.trim()).filter(Boolean);
+  if (!names.length) return;
+  const known = new Map(_plData.map(p => [p.username.toLowerCase(), p.username]));
+  const matched = [], unmatched = [];
+  names.forEach(n => {
+    const c = known.get(n.toLowerCase());
+    if (c) matched.push(c); else unmatched.push(n);
+  });
+  if (!matched.length) {
+    if (result) result.textContent = `No matching players. Unmatched: ${unmatched.join(", ")}`;
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = "Adding…"; }
+  Promise.all(matched.map(username =>
+    fetch("/players/set_group", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({username, group: groupName}),
+    })
+  )).then(() => {
+    if (btn) { btn.disabled = false; btn.textContent = "Add"; }
+    if (result) result.textContent =
+      `Added ${matched.length} player(s).${unmatched.length ? " Unmatched: " + unmatched.join(", ") : ""}`;
+    loadPlayers();
+  }).catch(() => { if (btn) { btn.disabled = false; btn.textContent = "Add"; } });
+}
+
+
 
 function plUpdateGroupColor(name, color) {
   fetch("/players/groups/update_color", {

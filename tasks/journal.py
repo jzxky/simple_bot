@@ -151,7 +151,7 @@ def dispatch_journal_action(entry: dict, state: GameState):
 # ---------------------------------------------------------------------------
 
 class JournalCheckTask(Task):
-    priority = 5  # lowest — yields to everything
+    priority = 35
     label = "Journal Check"
 
     def can_run(self, state: GameState) -> bool:
