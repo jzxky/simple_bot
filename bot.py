@@ -48,6 +48,8 @@ from players import PlayerRefreshTask
 _thread: threading.Thread = None
 _bionics_task = None
 _scheduler_snapshot: list = []
+_sched: "Scheduler | None" = None
+_state: "GameState | None" = None
 _stop_event = threading.Event()
 _pause_event = threading.Event()
 _reload_event = threading.Event()
@@ -269,7 +271,10 @@ def _run(c: dict):
         return
 
     try:
+        global _sched, _state
         sched = _build_scheduler(c)
+        _sched = sched
+        _state = state
 
         while not _stop_event.is_set():
             if _pause_event.is_set():
@@ -353,6 +358,7 @@ def _run(c: dict):
                 _reload_event.clear()
                 c = cfg.load()
                 sched = _build_scheduler(c, old_sched=sched)
+                _sched = sched
                 state.add_log("Config reloaded.")
 
             sched.tick(state, executor)
@@ -428,6 +434,11 @@ def get_bionics_task():
 
 
 def get_scheduler_snapshot() -> list:
+    if _sched is not None and _state is not None:
+        try:
+            return _sched.snapshot(_state)
+        except Exception:
+            pass
     return _scheduler_snapshot
 
 
