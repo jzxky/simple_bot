@@ -374,6 +374,9 @@
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>General</h3>
+              <label class="inline-toggle setting-row">Show Scheduler
+                <label class="toggle-label"><input type="checkbox" id="show_scheduler" {% if config.get('misc', {}).get('show_scheduler', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
               <label class="inline-toggle setting-row">Headless Mode
                 <label class="toggle-label"><input type="checkbox" id="headless" {% if config.get('misc', {}).get('headless', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
@@ -981,6 +984,27 @@
         <p style="color:#888;font-size:0.9rem;">No data yet. Enable Character History and start the bot to fetch stats.</p>
       </div>
     </section>
+
+  {% if config.get('misc', {}).get('show_scheduler', False) %}
+  <section class="card" id="scheduler-section" style="margin:16px">
+    <h2 class="card-header">
+      <span>Scheduler</span>
+      <span id="scheduler-updated" style="font-size:0.75rem;color:var(--muted);margin-left:8px"></span>
+    </h2>
+    <div class="card-body" style="padding:0">
+      <table class="data-table" style="width:100%">
+        <thead><tr>
+          <th>Task</th>
+          <th style="width:80px;text-align:center">Priority</th>
+          <th style="width:100px;text-align:center">Status</th>
+        </tr></thead>
+        <tbody id="scheduler-body">
+          <tr><td colspan="3" style="color:var(--muted);padding:12px">Waiting for data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
 
   </main>
 </div>

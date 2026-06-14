@@ -90,6 +90,7 @@ def save():
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
     c["misc"]["min_cash_on_hand"] = int(data.get("min_cash_on_hand", 0))
     c["misc"]["headless"] = data.get("headless", False)
+    c["misc"]["show_scheduler"] = data.get("show_scheduler", False)
 
     c.setdefault("character_history", {})
     c["character_history"]["enabled"] = data.get("char_history_enabled", False)
@@ -474,6 +475,11 @@ def logs_viewer(filename):
         lines = []
     return render_template("log.html", filename=safe, log_files=files,
                            lines=lines, line_count=len(lines))
+
+
+@app.route("/api/scheduler")
+def api_scheduler():
+    return jsonify({"tasks": bot.get_scheduler_snapshot()})
 
 
 @app.route("/api/bionics/status")

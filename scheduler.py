@@ -25,3 +25,18 @@ class Scheduler:
                 finally:
                     state.current_task = ""
                 return
+
+    def snapshot(self, state) -> list[dict]:
+        """Return current can_run status for all tasks without running any."""
+        result = []
+        for task in self._tasks:
+            try:
+                ready = task.can_run(state)
+            except Exception:
+                ready = False
+            result.append({
+                "label": task.label or type(task).__name__,
+                "priority": task.priority,
+                "ready": ready,
+            })
+        return result
