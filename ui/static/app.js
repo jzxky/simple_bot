@@ -19,44 +19,58 @@ const ACTION_SUB_MAP = {
 };
 
 function loadAvailableEarns() {
-  const sel = document.getElementById("earn_type");
-  const current = sel ? sel.dataset.current || "" : "";
+  const earnTypeSel = document.getElementById("earn_type");
+  const currentType = earnTypeSel ? earnTypeSel.dataset.current || "" : "";
   fetch("/api/available_earns")
     .then(r => r.json())
     .then(opts => {
       _earnCatalog = opts;
-      _renderEarnSelect(current);
+      _populateEarnCategories(currentType);
     })
     .catch(() => {
-      if (sel) sel.innerHTML = '<option value="">— could not load earns —</option>';
+      if (earnTypeSel) earnTypeSel.innerHTML = '<option value="">— could not load earns —</option>';
     });
 }
 
+function _populateEarnCategories(selectedEarnType) {
+  const catSel = document.getElementById("earn_category");
+  if (!catSel) return;
+
+  // Build ordered unique category list
+  const seen = new Set();
+  const cats = [];
+  _earnCatalog.forEach(e => {
+    const cat = e.category || "Uncategorized";
+    if (!seen.has(cat)) { seen.add(cat); cats.push(cat); }
+  });
+
+  // Determine which category the saved earn_type belongs to
+  const entry = _earnCatalog.find(e => e.schedule_value === selectedEarnType);
+  const selectedCat = entry ? (entry.category || "Uncategorized") : (cats[0] || "");
+
+  catSel.innerHTML = cats.map(c =>
+    `<option value="${c}"${c === selectedCat ? " selected" : ""}>${c}</option>`
+  ).join("");
+
+  _renderEarnSelect(selectedEarnType);
+}
+
 function _renderEarnSelect(selectedValue) {
+  const catSel = document.getElementById("earn_category");
   const sel = document.getElementById("earn_type");
   if (!sel) return;
-  if (!_earnCatalog.length) {
-    sel.innerHTML = '<option value="">— visit earn.asp to populate —</option>';
+  const cat = catSel ? catSel.value : "";
+  const items = _earnCatalog.filter(e => e.schedule_value && (e.category || "Uncategorized") === cat);
+  if (!items.length) {
+    sel.innerHTML = '<option value="">— no earns in this category —</option>';
+    _updateEarnsPills();
     return;
   }
-  const groups = {};
-  _earnCatalog.forEach(e => {
-    if (!e.schedule_value) return;
-    const cat = e.category || "Uncategorized";
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(e);
-  });
-  let html = "";
-  Object.entries(groups).forEach(([cat, items]) => {
-    html += `<optgroup label="${cat}">`;
-    items.forEach(e => {
-      const style = e.available === false ? ' style="color:red"' : '';
-      const selected = e.schedule_value === selectedValue ? " selected" : "";
-      html += `<option value="${e.schedule_value}"${selected}${style}>${e.label}</option>`;
-    });
-    html += "</optgroup>";
-  });
-  sel.innerHTML = html;
+  sel.innerHTML = items.map(e => {
+    const style = e.available === false ? ' style="color:red"' : '';
+    const selected = e.schedule_value === selectedValue ? " selected" : "";
+    return `<option value="${e.schedule_value}"${selected}${style}>${e.label}</option>`;
+  }).join("");
   _updateEarnsPills();
 }
 

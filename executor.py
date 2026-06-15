@@ -1073,25 +1073,28 @@ def _save_casework_snapshot(label: str, html: str):
 
 
 _EARN_SEED = [
-    {"label": "Whore",                               "schedule_value": "whore",              "data_earn": "0",  "category": "Secret"},
-    {"label": "Streetfight",                         "schedule_value": "street_fight",        "data_earn": "1",  "category": "Secret"},
-    {"label": "Joyride",                             "schedule_value": "joy_ride",            "data_earn": None, "category": "Secret"},
-    {"label": "Pimp",                                "schedule_value": "pimp",               "data_earn": None, "category": "Secret"},
-    {"label": "Shoplift",                            "schedule_value": "shoplift",            "data_earn": "2",  "category": "General"},
-    {"label": "Steal Cheques",                       "schedule_value": "steal_cheques",       "data_earn": None, "category": "General"},
-    {"label": "Nurse at local hospital",             "schedule_value": "nurse",               "data_earn": "3",  "category": "Hospital"},
-    {"label": "Doctor at local hospital",            "schedule_value": "doctor",              "data_earn": None, "category": "Hospital"},
-    {"label": "Surgeon at local hospital",           "schedule_value": "surgeon",             "data_earn": None, "category": "Hospital"},
-    {"label": "Hospital Director",                   "schedule_value": "hospital_director",   "data_earn": None, "category": "Hospital"},
-    {"label": "Mechanic at local vehicle yard",      "schedule_value": "mechanic",            "data_earn": "4",  "category": "Engineering"},
-    {"label": "Technician at local vehicle yard",    "schedule_value": "technician",          "data_earn": "6",  "category": "Engineering"},
-    {"label": "Engineer at local Construction Site", "schedule_value": "engineer",            "data_earn": "7",  "category": "Engineering"},
-    {"label": "Work at local bank",                  "schedule_value": "bank_teller",         "data_earn": "9",  "category": "Bank"},
-    {"label": "Mortician Assistant",                 "schedule_value": "mortician_assistant", "data_earn": "10", "category": "Mortician"},
-    {"label": "Legal Secretary",                     "schedule_value": "legal_secretary",     "data_earn": "11", "category": "Law"},
-    {"label": "Drag racing",                         "schedule_value": "drag_racing",         "data_earn": None, "category": "Crime"},
-    {"label": "Hack bank account",                   "schedule_value": "hack_bank",           "data_earn": None, "category": "Crime"},
-    {"label": "Scamming",                            "schedule_value": "scamming",            "data_earn": None, "category": "Crime"},
+    {"label": "Whore",                               "schedule_value": "whore",              "data_earn": "0",    "category": "Secret",      "available": True},
+    {"label": "Streetfight",                         "schedule_value": "street_fight",        "data_earn": "1",    "category": "Secret",      "available": True},
+    {"label": "Joyride",                             "schedule_value": "joy_ride",            "data_earn": None,   "category": "Secret",      "available": None},
+    {"label": "Pimp",                                "schedule_value": "pimp",               "data_earn": None,   "category": "Secret",      "available": None},
+    {"label": "Shoplift",                            "schedule_value": "shoplift",            "data_earn": "2",    "category": "Crime",       "available": True},
+    {"label": "Steal Cheques",                       "schedule_value": "steal_cheques",       "data_earn": None,   "category": "Crime",       "available": None},
+    {"label": "Nurse at local hospital",             "schedule_value": "nurse",               "data_earn": "3",    "category": "Hospital",    "available": True},
+    {"label": "Doctor at local hospital",            "schedule_value": "doctor",              "data_earn": None,   "category": "Hospital",    "available": None},
+    {"label": "Surgeon at local hospital",           "schedule_value": "surgeon",             "data_earn": None,   "category": "Hospital",    "available": None},
+    {"label": "Hospital Director",                   "schedule_value": "hospital_director",   "data_earn": None,   "category": "Hospital",    "available": None},
+    {"label": "Mechanic at local vehicle yard",      "schedule_value": "mechanic",            "data_earn": "4",    "category": "Engineering", "available": True},
+    {"label": "Technician at local vehicle yard",    "schedule_value": "technician",          "data_earn": "5",    "category": "Engineering", "available": True},
+    {"label": "Engineer at local Construction Site", "schedule_value": "engineer",            "data_earn": "6",    "category": "Engineering", "available": True},
+    {"label": "Work at local bank",                  "schedule_value": "bank_teller",         "data_earn": "7",    "category": "Bank",        "available": True},
+    {"label": "Mortician Assistant",                 "schedule_value": "mortician_assistant", "data_earn": "8",    "category": "Mortician",   "available": True},
+    {"label": "Legal Secretary",                     "schedule_value": "legal_secretary",     "data_earn": "10",   "category": "Law",         "available": True},
+    {"label": "Drag racing",                         "schedule_value": "drag_racing",         "data_earn": None,   "category": "Crime",       "available": None},
+    {"label": "Hack bank account",                   "schedule_value": "hack_bank",           "data_earn": None,   "category": "Crime",       "available": None},
+    {"label": "Scamming",                            "schedule_value": "scamming",            "data_earn": None,   "category": "Crime",       "available": None},
+    {"label": "Pizza Restaurant",                    "schedule_value": None,                  "data_earn": "Pizza","category": "General",     "available": False},
+    {"label": "Local 7/11",                          "schedule_value": None,                  "data_earn": "711",  "category": "General",     "available": False},
+    {"label": "Bar/Nightclub",                       "schedule_value": None,                  "data_earn": "Bar",  "category": "General",     "available": False},
 ]
 
 
@@ -1101,9 +1104,8 @@ def _upsert_earn_catalog(auto_opts, manual_opts):
 
     path = os.path.join(paths.data_dir(), "available_earns.json")
     if not os.path.exists(path):
-        seed = [dict(e, available=None) for e in _EARN_SEED]
         with open(path, "w", encoding="utf-8") as f:
-            _json.dump(seed, f, indent=2)
+            _json.dump(list(_EARN_SEED), f, indent=2)
 
     try:
         with open(path, encoding="utf-8") as f:
