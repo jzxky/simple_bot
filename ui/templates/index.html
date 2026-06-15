@@ -623,11 +623,14 @@
           </label>
           <hr class="stat-divider">
           <div class="row">
+            <label>Category
+              <select id="earn_category" onchange="_renderEarnSelect(); autoSave()"></select>
+            </label>
             <label>Earn
               <select id="earn_type" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
-              <span class="placeholder">Options loaded from the game. Unavailable earns appear in red.</span>
             </label>
           </div>
+          <p class="placeholder">Unavailable earns appear in red.</p>
           <div class="row">
             <button type="button" id="clear-earn-btn" class="action-btn" onclick="clearEarnQueue()">Clear Queue</button>
           </div>

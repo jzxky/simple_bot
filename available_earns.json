@@ -1,0 +1,156 @@
+[
+  {
+    "label": "Whore",
+    "schedule_value": "whore",
+    "data_earn": "0",
+    "category": "Secret",
+    "available": true
+  },
+  {
+    "label": "Streetfight",
+    "schedule_value": "street_fight",
+    "data_earn": "1",
+    "category": "Secret",
+    "available": true
+  },
+  {
+    "label": "Joyride",
+    "schedule_value": "joy_ride",
+    "data_earn": null,
+    "category": "Secret",
+    "available": null
+  },
+  {
+    "label": "Pimp",
+    "schedule_value": "pimp",
+    "data_earn": null,
+    "category": "Secret",
+    "available": null
+  },
+  {
+    "label": "Shoplift",
+    "schedule_value": "shoplift",
+    "data_earn": "2",
+    "category": "Crime",
+    "available": true
+  },
+  {
+    "label": "Steal Cheques",
+    "schedule_value": "steal_cheques",
+    "data_earn": null,
+    "category": "Crime",
+    "available": null
+  },
+  {
+    "label": "Nurse at local hospital",
+    "schedule_value": "nurse",
+    "data_earn": "3",
+    "category": "Hospital",
+    "available": true
+  },
+  {
+    "label": "Doctor at local hospital",
+    "schedule_value": "doctor",
+    "data_earn": null,
+    "category": "Hospital",
+    "available": null
+  },
+  {
+    "label": "Surgeon at local hospital",
+    "schedule_value": "surgeon",
+    "data_earn": null,
+    "category": "Hospital",
+    "available": null
+  },
+  {
+    "label": "Hospital Director",
+    "schedule_value": "hospital_director",
+    "data_earn": null,
+    "category": "Hospital",
+    "available": null
+  },
+  {
+    "label": "Mechanic at local vehicle yard",
+    "schedule_value": "mechanic",
+    "data_earn": "4",
+    "category": "Engineering",
+    "available": true
+  },
+  {
+    "label": "Technician at local vehicle yard",
+    "schedule_value": "technician",
+    "data_earn": "5",
+    "category": "Engineering",
+    "available": true
+  },
+  {
+    "label": "Engineer at local Construction Site",
+    "schedule_value": "engineer",
+    "data_earn": "6",
+    "category": "Engineering",
+    "available": true
+  },
+  {
+    "label": "Work at local bank",
+    "schedule_value": "bank_teller",
+    "data_earn": "7",
+    "category": "Bank",
+    "available": true
+  },
+  {
+    "label": "Mortician Assistant",
+    "schedule_value": "mortician_assistant",
+    "data_earn": "8",
+    "category": "Mortician",
+    "available": true
+  },
+  {
+    "label": "Legal Secretary",
+    "schedule_value": "legal_secretary",
+    "data_earn": "10",
+    "category": "Law",
+    "available": true
+  },
+  {
+    "label": "Drag racing",
+    "schedule_value": "drag_racing",
+    "data_earn": null,
+    "category": "Crime",
+    "available": null
+  },
+  {
+    "label": "Hack bank account",
+    "schedule_value": "hack_bank",
+    "data_earn": null,
+    "category": "Crime",
+    "available": null
+  },
+  {
+    "label": "Scamming",
+    "schedule_value": "scamming",
+    "data_earn": null,
+    "category": "Crime",
+    "available": null
+  },
+  {
+    "label": "Pizza Restaurant",
+    "schedule_value": null,
+    "data_earn": "Pizza",
+    "available": false,
+    "category": "General"
+  },
+  {
+    "label": "Local 7/11",
+    "schedule_value": null,
+    "data_earn": "711",
+    "available": false,
+    "category": "General"
+  },
+  {
+    "label": "Bar/Nightclub",
+    "schedule_value": null,
+    "data_earn": "Bar",
+    "available": false,
+    "category": "General"
+  }
+]
