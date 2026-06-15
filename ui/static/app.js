@@ -943,15 +943,18 @@ loadLogFiles();
 
 const CW_HOSPITAL_OCCUPATIONS = new Set(["Nurse", "Doctor", "Surgeon", "Hospital Director"]);
 const CW_FIRE_OCCUPATIONS = new Set(["Volunteer Fire Fighter", "Fire Fighter", "Fire Chief"]);
+const CW_ENGINEERING_OCCUPATIONS = new Set(["Mechanic", "Technician", "Engineer", "Chief Engineer"]);
 
 function updateCaseWorkSection(occupation) {
   const isHospital = CW_HOSPITAL_OCCUPATIONS.has(occupation);
   const isFire = CW_FIRE_OCCUPATIONS.has(occupation);
-  const hasWork = isHospital || isFire;
+  const isEngineering = CW_ENGINEERING_OCCUPATIONS.has(occupation);
+  const hasWork = isHospital || isFire || isEngineering;
 
   document.getElementById("cw-none").style.display = hasWork ? "none" : "";
   document.getElementById("cw-hospital").style.display = isHospital ? "" : "none";
   document.getElementById("cw-fire").style.display = isFire ? "" : "none";
+  document.getElementById("cw-engineering").style.display = isEngineering ? "" : "none";
 }
 
 function _serializePriorityTable(tbodyId) {

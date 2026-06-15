@@ -40,6 +40,14 @@ class CaseWorkTask(Task):
         pass
 
 
+class EngineeringCaseWorkTask(CaseWorkTask):
+    ELIGIBLE_OCCUPATIONS = {"Mechanic", "Technician", "Engineer", "Chief Engineer"}
+    HOME_CITY_ONLY = False
+
+    def _action(self) -> Action:
+        return Action("check_engineering_cases")
+
+
 class HospitalCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Nurse", "Doctor", "Surgeon", "Hospital Director"}
     HOME_CITY_ONLY = False  # DNA is filtered in the executor when away from home city

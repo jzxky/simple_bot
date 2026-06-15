@@ -791,6 +791,18 @@
             </div>
             <p class="placeholder">Fire case work — coming soon.</p>
           </div>
+
+          <!-- Engineering -->
+          <div id="cw-engineering" style="display:none">
+            <div class="cw-poll-row">
+              Poll every
+              <input type="number" id="engineering_poll_interval" class="input-narrow" min="31"
+                value="{{ config.get('case_work', {}).get('engineering', {}).get('poll_interval', 31) }}"
+                oninput="markNumDirty(this)">
+              <button class="num-save-btn" id="save-engineering_poll_interval" onclick="saveNum('engineering_poll_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+              seconds
+            </div>
+          </div>
         </div>
 
         <!-- Actions tab -->
