@@ -89,6 +89,28 @@ def _apply_migrations(con: sqlite3.Connection):
         if col not in existing:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
     con.commit()
+    _dedupe_career_history(con)
+
+
+def _dedupe_career_history(con: sqlite3.Connection):
+    """Ensure career_history has no duplicate (username, ts, rank, occupation, homecity) rows
+    and add a unique index so future inserts cannot create duplicates."""
+    existing_indexes = {r[1] for r in con.execute("PRAGMA index_list(career_history)").fetchall()}
+    if "idx_career_unique" in existing_indexes:
+        return  # already done
+
+    # Remove duplicate rows keeping the lowest id
+    con.execute("""
+        DELETE FROM career_history WHERE id NOT IN (
+            SELECT MIN(id) FROM career_history
+            GROUP BY username, ts, rank, occupation, homecity
+        )
+    """)
+    con.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_career_unique "
+        "ON career_history(username, ts, rank, occupation, homecity)"
+    )
+    con.commit()
 
 
 def init_db():
@@ -368,7 +390,7 @@ def upsert_players(player_list: list):
                 )
                 if changed:
                     con.execute(
-                        "INSERT INTO career_history (username, ts, rank, occupation, homecity) VALUES (?,?,?,?,?)",
+                        "INSERT OR IGNORE INTO career_history (username, ts, rank, occupation, homecity) VALUES (?,?,?,?,?)",
                         (name, ts, rank, occupation, homecity),
                     )
 
