@@ -9,7 +9,6 @@ ENV_PATH = os.path.join(paths.data_dir(), ".env")
 DEFAULT_CONFIG = {
     "earns": {
         "enabled": True,
-        "category": "Hospital",
         "earn_type": "surgeon",
         "check_interval_minutes": 30
     },

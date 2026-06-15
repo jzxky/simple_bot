@@ -36,7 +36,6 @@ def save():
     cfg.save_env(data.get("email", ""), data.get("password", ""))
 
     c["earns"]["enabled"] = data.get("earns_enabled", False)
-    c["earns"]["category"] = data.get("earn_category", "Hospital")
     c["earns"]["earn_type"] = data.get("earn_type", "surgeon")
 
     c["aggravated_crimes"]["enabled"] = data.get("crimes_enabled", False)
@@ -521,6 +520,17 @@ def logs_viewer(filename):
 def api_scheduler():
     return jsonify({"tasks": bot.get_scheduler_snapshot()})
 
+
+
+@app.route("/api/available_earns")
+def api_available_earns():
+    import json as _json
+    path = os.path.join(paths.data_dir(), "available_earns.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return jsonify(_json.load(f))
+    except Exception:
+        return jsonify([])
 
 
 @app.route("/api/players")
