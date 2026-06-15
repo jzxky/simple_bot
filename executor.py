@@ -58,7 +58,7 @@ BODY_PARTS = {"Arms", "Legs", "Eyes", "Brain", "Heart"}
 
 PUBLIC_BUSINESSES = {
     "Funeral Parlour", "Town Hall", "Hospital", "Fire Station",
-    "Airport", "Construction Company", "Bank"
+    "Airport", "Construction Company", "Bank Tills"
 }
 
 PUBLIC_JOB_MAP = {
@@ -68,7 +68,7 @@ PUBLIC_JOB_MAP = {
     "Fire Station": "Fire Chief",
     "Airport": "Commissioner-General",
     "Construction Company": "Chief Engineer",
-    "Bank": "Bank Manager",
+    "Bank Tills": "Bank Manager",
 }
 
 ARMED_MAX_RETRIES = 6
