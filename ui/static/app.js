@@ -1,13 +1,4 @@
-const EARN_MAP = {
-  Secret:      [["whore","Whore"],["street_fight","Streetfight"],["joy_ride","Joyride"],["pimp","Pimp"]],
-  General:     [["shoplift","Shoplift"],["steal_cheques","Steal Cheques"]],
-  Hospital:    [["nurse","Nurse"],["doctor","Doctor"],["surgeon","Surgeon"],["hospital_director","Hospital Director"]],
-  Engineering: [["mechanic","Mechanic"]],
-  Bank:        [["bank_teller","Work at Local Bank"]],
-  Mortician:   [["mortician_assistant","Mortician Assistant"]],
-  Law:         [["legal_secretary","Legal Secretary"]],
-  Crime:       [["shoplift","Shoplift"],["steal_cheques","Steal Cheques"],["drag_racing","Compete at illegal drags"],["hack_bank","Hack bank account"],["scamming","Scamming"]],
-};
+let _earnCatalog = [];
 
 const ACTION_SUB_MAP = {
   community_service: [],  // bot always picks the highest tier automatically
@@ -27,13 +18,45 @@ const ACTION_SUB_MAP = {
   drug_manufacturing: [],
 };
 
-function populateEarns(selectedValue) {
-  const cat = document.getElementById("earn_category").value;
+function loadAvailableEarns() {
   const sel = document.getElementById("earn_type");
-  const opts = EARN_MAP[cat] || [];
-  sel.innerHTML = opts.map(([v, l]) =>
-    `<option value="${v}" ${v === selectedValue ? "selected" : ""}>${l}</option>`
-  ).join("");
+  const current = sel ? sel.dataset.current || "" : "";
+  fetch("/api/available_earns")
+    .then(r => r.json())
+    .then(opts => {
+      _earnCatalog = opts;
+      _renderEarnSelect(current);
+    })
+    .catch(() => {
+      if (sel) sel.innerHTML = '<option value="">— could not load earns —</option>';
+    });
+}
+
+function _renderEarnSelect(selectedValue) {
+  const sel = document.getElementById("earn_type");
+  if (!sel) return;
+  if (!_earnCatalog.length) {
+    sel.innerHTML = '<option value="">— visit earn.asp to populate —</option>';
+    return;
+  }
+  const groups = {};
+  _earnCatalog.forEach(e => {
+    if (!e.schedule_value) return;
+    const cat = e.category || "Uncategorized";
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(e);
+  });
+  let html = "";
+  Object.entries(groups).forEach(([cat, items]) => {
+    html += `<optgroup label="${cat}">`;
+    items.forEach(e => {
+      const style = e.available === false ? ' style="color:red"' : '';
+      const selected = e.schedule_value === selectedValue ? " selected" : "";
+      html += `<option value="${e.schedule_value}"${selected}${style}>${e.label}</option>`;
+    });
+    html += "</optgroup>";
+  });
+  sel.innerHTML = html;
   _updateEarnsPills();
 }
 
@@ -76,7 +99,6 @@ function _doSave() {
     email: document.getElementById("email").value,
     password: document.getElementById("password").value,
     earns_enabled: document.getElementById("earns_enabled").checked,
-    earn_category: document.getElementById("earn_category").value,
     earn_type: document.getElementById("earn_type").value,
     crimes_enabled: document.getElementById("crimes_enabled").checked,
     primary_crime: document.getElementById("primary_crime").value,

@@ -623,20 +623,9 @@
           </label>
           <hr class="stat-divider">
           <div class="row">
-            <label>Career
-              <select id="earn_category" onchange="populateEarns(); autoSave()">
-                <option value="Secret"      {% if config.earns.category == 'Secret'      %}selected{% endif %}>Secret</option>
-                <option value="General"     {% if config.earns.category == 'General'     %}selected{% endif %}>General</option>
-                <option value="Hospital"    {% if config.earns.category == 'Hospital'    %}selected{% endif %}>Hospital</option>
-                <option value="Engineering" {% if config.earns.category == 'Engineering' %}selected{% endif %}>Engineering</option>
-                <option value="Bank"        {% if config.earns.category == 'Bank'        %}selected{% endif %}>Bank</option>
-                <option value="Mortician"   {% if config.earns.category == 'Mortician'   %}selected{% endif %}>Mortician</option>
-                <option value="Law"         {% if config.earns.category == 'Law'         %}selected{% endif %}>Law</option>
-                <option value="Crime"       {% if config.earns.category == 'Crime'       %}selected{% endif %}>Crime</option>
-              </select>
-            </label>
             <label>Earn
-              <select id="earn_type" onchange="autoSave()"></select>
+              <select id="earn_type" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
+              <span class="placeholder">Options loaded from the game. Unavailable earns appear in red.</span>
             </label>
           </div>
           <div class="row">
@@ -1055,9 +1044,8 @@
 
 <script src="/static/app.js"></script>
 <script>
-  const INITIAL_EARN_TYPE = "{{ config.earns.earn_type }}";
   const INITIAL_ACTION_SUB = "{{ config.action.sub_option }}";
-  populateEarns(INITIAL_EARN_TYPE);
+  loadAvailableEarns();
   populateActionSub(INITIAL_ACTION_SUB);
   toggleAwayCrime();
   initCollapse();

@@ -173,10 +173,32 @@ def handle_check_earns(action: Action, state: GameState):
     soup = BeautifulSoup(page.content(), "html.parser")
     auto_panel = soup.find("div", class_="mm-earn-mode-auto")
     available_values = []
+    auto_opts = []
     if auto_panel:
         sel = auto_panel.find("select", attrs={"name": "schedule_earn_identifier"})
         if sel:
-            available_values = [o.get("value", "") for o in sel.find_all("option")]
+            for o in sel.find_all("option"):
+                if o.get("value"):
+                    available_values.append(o.get("value", ""))
+                    auto_opts.append((o.get("value", ""), o.get_text(strip=True)))
+
+    manual_opts = []
+    manual_div = soup.find("div", id="earns_list")
+    if manual_div:
+        for wrapper in manual_div.find_all("div", class_="earn-option"):
+            data_earn = wrapper.get("data-earn", "")
+            span = wrapper.find("span")
+            if not span:
+                continue
+            is_trap = bool(span.find("s"))
+            label = span.get_text(strip=True)
+            manual_opts.append((data_earn, label, is_trap))
+
+    if auto_opts or manual_opts:
+        try:
+            _upsert_earn_catalog(auto_opts, manual_opts)
+        except Exception:
+            pass
 
     if earn_type not in available_values:
         state.add_log(f"Earn '{earn_type}' is not available — disabling earns. Select a new earn and save to re-enable.")
@@ -1048,6 +1070,74 @@ def _save_casework_snapshot(label: str, html: str):
     path = os.path.join(paths.data_dir(), f"casework_{label}.html")
     with open(path, "w", encoding="utf-8") as f:
         f.write(html)
+
+
+_EARN_SEED = [
+    {"label": "Whore",                               "schedule_value": "whore",              "data_earn": "0",  "category": "Secret"},
+    {"label": "Streetfight",                         "schedule_value": "street_fight",        "data_earn": "1",  "category": "Secret"},
+    {"label": "Joyride",                             "schedule_value": "joy_ride",            "data_earn": None, "category": "Secret"},
+    {"label": "Pimp",                                "schedule_value": "pimp",               "data_earn": None, "category": "Secret"},
+    {"label": "Shoplift",                            "schedule_value": "shoplift",            "data_earn": "2",  "category": "General"},
+    {"label": "Steal Cheques",                       "schedule_value": "steal_cheques",       "data_earn": None, "category": "General"},
+    {"label": "Nurse at local hospital",             "schedule_value": "nurse",               "data_earn": "3",  "category": "Hospital"},
+    {"label": "Doctor at local hospital",            "schedule_value": "doctor",              "data_earn": None, "category": "Hospital"},
+    {"label": "Surgeon at local hospital",           "schedule_value": "surgeon",             "data_earn": None, "category": "Hospital"},
+    {"label": "Hospital Director",                   "schedule_value": "hospital_director",   "data_earn": None, "category": "Hospital"},
+    {"label": "Mechanic at local vehicle yard",      "schedule_value": "mechanic",            "data_earn": "4",  "category": "Engineering"},
+    {"label": "Technician at local vehicle yard",    "schedule_value": "technician",          "data_earn": "6",  "category": "Engineering"},
+    {"label": "Engineer at local Construction Site", "schedule_value": "engineer",            "data_earn": "7",  "category": "Engineering"},
+    {"label": "Work at local bank",                  "schedule_value": "bank_teller",         "data_earn": "9",  "category": "Bank"},
+    {"label": "Mortician Assistant",                 "schedule_value": "mortician_assistant", "data_earn": "10", "category": "Mortician"},
+    {"label": "Legal Secretary",                     "schedule_value": "legal_secretary",     "data_earn": "11", "category": "Law"},
+    {"label": "Drag racing",                         "schedule_value": "drag_racing",         "data_earn": None, "category": "Crime"},
+    {"label": "Hack bank account",                   "schedule_value": "hack_bank",           "data_earn": None, "category": "Crime"},
+    {"label": "Scamming",                            "schedule_value": "scamming",            "data_earn": None, "category": "Crime"},
+]
+
+
+def _upsert_earn_catalog(auto_opts, manual_opts):
+    """Merge scraped earn options into the persistent catalog JSON."""
+    import paths, os, json as _json
+
+    path = os.path.join(paths.data_dir(), "available_earns.json")
+    if not os.path.exists(path):
+        seed = [dict(e, available=None) for e in _EARN_SEED]
+        with open(path, "w", encoding="utf-8") as f:
+            _json.dump(seed, f, indent=2)
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            entries = _json.load(f)
+    except Exception:
+        entries = []
+
+    by_label = {e["label"]: e for e in entries}
+
+    auto_labels = set()
+    for val, label in auto_opts:
+        auto_labels.add(label)
+        if label in by_label:
+            by_label[label]["schedule_value"] = val
+            by_label[label]["available"] = True
+        else:
+            by_label[label] = {"label": label, "schedule_value": val, "data_earn": None,
+                               "available": True, "category": "Uncategorized"}
+
+    for data_earn, label, is_trap in manual_opts:
+        if label in by_label:
+            by_label[label]["data_earn"] = data_earn
+            if is_trap and label not in auto_labels:
+                by_label[label]["available"] = False
+        else:
+            by_label[label] = {"label": label, "schedule_value": None, "data_earn": data_earn,
+                               "available": not is_trap, "category": "Uncategorized"}
+
+    for label, entry in by_label.items():
+        if entry.get("available") is True and label not in auto_labels:
+            entry["available"] = False
+
+    with open(path, "w", encoding="utf-8") as f:
+        _json.dump(list(by_label.values()), f, indent=2)
 
 
 def handle_check_hospital_cases(action: Action, state: GameState):
