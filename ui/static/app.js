@@ -2150,7 +2150,7 @@ function _plRenderGroupsTab(groups) {
   }
 
   const TRASH = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
-  const PLUS  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+  const EDIT  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 
   const rows = [];
   groups.forEach(g => {
@@ -2176,9 +2176,9 @@ function _plRenderGroupsTab(groups) {
         <select class="pl-filter-input" onchange="plUpdateGroupAssignment('${escHtml(g.name)}', 'case_work', this.value)">${cwSel}</select>
       </td>
       <td>${g.member_count||0}</td>
-      <td onclick="event.stopPropagation()" style="white-space:nowrap">
-        <button class="pl-icon-btn" title="Add members" onclick="plOpenAddMembersModal('${escHtml(g.name)}')">${PLUS}</button>
-        <button class="pl-icon-btn pl-icon-btn-danger" title="Delete group" onclick="plOpenDeleteModal('${escHtml(g.name)}')">${TRASH}</button>
+      <td style="white-space:nowrap">
+        <button class="pl-icon-btn" title="Edit group" onclick="event.stopPropagation();plOpenEditGroupModal('${escHtml(g.name)}')">${EDIT}</button>
+        <button class="pl-icon-btn pl-icon-btn-danger" title="Delete group" onclick="event.stopPropagation();plOpenDeleteModal('${escHtml(g.name)}')">${TRASH}</button>
       </td>
     </tr>`);
 
@@ -2276,53 +2276,117 @@ function plCloseDeleteModal() {
   if (m) m.style.display = "none";
 }
 
-// ── Add members modal ─────────────────────────────────────────────────────────
-function plOpenAddMembersModal(groupName) {
-  const modal  = document.getElementById("pl-addmembers-modal");
-  const title  = document.getElementById("pl-addmembers-title");
-  const text   = document.getElementById("pl-addmembers-text");
-  const result = document.getElementById("pl-addmembers-result");
-  const btn    = document.getElementById("pl-addmembers-confirm");
+// ── Edit group modal ──────────────────────────────────────────────────────────
+let _plEditGroupOriginalName = "";
+
+function plOpenEditGroupModal(groupName) {
+  const modal   = document.getElementById("pl-editgroup-modal");
+  const nameEl  = document.getElementById("pl-editgroup-name");
+  const colorEl = document.getElementById("pl-editgroup-color");
+  const membersEl = document.getElementById("pl-editgroup-members");
+  const resultEl  = document.getElementById("pl-editgroup-result");
+  const btn     = document.getElementById("pl-editgroup-confirm");
   if (!modal) return;
-  title.textContent = `Add Members to "${groupName}"`;
-  if (text) text.value = "";
-  if (result) result.textContent = "";
-  btn.onclick = () => _plDoAddMembers(groupName);
+
+  _plEditGroupOriginalName = groupName;
+  const g = _plGroups.find(x => x.name === groupName);
+  if (nameEl) nameEl.value = groupName;
+  if (colorEl && g) {
+    colorEl.value = g.color || "#3498db";
+    colorEl.style.setProperty("--pl-sel-color", colorEl.value);
+  }
+  if (membersEl) membersEl.value = "Loading…";
+  if (resultEl) resultEl.textContent = "";
+  if (btn) btn.onclick = () => _plDoEditGroup(_plEditGroupOriginalName);
+
   modal.style.display = "flex";
-  setTimeout(() => text?.focus(), 50);
+
+  // Pre-fill members
+  fetch(`/api/players/group/${encodeURIComponent(groupName)}`)
+    .then(r => r.json())
+    .then(data => {
+      const names = (data.players || []).map(p => p.username);
+      if (membersEl) membersEl.value = names.join("\n");
+      setTimeout(() => nameEl?.select(), 50);
+    })
+    .catch(() => { if (membersEl) membersEl.value = ""; });
 }
-function plCloseAddMembersModal() {
-  const m = document.getElementById("pl-addmembers-modal");
+
+function plCloseEditGroupModal() {
+  const m = document.getElementById("pl-editgroup-modal");
   if (m) m.style.display = "none";
 }
-function _plDoAddMembers(groupName) {
-  const text   = document.getElementById("pl-addmembers-text");
-  const result = document.getElementById("pl-addmembers-result");
-  const btn    = document.getElementById("pl-addmembers-confirm");
-  const names  = (text?.value || "").split("\n").map(s => s.trim()).filter(Boolean);
-  if (!names.length) return;
-  const known = new Map(_plData.map(p => [p.username.toLowerCase(), p.username]));
-  const matched = [], unmatched = [];
-  names.forEach(n => {
-    const c = known.get(n.toLowerCase());
-    if (c) matched.push(c); else unmatched.push(n);
-  });
-  if (!matched.length) {
-    if (result) result.textContent = `No matching players. Unmatched: ${unmatched.join(", ")}`;
-    return;
-  }
-  if (btn) { btn.disabled = true; btn.textContent = "Adding…"; }
-  Promise.all(matched.map(username =>
-    fetch("/players/set_group", {
+
+function _plDoEditGroup(originalName) {
+  const nameEl    = document.getElementById("pl-editgroup-name");
+  const colorEl   = document.getElementById("pl-editgroup-color");
+  const membersEl = document.getElementById("pl-editgroup-members");
+  const resultEl  = document.getElementById("pl-editgroup-result");
+  const btn       = document.getElementById("pl-editgroup-confirm");
+
+  const newName = (nameEl?.value || "").trim();
+  const newColor = colorEl?.value || "#3498db";
+  const names = (membersEl?.value || "").split("\n").map(s => s.trim()).filter(Boolean);
+
+  if (!newName) { if (resultEl) resultEl.textContent = "Name cannot be empty."; return; }
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+
+  const steps = [];
+
+  // Rename if changed
+  if (newName !== originalName) {
+    steps.push(fetch("/players/groups/rename", {
       method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({username, group: groupName}),
+      body: JSON.stringify({old_name: originalName, new_name: newName}),
+    }).then(r => r.json()).then(d => {
+      if (!d.ok) throw new Error(d.error || "Rename failed");
+    }));
+  }
+
+  // Colour update
+  const g = _plGroups.find(x => x.name === originalName);
+  if (!g || newColor !== g.color) {
+    steps.push(fetch("/players/groups/update_color", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name: newName !== originalName ? newName : originalName, color: newColor}),
+    }));
+  }
+
+  Promise.all(steps)
+    .then(() => {
+      // Set members — set everyone in textarea to this group; remove anyone currently in group but not in textarea
+      const targetGroupName = newName !== originalName ? newName : originalName;
+      const knownLower = new Map(_plData.map(p => [p.username.toLowerCase(), p.username]));
+      const wantedLower = new Set(names.map(n => n.toLowerCase()));
+
+      const g2 = _plGroups.find(x => x.name === originalName);
+      // Current members come from _plData
+      const currentMembers = _plData.filter(p => p.group === originalName).map(p => p.username);
+
+      const toAdd    = names.map(n => knownLower.get(n.toLowerCase())).filter(Boolean);
+      const toRemove = currentMembers.filter(u => !wantedLower.has(u.toLowerCase()));
+
+      const memberOps = [
+        ...toAdd.map(username => fetch("/players/set_group", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({username, group: targetGroupName}),
+        })),
+        ...toRemove.map(username => fetch("/players/set_group", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({username, group: ""}),
+        })),
+      ];
+      return Promise.all(memberOps);
     })
-  )).then(() => {
-    if (btn) { btn.disabled = false; btn.textContent = "Add"; }
-    if (result) result.textContent =
-      `Added ${matched.length} player(s).${unmatched.length ? " Unmatched: " + unmatched.join(", ") : ""}`;
-    loadPlayers();
-  }).catch(() => { if (btn) { btn.disabled = false; btn.textContent = "Add"; } });
+    .then(() => {
+      if (btn) { btn.disabled = false; btn.textContent = "Save"; }
+      plCloseEditGroupModal();
+      loadPlayers();
+    })
+    .catch(e => {
+      if (btn) { btn.disabled = false; btn.textContent = "Save"; }
+      if (resultEl) resultEl.textContent = String(e);
+    });
 }
 
 

@@ -1163,7 +1163,11 @@ input.input-unsaved { color: var(--red) !important; }
 .btn-danger:hover { background: #dc2626; }
 
 /* Colour select */
-.pl-color-select { font-family: monospace; }
+.pl-color-select {
+  font-family: monospace;
+  border-left: 10px solid var(--pl-sel-color, #3498db) !important;
+  padding-left: 6px;
+}
 
 /* Import textarea */
 .pl-import-textarea {

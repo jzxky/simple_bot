@@ -497,6 +497,23 @@ def create_group(name: str, color: str, group_type: str = "neutral") -> bool:
             con.close()
 
 
+def rename_group(old_name: str, new_name: str) -> bool:
+    """Rename a group; returns False if new_name already exists."""
+    ts = _utcnow()
+    with _lock:
+        con = _conn()
+        try:
+            existing = con.execute("SELECT 1 FROM groups WHERE name=?", (new_name,)).fetchone()
+            if existing:
+                return False
+            con.execute("UPDATE groups SET name=?, updated_at=? WHERE name=?", (new_name, ts, old_name))
+            con.execute("UPDATE players SET group_name=?, updated_at=? WHERE group_name=?", (new_name, ts, old_name))
+            con.commit()
+            return True
+        finally:
+            con.close()
+
+
 def delete_group(name: str):
     with _lock:
         con = _conn()
