@@ -2238,58 +2238,35 @@ def handle_gym(action: Action, state: GameState):
     state.add_log(f"Gym: completed activity '{activity}'.")
 
 
-_ENGINEERING_SECTIONS = [
-    "new building requests",
-    "business repairs",
-    "vehicle repair requests",
-    "vault construction requests",
-]
-
-
 def handle_check_engineering_cases(action: Action, state: GameState):
     if not state.timers.get("case", {}).get("ready", True):
         return
 
+    page = browser.page()
     _nav(_u("/income/construction.asp"), state)
     if not _check_session(state):
         return
 
-    html = browser.page().content()
+    html = page.content()
     soup = BeautifulSoup(html, "html.parser")
-    content = soup.find("div", id="holder_content") or soup
 
-    links = []
-    for section_name in _ENGINEERING_SECTIONS:
-        heading = content.find(lambda tag: tag.name in ("h2", "h3", "b", "strong", "p", "td")
-                               and section_name in tag.get_text(strip=True).lower())
-        if not heading:
-            continue
-        table = heading.find_next("table")
-        if not table:
-            continue
-        for row in table.find_all("tr"):
-            cells = row.find_all("td", class_="display_border")
-            if not cells:
-                continue
-            last_td = cells[-1]
-            a = last_td.find("a")
-            if a and a.get("href") and "userprofile.asp" not in a["href"]:
-                href = a["href"]
-                if not href.startswith("http"):
-                    href = _u("/income/") + href.lstrip("/")
-                links.append((section_name, href))
-
-    if not links:
+    # Find the first radio button across all sections
+    first_radio = soup.find("input", {"type": "radio", "name": "Req_id"})
+    if not first_radio:
         return
 
     _save_casework_snapshot("engineering", html)
-    section_name, url = links[0]
-    state.add_log(f"Engineering case work: {section_name}.")
-    _nav(url, state)
 
-    soup = BeautifulSoup(browser.page().content(), "html.parser")
-    success = soup.find("div", id="success")
-    fail = soup.find("div", id="fail")
+    radio_value = first_radio.get("value", "")
+    state.add_log(f"Engineering case work: selecting job #{radio_value}.")
+
+    page.check(f"input[type='radio'][name='Req_id'][value='{radio_value}']")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+
+    result_soup = BeautifulSoup(page.content(), "html.parser")
+    success = result_soup.find("div", id="success")
+    fail = result_soup.find("div", id="fail")
     if success:
         state.add_log(f"Engineering case work result: {success.get_text(strip=True)}")
     elif fail:
