@@ -580,7 +580,7 @@ def promo_bar_threads():
 @app.route("/players/groups/create", methods=["POST"])
 def players_groups_create():
     data = request.get_json()
-    ok = pl.create_group(data.get("name", "").strip(), data.get("color", "#888888"))
+    ok = pl.create_group(data.get("name", "").strip(), data.get("color", "#888888"), data.get("group_type", "neutral"))
     return jsonify({"ok": ok, "error": "Name already exists." if not ok else None})
 
 
@@ -612,6 +612,14 @@ def players_groups_update_assignment():
     import player_db as _db
     _db.update_group_assignment(data.get("name", ""), data.get("context", "agg_crimes"), data.get("value", ""))
     return jsonify({"ok": True})
+
+
+@app.route("/players/groups/rename", methods=["POST"])
+def players_groups_rename():
+    data = request.get_json()
+    import player_db as _db
+    ok = _db.rename_group(data.get("old_name", ""), data.get("new_name", "").strip())
+    return jsonify({"ok": ok, "error": "Name already exists." if not ok else None})
 
 
 @app.route("/api/players/group/<group_name>")

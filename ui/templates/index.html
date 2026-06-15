@@ -941,17 +941,18 @@
               <option value="friendly">Friendly</option>
               <option value="enemy">Enemy</option>
             </select>
-            <select id="pl-new-group-color" class="task-select pl-color-select">
-              <option value="#e74c3c">● Red</option>
-              <option value="#e67e22">● Orange</option>
-              <option value="#f1c40f">● Yellow</option>
-              <option value="#2ecc71">● Green</option>
-              <option value="#3498db" selected>● Blue</option>
-              <option value="#9b59b6">● Purple</option>
-              <option value="#e91e8c">● Pink</option>
-              <option value="#1abc9c">● Teal</option>
-              <option value="#aaaaaa">● Light Grey</option>
-              <option value="#555555">● Dark Grey</option>
+            <select id="pl-new-group-color" class="task-select pl-color-select" style="--pl-sel-color:#3498db"
+              onchange="this.style.setProperty('--pl-sel-color',this.value)">
+              <option value="#e74c3c">&#9679; Red</option>
+              <option value="#e67e22">&#9679; Orange</option>
+              <option value="#f1c40f">&#9679; Yellow</option>
+              <option value="#2ecc71">&#9679; Green</option>
+              <option value="#3498db" selected>&#9679; Blue</option>
+              <option value="#9b59b6">&#9679; Purple</option>
+              <option value="#e91e8c">&#9679; Pink</option>
+              <option value="#1abc9c">&#9679; Teal</option>
+              <option value="#aaaaaa">&#9679; Light Grey</option>
+              <option value="#555555">&#9679; Dark Grey</option>
             </select>
             <button class="action-btn" onclick="plCreateGroup()">Create Group</button>
             <span id="pl-group-create-error" style="font-size:12px;color:var(--error,#f87171)"></span>
@@ -1075,16 +1076,40 @@
   </div>
 </div>
 
-<!-- Group add members modal -->
-<div id="pl-addmembers-modal" class="pl-modal-overlay" onclick="if(event.target===this)plCloseAddMembersModal()">
+<!-- Edit group modal -->
+<div id="pl-editgroup-modal" class="pl-modal-overlay" onclick="if(event.target===this)plCloseEditGroupModal()">
   <div class="pl-modal-box">
-    <h3 style="margin:0 0 8px" id="pl-addmembers-title">Add Members</h3>
-    <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 8px">One username per line.</p>
-    <textarea id="pl-addmembers-text" class="pl-import-textarea" style="min-height:130px" placeholder="Player1&#10;Player2&#10;Player3"></textarea>
-    <p id="pl-addmembers-result" style="font-size:0.82rem;color:var(--text-muted);margin:6px 0 0;min-height:1.2em"></p>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
-      <button class="btn-secondary" onclick="plCloseAddMembersModal()">Cancel</button>
-      <button class="action-btn" id="pl-addmembers-confirm">Add</button>
+    <h3 style="margin:0 0 12px">Edit Group</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;color:var(--text-muted)">
+        Group Name
+        <input type="text" id="pl-editgroup-name" style="width:100%;box-sizing:border-box;">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;color:var(--text-muted)">
+        Colour
+        <select id="pl-editgroup-color" class="pl-color-select" style="--pl-sel-color:#3498db"
+          onchange="this.style.setProperty('--pl-sel-color',this.value)">
+          <option value="#e74c3c">&#9679; Red</option>
+          <option value="#e67e22">&#9679; Orange</option>
+          <option value="#f1c40f">&#9679; Yellow</option>
+          <option value="#2ecc71">&#9679; Green</option>
+          <option value="#3498db" selected>&#9679; Blue</option>
+          <option value="#9b59b6">&#9679; Purple</option>
+          <option value="#e91e8c">&#9679; Pink</option>
+          <option value="#1abc9c">&#9679; Teal</option>
+          <option value="#aaaaaa">&#9679; Light Grey</option>
+          <option value="#555555">&#9679; Dark Grey</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:0.85rem;color:var(--text-muted)">
+        Members (one per line)
+        <textarea id="pl-editgroup-members" class="pl-import-textarea" style="min-height:130px" placeholder="Player1&#10;Player2&#10;Player3"></textarea>
+      </label>
+    </div>
+    <p id="pl-editgroup-result" style="font-size:0.82rem;color:var(--text-muted);margin:0 0 10px;min-height:1.2em"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn-secondary" onclick="plCloseEditGroupModal()">Cancel</button>
+      <button class="action-btn" id="pl-editgroup-confirm">Save</button>
     </div>
   </div>
 </div>
