@@ -66,6 +66,9 @@ DEFAULT_CONFIG = {
         },
         "fire": {
             "poll_interval": 31
+        },
+        "engineering": {
+            "poll_interval": 31
         }
     },
     "players": {
