@@ -2061,6 +2061,34 @@ function plLoadHistory(username, containerId, toggleEl) {
     .catch(() => { container.innerHTML = '<p style="color:var(--muted);padding:8px">Failed to load.</p>'; });
 }
 
+// ── Recently Dead ─────────────────────────────────────────────────────────────
+
+function plRenderRecentDead() {
+  const tbody = document.getElementById("pl-dead-tbody");
+  if (!tbody) return;
+  const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
+  const dead = (_plData || []).filter(p => {
+    if (p.active) return false;
+    if (!p.died_at) return false;
+    return new Date(p.died_at).getTime() >= cutoff;
+  }).sort((a, b) => new Date(b.died_at) - new Date(a.died_at));
+
+  if (!dead.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="padding:12px;color:var(--text-muted);text-align:center">No deaths in the last 3 days.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = dead.map(p => {
+    const diedDate = new Date(p.died_at).toLocaleString();
+    return `<tr>
+      <td>${escHtml(p.username)}</td>
+      <td class="col-homecity">${escHtml(p.homecity || "")}</td>
+      <td class="col-occupation">${escHtml(p.occupation || "")}</td>
+      <td class="col-rank">${escHtml(p.rank || "")}</td>
+      <td style="white-space:nowrap">${escHtml(diedDate)}</td>
+    </tr>`;
+  }).join("");
+}
+
 // ── Assignments & groups ──────────────────────────────────────────────────────
 
 function plSetAssignment(username, context, value) {
