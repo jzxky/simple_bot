@@ -45,7 +45,7 @@ def _open_browser():
     webbrowser.open(f"http://localhost:{PORT}")
 
 
-if __name__ == "__main__":
+def _run():
     if "--install" in sys.argv:
         _install_chrome()
         sys.exit(0)
@@ -55,3 +55,20 @@ if __name__ == "__main__":
         threading.Thread(target=_open_browser, daemon=True).start()
     from ui.app import run
     run()
+
+
+if __name__ == "__main__":
+    try:
+        _run()
+    except SystemExit:
+        raise
+    except Exception:
+        import traceback
+        crash_log = os.path.join(os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__)), "crash.log")
+        traceback.print_exc()
+        with open(crash_log, "a", encoding="utf-8") as f:
+            f.write(traceback.format_exc() + "\n")
+        if getattr(sys, "frozen", False):
+            print(f"\nA crash log was written to: {crash_log}")
+            input("Press Enter to exit...")
+        sys.exit(1)
