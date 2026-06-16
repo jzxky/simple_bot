@@ -2440,12 +2440,32 @@ def handle_check_engineering_cases(action: Action, state: GameState):
     html = page.content()
     soup = BeautifulSoup(html, "html.parser")
 
-    # Find the first radio button across all sections
+    _save_casework_snapshot("engineering", html)
+
+    # New building requests take priority
+    new_build_radio = soup.find("input", {"type": "radio", "name": "Req_username"})
+    if new_build_radio:
+        radio_value = new_build_radio.get("value", "")
+        state.add_log(f"Engineering: starting construction for '{radio_value}'.")
+        page.check(f"input[type='radio'][name='Req_username'][value='{radio_value}']")
+        page.click("input[type='submit'][name='B1'][value='Start Construction']")
+        page.wait_for_load_state("domcontentloaded")
+        result_soup = BeautifulSoup(page.content(), "html.parser")
+        success = result_soup.find("div", id="success")
+        fail = result_soup.find("div", id="fail")
+        if success:
+            state.add_log(f"Engineering construction result: {success.get_text(strip=True)}")
+        elif fail:
+            state.add_log(f"Engineering construction failed: {fail.get_text(strip=True)}")
+        else:
+            state.add_log("Engineering construction: submitted.")
+        _refresh_state(state)
+        return
+
+    # Fall back to existing repair/case work
     first_radio = soup.find("input", {"type": "radio", "name": "Req_id"})
     if not first_radio:
         return
-
-    _save_casework_snapshot("engineering", html)
 
     radio_value = first_radio.get("value", "")
     state.add_log(f"Engineering case work: selecting job #{radio_value}.")
