@@ -462,11 +462,15 @@ function pollStatus() {
       const clearQueueBtn = document.getElementById("jail-clear-queue-btn");
       if (d.in_jail) {
         if (jailBadge) jailBadge.style.display = "";
-        if (statusCard) statusCard.classList.add("in-jail");
+        if (statusCard) { statusCard.classList.add("in-jail"); statusCard.classList.remove("in-hospital"); }
         if (clearQueueBtn) clearQueueBtn.disabled = false;
+      } else if (d.in_hospital) {
+        if (jailBadge) jailBadge.style.display = "none";
+        if (statusCard) { statusCard.classList.remove("in-jail"); statusCard.classList.add("in-hospital"); }
+        if (clearQueueBtn) clearQueueBtn.disabled = true;
       } else {
         if (jailBadge) jailBadge.style.display = "none";
-        if (statusCard) statusCard.classList.remove("in-jail");
+        if (statusCard) { statusCard.classList.remove("in-jail"); statusCard.classList.remove("in-hospital"); }
         if (clearQueueBtn) clearQueueBtn.disabled = true;
       }
 
@@ -809,15 +813,6 @@ function _renderTimers() {
     return `<div class="stat-item"><span class="stat-label" style="color:${col}">● ${label}</span></div>`;
   };
   const b = _botState;
-  if (b.in_jail)           tiles.push(chip("In Jail",       false, true));
-  if (b.in_hospital) {
-    if (_hospitalReleaseAtMs != null) {
-      const secs = Math.max(0, Math.floor((_hospitalReleaseAtMs - now) / 1000));
-      tiles.push(chip(`In Hospital: ${_fmtCountdown(secs)}`, false, true));
-    } else {
-      tiles.push(chip("In Hospital", false, true));
-    }
-  }
   if (b.city && b.home_city && b.city !== b.home_city)
                            tiles.push(chip("Away",          false, false));
   if (b.hold_action_timer) tiles.push(chip("Hold Action",   false, true));
