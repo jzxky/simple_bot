@@ -906,7 +906,7 @@
           <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Player List</button>
           <button class="tab-btn" onclick="showTab('pl-tab-groups', this)">Groups</button>
           <button class="tab-btn" onclick="showTab('pl-tab-import', this)">Import</button>
-          <button class="tab-btn" onclick="showTab('pl-tab-dead', this); plRenderRecentDead()">Recently Dead</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-dead', this); plRenderRecentDead()">Obituaries</button>
         </div>
 
         <!-- Player List tab -->
@@ -927,6 +927,7 @@
             <table class="pl-table" id="pl-table">
               <thead>
                 <tr>
+                  <th class="pl-th" style="width:18px" title="Online status"></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('username')" data-col="username">Name <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('rank')" data-col="rank">Rank <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon">↕</span></th>
@@ -937,6 +938,7 @@
                   <th class="pl-th pl-th-filter" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
                 </tr>
                 <tr id="pl-filter-row">
+                  <th class="pl-filter-cell"></th>
                   <th class="pl-filter-cell"><input type="text" id="pl-search" class="pl-filter-input" placeholder="Name…" oninput="plFilter()"></th>
                   <th class="pl-filter-cell"><select id="pl-filter-rank" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"><select id="pl-filter-occupation" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
@@ -1027,7 +1029,7 @@
           <div id="pl-import-report" class="import-report" style="display:none"></div>
         </div>
 
-        <!-- Recently Dead tab -->
+        <!-- Obituaries tab -->
         <div id="pl-tab-dead" class="tab-panel">
           <div style="overflow-x:auto;margin-top:8px">
             <table class="pl-table" id="pl-dead-table">

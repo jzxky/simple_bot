@@ -494,6 +494,8 @@ function pollStatus() {
         action_ready: !!d.action_ready, hold_action_timer: !!d.hold_action_timer,
         city: d.city || "", home_city: d.home_city || "",
         cs_sentence: d.cs_sentence || 0, agg_fail_count: d.agg_fail_count || 0,
+        online_players: new Set(d.online_players || []),
+        local_players: new Set(d.local_players || []),
       };
       _updateStatPanel();
       _updateCharPills();
@@ -656,6 +658,7 @@ let _botState = {
   logged_in: false, in_jail: false, in_hospital: false,
   action_ready: false, hold_action_timer: false,
   city: "", home_city: "", cs_sentence: 0, agg_fail_count: 0,
+  online_players: new Set(), local_players: new Set(),
 };
 
 function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs, flightDepartsAt, hospitalReleaseAt) {
@@ -1947,7 +1950,7 @@ function _plRenderTable() {
   const colorMap = _plGroupColorMap();
 
   if (_plFiltered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
     return;
   }
 
@@ -1961,8 +1964,14 @@ function _plRenderTable() {
     const aggCell = p.agg_crimes ? `<span class="pl-assign-badge pl-assign-${p.agg_crimes}">${p.agg_crimes}</span>` : "—";
     const cwCell  = p.case_work  ? `<span class="pl-assign-badge pl-assign-${p.case_work}">${p.case_work}</span>`   : "—";
     const expanded = _plExpanded[p.username];
+    const isLocal  = _botState.local_players.has(p.username);
+    const isOnline = isLocal || _botState.online_players.has(p.username);
+    const dot = isLocal  ? `<span title="Online — local" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#32cd32"></span>`
+              : isOnline ? `<span title="Online" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f0c040"></span>`
+              : "";
 
     rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow('${escHtml(p.username)}')" style="cursor:pointer">
+      <td style="text-align:center">${dot}</td>
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
       <td>${escHtml(p.rank||"—")}</td>
       <td>${escHtml(p.occupation||"—")}</td>
@@ -1974,7 +1983,7 @@ function _plRenderTable() {
     </tr>`);
 
     if (expanded) {
-      rows.push(`<tr class="pl-detail-row"><td colspan="8"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
+      rows.push(`<tr class="pl-detail-row"><td colspan="9"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
     }
   });
   tbody.innerHTML = rows.join("");
@@ -2061,7 +2070,7 @@ function plLoadHistory(username, containerId, toggleEl) {
     .catch(() => { container.innerHTML = '<p style="color:var(--muted);padding:8px">Failed to load.</p>'; });
 }
 
-// ── Recently Dead ─────────────────────────────────────────────────────────────
+// ── Obituaries ────────────────────────────────────────────────────────────────
 
 function plRenderRecentDead() {
   const tbody = document.getElementById("pl-dead-tbody");
