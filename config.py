@@ -79,6 +79,12 @@ DEFAULT_CONFIG = {
         "activity": "weights",
         "auto_travel": False,
     },
+    "casino": {
+        "enabled": False,
+        "activity": "slots",
+        "bet_amount": 100,
+        "auto_travel": False,
+    },
     "promo": {
         "monitor_top_job": False,
         "top_job_thread_id": ""

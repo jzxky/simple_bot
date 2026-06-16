@@ -117,6 +117,12 @@ def save():
     c["gym"]["activity"] = data.get("gym_activity", "weights")
     c["gym"]["auto_travel"] = data.get("gym_auto_travel", False)
 
+    c.setdefault("casino", {})
+    c["casino"]["enabled"] = data.get("casino_enabled", False)
+    c["casino"]["activity"] = data.get("casino_activity", "slots")
+    c["casino"]["bet_amount"] = max(100, min(99999, int(data.get("casino_bet_amount", 100) or 100)))
+    c["casino"]["auto_travel"] = data.get("casino_auto_travel", False)
+
     c.setdefault("bionics", {})
     c["bionics"]["enabled"] = data.get("bionics_enabled", False)
     c["bionics"]["wanted_items"] = data.get("bionics_wanted_items", [])

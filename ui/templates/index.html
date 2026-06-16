@@ -166,6 +166,32 @@
                 <span id="gym-timer" class="stat-value" style="margin-left:8px">--</span>
               </div>
             </div>
+            {% set casino = config.get('casino', {}) %}
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                Casino (Beirut)
+                <label class="toggle-label">
+                  <input type="checkbox" id="casino_enabled" {% if casino.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <div class="setting-row">
+                <label for="casino_activity">Activity</label>
+                <select id="casino_activity" style="width:200px" onchange="autoSave()">
+                  {% for v, l in [('slots','Slots'),('blackjack','Blackjack')] %}
+                  <option value="{{ v }}" {% if casino.get('activity','slots') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row">
+                <label for="casino_bet_amount">Bet Amount</label>
+                <input type="number" id="casino_bet_amount" min="100" max="99999" style="width:100px"
+                  value="{{ casino.get('bet_amount', 100) }}" onchange="autoSave()">
+              </div>
+              <label class="inline-toggle setting-row">Auto-Travel to Beirut
+                <label class="toggle-label"><input type="checkbox" id="casino_auto_travel" {% if casino.get('auto_travel') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+            </div>
           </div>
         </div>
         <div id="promotion" class="tab-panel">
