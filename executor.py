@@ -2394,7 +2394,6 @@ def handle_casino(action: Action, state: GameState):
 
     if state.current_city != _BEIRUT:
         if not auto_travel:
-            state.add_log("Casino: not in Beirut and auto-travel is off — skipping.")
             return
         state.add_log("Casino: travelling to Beirut...")
         result = handle_travel(Action("travel", target_city=_BEIRUT, method="airport"), state)
