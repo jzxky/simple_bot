@@ -2011,6 +2011,23 @@ _AIRPORT_URL = "/travel/airport.asp"
 _CHICAGO = "Chicago"
 _NO_VEHICLE_TEXT = "you don't own a vehicle, it's parked or it's stashed in your vehicles vault"
 
+_CASINO_URL = "/localcity/casino.asp"
+_BEIRUT = "Beirut"
+_CASINO_STOP_TEXT = "don't you think"
+
+_CARD_RANK_VALUE = {
+    "a": 11, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9,
+    "10": 10, "t": 10, "j": 10, "q": 10, "k": 10,
+}
+
+
+def _card_rank_value(img_src: str) -> "int | None":
+    """Parse a card image filename like 'js.gif' or '10c.gif' into a blackjack rank value."""
+    m = re.search(r"/([0-9]{1,2}|[ajqkt])([cdhs])\.gif", img_src, re.I)
+    if not m:
+        return None
+    return _CARD_RANK_VALUE.get(m.group(1).lower())
+
 
 def handle_check_vehicle(action: Action, state: GameState) -> int:
     _nav(_u(_REPAIRS_URL), state)
@@ -2238,6 +2255,132 @@ def handle_gym(action: Action, state: GameState):
     state.add_log(f"Gym: completed activity '{activity}'.")
 
 
+def _casino_stopped(soup: "BeautifulSoup") -> bool:
+    return _CASINO_STOP_TEXT in soup.get_text(" ", strip=True).lower()
+
+
+def _play_slots(state: GameState, bet_amount: int):
+    page = browser.page()
+    bet = max(100, min(99999, bet_amount))
+    while True:
+        soup = BeautifulSoup(page.content(), "html.parser")
+        if not soup.find("input", attrs={"name": "bet"}):
+            state.add_log("Casino (Slots): bet input not found — stopping.")
+            return
+        page.fill("input[name='bet']", str(bet))
+        page.click("input[name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+        if not _check_session(state):
+            return
+
+        result_soup = BeautifulSoup(page.content(), "html.parser")
+        if _casino_stopped(result_soup):
+            state.add_log("Casino (Slots): session over.")
+            return
+        if not result_soup.find("input", attrs={"name": "bet"}):
+            state.add_log("Casino (Slots): no further bet form — stopping.")
+            return
+
+
+def _play_blackjack_hand(state: GameState, bet_amount: int) -> bool:
+    """Play a single hand to completion. Returns True if another hand can be started."""
+    page = browser.page()
+    bet = max(100, min(50000, bet_amount))
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    if not soup.find("input", attrs={"name": "bet"}):
+        state.add_log("Casino (Blackjack): bet input not found — stopping.")
+        return False
+    page.fill("input[name='bet']", str(bet))
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    if not _check_session(state):
+        return False
+
+    while True:
+        soup = BeautifulSoup(page.content(), "html.parser")
+        if _casino_stopped(soup):
+            state.add_log("Casino (Blackjack): session over.")
+            return False
+
+        total_match = re.search(r"Current Card total\s*=\s*(\d+)", soup.get_text(" "), re.I)
+        result_buttons = soup.find_all("input", attrs={"name": "result"})
+        if not total_match or not result_buttons:
+            state.add_log("Casino (Blackjack): hand resolved.")
+            return True
+
+        player_total = int(total_match.group(1))
+        dealer_card_value = None
+        dealer_label = soup.find(string=re.compile(r"Blackjack Machines 1st card", re.I))
+        if dealer_label:
+            dealer_img = dealer_label.find_next("img")
+            if dealer_img:
+                dealer_card_value = _card_rank_value(dealer_img.get("src", ""))
+
+        if player_total >= 17:
+            action_value = "Stay"
+        elif player_total <= 11:
+            action_value = "Hit"
+        else:
+            dealer_strong = dealer_card_value is None or dealer_card_value >= 7
+            action_value = "Hit" if dealer_strong else "Stay"
+
+        if not any(b.get("value") == action_value for b in result_buttons):
+            state.add_log(f"Casino (Blackjack): '{action_value}' button not available — stopping.")
+            return False
+
+        page.click(f"input[name='result'][value='{action_value}']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+        if not _check_session(state):
+            return False
+
+
+def handle_casino(action: Action, state: GameState):
+    casino_cfg = cfg.load().get("casino", {})
+    activity = casino_cfg.get("activity", "slots")
+    bet_amount = int(casino_cfg.get("bet_amount", 100))
+    auto_travel = casino_cfg.get("auto_travel", False)
+
+    if state.current_city != _BEIRUT:
+        if not auto_travel:
+            state.add_log("Casino: not in Beirut and auto-travel is off — skipping.")
+            return
+        state.add_log("Casino: travelling to Beirut...")
+        result = handle_travel(Action("travel", target_city=_BEIRUT, method="airport"), state)
+        if result == 0:
+            state.add_log("Casino: travel to Beirut failed — skipping.")
+            return
+        if state.current_city != _BEIRUT:
+            state.add_log(f"Casino: still not in Beirut after travel ({state.current_city}) — skipping.")
+            return
+
+    _nav(_u(_CASINO_URL), state)
+    if not _check_session(state):
+        return
+
+    page = browser.page()
+    soup = BeautifulSoup(page.content(), "html.parser")
+    link_text = "blackjack" if activity == "blackjack" else "slots"
+    link = soup.find("a", string=re.compile(link_text, re.I))
+    if not link or not link.get("href"):
+        state.add_log(f"Casino: could not find a link to {activity} on the casino page.")
+        return
+    page.click(f"a:has-text('{link.get_text(strip=True)}')")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    if not _check_session(state):
+        return
+
+    if activity == "blackjack":
+        while _play_blackjack_hand(state, bet_amount):
+            pass
+    else:
+        _play_slots(state, bet_amount)
+
+
 def handle_check_engineering_cases(action: Action, state: GameState):
     if not state.timers.get("case", {}).get("ready", True):
         return
@@ -2310,6 +2453,7 @@ HANDLERS = {
     "turn_in_warrant": handle_turn_in_warrant,
     "apply_illness_treatment": handle_apply_illness_treatment,
     "do_gym": handle_gym,
+    "play_casino": handle_casino,
     "check_vehicle": handle_check_vehicle,
     "repair_vehicle": handle_repair_vehicle,
     "travel": handle_travel,
