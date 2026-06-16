@@ -906,6 +906,7 @@
           <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Player List</button>
           <button class="tab-btn" onclick="showTab('pl-tab-groups', this)">Groups</button>
           <button class="tab-btn" onclick="showTab('pl-tab-import', this)">Import</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-dead', this); plRenderRecentDead()">Recently Dead</button>
         </div>
 
         <!-- Player List tab -->
@@ -1024,6 +1025,26 @@
             <button class="action-btn" onclick="plRunImport()">Import</button>
           </div>
           <div id="pl-import-report" class="import-report" style="display:none"></div>
+        </div>
+
+        <!-- Recently Dead tab -->
+        <div id="pl-tab-dead" class="tab-panel">
+          <div style="overflow-x:auto;margin-top:8px">
+            <table class="pl-table" id="pl-dead-table">
+              <thead>
+                <tr>
+                  <th style="width:160px">Username</th>
+                  <th class="col-homecity">Home City</th>
+                  <th class="col-occupation">Occupation</th>
+                  <th class="col-rank">Rank</th>
+                  <th>Died</th>
+                </tr>
+              </thead>
+              <tbody id="pl-dead-tbody">
+                <tr><td colspan="5" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>

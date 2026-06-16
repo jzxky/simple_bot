@@ -73,6 +73,7 @@ _MIGRATIONS = [
     ("players",  "assignments_updated_at", "TEXT DEFAULT ''"),
     ("players",  "scraped_at",             "TEXT DEFAULT ''"),
     ("groups",   "updated_at",             "TEXT DEFAULT ''"),
+    ("players",  "died_at",               "TEXT DEFAULT ''"),
 ]
 
 
@@ -212,7 +213,7 @@ def get_all_players() -> list:
             rows = con.execute(
                 """SELECT username, homecity, occupation, rank, active,
                           group_name, agg_crimes, case_work,
-                          character_age, jail_age
+                          character_age, jail_age, died_at
                    FROM players ORDER BY username COLLATE NOCASE"""
             ).fetchall()
             result = []
@@ -402,8 +403,9 @@ def upsert_players(player_list: list):
 
 
 def mark_absent_dead(seen_names: set) -> int:
-    """Mark active players absent from seen_names as dead (active=0). Returns count marked."""
+    """Mark active players absent from seen_names as dead. Clears group. Returns count marked."""
     marked = 0
+    ts = _utcnow()
     with _lock:
         con = _conn()
         try:
@@ -412,7 +414,10 @@ def mark_absent_dead(seen_names: set) -> int:
             ).fetchall()
             for r in rows:
                 if r["username"] not in seen_names:
-                    con.execute("UPDATE players SET active=0 WHERE username=?", (r["username"],))
+                    con.execute(
+                        "UPDATE players SET active=0, group_name='', died_at=?, assignments_updated_at=? WHERE username=?",
+                        (ts, ts, r["username"]),
+                    )
                     marked += 1
             con.commit()
         finally:
