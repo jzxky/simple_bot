@@ -52,6 +52,12 @@ def load() -> dict:
 
 def refresh() -> int:
     """Fetch from updateusers.php, update SQLite. Returns active player count."""
+    count, _marked = _refresh_impl()
+    return count
+
+
+def _refresh_impl() -> "tuple[int, int]":
+    """Fetch from updateusers.php, update SQLite. Returns (active count, dead-marked count)."""
     try:
         browser.page().goto(
             urls.BASE_URL + "/skin/updateusers.php?q=1",
@@ -60,7 +66,7 @@ def refresh() -> int:
         raw = json.loads(browser.page().inner_text("body"))
         browser.page().goto(urls.BASE_URL + "/main.asp", wait_until="domcontentloaded", timeout=15000)
     except Exception:
-        return 0
+        return 0, 0
 
     seen = set()
     player_list = []
@@ -80,8 +86,16 @@ def refresh() -> int:
             seen.add(name)
 
     _db.upsert_players(player_list)
-    _db.mark_absent_dead(seen)
-    return len(seen)
+
+    marked = 0
+    prev_active = _db.get_active_count()
+    if prev_active > 0 and len(seen) < prev_active * 0.5:
+        print(f"Player refresh: fetched list has only {len(seen)} active players "
+              f"vs {prev_active} previously known — skipping dead-marking pass (suspect bad fetch).")
+    else:
+        marked = _db.mark_absent_dead(seen)
+
+    return len(seen), marked
 
 
 # Thin wrappers — delegate to player_db
@@ -143,8 +157,11 @@ class PlayerRefreshTask(Task):
 
     def run(self, state, executor):
         self._last_run = time.monotonic()
-        count = refresh()
-        state.add_log(f"Player list refreshed: {count} active players.")
+        count, marked = _refresh_impl()
+        msg = f"Player list refreshed: {count} active players."
+        if marked:
+            msg += f" Marked {marked} absent player(s) as dead."
+        state.add_log(msg)
 
 
 class SyncTask(Task):

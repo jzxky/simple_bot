@@ -19,7 +19,6 @@ import paths
 DB_PATH = os.path.join(paths.data_dir(), "players.db")
 # Players with these home cities are never stored — not even as inactive
 _SKIP_CITIES = {"heaven", "hell", "locked"}
-_DEAD_CITIES  = _SKIP_CITIES  # kept for mark_absent_dead compat
 
 _lock = threading.Lock()
 
@@ -402,19 +401,23 @@ def upsert_players(player_list: list):
             con.close()
 
 
-def mark_absent_dead(seen_names: set):
+def mark_absent_dead(seen_names: set) -> int:
+    """Mark active players absent from seen_names as dead (active=0). Returns count marked."""
+    marked = 0
     with _lock:
         con = _conn()
         try:
             rows = con.execute(
-                "SELECT username, homecity FROM players WHERE active=1"
+                "SELECT username FROM players WHERE active=1"
             ).fetchall()
             for r in rows:
-                if r["username"] not in seen_names and r["homecity"].lower() in _DEAD_CITIES:
+                if r["username"] not in seen_names:
                     con.execute("UPDATE players SET active=0 WHERE username=?", (r["username"],))
+                    marked += 1
             con.commit()
         finally:
             con.close()
+    return marked
 
 
 def increment_ages(online_names: set, jailed_names: set, minutes: int = 30):
