@@ -1,15 +1,27 @@
 # -*- mode: python ; coding: utf-8 -*-
+# PyInstaller spec for MafiaMatrixBot (Windows)
+#
+# Bundles all Python code + patchright driver.
+# Chrome browser is NOT bundled — install separately:
+#   MafiaMatrixBot.exe --install
+
+from PyInstaller.utils.hooks import collect_data_files
+
+# Collect all patchright package data (driver binary, etc.)
+patchright_datas = collect_data_files('patchright', includes=['**/*'])
 
 a = Analysis(
     ['main.py'],
     pathex=['.'],
     binaries=[],
     datas=[
-        ('ui/templates', 'ui/templates'),
-        ('ui/static',    'ui/static'),
-    ],
+        ('ui/templates',       'ui/templates'),
+        ('ui/static',          'ui/static'),
+        ('available_earns.json', '.'),
+        ('VERSION',            '.'),
+    ] + patchright_datas,
     hiddenimports=[
-        # third-party
+        # patchright
         'patchright',
         'patchright.sync_api',
         'patchright._impl._api_types',
@@ -78,44 +90,61 @@ a = Analysis(
         'patchright._impl.sync._video',
         'patchright._impl.sync._web_error',
         'patchright._impl.sync._worker',
+        # web framework
         'flask',
         'jinja2',
         'werkzeug',
+        'werkzeug.serving',
+        'werkzeug.routing',
+        # parsing
         'bs4',
+        'lxml',
         # project modules
+        'action_cooldowns',
         'bot',
         'browser',
         'character_history',
         'config',
         'executor',
         'paths',
+        'player_db',
         'players',
         'scheduler',
         'site_map',
         'state',
+        'sync_client',
+        'sync_server',
         'trait_requirements',
+        'urls',
         'ui.app',
         # tasks package
         'tasks',
         'tasks.agg_crimes',
         'tasks.away_action',
         'tasks.base',
+        'tasks.bionics',
         'tasks.career_training',
         'tasks.case_work',
         'tasks.character_history',
         'tasks.check_top_job',
         'tasks.community_service',
         'tasks.consume',
+        'tasks.cs_punishment',
         'tasks.deposit',
         'tasks.drug_manufacturing',
+        'tasks.drug_trade',
         'tasks.earns',
         'tasks.fire_duties',
+        'tasks.gym',
+        'tasks.illness',
         'tasks.jail_action',
         'tasks.jail_consume',
         'tasks.jail_duties',
         'tasks.jailbreak',
+        'tasks.journal',
         'tasks.login',
         'tasks.maintain_cash',
+        'tasks.online_age',
         'tasks.refresh',
         'tasks.snipe_top_job',
         'tasks.withdraw',

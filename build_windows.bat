@@ -36,11 +36,14 @@ if errorlevel 1 (
 
 echo.
 echo BUILD COMPLETE.
-echo Executable folder: dist\MafiaMatrixBot\
-echo Run:              dist\MafiaMatrixBot\MafiaMatrixBot.exe
+echo Output folder: dist\MafiaMatrixBot\
 echo.
-echo NOTE: On first run, create a .env file next to the exe:
-echo   MM_EMAIL=your@email.com
-echo   MM_PASSWORD=yourpassword
+echo === First-time setup for end users ===
+echo 1. Copy dist\MafiaMatrixBot\ to the target machine
+echo 2. Run:  MafiaMatrixBot.exe --install   (installs Chrome, one time only)
+echo 3. Create a .env file next to MafiaMatrixBot.exe:
+echo      MM_EMAIL=your@email.com
+echo      MM_PASSWORD=yourpassword
+echo 4. Run:  MafiaMatrixBot.exe
 echo.
 pause
