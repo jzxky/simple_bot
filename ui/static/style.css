@@ -614,6 +614,40 @@ input.input-unsaved { color: var(--red) !important; }
 .in-jail .stat-item-timer .stat-value.ready {
   color: #8ecb8e !important;
 }
+.in-hospital {
+  border-color: #a01010 !important;
+  background: #750606 !important;
+}
+.in-hospital > h2 {
+  background: #750606 !important;
+  border-bottom-color: #a01010 !important;
+}
+.in-hospital .card-body {
+  background: #750606;
+}
+.in-hospital .stat-item {
+  background: #8a0808;
+  border-color: #b01212;
+}
+.in-hospital .stat-label {
+  color: #e0a0a0;
+}
+.in-hospital .stat-value {
+  color: #f8e8e8;
+}
+.in-hospital .stat-divider {
+  border-top-color: #a01010;
+}
+.in-hospital .placeholder {
+  color: #c08080;
+}
+.in-hospital .stat-timer-value {
+  color: #f0c0c0 !important;
+}
+.in-hospital .stat-timer-value.ready,
+.in-hospital .stat-item-timer .stat-value.ready {
+  color: #f08080 !important;
+}
 .cash-opt {
   display: flex;
   align-items: center;
