@@ -191,6 +191,10 @@
               <label class="inline-toggle setting-row">Auto-Travel to Beirut
                 <label class="toggle-label"><input type="checkbox" id="casino_auto_travel" {% if casino.get('auto_travel') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+              <div class="setting-row" style="margin-top:6px">
+                <span class="stat-label">Next casino use</span>
+                <span id="casino-timer" class="stat-value" style="margin-left:8px">--</span>
+              </div>
             </div>
           </div>
         </div>

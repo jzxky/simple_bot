@@ -197,6 +197,14 @@ def _get_last_gym_use() -> float:
         return 0.0
 
 
+def _get_casino_release_at() -> float:
+    try:
+        from tasks.casino import load_casino_release_at
+        return load_casino_release_at()
+    except Exception:
+        return 0.0
+
+
 def _get_bionics_next_check_at(state) -> "float | None":
     import time as _time
     task = bot.get_bionics_task()
@@ -267,6 +275,7 @@ def status():
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
         "last_gym_use": _get_last_gym_use(),
+        "casino_release_at": _get_casino_release_at(),
         "bionics_next_check_at": _get_bionics_next_check_at(s),
         "bionics_views": ({"current": bot.get_bionics_task().last_views[0], "max": bot.get_bionics_task().last_views[1]} if bot.get_bionics_task() and bot.get_bionics_task().last_views else None),
         "is_git_repo": _is_git_repo(),

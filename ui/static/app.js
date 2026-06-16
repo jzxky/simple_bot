@@ -521,6 +521,21 @@ function pollStatus() {
         }
       }
 
+      // Casino timer
+      const casinoTimerEl = document.getElementById("casino-timer");
+      if (casinoTimerEl) {
+        const releaseAt = d.casino_release_at || 0;
+        const secsLeft = Math.round(releaseAt - Date.now() / 1000);
+        if (releaseAt <= 0 || secsLeft <= 0) {
+          casinoTimerEl.textContent = "Ready";
+        } else {
+          const h = Math.floor(secsLeft / 3600);
+          const m = Math.floor((secsLeft % 3600) / 60);
+          const s = secsLeft % 60;
+          casinoTimerEl.textContent = h + "h " + String(m).padStart(2,"0") + "m " + String(s).padStart(2,"0") + "s";
+        }
+      }
+
       // Bionics store visits + next check
       const bionicsViewsEl = document.getElementById("bionics-views");
       const bionicsNextEl  = document.getElementById("bionics-next-check");
