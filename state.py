@@ -182,7 +182,7 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
         if "Name" in label:
             pass  # own name parsed via anchor below
         elif "Jail Rank" in label:
-            pass  # handled separately above
+            s.jail_rank = text
         elif "Rank" in label and "Next" not in label:
             s.rank = text
         elif "Occupation" in label:
