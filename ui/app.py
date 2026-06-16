@@ -272,6 +272,8 @@ def status():
         "in_hospital": s.in_hospital,
         "cs_sentence": s.cs_sentence,
         "agg_fail_count": s.agg_fail_count(),
+        "online_players": list(s.online_players),
+        "local_players": list(s.local_players),
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
         "last_gym_use": _get_last_gym_use(),

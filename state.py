@@ -61,6 +61,8 @@ class GameState:
     in_hospital: bool = False
     hospital_release_at: "float | None" = None
     cs_sentence: int = 0      # community services still owed as agg-crime punishment
+    online_players: set = field(default_factory=set)   # all usernames in whosonlinecell
+    local_players: set = field(default_factory=set)    # subset with * (same city as bot)
 
     @property
     def ingame_mins(self) -> "int | None":
@@ -327,6 +329,20 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
                 except Exception:
                     pass
                 break
+
+    # Online/local players — parsed from whosonlinecell on every non-jail page
+    woc = soup.find("div", id="whosonlinecell")
+    if woc:
+        online, local = set(), set()
+        for a in woc.find_all("a", id=lambda v: v and v.startswith("profileLink:")):
+            parts = a.get("id", "").split(":")
+            if len(parts) >= 2:
+                name = parts[1]
+                online.add(name)
+                if a.find("span", style=lambda v: v and "ff9900" in v):
+                    local.add(name)
+        s.online_players = online
+        s.local_players = local
 
     # Login state
     s.logged_in = url.rstrip("/") != urls.BASE_URL + "/default.asp"

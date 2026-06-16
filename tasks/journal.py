@@ -155,7 +155,7 @@ class JournalCheckTask(Task):
     label = "Journal Check"
 
     def can_run(self, state: GameState) -> bool:
-        return state.logged_in and state.has_new_journals and not state.in_jail
+        return state.logged_in and state.has_new_journals
 
     def run(self, state: GameState, executor):
         executor.execute(Action("check_journals"), state)
