@@ -940,7 +940,7 @@ function consumeItem(type) {
 }
 
 function escHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/'/g,"&#39;").replace(/"/g,"&quot;");
 }
 
 function loadLogFiles() {
