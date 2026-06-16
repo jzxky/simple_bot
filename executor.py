@@ -2309,7 +2309,22 @@ def _play_blackjack_hand(state: GameState, bet_amount: int) -> bool:
         total_match = re.search(r"Current Card total\s*=\s*(\d+)", soup.get_text(" "), re.I)
         result_buttons = soup.find_all("input", attrs={"name": "result"})
         if not total_match or not result_buttons:
-            state.add_log("Casino (Blackjack): hand resolved.")
+            outcome = soup.find("font", attrs={"color": re.compile("red|green", re.I)})
+            if outcome:
+                state.add_log(f"Casino (Blackjack): {outcome.get_text(strip=True)}")
+            else:
+                state.add_log("Casino (Blackjack): hand resolved.")
+
+            continue_btn = soup.find("input", attrs={"name": "B1", "value": re.compile("continue", re.I)})
+            if continue_btn:
+                page.click("input[name='B1'][value='Continue']")
+                page.wait_for_load_state("domcontentloaded")
+                _refresh_state(state)
+                if not _check_session(state):
+                    return False
+                if _casino_stopped(BeautifulSoup(page.content(), "html.parser")):
+                    state.add_log("Casino (Blackjack): session over.")
+                    return False
             return True
 
         player_total = int(total_match.group(1))
