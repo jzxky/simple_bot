@@ -2011,9 +2011,10 @@ _AIRPORT_URL = "/travel/airport.asp"
 _CHICAGO = "Chicago"
 _NO_VEHICLE_TEXT = "you don't own a vehicle, it's parked or it's stashed in your vehicles vault"
 
-_CASINO_URL = "/localcity/casino.asp"
+_CASINO_URL = "/localcity/businesses.asp?name=Casino"
 _BEIRUT = "Beirut"
 _CASINO_STOP_TEXT = "don't you think"
+_CASINO_RADIO_VALUE = {"slots": "slot", "blackjack": "blackjack"}
 
 _CARD_RANK_VALUE = {
     "a": 11, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9,
@@ -2362,13 +2363,13 @@ def handle_casino(action: Action, state: GameState):
         return
 
     page = browser.page()
+    radio_value = _CASINO_RADIO_VALUE.get(activity, "slot")
     soup = BeautifulSoup(page.content(), "html.parser")
-    link_text = "blackjack" if activity == "blackjack" else "slots"
-    link = soup.find("a", string=re.compile(link_text, re.I))
-    if not link or not link.get("href"):
-        state.add_log(f"Casino: could not find a link to {activity} on the casino page.")
+    if not soup.find("input", attrs={"name": "casinooption", "value": radio_value}):
+        state.add_log(f"Casino: could not find the '{activity}' option on the casino page.")
         return
-    page.click(f"a:has-text('{link.get_text(strip=True)}')")
+    page.check(f"input[name='casinooption'][value='{radio_value}']")
+    page.click("input[name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
     if not _check_session(state):
