@@ -2257,7 +2257,38 @@ def handle_gym(action: Action, state: GameState):
 
 
 def _casino_stopped(soup: "BeautifulSoup") -> bool:
+    fail_div = soup.find("div", id="fail")
+    if fail_div and _CASINO_STOP_TEXT in fail_div.get_text(" ", strip=True).lower():
+        return True
     return _CASINO_STOP_TEXT in soup.get_text(" ", strip=True).lower()
+
+
+def _parse_casino_release(soup: "BeautifulSoup", state: GameState) -> "float | None":
+    """Extract the 'Try again after <date>!' timestamp from the casino fail div, anchored to wall clock."""
+    from state import SERVER_TIME_FMT
+    from datetime import datetime
+    fail_div = soup.find("div", id="fail")
+    text = fail_div.get_text(" ", strip=True) if fail_div else soup.get_text(" ", strip=True)
+    m = re.search(r"Try again after (.+?)!", text, re.I)
+    if not m or not state.server_time:
+        return None
+    try:
+        release_dt = datetime.strptime(m.group(1).strip(), SERVER_TIME_FMT)
+    except (ValueError, TypeError):
+        return None
+    offset = (release_dt - state.server_time).total_seconds()
+    return time.time() + offset
+
+
+def _handle_casino_stop(soup: "BeautifulSoup", state: GameState, label: str):
+    from tasks.casino import save_casino_release_at
+    from datetime import datetime
+    release_at = _parse_casino_release(soup, state)
+    if release_at is not None:
+        save_casino_release_at(release_at)
+        state.add_log(f"{label}: session over, locked out until {datetime.fromtimestamp(release_at).strftime('%Y-%m-%d %H:%M:%S')}.")
+    else:
+        state.add_log(f"{label}: session over.")
 
 
 def _play_slots(state: GameState, bet_amount: int):
@@ -2277,7 +2308,7 @@ def _play_slots(state: GameState, bet_amount: int):
 
         result_soup = BeautifulSoup(page.content(), "html.parser")
         if _casino_stopped(result_soup):
-            state.add_log("Casino (Slots): session over.")
+            _handle_casino_stop(result_soup, state, "Casino (Slots)")
             return
         if not result_soup.find("input", attrs={"name": "bet"}):
             state.add_log("Casino (Slots): no further bet form — stopping.")
@@ -2303,7 +2334,7 @@ def _play_blackjack_hand(state: GameState, bet_amount: int) -> bool:
     while True:
         soup = BeautifulSoup(page.content(), "html.parser")
         if _casino_stopped(soup):
-            state.add_log("Casino (Blackjack): session over.")
+            _handle_casino_stop(soup, state, "Casino (Blackjack)")
             return False
 
         total_match = re.search(r"Current Card total\s*=\s*(\d+)", soup.get_text(" "), re.I)
@@ -2322,8 +2353,9 @@ def _play_blackjack_hand(state: GameState, bet_amount: int) -> bool:
                 _refresh_state(state)
                 if not _check_session(state):
                     return False
-                if _casino_stopped(BeautifulSoup(page.content(), "html.parser")):
-                    state.add_log("Casino (Blackjack): session over.")
+                continue_soup = BeautifulSoup(page.content(), "html.parser")
+                if _casino_stopped(continue_soup):
+                    _handle_casino_stop(continue_soup, state, "Casino (Blackjack)")
                     return False
             return True
 
