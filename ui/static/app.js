@@ -941,6 +941,15 @@ function escHtml(s) {
   return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/'/g,"&#39;").replace(/"/g,"&quot;");
 }
 
+// Use escJsStr (not escHtml) when embedding a value as a string argument inside an
+// inline onclick/onchange attribute.  JSON.stringify produces a valid JS double-quoted
+// string literal; replacing the outer " with &quot; keeps it safe in the HTML context.
+// The browser decodes &quot; → " before the JS engine parses it, so the result is a
+// properly-escaped JS string regardless of apostrophes or other special characters.
+function escJsStr(s) {
+  return JSON.stringify(s == null ? "" : String(s)).replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+}
+
 function loadLogFiles() {
   fetch("/logs/list")
     .then(r => r.json())
@@ -1270,7 +1279,7 @@ function checkWarrants() {
           <td>${escHtml(w.jail_time)}</td>
           <td>${escHtml(w.css)}</td>
           <td>${escHtml(w.defense)}</td>
-          <td><button class="btn-secondary" style="white-space:nowrap;padding:4px 10px" onclick="turnInWarrant(this,'${escHtml(w.turn_in_url)}','${escHtml(w.case_id)}')">Turn In</button></td>
+          <td><button class="btn-secondary" style="white-space:nowrap;padding:4px 10px" onclick="turnInWarrant(this,${escJsStr(w.turn_in_url)},${escJsStr(w.case_id)})">Turn In</button></td>
         </tr>`;
       }
       html += `</tbody></table></div>`;
@@ -1965,7 +1974,7 @@ function _plRenderTable() {
               : isOnline ? `<span title="Online" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f0c040"></span>`
               : "";
 
-    rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow('${escHtml(p.username)}')" style="cursor:pointer">
+    rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow(${escJsStr(p.username)})" style="cursor:pointer">
       <td style="text-align:center">${dot}</td>
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
       <td>${escHtml(p.rank||"—")}</td>
@@ -2001,13 +2010,13 @@ function _plDetailHtml(p) {
   <div class="pl-detail-item"><span class="pl-detail-label">Jail Age</span>${_fmtAge(p.jail_age||0)}</div>
   <div class="pl-detail-item">
     <span class="pl-detail-label">Group</span>
-    <select onchange="plSetGroup('${escHtml(p.username)}', this.value, this)" onclick="event.stopPropagation()">
+    <select onchange="plSetGroup(${escJsStr(p.username)}, this.value, this)" onclick="event.stopPropagation()">
       <option value="">— none —</option>${groupOpts}
     </select>
   </div>
   <div class="pl-detail-item">
     <span class="pl-detail-label">Agg Crimes</span>
-    <select onchange="plSetAssignment('${escHtml(p.username)}', 'agg_crimes', this.value)" onclick="event.stopPropagation()">
+    <select onchange="plSetAssignment(${escJsStr(p.username)}, 'agg_crimes', this.value)" onclick="event.stopPropagation()">
       <option value="" ${!p.agg_crimes?'selected':''}>— none —</option>
       <option value="whitelist" ${p.agg_crimes==='whitelist'?'selected':''}>Whitelist</option>
       <option value="blacklist" ${p.agg_crimes==='blacklist'?'selected':''}>Blacklist</option>
@@ -2015,14 +2024,14 @@ function _plDetailHtml(p) {
   </div>
   <div class="pl-detail-item">
     <span class="pl-detail-label">Case Work</span>
-    <select onchange="plSetAssignment('${escHtml(p.username)}', 'case_work', this.value)" onclick="event.stopPropagation()">
+    <select onchange="plSetAssignment(${escJsStr(p.username)}, 'case_work', this.value)" onclick="event.stopPropagation()">
       <option value="" ${!p.case_work?'selected':''}>— none —</option>
       <option value="whitelist" ${p.case_work==='whitelist'?'selected':''}>Whitelist</option>
       <option value="blacklist" ${p.case_work==='blacklist'?'selected':''}>Blacklist</option>
     </select>
   </div>
 </div>
-<div class="pl-history-toggle" onclick="plLoadHistory('${escHtml(p.username)}', '${histId}', this); event.stopPropagation()">
+<div class="pl-history-toggle" onclick="plLoadHistory(${escJsStr(p.username)}, '${histId}', this); event.stopPropagation()">
   ▸ Show Career History
 </div>
 <div id="${histId}" style="display:none"></div>`;
@@ -2211,25 +2220,25 @@ function _plRenderGroupsTab(groups) {
       `<option value="${v}" ${g.case_work===v?'selected':''}>${v||"—"}</option>`).join("");
     const typeSel = ["neutral","friendly","enemy"].map(v =>
       `<option value="${v}" ${g.type===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join("");
-    const colorSel = _plColorSelect(g.color, `plUpdateGroupColor('${escHtml(g.name)}', this.value)`);
+    const colorSel = _plColorSelect(g.color, `plUpdateGroupColor(${escJsStr(g.name)}, this.value)`);
     const expanded = _plGroupExpanded[g.name];
 
-    rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleGroup('${escHtml(g.name)}')" style="cursor:pointer">
+    rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleGroup(${escJsStr(g.name)})" style="cursor:pointer">
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(g.name)}</td>
       <td onclick="event.stopPropagation()">
-        <select class="pl-filter-input" onchange="plUpdateGroupType('${escHtml(g.name)}', this.value)">${typeSel}</select>
+        <select class="pl-filter-input" onchange="plUpdateGroupType(${escJsStr(g.name)}, this.value)">${typeSel}</select>
       </td>
       <td onclick="event.stopPropagation()">${colorSel}</td>
       <td onclick="event.stopPropagation()">
-        <select class="pl-filter-input" onchange="plUpdateGroupAssignment('${escHtml(g.name)}', 'agg_crimes', this.value)">${aggSel}</select>
+        <select class="pl-filter-input" onchange="plUpdateGroupAssignment(${escJsStr(g.name)}, 'agg_crimes', this.value)">${aggSel}</select>
       </td>
       <td onclick="event.stopPropagation()">
-        <select class="pl-filter-input" onchange="plUpdateGroupAssignment('${escHtml(g.name)}', 'case_work', this.value)">${cwSel}</select>
+        <select class="pl-filter-input" onchange="plUpdateGroupAssignment(${escJsStr(g.name)}, 'case_work', this.value)">${cwSel}</select>
       </td>
       <td>${g.member_count||0}</td>
       <td style="white-space:nowrap">
-        <button class="pl-icon-btn" title="Edit group" onclick="event.stopPropagation();plOpenEditGroupModal('${escHtml(g.name)}')">${EDIT}</button>
-        <button class="pl-icon-btn pl-icon-btn-danger" title="Delete group" onclick="event.stopPropagation();plOpenDeleteModal('${escHtml(g.name)}')">${TRASH}</button>
+        <button class="pl-icon-btn" title="Edit group" onclick="event.stopPropagation();plOpenEditGroupModal(${escJsStr(g.name)})">${EDIT}</button>
+        <button class="pl-icon-btn pl-icon-btn-danger" title="Delete group" onclick="event.stopPropagation();plOpenDeleteModal(${escJsStr(g.name)})">${TRASH}</button>
       </td>
     </tr>`);
 
