@@ -1,104 +1,47 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for MafiaMatrixBot (Windows)
+# PyInstaller spec for MafiaMatrixBot (Windows) — single-file output
 #
-# Bundles all Python code + patchright driver.
-# Chrome browser is NOT bundled — install separately:
+# Produces: dist/MafiaMatrixBot.exe  (one portable file)
+#
+# Chrome is NOT bundled — install once with:
 #   MafiaMatrixBot.exe --install
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_all
 
-# Collect all patchright package data (driver binary, etc.)
-patchright_datas = collect_data_files('patchright', includes=['**/*'])
+patchright_datas, patchright_binaries, patchright_hiddenimports = collect_all('patchright')
 
 a = Analysis(
     ['main.py'],
     pathex=['.'],
-    binaries=[],
+    binaries=patchright_binaries,
     datas=[
-        ('ui/templates',       'ui/templates'),
-        ('ui/static',          'ui/static'),
+        ('ui/templates',         'ui/templates'),
+        ('ui/static',            'ui/static'),
         ('available_earns.json', '.'),
-        ('VERSION',            '.'),
+        ('VERSION',              '.'),
     ] + patchright_datas,
-    hiddenimports=[
-        # patchright
-        'patchright',
-        'patchright.sync_api',
-        'patchright._impl._api_types',
-        'patchright._impl._assertions',
-        'patchright._impl._browser',
-        'patchright._impl._browser_context',
-        'patchright._impl._browser_type',
-        'patchright._impl._cdp_session',
-        'patchright._impl._clock',
-        'patchright._impl._connection',
-        'patchright._impl._console_message',
-        'patchright._impl._dialog',
-        'patchright._impl._download',
-        'patchright._impl._element_handle',
-        'patchright._impl._errors',
-        'patchright._impl._event_context_manager',
-        'patchright._impl._fetch',
-        'patchright._impl._file_chooser',
-        'patchright._impl._frame',
-        'patchright._impl._har_router',
-        'patchright._impl._helper',
-        'patchright._impl._input',
-        'patchright._impl._js_handle',
-        'patchright._impl._keyboard',
-        'patchright._impl._local_utils',
-        'patchright._impl._locator',
-        'patchright._impl._mouse',
-        'patchright._impl._network',
-        'patchright._impl._page',
-        'patchright._impl._playwright',
-        'patchright._impl._request',
-        'patchright._impl._router',
-        'patchright._impl._selectors',
-        'patchright._impl._set_input_files_helpers',
-        'patchright._impl._sync_context_manager',
-        'patchright._impl._touchscreen',
-        'patchright._impl._tracing',
-        'patchright._impl._transport',
-        'patchright._impl._video',
-        'patchright._impl._web_error',
-        'patchright._impl._worker',
-        'patchright._impl.sync._assertions',
-        'patchright._impl.sync._browser',
-        'patchright._impl.sync._browser_context',
-        'patchright._impl.sync._browser_type',
-        'patchright._impl.sync._cdp_session',
-        'patchright._impl.sync._clock',
-        'patchright._impl.sync._dialog',
-        'patchright._impl.sync._download',
-        'patchright._impl.sync._element_handle',
-        'patchright._impl.sync._fetch',
-        'patchright._impl.sync._file_chooser',
-        'patchright._impl.sync._frame',
-        'patchright._impl.sync._js_handle',
-        'patchright._impl.sync._keyboard',
-        'patchright._impl.sync._locator',
-        'patchright._impl.sync._mouse',
-        'patchright._impl.sync._network',
-        'patchright._impl.sync._page',
-        'patchright._impl.sync._playwright',
-        'patchright._impl.sync._request',
-        'patchright._impl.sync._router',
-        'patchright._impl.sync._selectors',
-        'patchright._impl.sync._touchscreen',
-        'patchright._impl.sync._tracing',
-        'patchright._impl.sync._video',
-        'patchright._impl.sync._web_error',
-        'patchright._impl.sync._worker',
+    hiddenimports=patchright_hiddenimports + [
         # web framework
         'flask',
         'jinja2',
+        'jinja2.ext',
         'werkzeug',
         'werkzeug.serving',
         'werkzeug.routing',
+        'werkzeug.middleware.shared_data',
+        'werkzeug.exceptions',
         # parsing
         'bs4',
+        'bs4.builder',
+        'bs4.builder._htmlparser',
+        'bs4.builder._lxml',
         'lxml',
+        'lxml.etree',
+        'lxml._elementpath',
+        # stdlib extras often missed
+        'sqlite3',
+        'email.mime.text',
+        'email.mime.multipart',
         # project modules
         'action_cooldowns',
         'bot',
@@ -110,7 +53,6 @@ a = Analysis(
         'player_db',
         'players',
         'scheduler',
-        'site_map',
         'state',
         'sync_client',
         'sync_server',
@@ -125,6 +67,7 @@ a = Analysis(
         'tasks.bionics',
         'tasks.career_training',
         'tasks.case_work',
+        'tasks.casino',
         'tasks.character_history',
         'tasks.check_top_job',
         'tasks.community_service',
@@ -152,33 +95,29 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'tkinter', 'matplotlib', 'numpy', 'pandas', 'PIL',
+        'IPython', 'jupyter', 'notebook', 'pytest',
+    ],
     noarchive=False,
 )
 
 pyz = PYZ(a.pure, a.zipped_data)
 
+# Single-file EXE — everything bundled in, no COLLECT step
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='MafiaMatrixBot',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
     console=True,
     icon=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='MafiaMatrixBot',
 )
