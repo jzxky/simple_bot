@@ -197,6 +197,14 @@ def _get_last_gym_use() -> float:
         return 0.0
 
 
+def _get_respect_data() -> dict:
+    try:
+        from tasks.respect import load_respect_data
+        return load_respect_data()
+    except Exception:
+        return {"respect_pct": None, "last_check": 0.0}
+
+
 def _get_casino_release_at() -> float:
     try:
         from tasks.casino import load_casino_release_at
@@ -285,7 +293,17 @@ def status():
         "vehicle_health": s.vehicle_health,
         "char_history_updated_at": s.char_history_updated_at,
         "hospital_release_at": s.hospital_release_at,
+        "respect_pct": _get_respect_data().get("respect_pct"),
+        "respect_last_check": _get_respect_data().get("last_check", 0.0),
     })
+
+
+@app.route("/respect/refresh", methods=["POST"])
+def respect_refresh():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    bot.request_respect_refresh()
+    return jsonify({"ok": True})
 
 
 @app.route("/clear_earn_queue", methods=["POST"])

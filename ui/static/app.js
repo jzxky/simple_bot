@@ -340,12 +340,16 @@ function _updateIncomeTabColors() {
 }
 
 let _lastEnergy = null;
+let _respectPct = null;
 
 function _updateCharPills() {
   const el = document.getElementById("pills-s-character");
   if (!el) return;
   const pills = [];
   if (_lastEnergy != null) pills.push(_pill(`⚡ ${_lastEnergy}%`));
+  if (_respectPct != null) {
+    pills.push(`<span class="pill pill-clickable" onclick="openRespectOverlay()" title="Click to view/refresh">Respect: ${escHtml(_respectPct)}</span>`);
+  }
   const now = Date.now();
   if (_jailReleaseEndMs != null) {
     const secs = Math.max(0, Math.floor((_jailReleaseEndMs - now) / 1000));
@@ -357,6 +361,31 @@ function _updateCharPills() {
   }
   if (_aggProActive && !_activeTimers["aggpro"]) pills.push(_pill("AggPro: Active"));
   el.innerHTML = pills.join("");
+}
+
+function openRespectOverlay() {
+  const ov = document.getElementById("respect-overlay");
+  if (ov) {
+    document.getElementById("respect-overlay-pct").textContent = _respectPct != null ? _respectPct : "—";
+    ov.style.display = "flex";
+  }
+}
+
+function closeRespectOverlay() {
+  const ov = document.getElementById("respect-overlay");
+  if (ov) ov.style.display = "none";
+}
+
+function refreshRespect() {
+  const btn = document.getElementById("respect-refresh-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Refreshing…"; }
+  fetch("/respect/refresh", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      if (btn) { btn.disabled = false; btn.textContent = "Refresh Now"; }
+      if (d.error) { alert(d.error); return; }
+    })
+    .catch(() => { if (btn) { btn.disabled = false; btn.textContent = "Refresh Now"; } });
 }
 
 let _botRunning = false;
@@ -492,6 +521,7 @@ function pollStatus() {
 
       // Timers
       _lastEnergy = d.energy;
+      if (d.respect_pct !== undefined) _respectPct = d.respect_pct;
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null, d.flight_departs_at || null, d.hospital_release_at || null);
       _botState = {
         logged_in: !!d.logged_in, in_jail: !!d.in_jail, in_hospital: !!d.in_hospital,

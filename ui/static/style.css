@@ -565,6 +565,13 @@ input.input-unsaved { color: var(--red) !important; }
   text-transform: uppercase;
   white-space: nowrap;
 }
+.pill-clickable {
+  cursor: pointer;
+}
+.pill-clickable:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 /* Jail */
 .jail-badge {
