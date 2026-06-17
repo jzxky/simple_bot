@@ -1017,6 +1017,7 @@ function updateCaseWorkSection(occupation) {
   document.getElementById("cw-hospital").style.display = isHospital ? "" : "none";
   document.getElementById("cw-fire").style.display = isFire ? "" : "none";
   document.getElementById("cw-engineering").style.display = isEngineering ? "" : "none";
+  if (isHospital)    renderCwHospitalHistory();
   if (isEngineering) renderCwEngineeringHistory();
 }
 
@@ -1556,6 +1557,42 @@ function renderCwEngineeringHistory() {
   container.innerHTML = html;
 }
 
+function renderCwHospitalHistory() {
+  const container = document.getElementById("cw-hosp-history");
+  if (!container) return;
+  const enabled = document.getElementById("char_history_enabled")?.checked;
+  if (!enabled) { container.innerHTML = ""; return; }
+
+  if (!_chData || !_chData.stat_sections) {
+    container.innerHTML = `<p style="color:var(--muted);font-size:0.9rem">No character history data yet.</p>`;
+    return;
+  }
+  const sec = (_chData.stat_sections || []).find(s => s.title === "Medical Work");
+  if (!sec) { container.innerHTML = ""; return; }
+
+  const REFRESH_BTN = `<button class="btn-secondary icon-btn" onclick="refreshCharHistory()" title="Refresh character history" style="margin-left:4px;padding:2px 5px">
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+  </button>`;
+
+  const hideZeros = _isHideZeros(sec.title);
+  const rows = hideZeros ? sec.rows.filter(r => !_isZero(r.value)) : sec.rows;
+  const toggle = _hzToggle(sec.title, hideZeros);
+
+  let html = `<div class="ch-section">
+    <div class="ch-section-head"><span class="ch-section-title">${sec.title}</span>${toggle}${REFRESH_BTN}</div>`;
+  if (!rows.length && hideZeros) {
+    html += `<p class="ch-empty-note">All values zero</p>`;
+  } else {
+    html += `<table class="ch-table">`;
+    for (const row of rows) {
+      html += `<tr><td class="ch-key">${row.key}</td><td class="ch-val">${_fmtVal(row.value)}</td></tr>`;
+    }
+    html += `</table>`;
+  }
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
 const _AGG_CRIME_KEYS = new Set([
   "Pickpocketing", "Muggings", "GTAs", "Break & Enters",
   "Torches", "Armed Robberies", "Bank Robberies", "Hacking",
@@ -1743,6 +1780,7 @@ function renderCharHistory(data, reqs) {
   }
 
   body.innerHTML = html;
+  renderCwHospitalHistory();
   renderCwEngineeringHistory();
 }
 
@@ -2130,11 +2168,11 @@ function plRenderRecentDead() {
   }
   tbody.innerHTML = dead.map(p => {
     const diedDate = new Date(p.died_at).toLocaleString();
-    return `<tr>
+    return `<tr class="pl-data-row">
       <td>${escHtml(p.username)}</td>
-      <td class="col-homecity">${escHtml(p.homecity || "")}</td>
-      <td class="col-occupation">${escHtml(p.occupation || "")}</td>
-      <td class="col-rank">${escHtml(p.rank || "")}</td>
+      <td class="col-rank">${escHtml(p.rank || "—")}</td>
+      <td class="col-occupation">${escHtml(p.occupation || "—")}</td>
+      <td class="col-homecity">${escHtml(p.homecity || "—")}</td>
       <td style="white-space:nowrap">${escHtml(diedDate)}</td>
     </tr>`;
   }).join("");
