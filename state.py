@@ -330,25 +330,23 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
                     pass
                 break
 
-    # Online/local players — parsed from whosonlinecell on every non-jail page
-    woc = soup.find("div", id="whosonlinecell")
-    if woc:
-        online, local = set(), set()
-        for a in woc.find_all("a", id=True):
+    # Online/local players — two whosonlinecell divs: class contains "global" or "local"
+    def _parse_woc(div) -> set:
+        names = set()
+        for a in div.find_all("a", id=True):
             pid = a.get("id", "")
             if not pid.startswith("profileLink:"):
                 continue
             parts = pid.split(":")
-            if len(parts) < 2:
-                continue
-            name = parts[1]
-            online.add(name)
-            # Local = green background on the <a> element itself
-            a_style = a.get("style", "")
-            if "50, 205, 50" in a_style:
-                local.add(name)
-        s.online_players = online
-        s.local_players = local
+            if len(parts) >= 2:
+                names.add(parts[1])
+        return names
+
+    global_woc = soup.find("div", id="whosonlinecell", class_="global")
+    local_woc  = soup.find("div", id="whosonlinecell", class_="local")
+    if global_woc or local_woc:
+        s.online_players = _parse_woc(global_woc) if global_woc else set()
+        s.local_players  = _parse_woc(local_woc)  if local_woc  else set()
 
     # Login state
     s.logged_in = url.rstrip("/") != urls.BASE_URL + "/default.asp"
