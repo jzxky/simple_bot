@@ -837,6 +837,47 @@
               <button class="num-save-btn" id="save-engineering_poll_interval" onclick="saveNum('engineering_poll_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               seconds
             </div>
+            <table class="priority-table" id="engineering-priority-table">
+              <thead>
+                <tr><th></th><th>#</th><th>Task</th><th>Target</th></tr>
+              </thead>
+              <tbody id="engineering-priority-body">
+                {% set ENG_META = {
+                  'construct_apartment': {'label': 'Construct Apartment', 'pvp': true},
+                  'repair_business':     {'label': 'Repair Business',     'pvp': false},
+                  'repair_vehicle':      {'label': 'Repair Vehicle',      'pvp': true},
+                  'construct_vault':     {'label': 'Construct Vault',     'pvp': true},
+                } %}
+                {% set eng_tasks = config.get('case_work', {}).get('engineering', {}).get('tasks', [
+                  {'type':'construct_apartment', 'target':'all'},
+                  {'type':'repair_business',     'enabled':true},
+                  {'type':'repair_vehicle',      'target':'all'},
+                  {'type':'construct_vault',     'target':'all'},
+                ]) %}
+                {% for task in eng_tasks %}
+                {% set meta = ENG_META.get(task.type, {'label': task.type, 'pvp': false}) %}
+                <tr data-type="{{ task.type }}">
+                  <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
+                  <td class="priority-num">{{ loop.index }}</td>
+                  <td>{{ meta.label }}</td>
+                  <td>
+                    {% if meta.pvp %}
+                    <select class="cw-select" id="cw_{{ task.type }}_target" onchange="autoSave()">
+                      {% for v, l in [('all','All'),('whitelist','Whitelist Only'),('not_blacklist','Not Blacklist'),('none','No-one')] %}
+                      <option value="{{ v }}" {% if task.get('target','all') == v %}selected{% endif %}>{{ l }}</option>
+                      {% endfor %}
+                    </select>
+                    {% else %}
+                    <label class="toggle-label" style="justify-content:flex-start">
+                      <input type="checkbox" id="cw_{{ task.type }}_enabled" {% if task.get('enabled', true) %}checked{% endif %} onchange="autoSave()">
+                      <span class="toggle"></span>
+                    </label>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
             <div id="cw-eng-history" style="margin-top:10px"></div>
           </div>
         </div>

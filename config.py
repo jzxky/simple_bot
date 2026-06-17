@@ -67,7 +67,13 @@ DEFAULT_CONFIG = {
             "poll_interval": 31
         },
         "engineering": {
-            "poll_interval": 31
+            "poll_interval": 31,
+            "tasks": [
+                {"type": "construct_apartment", "target": "all"},
+                {"type": "repair_business",     "enabled": True},
+                {"type": "repair_vehicle",      "target": "all"},
+                {"type": "construct_vault",     "target": "all"},
+            ]
         }
     },
     "players": {
