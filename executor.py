@@ -274,11 +274,14 @@ def _get_online_local_players(state: GameState) -> list:
         return []
     players = []
     for a in cell.find_all("a"):
-        parts = a.get("id", "").split(":")
+        aid = a.get("id", "")
+        parts = aid.split(":")
         if len(parts) < 3:
             continue
         name, status = parts[1], parts[2]
         if status == "In-Jail" or name == state.own_name:
+            continue
+        if "Angel" in parts:
             continue
         players.append(name)
     return players
