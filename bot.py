@@ -41,6 +41,7 @@ from tasks.drug_trade import DrugTradeTask
 from tasks.illness import IllnessTask
 from tasks.gym import GymTask
 from tasks.casino import CasinoTask
+from tasks.respect import RespectTask
 from tasks.cs_punishment import CSPunishmentTask
 from tasks.online_age import OnlineAgeTask
 from tasks.bionics import BionicsTask
@@ -78,6 +79,7 @@ _travel_dests_request: queue.Queue = queue.Queue(maxsize=1)
 _travel_dests_result: queue.Queue = queue.Queue(maxsize=1)
 _clear_earn_event = threading.Event()
 _clear_jail_duty_queue_event = threading.Event()
+_respect_refresh_queue: queue.Queue = queue.Queue()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
 state = GameState()
@@ -174,6 +176,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     global _bionics_task
     _bionics_task = BionicsTask()
     sched.add(_bionics_task)
+    sched.add(RespectTask())
     sched.add(PlayerRefreshTask())
     sched.add(SyncTask())
     sched.add(CheckTopJobTask())
@@ -281,6 +284,8 @@ def _run(c: dict):
         _sched = sched
         _state = state
 
+        _startup_earns_done = not c.get("earns", {}).get("enabled", False)
+
         while not _stop_event.is_set():
             if _pause_event.is_set():
                 time.sleep(1)
@@ -368,6 +373,22 @@ def _run(c: dict):
 
             sched.tick(state, executor)
             _scheduler_snapshot = sched.snapshot(state)
+
+            if not _startup_earns_done and state.logged_in:
+                earn_type = c["earns"].get("earn_type", "surgeon")
+                try:
+                    executor.execute(Action("check_earns", earn_type=earn_type), state)
+                except Exception as _e:
+                    state.add_log(f"Startup earns check failed: {_e}")
+                _startup_earns_done = True
+
+            # Respect refresh requests from the Flask thread
+            if not _respect_refresh_queue.empty():
+                try:
+                    _respect_refresh_queue.get_nowait()
+                    executor.execute(Action("fetch_respect"), state)
+                except Exception as e:
+                    state.add_log(f"Respect refresh error: {e}")
 
             # Clear earn queue if requested from UI
             if _clear_earn_event.is_set():
@@ -552,6 +573,10 @@ def online_population() -> dict:
         "jail_inmates": sorted(jail_inmates),
         "partners": sorted(partners),
     }
+
+
+def request_respect_refresh():
+    _respect_refresh_queue.put(True)
 
 
 def request_clear_earn_queue():

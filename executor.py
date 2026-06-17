@@ -2486,6 +2486,26 @@ def handle_check_engineering_cases(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def handle_fetch_respect(action: Action, state: GameState):
+    from tasks.respect import save_respect_data
+    import time as _time
+    if not state.own_name:
+        return
+    page = browser.page()
+    _nav(_u(f"/userprofile.asp?username={state.own_name}"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(page.content(), "html.parser")
+    bar = soup.find("div", id="respect_bar")
+    if bar:
+        pct = bar.get_text(strip=True)
+        save_respect_data(pct, _time.time())
+        state.add_log(f"Respect: {pct}")
+    else:
+        save_respect_data(None, _time.time())
+    _nav(_u("/main.asp"), state)
+
+
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
@@ -2524,6 +2544,7 @@ HANDLERS = {
     "check_vehicle": handle_check_vehicle,
     "repair_vehicle": handle_repair_vehicle,
     "travel": handle_travel,
+    "fetch_respect": handle_fetch_respect,
 }
 
 
