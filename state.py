@@ -334,13 +334,19 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     woc = soup.find("div", id="whosonlinecell")
     if woc:
         online, local = set(), set()
-        for a in woc.find_all("a", id=lambda v: v and v.startswith("profileLink:")):
-            parts = a.get("id", "").split(":")
-            if len(parts) >= 2:
-                name = parts[1]
-                online.add(name)
-                if a.find("span", style=lambda v: v and "ff9900" in v):
-                    local.add(name)
+        for a in woc.find_all("a", id=True):
+            pid = a.get("id", "")
+            if not pid.startswith("profileLink:"):
+                continue
+            parts = pid.split(":")
+            if len(parts) < 2:
+                continue
+            name = parts[1]
+            online.add(name)
+            # Local = green background on the <a> element itself
+            a_style = a.get("style", "")
+            if "50, 205, 50" in a_style:
+                local.add(name)
         s.online_players = online
         s.local_players = local
 
