@@ -2211,9 +2211,9 @@ def handle_gym(action: Action, state: GameState):
     ):
         # Parse cost
         cost = 0
-        cost_p = soup.find("p", string=_re.compile(r"current cost", _re.I))
+        cost_p = soup.find("p", string=re.compile(r"current cost", re.I))
         if cost_p:
-            m = _re.search(r"\$([\d,]+)", cost_p.get_text())
+            m = re.search(r"\$([\d,]+)", cost_p.get_text())
             if m:
                 cost = int(m.group(1).replace(",", ""))
 
