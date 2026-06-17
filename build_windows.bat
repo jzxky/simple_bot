@@ -23,7 +23,7 @@ echo Installing dependencies...
 pip install --quiet -r requirements.txt
 pip install --quiet pyinstaller
 
-:: Build
+:: Build — single portable EXE
 echo.
 echo Building executable...
 pyinstaller simple_bot.spec --noconfirm
@@ -36,14 +36,17 @@ if errorlevel 1 (
 
 echo.
 echo BUILD COMPLETE.
-echo Output folder: dist\MafiaMatrixBot\
+echo Output: dist\MafiaMatrixBot.exe
 echo.
 echo === First-time setup for end users ===
-echo 1. Copy dist\MafiaMatrixBot\ to the target machine
-echo 2. Run:  MafiaMatrixBot.exe --install   (installs Chrome, one time only)
-echo 3. Create a .env file next to MafiaMatrixBot.exe:
+echo 1. Copy MafiaMatrixBot.exe to any folder on the target machine
+echo 2. Run:  MafiaMatrixBot.exe --install    (downloads Chrome, one time only)
+echo 3. Create a .env file in the SAME folder as MafiaMatrixBot.exe:
 echo      MM_EMAIL=your@email.com
 echo      MM_PASSWORD=yourpassword
 echo 4. Run:  MafiaMatrixBot.exe
+echo.
+echo Note: On first launch the EXE will take ~10-20s to unpack itself.
+echo       Subsequent launches are just as fast.
 echo.
 pause
