@@ -2431,9 +2431,45 @@ def handle_casino(action: Action, state: GameState):
         _play_slots(state, bet_amount)
 
 
+_ENG_SECTION_KEYS = {
+    "new building requests":    "construct_apartment",
+    "business repairs":         "repair_business",
+    "vehicle repair requests":  "repair_vehicle",
+    "vault construction requests": "construct_vault",
+}
+
+
+def _finish_eng(state: GameState):
+    result_soup = BeautifulSoup(browser.page().content(), "html.parser")
+    success = result_soup.find("div", id="success")
+    fail = result_soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Engineering result: {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Engineering failed: {fail.get_text(strip=True)}")
+    else:
+        state.add_log("Engineering case work: submitted.")
+    _refresh_state(state)
+
+
 def handle_check_engineering_cases(action: Action, state: GameState):
     if not state.timers.get("case", {}).get("ready", True):
         return
+
+    tasks = action.params.get("tasks", [])
+    # Build priority list; repair_business uses enabled flag, others use target
+    priority = []
+    task_cfg = {}
+    for t in tasks:
+        typ = t["type"]
+        if typ == "repair_business":
+            if t.get("enabled", True) is not False:
+                priority.append(typ)
+            task_cfg[typ] = t
+        else:
+            if t.get("target", "all") != "none":
+                priority.append(typ)
+            task_cfg[typ] = t
 
     page = browser.page()
     _nav(_u("/income/construction.asp"), state)
@@ -2442,51 +2478,95 @@ def handle_check_engineering_cases(action: Action, state: GameState):
 
     html = page.content()
     soup = BeautifulSoup(html, "html.parser")
-
     _save_casework_snapshot("engineering", html)
 
-    # New building requests take priority
-    new_build_radio = soup.find("input", {"type": "radio", "name": "Req_username"})
-    if new_build_radio:
-        radio_value = new_build_radio.get("value", "")
-        state.add_log(f"Engineering: starting construction for '{radio_value}'.")
-        page.check(f"input[type='radio'][name='Req_username'][value='{radio_value}']")
-        page.click("input[type='submit'][name='B1'][value='Start Construction']")
-        page.wait_for_load_state("domcontentloaded")
-        result_soup = BeautifulSoup(page.content(), "html.parser")
-        success = result_soup.find("div", id="success")
-        fail = result_soup.find("div", id="fail")
-        if success:
-            state.add_log(f"Engineering construction result: {success.get_text(strip=True)}")
-        elif fail:
-            state.add_log(f"Engineering construction failed: {fail.get_text(strip=True)}")
+    # Split page into sections by column_title divs
+    sections = {}  # type_key -> list of tags between this title and the next
+    current_key = None
+    current_tags = []
+    holder = soup.find("div", id="holder_content")
+    children = holder.children if holder else soup.children
+    for tag in children:
+        if hasattr(tag, "get") and "column_title" in tag.get("class", []):
+            if current_key:
+                sections[current_key] = current_tags
+            heading = tag.get_text(strip=True).lower()
+            current_key = next((v for k, v in _ENG_SECTION_KEYS.items() if k in heading), None)
+            current_tags = []
+        elif current_key is not None:
+            current_tags.append(tag)
+    if current_key:
+        sections[current_key] = current_tags
+
+    def _section_soup(tags):
+        combined = "".join(str(t) for t in tags)
+        return BeautifulSoup(combined, "html.parser")
+
+    def _target_ok(username, task_type):
+        cfg = task_cfg.get(task_type, {})
+        target = cfg.get("target", "all")
+        if target == "all":
+            return True
+        if target == "whitelist":
+            return username in (state.whitelist or [])
+        if target == "not_blacklist":
+            return username not in (state.blacklist or [])
+        return False
+
+    # Try each type in priority order
+    for typ in priority:
+        if typ not in sections:
+            continue
+        sec = _section_soup(sections[typ])
+
+        if typ == "repair_business":
+            radio = sec.find("input", {"type": "radio", "name": "Req_id"})
+            if not radio:
+                continue
+            val = radio.get("value", "")
+            state.add_log(f"Engineering: repair business job #{val}.")
+            page.check(f"input[type='radio'][name='Req_id'][value='{val}']")
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
+            _finish_eng(state)
+            return
+
+        if typ == "construct_apartment":
+            radios = sec.find_all("input", {"type": "radio", "name": "Req_username"})
+            for radio in radios:
+                username = radio.get("value", "")
+                if not _target_ok(username, typ):
+                    continue
+                state.add_log(f"Engineering: construct apartment for '{username}'.")
+                page.check(f"input[type='radio'][name='Req_username'][value='{username}']")
+                page.click("input[type='submit'][name='B1'][value='Start Construction']")
+                page.wait_for_load_state("domcontentloaded")
+                _finish_eng(state)
+                return
         else:
-            state.add_log("Engineering construction: submitted.")
-        _refresh_state(state)
-        return
+            radios = sec.find_all("input", {"type": "radio", "name": "Req_id"})
+            for radio in radios:
+                val = radio.get("value", "")
+                # Try to find the requester username from nearby text
+                parent = radio.parent
+                username = ""
+                if parent:
+                    for sib in parent.find_all("td"):
+                        txt = sib.get_text(strip=True)
+                        if txt and not txt.isdigit() and txt != val:
+                            username = txt
+                            break
+                if username and not _target_ok(username, typ):
+                    continue
+                label = "repair vehicle" if typ == "repair_vehicle" else "construct vault"
+                state.add_log(f"Engineering: {label} job #{val}" + (f" for '{username}'" if username else "") + ".")
+                page.check(f"input[type='radio'][name='Req_id'][value='{val}']")
+                page.click("input[type='submit'][name='B1']")
+                page.wait_for_load_state("domcontentloaded")
+                _finish_eng(state)
+                return
 
-    # Fall back to existing repair/case work
-    first_radio = soup.find("input", {"type": "radio", "name": "Req_id"})
-    if not first_radio:
-        return
-
-    radio_value = first_radio.get("value", "")
-    state.add_log(f"Engineering case work: selecting job #{radio_value}.")
-
-    page.check(f"input[type='radio'][name='Req_id'][value='{radio_value}']")
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
-
-    result_soup = BeautifulSoup(page.content(), "html.parser")
-    success = result_soup.find("div", id="success")
-    fail = result_soup.find("div", id="fail")
-    if success:
-        state.add_log(f"Engineering case work result: {success.get_text(strip=True)}")
-    elif fail:
-        state.add_log(f"Engineering case work failed: {fail.get_text(strip=True)}")
-    else:
-        state.add_log("Engineering case work: submitted.")
-    _refresh_state(state)
+    state.add_log("Engineering: no eligible case work available.")
 
 
 def handle_fetch_respect(action: Action, state: GameState):

@@ -142,6 +142,8 @@ def save():
     c["case_work"]["fire"]["poll_interval"] = max(31, int(data.get("fire_poll_interval", 31)))
     c["case_work"].setdefault("engineering", {})
     c["case_work"]["engineering"]["poll_interval"] = max(31, int(data.get("engineering_poll_interval", 31)))
+    if data.get("engineering_tasks"):
+        c["case_work"]["engineering"]["tasks"] = data["engineering_tasks"]
 
     cfg.save(c)
     if bot.is_running():
