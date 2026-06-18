@@ -7,27 +7,13 @@ An invalid URL will stay on the given URL and show "Error 404" in the title.
 Usage:
     python3 verify_promo_urls.py
 
-Reads credentials from .env (EMAIL= and PASSWORD= keys).
+Reads credentials from MM_EMAIL / MM_PASSWORD in the bot's .env file
+(same location as config.json, resolved via paths.data_dir()).
 """
 
-import os
 import sys
 import time
-
-# Load .env credentials
-def _load_env():
-    env_path = os.path.join(os.path.dirname(__file__), ".env")
-    creds = {}
-    if not os.path.exists(env_path):
-        print("ERROR: .env file not found.")
-        sys.exit(1)
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if "=" in line and not line.startswith("#"):
-                k, _, v = line.partition("=")
-                creds[k.strip()] = v.strip().strip('"').strip("'")
-    return creds
+import config as cfg
 
 PROMOS = [
     ("Jail",         "Schooled",             "/promotion/schooled.asp"),
@@ -76,11 +62,11 @@ PROMOS = [
 BASE_URL = "https://mafiamatrix.com"
 
 def main():
-    creds = _load_env()
-    email = creds.get("EMAIL") or creds.get("email", "")
-    password = creds.get("PASSWORD") or creds.get("password", "")
+    creds = cfg._load_env()
+    email = creds.get("email", "")
+    password = creds.get("password", "")
     if not email or not password:
-        print("ERROR: EMAIL and PASSWORD must be set in .env")
+        print(f"ERROR: MM_EMAIL and MM_PASSWORD must be set in {cfg.ENV_PATH}")
         sys.exit(1)
 
     import browser
