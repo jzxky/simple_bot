@@ -121,20 +121,24 @@ def _parse(html: str) -> dict:
                     earn_history.append({"category": category, "entries": entries})
             continue
 
-        # ── Standard single-column stat tables (Key: Value per row) ───────
+        # ── Standard stat tables: single-cell "Key: Value" or two-cell rows ─
         section_rows = []
         for tr in rows[1:]:  # skip title row
             cells = tr.find_all("td")
-            if len(cells) != 1:
-                continue
-            text = cells[0].get_text(strip=True)
-            if ":" not in text:
-                continue
-            key, _, val = text.partition(":")
-            key = key.strip()
-            val = val.strip()
-            if key:
-                section_rows.append({"key": key, "value": val})
+            if len(cells) == 1:
+                text = cells[0].get_text(strip=True)
+                if ":" not in text:
+                    continue
+                key, _, val = text.partition(":")
+                key = key.strip()
+                val = val.strip()
+                if key:
+                    section_rows.append({"key": key, "value": val})
+            elif len(cells) == 2:
+                key = cells[0].get_text(strip=True).rstrip(":")
+                val = cells[1].get_text(strip=True)
+                if key:
+                    section_rows.append({"key": key, "value": val})
 
         career = title in _CAREER_SECTIONS
         if section_rows:
