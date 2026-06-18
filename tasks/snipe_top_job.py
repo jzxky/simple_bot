@@ -11,6 +11,7 @@ import urls
 from state import GameState, parse_state, SERVER_TIME_FMT
 from tasks.base import Task
 from tasks.check_top_job import _top_job_map
+from promotions import PROMO_BY_RANK, get_choice
 
 SNIPE_TIMEOUT = 30 * 60  # seconds
 
@@ -65,15 +66,20 @@ class SnipeTopJobTask(Task):
 
     def _submit_promo(self, state: GameState, top_job: str) -> bool:
         try:
+            promo_data = PROMO_BY_RANK.get(top_job, {})
+            slug = promo_data.get("slug", "")
+            choice = get_choice(slug) if slug else "A"
             page = browser.page()
-            radio = page.query_selector("input[type='radio']")
-            if radio:
-                radio.click()
+            radios = page.query_selector_all("input[type='radio']")
+            idx = 0 if choice == "A" else 1
+            target = radios[idx] if len(radios) > idx else (radios[0] if radios else None)
+            if target:
+                target.click()
             page.click("input[type='submit']")
             page.wait_for_load_state("domcontentloaded", timeout=10000)
             parse_state(page.content(), page.url, state)
             if state.occupation == top_job:
-                state.add_log(f"SnipeTopJob: promotion to {top_job} successful!")
+                state.add_log(f"SnipeTopJob: promoted to {top_job} (option {choice})!")
                 return True
             state.add_log("SnipeTopJob: form submitted but occupation not updated yet.")
             return False

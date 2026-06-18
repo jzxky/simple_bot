@@ -28,6 +28,7 @@ from tasks.refresh import RefreshTask
 from tasks.consume import ConsumeTask
 from tasks.check_top_job import CheckTopJobTask
 from tasks.snipe_top_job import SnipeTopJobTask
+from tasks.auto_promo import AutoPromoTask
 from tasks.jail_duties import JailDutiesTask
 from tasks.jail_action import JailActionTask
 from tasks.jail_consume import JailConsumeTask
@@ -181,6 +182,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(SyncTask())
     sched.add(CheckTopJobTask())
     sched.add(SnipeTopJobTask())
+    sched.add(AutoPromoTask())
     sched.add(JailDutiesTask())
     sched.add(JailActionTask())
     sched.add(JailConsumeTask())

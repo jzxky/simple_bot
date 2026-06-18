@@ -130,6 +130,8 @@ function _doSave() {
     payback_mode: document.getElementById("payback_mode").value,
     monitor_top_job: document.getElementById("monitor_top_job").checked,
     promo_thread_id: (document.getElementById("promo_thread_id") || {value:""}).value.trim(),
+    auto_promo_enabled: document.getElementById("auto_promo_enabled")?.checked ?? false,
+    promo_choices: _collectPromoChoices(),
     jail_enabled: document.getElementById("jail_enabled").checked,
     jail_duty: document.getElementById("jail_duty").value,
     jail_action: document.getElementById("jail_action").value,
@@ -1059,6 +1061,14 @@ function updateCaseWorkSection(occupation) {
   document.getElementById("cw-engineering").style.display = isEngineering ? "" : "none";
   if (isHospital)    renderCwHospitalHistory();
   if (isEngineering) renderCwEngineeringHistory();
+}
+
+function _collectPromoChoices() {
+  const choices = {};
+  document.querySelectorAll('input[type="radio"][name^="promo_"]').forEach(radio => {
+    if (radio.checked) choices[radio.name.replace(/^promo_/, "")] = radio.value;
+  });
+  return choices;
 }
 
 function _serializePriorityTable(tbodyId) {
