@@ -2566,7 +2566,6 @@ def handle_check_engineering_cases(action: Action, state: GameState):
                 _finish_eng(state)
                 return
 
-    state.add_log("Engineering: no eligible case work available.")
 
 
 def handle_fetch_respect(action: Action, state: GameState):
