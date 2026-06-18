@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Verify which promotion URLs are valid on mafiamatrix.com.
+Verify which promotion URLs are valid on mafiamatrix.net.
 A valid URL will redirect to main.asp (bot is ineligible but the page exists).
 An invalid URL will stay on the given URL and show "Error 404" in the title.
 
@@ -59,8 +59,6 @@ PROMOS = [
     ("Gangster",     "Don",                  "/promotion/don.asp"),
 ]
 
-BASE_URL = "https://mafiamatrix.com"
-
 def main():
     creds = cfg._load_env()
     email = creds.get("email", "")
@@ -73,7 +71,7 @@ def main():
     import urls
 
     print("Launching browser and logging in...")
-    browser.start(headless=False)
+    browser.start(headless=True)
     page = browser.page()
 
     # Log in
@@ -126,7 +124,7 @@ def main():
     if results["fail"]:
         print("\nFAILED URLs (need correct paths):")
         for item in results["fail"]:
-            print(f"  {item[1]:<25} {BASE_URL + item[2]}")
+            print(f"  {item[1]:<25} {urls.BASE_URL + item[2]}")
 
     if results["other"]:
         print("\nUNKNOWN results (manual review needed):")
