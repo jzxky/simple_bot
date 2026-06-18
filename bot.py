@@ -151,7 +151,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             tasks=hosp.get("tasks", []),
         ))
         eng = cw_cfg.get("engineering", {})
-        sched.add(EngineeringCaseWorkTask(poll_interval=eng.get("poll_interval", 31)))
+        sched.add(EngineeringCaseWorkTask(poll_interval=eng.get("poll_interval", 31), tasks=eng.get("tasks", [])))
 
     away_cfg = c.get("away_action", {})
     if away_cfg.get("enabled", False):
