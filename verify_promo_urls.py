@@ -73,7 +73,7 @@ def main():
     import urls
 
     print("Launching browser and logging in...")
-    browser.launch(headless=False)
+    browser.start(headless=False)
     page = browser.page()
 
     # Log in
@@ -133,7 +133,7 @@ def main():
         for item in results["other"]:
             print(f"  {item[1]:<25} landed on: {item[3]}")
 
-    browser.close()
+    browser.stop()
 
 if __name__ == "__main__":
     main()
