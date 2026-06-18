@@ -215,6 +215,113 @@
                 </div>
               </div>
             </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                Auto-Promotion
+                <label class="toggle-label">
+                  <input type="checkbox" id="auto_promo_enabled"
+                    {% if promo.get('auto_promo', {}).get('enabled') %}checked{% endif %}
+                    onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <p style="font-size:0.85rem;color:var(--muted);margin:0 0 14px;">
+                At 100% rank progress, the bot checks main.asp and submits the option you select below.
+              </p>
+
+              {% set choices = promo.get('choices', {}) %}
+              {% set PROMO_CATS = [
+                ('Jail', [
+                  ('schooled','Schooled','off+25/def+25','off+30/def+20','A'),
+                  ('mule','Mule','off+100/def+80','off+80/def+100','A'),
+                  ('hardrock','Hardrock','off+200/def+150','off+250/def+150','A'),
+                  ('lifer','Lifer','off+200/def+80','off+250/def+80','A'),
+                ]),
+                ('City', [
+                  ('mayor','Mayor','off+10/def+350/int+15','off+50/def+260/int+25','B'),
+                ]),
+                ('Bank', [
+                  ('bank_teller','Bank Teller','off+5/def+10/int+10','off+10/def+6/int+10','A'),
+                  ('loan_officer','Loan Officer','off+12/def+105/int+20','off+25/def+95/int+5','A'),
+                  ('bank_manager','Bank Manager','off+5/def+50/int+20','off+22/def+116/int+5','A'),
+                ]),
+                ('Fire', [
+                  ('fire_fighter','Fire Fighter','off+65/def+115/int+10','off+25/def+205/int+45','B'),
+                  ('fire_chief','Fire Chief','off+50/def+200/int+20','off+100/def+150/int+25','B'),
+                ]),
+                ('Funeral', [
+                  ('mortician_assistant','Mortician Assistant','off+12/def+100/int+15','off+30/def+60/int+30','B'),
+                  ('mortician','Mortician','off+15/def+90/int+20','off+25/def+120/int+5','A'),
+                  ('funeral_director','Funeral Director','off+12/def+110/int+20','off+40/def+95/int+5','A'),
+                ]),
+                ('Hospital', [
+                  ('nurse','Nurse','off+12/def+10/int+25','off+20/def+15/int+5','A'),
+                  ('doctor','Doctor','off+54/def+105/int+5','off+15/def+185/int+35','B'),
+                  ('surgeon','Surgeon','off+74/def+115/int+10','off+25/def+205/int+55','B'),
+                  ('hospital_director','Hospital Director','off+12/def+110/int+20','off+50/def+80/int+5','A'),
+                ]),
+                ('Law', [
+                  ('legal_secretary','Legal Secretary','off+15/def+100/int+20','off+22/def+80/int+25','B'),
+                  ('lawyer','Lawyer','off+15/def+110/int+20','off+30/def+90/int+35','B'),
+                  ('judge','Judge','off+20/def+250/int+35','off+20/def+250/int+35','A'),
+                  ('supreme_court_judge','Supreme Court Judge','off+350/def+100/int+35','off+100/def+350/int+55','B'),
+                ]),
+                ('Construction', [
+                  ('mechanic','Mechanic','off+12/def+10/int+25','off+20/def+15/int+5','A'),
+                  ('technician','Technician','off+54/def+105/int+5','off+15/def+185/int+35','B'),
+                  ('engineer','Engineer','off+74/def+115/int+10','off+25/def+205/int+55','B'),
+                  ('chief_engineer','Chief Engineer','off+12/def+110/int+20','off+50/def+80/int+5','A'),
+                ]),
+                ('Customs', [
+                  ('supervisor','Supervisor','off+15/def+90/int+20','off+25/def+120/int+5','A'),
+                  ('superintendent','Superintendent','off+12/def+100/int+15','off+30/def+60/int+30','B'),
+                  ('commissioner_general','Commissioner-General','off+12/def+110/int+20','off+40/def+95/int+5','A'),
+                ]),
+                ('Police', [
+                  ('sergeant','Sergeant','off+12/def+210/int+25','off+45/def+150/int+35','B'),
+                  ('senior_sergeant','Senior Sergeant','off+30/def+260/int+14','off+35/def+150/int+12','A'),
+                  ('detective','Detective','off+12/def+210/int+15','off+40/def+170/int+30','B'),
+                  ('commissioner','Commissioner','off+10/def+350/int+15','off+50/def+260/int+25','B'),
+                ]),
+                ('Gangster', [
+                  ('dealer','Dealer','off+12/def+8/int+20','off+22/def+16/int+5','A'),
+                  ('giovane_dhonore',"Giovane D'Honore",'off+19/def+12/int+25','off+29/def+20/int+10','A'),
+                  ('enforcer','Enforcer','off+18/def+20/int+30','off+30/def+28/int+10','A'),
+                  ('piciotto','Piciotto','off+20/def+30/int+30','off+35/def+21/int+12','A'),
+                  ('sgarrista','Sgarrista','off+18/def+20/int+30','off+30/def+28/int+10','A'),
+                  ('capodecima','Capodecima','off+18/def+20/int+30','off+30/def+28/int+10','A'),
+                  ('caporegime','Caporegime','off+18/def+20/int+30','off+30/def+28/int+10','A'),
+                  ('boss','Boss','off+24/def+20/int+10','off+18/def+18/int+35','B'),
+                  ('don','Don','off+15/def+15/int+35','off+20/def+20/int+15','A'),
+                ]),
+              ] %}
+
+              {% for cat_name, cat_ranks in PROMO_CATS %}
+              <h4 style="margin:16px 0 6px;color:var(--muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #333;padding-bottom:4px;">{{ cat_name }}</h4>
+              <table style="width:100%;border-collapse:collapse;">
+                {% for slug, rank_name, opt_a, opt_b, def_choice in cat_ranks %}
+                {% set chosen = choices.get(slug, def_choice) %}
+                <tr style="border-bottom:1px solid #2a2a3a;">
+                  <td style="padding:5px 10px 5px 0;font-size:0.88rem;min-width:150px;white-space:nowrap;">{{ rank_name }}</td>
+                  <td style="padding:5px 12px 5px 0;">
+                    <label style="cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                      <input type="radio" name="promo_{{ slug }}" value="A"
+                        {% if chosen == 'A' %}checked{% endif %} onchange="autoSave()">
+                      <span style="font-size:0.78rem;color:var(--muted)">A: {{ opt_a }}</span>
+                    </label>
+                  </td>
+                  <td style="padding:5px 0;">
+                    <label style="cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+                      <input type="radio" name="promo_{{ slug }}" value="B"
+                        {% if chosen == 'B' %}checked{% endif %} onchange="autoSave()">
+                      <span style="font-size:0.78rem;color:var(--muted)">B: {{ opt_b }}</span>
+                    </label>
+                  </td>
+                </tr>
+                {% endfor %}
+              </table>
+              {% endfor %}
+            </div>
           </div>
         </div>
 

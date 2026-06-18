@@ -74,6 +74,10 @@ def save():
     c.setdefault("promo", {})
     c["promo"]["monitor_top_job"] = data.get("monitor_top_job", False)
     c["promo"]["top_job_thread_id"] = data.get("promo_thread_id", "")
+    c["promo"].setdefault("auto_promo", {})
+    c["promo"]["auto_promo"]["enabled"] = data.get("auto_promo_enabled", False)
+    if "promo_choices" in data and isinstance(data.get("promo_choices"), dict):
+        c["promo"]["choices"] = data["promo_choices"]
 
     c.setdefault("jail", {})
     prev_duty = c["jail"].get("duty", "laundry")

@@ -93,7 +93,22 @@ DEFAULT_CONFIG = {
     },
     "promo": {
         "monitor_top_job": False,
-        "top_job_thread_id": ""
+        "top_job_thread_id": "",
+        "auto_promo": {"enabled": False},
+        "choices": {
+            "schooled": "A", "mule": "A", "hardrock": "A", "lifer": "A",
+            "mayor": "B",
+            "bank_teller": "A", "loan_officer": "A", "bank_manager": "A",
+            "fire_fighter": "B", "fire_chief": "B",
+            "mortician_assistant": "B", "mortician": "A", "funeral_director": "A",
+            "nurse": "A", "doctor": "B", "surgeon": "B", "hospital_director": "A",
+            "legal_secretary": "B", "lawyer": "B", "judge": "A", "supreme_court_judge": "B",
+            "mechanic": "A", "technician": "B", "engineer": "B", "chief_engineer": "A",
+            "supervisor": "A", "superintendent": "B", "commissioner_general": "A",
+            "sergeant": "B", "senior_sergeant": "A", "detective": "B", "commissioner": "B",
+            "dealer": "A", "giovane_dhonore": "A", "enforcer": "A", "piciotto": "A",
+            "sgarrista": "A", "capodecima": "A", "caporegime": "A", "boss": "B", "don": "A",
+        }
     },
     "consumables": {
         "timer_limit": "00:00",
