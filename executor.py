@@ -2457,7 +2457,9 @@ def _click_eng_submit(page, radio_name: str, radio_value: str):
 
 
 def _finish_eng(state: GameState):
-    result_soup = BeautifulSoup(browser.page().content(), "html.parser")
+    html = browser.page().content()
+    _save_casework_snapshot("engineering_result", html)
+    result_soup = BeautifulSoup(html, "html.parser")
     # Read only from the portion of the page before the first column_title section,
     # so section-level divs don't shadow the top-level result message.
     search_root = result_soup
@@ -2470,8 +2472,16 @@ def _finish_eng(state: GameState):
             pre.append(str(child))
         if pre:
             search_root = BeautifulSoup("".join(pre), "html.parser")
-    success = search_root.find("div", id="success")
-    fail = search_root.find("div", id="fail")
+    success = (
+        search_root.find("div", id="success") or
+        search_root.find("div", class_="info green") or
+        search_root.find("div", class_="success")
+    )
+    fail = (
+        search_root.find("div", id="fail") or
+        search_root.find("div", class_="info red") or
+        search_root.find("div", class_="fail")
+    )
     if success:
         state.add_log(f"Engineering result: {success.get_text(strip=True)}")
     elif fail:
