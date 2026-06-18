@@ -70,21 +70,29 @@ def main():
     import browser
     import urls
 
+    from bs4 import BeautifulSoup
+
     print("Launching browser and logging in...")
     browser.start(headless=True)
     page = browser.page()
 
-    # Log in
-    page.goto(urls.BASE_URL + "/index.asp", wait_until="domcontentloaded", timeout=30000)
-    page.fill("input[name='email']", email)
-    page.fill("input[name='password']", password)
-    page.click("input[type='submit']")
-    page.wait_for_load_state("domcontentloaded", timeout=15000)
-    time.sleep(1)
+    # Log in (mirrors executor.py handle_login)
+    page.goto(urls.BASE_URL + "/default.asp", wait_until="load", timeout=30000)
+    page.wait_for_selector("form#loginForm", timeout=10000)
+    page.fill("input#email", email)
+    page.fill("input#pass", password)
+    page.click("button.btn-login")
+    page.wait_for_load_state("networkidle", timeout=15000)
 
-    if "loggedin" not in page.url and "main" not in page.url:
-        print(f"ERROR: Login may have failed. Current URL: {page.url}")
-        print("Proceeding anyway...")
+    soup = BeautifulSoup(page.content(), "html.parser")
+    err = soup.find("div", class_="info red")
+    if err and "login failed" in err.get_text(strip=True).lower():
+        print(f"ERROR: Login failed — {err.get_text(strip=True)}")
+        browser.stop()
+        sys.exit(1)
+
+    if soup.find("a", class_="btn-play"):
+        page.goto(urls.BASE_URL + "/loggedin.asp?display=play", wait_until="networkidle", timeout=15000)
 
     print(f"\nLogged in. Testing {len(PROMOS)} promotion URLs...\n")
 
