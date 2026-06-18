@@ -2439,6 +2439,23 @@ _ENG_SECTION_KEYS = {
 }
 
 
+def _click_eng_submit(page, radio_name: str, radio_value: str):
+    """Click the first submit button that follows the given radio in DOM order."""
+    page.evaluate(f"""() => {{
+        const radio = document.querySelector(
+            'input[type="radio"][name="{radio_name}"][value="{radio_value}"]'
+        );
+        if (!radio) return;
+        const allEls = Array.from(document.querySelectorAll('*'));
+        const radioIdx = allEls.indexOf(radio);
+        const btn = allEls.slice(radioIdx + 1).find(
+            el => el.tagName === 'INPUT' && el.type === 'submit'
+        );
+        if (btn) btn.click();
+    }}""")
+    page.wait_for_load_state("domcontentloaded")
+
+
 def _finish_eng(state: GameState):
     result_soup = BeautifulSoup(browser.page().content(), "html.parser")
     success = result_soup.find("div", id="success")
@@ -2526,8 +2543,7 @@ def handle_check_engineering_cases(action: Action, state: GameState):
             val = radio.get("value", "")
             state.add_log(f"Engineering: repair business job #{val}.")
             page.check(f"input[type='radio'][name='Req_id'][value='{val}']")
-            page.click("input[type='submit'][name='B1']")
-            page.wait_for_load_state("domcontentloaded")
+            _click_eng_submit(page, "Req_id", val)
             _finish_eng(state)
             return
 
@@ -2539,8 +2555,7 @@ def handle_check_engineering_cases(action: Action, state: GameState):
                     continue
                 state.add_log(f"Engineering: construct apartment for '{username}'.")
                 page.check(f"input[type='radio'][name='Req_username'][value='{username}']")
-                page.click("input[type='submit'][name='B1'][value='Start Construction']")
-                page.wait_for_load_state("domcontentloaded")
+                _click_eng_submit(page, "Req_username", username)
                 _finish_eng(state)
                 return
         else:
@@ -2561,8 +2576,7 @@ def handle_check_engineering_cases(action: Action, state: GameState):
                 label = "repair vehicle" if typ == "repair_vehicle" else "construct vault"
                 state.add_log(f"Engineering: {label} job #{val}" + (f" for '{username}'" if username else "") + ".")
                 page.check(f"input[type='radio'][name='Req_id'][value='{val}']")
-                page.click("input[type='submit'][name='B1']")
-                page.wait_for_load_state("domcontentloaded")
+                _click_eng_submit(page, "Req_id", val)
                 _finish_eng(state)
                 return
 
