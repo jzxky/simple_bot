@@ -2441,19 +2441,19 @@ _ENG_SECTION_KEYS = {
 
 def _click_eng_submit(page, radio_name: str, radio_value: str):
     """Click the first submit button that follows the given radio in DOM order."""
-    page.evaluate(f"""() => {{
-        const radio = document.querySelector(
-            'input[type="radio"][name="{radio_name}"][value="{radio_value}"]'
-        );
-        if (!radio) return;
-        const allEls = Array.from(document.querySelectorAll('*'));
-        const radioIdx = allEls.indexOf(radio);
-        const btn = allEls.slice(radioIdx + 1).find(
-            el => el.tagName === 'INPUT' && el.type === 'submit'
-        );
-        if (btn) btn.click();
-    }}""")
-    page.wait_for_load_state("domcontentloaded")
+    with page.expect_navigation(wait_until="domcontentloaded"):
+        page.evaluate(f"""() => {{
+            const radio = document.querySelector(
+                'input[type="radio"][name="{radio_name}"][value="{radio_value}"]'
+            );
+            if (!radio) return;
+            const allEls = Array.from(document.querySelectorAll('*'));
+            const radioIdx = allEls.indexOf(radio);
+            const btn = allEls.slice(radioIdx + 1).find(
+                el => el.tagName === 'INPUT' && el.type === 'submit'
+            );
+            if (btn) btn.click();
+        }}""");
 
 
 def _finish_eng(state: GameState):
