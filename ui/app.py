@@ -25,6 +25,7 @@ NOTIFICATION_EVENTS = [
     ("cloudflare_detected", "Cloudflare challenge"),
     ("jailed",              "Went to jail"),
     ("targets_exhausted",   "Crime targets exhausted"),
+    ("mhs_protected",       "MHS protection triggered"),
 ]
 
 _ui_root = os.path.join(paths.resource_dir(), "ui")

@@ -164,6 +164,7 @@ DEFAULT_CONFIG = {
         "cloudflare_detected": True,
         "jailed":              False,
         "targets_exhausted":   False,
+        "mhs_protected":       True,
     }
 }
 
