@@ -79,7 +79,10 @@ class SnipeTopJobTask(Task):
             page.wait_for_load_state("domcontentloaded", timeout=10000)
             parse_state(page.content(), page.url, state)
             if state.occupation == top_job:
-                state.add_log(f"SnipeTopJob: promoted to {top_job} (option {choice})!")
+                msg = f"SnipeTopJob: promoted to {top_job} (option {choice})!"
+                state.add_log(msg)
+                if cfg.load().get("notifications", {}).get("promotion_success", False):
+                    state.push_notification("promotion_success", msg)
                 return True
             state.add_log("SnipeTopJob: form submitted but occupation not updated yet.")
             return False

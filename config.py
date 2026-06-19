@@ -154,6 +154,16 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "server_url": "",
         "interval_minutes": 2,
+    },
+    "notifications": {
+        "bionics_in_stock":    True,
+        "bionics_purchased":   True,
+        "promotion_success":   True,
+        "auto_promo":          True,
+        "session_expired":     True,
+        "cloudflare_detected": True,
+        "jailed":              False,
+        "targets_exhausted":   False,
     }
 }
 

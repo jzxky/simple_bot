@@ -287,6 +287,7 @@ def _run(c: dict):
         _state = state
 
         _startup_earns_done = not c.get("earns", {}).get("enabled", False)
+        _was_in_jail = False
 
         while not _stop_event.is_set():
             if _pause_event.is_set():
@@ -295,10 +296,13 @@ def _run(c: dict):
 
             # Detect Cloudflare challenge — pause and wait for manual resolution
             if browser.is_cloudflare_challenge():
-                state.add_log(
+                msg = (
                     "Cloudflare gateway detected — manual takeover required. "
                     "Complete the challenge in the browser then press Resume."
                 )
+                state.add_log(msg)
+                if c.get("notifications", {}).get("cloudflare_detected", False):
+                    state.push_notification("cloudflare_detected", msg)
                 _pause_event.set()
                 continue
 
@@ -306,9 +310,15 @@ def _run(c: dict):
             if state.logged_in and browser.current_url().rstrip("/") == urls.BASE_URL + "/default.asp" and not browser.is_cloudflare_challenge():
                 state.logged_in = False
                 if c.get("misc", {}).get("relog_on_session_expire", True):
-                    state.add_log("Session expired — will re-login.")
+                    msg = "Session expired — will re-login."
+                    state.add_log(msg)
+                    if c.get("notifications", {}).get("session_expired", False):
+                        state.push_notification("session_expired", msg)
                 else:
-                    state.add_log("Session expired — re-login disabled, pausing.")
+                    msg = "Session expired — re-login disabled, pausing."
+                    state.add_log(msg)
+                    if c.get("notifications", {}).get("session_expired", False):
+                        state.push_notification("session_expired", msg)
                     state.relog_suppressed = True
                     _pause_event.set()
 
@@ -401,6 +411,12 @@ def _run(c: dict):
             if _clear_jail_duty_queue_event.is_set():
                 _clear_jail_duty_queue_event.clear()
                 executor.execute(Action("clear_jail_duty_queue"), state)
+
+            # Jailed notification — fires once when in_jail flips True
+            if state.in_jail and not _was_in_jail:
+                if c.get("notifications", {}).get("jailed", False):
+                    state.push_notification("jailed", "Bot went to jail.")
+            _was_in_jail = state.in_jail
 
             # Payback after a successful crime
             if getattr(state, "_last_crime_victim", None):

@@ -16,6 +16,17 @@ import players as pl
 import character_history as ch
 import trait_requirements as tr
 
+NOTIFICATION_EVENTS = [
+    ("bionics_in_stock",    "Bionics in stock"),
+    ("bionics_purchased",   "Bionic purchased"),
+    ("promotion_success",   "Rank promotion"),
+    ("auto_promo",          "Auto-promotion triggered"),
+    ("session_expired",     "Session expired"),
+    ("cloudflare_detected", "Cloudflare challenge"),
+    ("jailed",              "Went to jail"),
+    ("targets_exhausted",   "Crime targets exhausted"),
+]
+
 _ui_root = os.path.join(paths.resource_dir(), "ui")
 app = Flask(__name__,
             template_folder=os.path.join(_ui_root, "templates"),
@@ -25,7 +36,7 @@ app = Flask(__name__,
 @app.route("/")
 def index():
     c = cfg.load()
-    return render_template("index.html", config=c)
+    return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS)
 
 
 @app.route("/save", methods=["POST"])
@@ -149,9 +160,27 @@ def save():
     if data.get("engineering_tasks"):
         c["case_work"]["engineering"]["tasks"] = data["engineering_tasks"]
 
+    c.setdefault("notifications", {})
+    for slug, _ in NOTIFICATION_EVENTS:
+        c["notifications"][slug] = data.get(f"notif_{slug}", False)
+
     cfg.save(c)
     if bot.is_running():
         bot.request_reload()
+    return jsonify({"ok": True})
+
+
+@app.route("/notifications/dismiss", methods=["POST"])
+def notif_dismiss():
+    nid = (request.get_json() or {}).get("id")
+    if nid:
+        bot.state.notifications = [n for n in bot.state.notifications if n["id"] != nid]
+    return jsonify({"ok": True})
+
+
+@app.route("/notifications/clear", methods=["POST"])
+def notif_clear():
+    bot.state.notifications = []
     return jsonify({"ok": True})
 
 
@@ -301,6 +330,7 @@ def status():
         "hospital_release_at": s.hospital_release_at,
         "respect_pct": _get_respect_data().get("respect_pct"),
         "respect_last_check": _get_respect_data().get("last_check", 0.0),
+        "notifications": bot.state.notifications,
     })
 
 

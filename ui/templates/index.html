@@ -21,6 +21,10 @@
       <span id="status-text">Stopped</span>
       <span id="status-task" class="status-task"></span>
     </div>
+    <button id="notif-bell" class="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications" style="display:none">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span id="notif-badge" class="notif-badge">0</span>
+    </button>
   </header>
 
   <main>
@@ -511,6 +515,17 @@
                   <button id="restart-btn" class="action-btn" onclick="restartBot()">Restart</button>
                 </div>
               </div>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Notifications</h3>
+              <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification badge in the header so you can see them when you return AFK.</p>
+              {% set notif_cfg = config.get('notifications', {}) %}
+              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'cloudflare_detected': True, 'jailed': False, 'targets_exhausted': False} %}
+              {% for slug, label in notification_events %}
+              <label class="inline-toggle setting-row">{{ label }}
+                <label class="toggle-label"><input type="checkbox" id="notif_{{ slug }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              {% endfor %}
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>
@@ -1341,5 +1356,14 @@
       </div>
     </div>
   </div>
+
+<!-- Notification panel -->
+<div id="notif-panel" class="notif-panel" style="display:none">
+  <div class="notif-panel-head">
+    <span class="notif-panel-title">Notifications</span>
+    <button class="notif-clear-btn" onclick="clearAllNotifs()">Clear all</button>
+  </div>
+  <div id="notif-list"></div>
+</div>
 </body>
 </html>
