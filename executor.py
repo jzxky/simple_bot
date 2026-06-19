@@ -1471,6 +1471,11 @@ def handle_check_bionics(action: Action, state: GameState):
         task.last_checked_at = time.time()
         save_last_bionics_check(task.last_checked_at)
 
+    # Log anything currently in stock, regardless of whether the user wants it
+    all_in_stock = [i for i, d in store.items() if d.get("stock", 0) > 0]
+    if all_in_stock:
+        state.add_log(f"Bionics: in stock — {', '.join(all_in_stock)}.")
+
     # Step 7: Filter wanted items in stock (reverse order)
     can_buy = _in_stock_affordable()
     if not [i for i in ordered_wanted if store.get(i, {}).get("stock", 0) > 0]:
