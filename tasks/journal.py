@@ -144,6 +144,10 @@ def dispatch_journal_action(entry: dict, state: GameState):
         if _FLU_TEXT in entry.get("text", "").lower():
             if _illness_queue is not None:
                 _illness_queue.put(True)
+    if entry.get("title") == "Protection MHS attempt":
+        if cfg.load().get("notifications", {}).get("mhs_protected", False):
+            attacker = entry.get("text", "")
+            state.push_notification("mhs_protected", f"MHS blocked: {attacker}")
 
 
 # ---------------------------------------------------------------------------
