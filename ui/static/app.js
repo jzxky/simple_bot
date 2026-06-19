@@ -189,6 +189,7 @@ function _doSave() {
     sync_enabled:       (document.getElementById("sync_enabled")||{checked:false}).checked,
     sync_server_url:    (document.getElementById("sync_server_url")||{value:""}).value.trim(),
     sync_interval:      parseInt((document.getElementById("sync_interval")||{value:"2"}).value)||2,
+    ..._collectNotifSettings(),
   };
 
   return fetch("/save", {
@@ -616,6 +617,9 @@ function pollStatus() {
           cjRefreshData();
         }
       }
+
+      // Notifications
+      _updateNotifBell(d.notifications || []);
 
       // Character history live reload — refresh when char_history_updated_at advances
       if ((d.char_history_updated_at || 0) > _chLastUpdated) {
@@ -2606,5 +2610,66 @@ function plUpdateGroupAssignment(name, context, value) {
     const g = _plGroups.find(x => x.name === name);
     if (g) g[context] = value;
   }).catch(() => {});
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+let _notifPanelOpen = false;
+
+function _updateNotifBell(notifs) {
+  const bell = document.getElementById("notif-bell");
+  const badge = document.getElementById("notif-badge");
+  if (!bell) return;
+  if (notifs.length > 0) {
+    badge.textContent = notifs.length;
+    bell.style.display = "";
+  } else {
+    bell.style.display = "none";
+    _notifPanelOpen = false;
+    const panel = document.getElementById("notif-panel");
+    if (panel) panel.style.display = "none";
+  }
+  if (_notifPanelOpen) _renderNotifList(notifs);
+}
+
+function toggleNotifPanel() {
+  const panel = document.getElementById("notif-panel");
+  if (!panel) return;
+  _notifPanelOpen = !_notifPanelOpen;
+  panel.style.display = _notifPanelOpen ? "" : "none";
+}
+
+function _renderNotifList(notifs) {
+  const list = document.getElementById("notif-list");
+  if (!list) return;
+  if (!notifs.length) { list.innerHTML = ""; return; }
+  list.innerHTML = notifs.map(n => `
+    <div class="notif-item">
+      <div class="notif-item-body">
+        <span class="notif-ts">${escHtml(n.ts)}</span>
+        <span class="notif-msg">${escHtml(n.message)}</span>
+      </div>
+      <button class="notif-dismiss-btn" onclick="dismissNotif('${escHtml(n.id)}')" title="Dismiss">✕</button>
+    </div>`).join("");
+}
+
+function dismissNotif(id) {
+  fetch("/notifications/dismiss", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id}),
+  }).catch(() => {});
+}
+
+function clearAllNotifs() {
+  fetch("/notifications/clear", {method: "POST"}).catch(() => {});
+}
+
+function _collectNotifSettings() {
+  const out = {};
+  document.querySelectorAll('input[id^="notif_"]').forEach(el => {
+    out[el.id] = el.checked;
+  });
+  return out;
 }
 

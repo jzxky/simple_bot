@@ -61,8 +61,9 @@ class AutoPromoTask(Task):
             page.click("input[type='submit']")
             page.wait_for_load_state("domcontentloaded", timeout=15000)
             parse_state(page.content(), page.url, state)
-            state.add_log(
-                f"Auto-promo: {promo['rank']} — option {choice} ({option_label}) submitted."
-            )
+            msg = f"Auto-promo: {promo['rank']} — option {choice} ({option_label}) submitted."
+            state.add_log(msg)
+            if cfg.load().get("notifications", {}).get("auto_promo", False):
+                state.push_notification("auto_promo", msg)
         except Exception as e:
             state.add_log(f"AutoPromo: submit error: {e}")

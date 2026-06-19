@@ -63,6 +63,7 @@ class GameState:
     cs_sentence: int = 0      # community services still owed as agg-crime punishment
     online_players: set = field(default_factory=set)   # all usernames in whosonlinecell
     local_players: set = field(default_factory=set)    # subset with * (same city as bot)
+    notifications: list = field(default_factory=list)
 
     @property
     def ingame_mins(self) -> "int | None":
@@ -96,6 +97,16 @@ class GameState:
         if len(self.log) > 200:
             self.log = self.log[-200:]
         print(entry)
+
+    def push_notification(self, event_type: str, message: str):
+        import time as _t
+        ts = self.server_time.strftime("%H:%M:%S") if self.server_time else "?"
+        self.notifications.append({
+            "id": str(int(_t.time() * 1000)),
+            "ts": ts,
+            "event_type": event_type,
+            "message": message,
+        })
 
 
 def _parse_money(text: str) -> int:

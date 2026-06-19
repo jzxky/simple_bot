@@ -16,6 +16,11 @@ import browser
 def _u(path: str) -> str:
     return urls.BASE_URL + path
 
+
+def _notify(state: GameState, event_type: str, message: str):
+    if cfg.load().get("notifications", {}).get(event_type, False):
+        state.push_notification(event_type, message)
+
 _DRUG_TRADE_NAME_MAP = {
     "marijuana": "marijuana",
     "cocaine":   "cocaine",
@@ -1474,7 +1479,9 @@ def handle_check_bionics(action: Action, state: GameState):
     # Log anything currently in stock, regardless of whether the user wants it
     all_in_stock = [i for i, d in store.items() if d.get("stock", 0) > 0]
     if all_in_stock:
-        state.add_log(f"Bionics: in stock — {', '.join(all_in_stock)}.")
+        msg = f"Bionics: in stock — {', '.join(all_in_stock)}."
+        state.add_log(msg)
+        _notify(state, "bionics_in_stock", msg)
 
     # Step 7: Filter wanted items in stock (reverse order)
     can_buy = _in_stock_affordable()
@@ -1504,7 +1511,9 @@ def handle_check_bionics(action: Action, state: GameState):
         fail_div    = result_soup.find("div", id="fail")
 
         if success_div:
-            state.add_log(f"Bionics: purchased {target} — {success_div.get_text(strip=True)}")
+            msg = f"Bionics: purchased {target} — {success_div.get_text(strip=True)}"
+            state.add_log(msg)
+            _notify(state, "bionics_purchased", msg)
             purchased.append(target)
             store[target] = {"price": price, "stock": 0}
         elif fail_div:

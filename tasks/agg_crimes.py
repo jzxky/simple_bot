@@ -8,6 +8,7 @@ any other task (except consume) is ready; if so it yields, otherwise it retries 
 """
 
 import time
+import config as cfg
 from tasks.base import Task, Action
 from state import GameState
 
@@ -106,9 +107,15 @@ class AggCrimeTask(Task):
                 else:
                     self._hack_exhausted = False
                     self._cooldown_until = time.monotonic() + COOLDOWN_SECONDS
-                    state.add_log("All targets exhausted — 3 minute cooldown started.")
+                    msg = "All targets exhausted — 3 minute cooldown started."
+                    state.add_log(msg)
+                    if cfg.load().get("notifications", {}).get("targets_exhausted", False):
+                        state.push_notification("targets_exhausted", msg)
             else:
                 self._cooldown_until = time.monotonic() + COOLDOWN_SECONDS
-                state.add_log("All targets exhausted — 3 minute cooldown started.")
+                msg = "All targets exhausted — 3 minute cooldown started."
+                state.add_log(msg)
+                if cfg.load().get("notifications", {}).get("targets_exhausted", False):
+                    state.push_notification("targets_exhausted", msg)
         elif self._hack_exhausted:
             self._hack_exhausted = False
