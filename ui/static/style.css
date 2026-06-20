@@ -755,27 +755,28 @@ input.input-unsaved { color: var(--red) !important; }
 /* Promotion choices */
 .promo-row {
   display: flex;
+  align-items: flex-start;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 12px;
+  gap: 4px 10px;
   padding: 5px 0;
   border-bottom: 1px solid #2a2a3a;
 }
 .promo-rank-name {
   font-size: 0.88rem;
-  min-width: 150px;
+  min-width: 140px;
   flex-shrink: 0;
+  padding-top: 2px;
 }
 .promo-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  gap: 4px 12px;
 }
 .promo-option {
-  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 5px;
+  cursor: pointer;
   font-size: 0.78rem;
   color: var(--muted);
 }
