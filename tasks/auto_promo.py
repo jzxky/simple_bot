@@ -13,6 +13,13 @@ from promotions import PROMO_BY_RANK, get_choice, match_url
 
 _CHECK_INTERVAL = 60  # seconds — don't hammer; check once per minute at most
 
+# These ranks are competitive top-job slots or require manual handling — skip auto-promo
+_EXCLUDED_RANKS = {
+    "Commissioner", "Commissioner-General", "Judge", "Supreme Court Judge",
+    "Fire Chief", "Chief Engineer", "Bank Manager", "Funeral Director",
+    "Hospital Director", "Boss", "Godfather", "Capo di tutti capi",
+}
+
 
 class AutoPromoTask(Task):
     priority = 95
@@ -29,6 +36,8 @@ class AutoPromoTask(Task):
         if not cfg.load().get("promo", {}).get("auto_promo", {}).get("enabled", False):
             return False
         if state.snipe_top_job_pending:
+            return False
+        if state.next_rank in _EXCLUDED_RANKS:
             return False
         if state.next_rank not in PROMO_BY_RANK:
             return False

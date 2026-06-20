@@ -302,28 +302,24 @@
 
               {% for cat_name, cat_ranks in PROMO_CATS %}
               <h4 style="margin:16px 0 6px;color:var(--muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #333;padding-bottom:4px;">{{ cat_name }}</h4>
-              <table style="width:100%;border-collapse:collapse;">
-                {% for slug, rank_name, opt_a, opt_b, def_choice in cat_ranks %}
-                {% set chosen = choices.get(slug, def_choice) %}
-                <tr style="border-bottom:1px solid #2a2a3a;">
-                  <td style="padding:5px 10px 5px 0;font-size:0.88rem;min-width:150px;white-space:nowrap;">{{ rank_name }}</td>
-                  <td style="padding:5px 12px 5px 0;">
-                    <label style="cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
-                      <input type="radio" name="promo_{{ slug }}" value="A"
-                        {% if chosen == 'A' %}checked{% endif %} onchange="autoSave()">
-                      <span style="font-size:0.78rem;color:var(--muted)">A: {{ opt_a }}</span>
-                    </label>
-                  </td>
-                  <td style="padding:5px 0;">
-                    <label style="cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
-                      <input type="radio" name="promo_{{ slug }}" value="B"
-                        {% if chosen == 'B' %}checked{% endif %} onchange="autoSave()">
-                      <span style="font-size:0.78rem;color:var(--muted)">B: {{ opt_b }}</span>
-                    </label>
-                  </td>
-                </tr>
-                {% endfor %}
-              </table>
+              {% for slug, rank_name, opt_a, opt_b, def_choice in cat_ranks %}
+              {% set chosen = choices.get(slug, def_choice) %}
+              <div class="promo-row">
+                <span class="promo-rank-name">{{ rank_name }}</span>
+                <div class="promo-options">
+                  <label class="promo-option">
+                    <input type="radio" name="promo_{{ slug }}" value="A"
+                      {% if chosen == 'A' %}checked{% endif %} onchange="autoSave()">
+                    <span>A: {{ opt_a }}</span>
+                  </label>
+                  <label class="promo-option">
+                    <input type="radio" name="promo_{{ slug }}" value="B"
+                      {% if chosen == 'B' %}checked{% endif %} onchange="autoSave()">
+                    <span>B: {{ opt_b }}</span>
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
               {% endfor %}
             </div>
           </div>
