@@ -185,6 +185,32 @@ def notif_clear():
     return jsonify({"ok": True})
 
 
+@app.route("/earn_catalog", methods=["GET"])
+def earn_catalog_get():
+    import json, os
+    path = os.path.join(paths.data_dir(), "available_earns.json")
+    if not os.path.exists(path):
+        return jsonify([])
+    try:
+        with open(path, encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except Exception:
+        return jsonify([])
+
+
+@app.route("/earn_catalog", methods=["POST"])
+def earn_catalog_post():
+    import json, os
+    data = request.get_json() or []
+    path = os.path.join(paths.data_dir(), "available_earns.json")
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/start", methods=["POST"])
 def start():
     bot.start()

@@ -377,6 +377,84 @@ function closeRespectOverlay() {
   if (ov) ov.style.display = "none";
 }
 
+// ---------------------------------------------------------------------------
+// Earn catalog overlay
+// ---------------------------------------------------------------------------
+
+const _EARN_CATEGORIES = [
+  "Crime", "Hospital", "Engineering", "Bank", "Mortician", "Law",
+  "Fire", "Police", "Gangster", "General", "Secret", "Uncategorized",
+];
+
+let _earnCatalog = [];
+
+async function openEarnCatalog() {
+  const ov = document.getElementById("earn-catalog-overlay");
+  if (!ov) return;
+  try {
+    const res = await fetch("/earn_catalog");
+    _earnCatalog = await res.json();
+  } catch (e) {
+    _earnCatalog = [];
+  }
+  _renderEarnCatalogRows();
+  ov.style.display = "flex";
+}
+
+function closeEarnCatalog() {
+  const ov = document.getElementById("earn-catalog-overlay");
+  if (ov) ov.style.display = "none";
+}
+
+function _renderEarnCatalogRows() {
+  const tbody = document.getElementById("earn-catalog-rows");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const sorted = [..._earnCatalog].sort((a, b) => a.label.localeCompare(b.label));
+  for (const entry of sorted) {
+    const avail = entry.available === true ? "✓" : entry.available === false ? "✗" : "—";
+    const availColor = entry.available === true ? "#a6e3a1" : entry.available === false ? "#f38ba8" : "var(--muted)";
+    const catOptions = _EARN_CATEGORIES.map(c =>
+      `<option value="${c}" ${entry.category === c ? "selected" : ""}>${c}</option>`
+    ).join("");
+    const tr = document.createElement("tr");
+    tr.style.borderBottom = "1px solid #2a2a3a";
+    tr.dataset.label = entry.label;
+    tr.innerHTML = `
+      <td style="padding:6px 8px;">${entry.label}</td>
+      <td style="padding:6px 8px;color:${availColor};font-weight:600;">${avail}</td>
+      <td style="padding:6px 8px;">
+        <select class="earn-cat-select" style="background:#2a2a3a;color:#cdd6f4;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:0.82rem;">
+          ${catOptions}
+        </select>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function saveEarnCatalog() {
+  const rows = document.querySelectorAll("#earn-catalog-rows tr[data-label]");
+  const byLabel = Object.fromEntries(_earnCatalog.map(e => [e.label, e]));
+  rows.forEach(row => {
+    const label = row.dataset.label;
+    const sel = row.querySelector(".earn-cat-select");
+    if (byLabel[label] && sel) byLabel[label].category = sel.value;
+  });
+  const updated = Object.values(byLabel);
+  try {
+    await fetch("/earn_catalog", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(updated),
+    });
+    _earnCatalog = updated;
+    closeEarnCatalog();
+    _renderEarnSelect();
+  } catch (e) {
+    alert("Failed to save earn categories.");
+  }
+}
+
 function refreshRespect() {
   const btn = document.getElementById("respect-refresh-btn");
   if (btn) { btn.disabled = true; btn.textContent = "Refreshing…"; }
