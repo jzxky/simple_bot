@@ -2413,7 +2413,7 @@ def handle_casino(action: Action, state: GameState):
         if not auto_travel:
             return
         state.add_log("Casino: travelling to Beirut...")
-        result = handle_travel(Action("travel", target_city=_BEIRUT, method="airport"), state)
+        result = handle_travel(Action("travel", target_city=_BEIRUT, method="own_vehicle"), state)
         if result == 0:
             state.add_log("Casino: travel to Beirut failed — skipping.")
             return
