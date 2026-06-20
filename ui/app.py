@@ -64,6 +64,7 @@ def save():
     c["action"]["enabled"] = data.get("action_enabled", False)
     c["action"]["type"] = data.get("action_type", "community_service")
     c["action"]["sub_option"] = data.get("action_sub", "")
+    c["action"]["career_training_stop_at_14"] = data.get("career_training_stop_at_14", False)
 
     c.setdefault("away_action", {})
     c["away_action"]["enabled"] = data.get("away_action_enabled", False)

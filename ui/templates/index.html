@@ -982,6 +982,15 @@
               <select id="action_sub" onchange="autoSave()"></select>
             </label>
           </div>
+          <div id="career_training_options" class="setting-row" style="display:none;margin-bottom:8px;">
+            Stop training at 14
+            <label class="toggle-label">
+              <input type="checkbox" id="career_training_stop_at_14"
+                {% if config.get('action', {}).get('career_training_stop_at_14') %}checked{% endif %}
+                onchange="autoSave()">
+              <span class="toggle"></span>
+            </label>
+          </div>
           <h3>Out of Home City</h3>
           <div class="row">
             <label>Action
