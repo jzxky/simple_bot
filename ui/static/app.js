@@ -390,8 +390,6 @@ const _EARN_CATEGORIES = [
   "Fire", "Police", "Gangster", "General", "Secret", "Uncategorized",
 ];
 
-let _earnCatalog = [];
-
 async function openEarnCatalog() {
   const ov = document.getElementById("earn-catalog-overlay");
   if (!ov) return;
