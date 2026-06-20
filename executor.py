@@ -153,15 +153,12 @@ def handle_login(action: Action, state: GameState):
     state.add_log("Logged in successfully.")
 
 
-def handle_check_earns(action: Action, state: GameState):
-    earn_type = action.params["earn_type"]
-    page = browser.page()
+def _scrape_earn_catalog(page, state: GameState):
+    """Navigate to earn.asp, scrape available options, update catalog. Returns (auto_opts, available_values)."""
     _nav(_u("/income/earn.asp"), state)
-
     if not _check_session(state):
-        return
+        return [], []
 
-    # Enable AUTO mode first — check if the auto panel is hidden, if so click the knob to toggle
     auto_div = page.query_selector("div.mm-earn-mode-auto")
     if auto_div:
         style = auto_div.get_attribute("style") or ""
@@ -174,7 +171,6 @@ def handle_check_earns(action: Action, state: GameState):
             )
             state.add_log("Switched to AUTO earn mode.")
 
-    # Check earn is available by looking for it in the schedule select inside the auto panel
     soup = BeautifulSoup(page.content(), "html.parser")
     auto_panel = soup.find("div", class_="mm-earn-mode-auto")
     available_values = []
@@ -209,6 +205,22 @@ def handle_check_earns(action: Action, state: GameState):
         state.add_log(f"Earns detected — auto: [{auto_labels}] | manual: [{manual_labels}]")
     else:
         state.add_log("Earns: no options detected on earn page.")
+
+    return auto_opts, available_values
+
+
+def handle_refresh_earn_catalog(action: Action, state: GameState):
+    """Scrape the earn page and update available_earns.json — no queue action."""
+    _scrape_earn_catalog(browser.page(), state)
+
+
+def handle_check_earns(action: Action, state: GameState):
+    earn_type = action.params["earn_type"]
+    page = browser.page()
+
+    auto_opts, available_values = _scrape_earn_catalog(page, state)
+    if not available_values:
+        return
 
     if earn_type not in available_values:
         state.add_log(f"Earn '{earn_type}' is not available — disabling earns. Select a new earn and save to re-enable.")
@@ -2658,6 +2670,7 @@ def handle_fetch_respect(action: Action, state: GameState):
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
+    "refresh_earn_catalog": handle_refresh_earn_catalog,
     "clear_earn_queue": handle_clear_earn_queue,
     "do_crime": handle_do_crime,
     "check_weapon": handle_check_weapon,
