@@ -2437,6 +2437,14 @@ def handle_casino(action: Action, state: GameState):
     _refresh_state(state)
     if not _check_session(state):
         return
+    if "/localcity/local.asp" in browser.current_url():
+        from tasks.casino import save_casino_release_at
+        release_at = time.time() + 10 * 60
+        save_casino_release_at(release_at)
+        state.add_log("Casino: unavailable (redirected to local city) — retrying in 10 minutes.")
+        return
+    if not _check_session(state):
+        return
 
     if activity == "blackjack":
         while _play_blackjack_hand(state, bet_amount):
