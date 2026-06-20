@@ -204,6 +204,11 @@ def handle_check_earns(action: Action, state: GameState):
             _upsert_earn_catalog(auto_opts, manual_opts)
         except Exception:
             pass
+        auto_labels = ", ".join(f"{v} ({l})" for v, l in auto_opts) or "none"
+        manual_labels = ", ".join(f"{d}:{l}" + (" [trap]" if t else "") for d, l, t in manual_opts) or "none"
+        state.add_log(f"Earns detected — auto: [{auto_labels}] | manual: [{manual_labels}]")
+    else:
+        state.add_log("Earns: no options detected on earn page.")
 
     if earn_type not in available_values:
         state.add_log(f"Earn '{earn_type}' is not available — disabling earns. Select a new earn and save to re-enable.")
