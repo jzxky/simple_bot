@@ -387,14 +387,12 @@ def _run(c: dict):
             _scheduler_snapshot = sched.snapshot(state)
 
             if not _startup_earns_done and state.logged_in:
-                earn_cfg = cfg.load().get("earns", {})
                 _startup_earns_done = True
-                earn_type = earn_cfg.get("earn_type", "surgeon")
-                state.add_log(f"Startup: running earn check for '{earn_type}'.")
+                state.add_log("Startup: refreshing earn catalog.")
                 try:
-                    executor.execute(Action("check_earns", earn_type=earn_type), state)
+                    executor.execute(Action("refresh_earn_catalog"), state)
                 except Exception as _e:
-                    state.add_log(f"Startup earns check failed: {_e}")
+                    state.add_log(f"Startup earn catalog refresh failed: {_e}")
 
             # Respect refresh requests from the Flask thread
             if not _respect_refresh_queue.empty():
