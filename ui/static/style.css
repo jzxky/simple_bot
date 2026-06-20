@@ -752,6 +752,34 @@ input.input-unsaved { color: var(--red) !important; }
   display: inline-block; text-align: right;
 }
 
+/* Promotion choices */
+.promo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid #2a2a3a;
+}
+.promo-rank-name {
+  font-size: 0.88rem;
+  min-width: 150px;
+  flex-shrink: 0;
+}
+.promo-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+.promo-option {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 /* Promotion History */
 .ch-table-scroll { overflow-x: auto; }
 .ch-promo-table th {
