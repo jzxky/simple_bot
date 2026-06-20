@@ -388,13 +388,14 @@ def _run(c: dict):
 
             if not _startup_earns_done and state.logged_in:
                 earn_cfg = cfg.load().get("earns", {})
+                _startup_earns_done = True
                 if earn_cfg.get("enabled", False):
                     earn_type = earn_cfg.get("earn_type", "surgeon")
+                    state.add_log(f"Startup: running earn check for '{earn_type}'.")
                     try:
                         executor.execute(Action("check_earns", earn_type=earn_type), state)
                     except Exception as _e:
                         state.add_log(f"Startup earns check failed: {_e}")
-                _startup_earns_done = True
 
             # Respect refresh requests from the Flask thread
             if not _respect_refresh_queue.empty():
