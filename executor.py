@@ -2595,6 +2595,8 @@ def handle_check_engineering_cases(action: Action, state: GameState):
             radios = sec.find_all("input", {"type": "radio", "name": "Req_username"})
             for radio in radios:
                 username = radio.get("value", "")
+                if state.own_name and username.lower() == state.own_name.lower():
+                    continue
                 if not _target_ok(username, typ):
                     continue
                 state.add_log(f"Engineering: construct apartment for '{username}'.")
@@ -2615,6 +2617,8 @@ def handle_check_engineering_cases(action: Action, state: GameState):
                         if txt and not txt.isdigit() and txt != val:
                             username = txt
                             break
+                if state.own_name and username.lower() == state.own_name.lower():
+                    continue
                 if username and not _target_ok(username, typ):
                     continue
                 label = "repair vehicle" if typ == "repair_vehicle" else "construct vault"
