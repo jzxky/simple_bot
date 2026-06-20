@@ -83,12 +83,15 @@ function populateActionSub(selectedValue) {
   if (opts.length === 0) {
     label.style.visibility = "hidden";
     sel.innerHTML = "";
-    return;
+  } else {
+    label.style.visibility = "visible";
+    sel.innerHTML = opts.map(([v, l]) =>
+      `<option value="${v}" ${v === selectedValue ? "selected" : ""}>${l}</option>`
+    ).join("");
   }
-  label.style.visibility = "visible";
-  sel.innerHTML = opts.map(([v, l]) =>
-    `<option value="${v}" ${v === selectedValue ? "selected" : ""}>${l}</option>`
-  ).join("");
+
+  const ctOpts = document.getElementById("career_training_options");
+  if (ctOpts) ctOpts.style.display = type === "career_training" ? "" : "none";
 }
 
 function toggleAwayCrime() {
@@ -124,6 +127,7 @@ function _doSave() {
     action_enabled: document.getElementById("action_enabled").checked,
     action_type: document.getElementById("action_type").value,
     action_sub: document.getElementById("action_sub").value,
+    career_training_stop_at_14: document.getElementById("career_training_stop_at_14")?.checked ?? false,
     away_action_enabled: document.getElementById("action_enabled").checked,
     away_action_type: document.getElementById("away_action_type").value,
     fallback_to_away: document.getElementById("fallback_to_away").checked,

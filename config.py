@@ -33,7 +33,8 @@ DEFAULT_CONFIG = {
     "action": {
         "enabled": True,
         "type": "community_service",
-        "sub_option": ""
+        "sub_option": "",
+        "career_training_stop_at_14": False
     },
     "away_action": {
         "enabled": False,

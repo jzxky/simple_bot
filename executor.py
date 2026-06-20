@@ -835,15 +835,42 @@ def handle_career_training(action: Action, state: GameState):
     if not _check_session(state):
         return
 
+    # Redirect to local.asp means the training centre is unavailable
+    if "/localcity/local.asp" in browser.current_url():
+        soup = BeautifulSoup(page.content(), "html.parser")
+        fail = soup.find("div", id="fail") or soup.find("div", class_="info red")
+        msg = fail.get_text(strip=True) if fail else "Training centre unavailable."
+        state.add_log(f"Career training: {msg} — disabling actions.")
+        c = cfg.load()
+        c["action"]["enabled"] = False
+        cfg.save(c)
+        return
+
     soup = BeautifulSoup(page.content(), "html.parser")
+
+    # Parse current training count from page text e.g. "Current Customs trains: 4"
+    import re as _re
+    page_text = soup.get_text(" ")
+    train_match = _re.search(r"Current \w+ trains?:\s*(\d+)", page_text, _re.I)
+    current_trains = int(train_match.group(1)) if train_match else None
+    if current_trains is not None:
+        state.add_log(f"Career training ({career}): current trains = {current_trains}.")
+
+    # Stop-at-14 check
+    stop_at_14 = cfg.load().get("action", {}).get("career_training_stop_at_14", False)
+    if stop_at_14 and current_trains is not None and current_trains >= 14:
+        state.add_log(f"Career training: reached {current_trains} trains — stop-at-14 reached, disabling actions.")
+        c = cfg.load()
+        c["action"]["enabled"] = False
+        cfg.save(c)
+        return
+
     select = soup.find("select", attrs={"name": "action"})
     if not select:
         state.add_log(f"Career training form not found for {career}.")
         return
 
     options = select.find_all("option")
-    # Initial enroll: value contains "accept" or "begin training"
-    # Ongoing study: value is "Yes"
     enroll_opt = None
     study_opt = None
     for opt in options:
