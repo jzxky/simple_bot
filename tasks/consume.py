@@ -146,10 +146,22 @@ class ConsumeTask(Task):
             return False
         c = cfg.load()
         cons_cfg = c.get("consumables", {})
+        away = state.current_city != state.home_city
         # Auto-consume has its own readiness check
         if self._auto_consume_ready(state, c, cons_cfg):
+            if away and cons_cfg.get("auto_consumable", "") != "ecstasy":
+                return False
             return True
-        return not self._queue.empty()
+        if self._queue.empty():
+            return False
+        if away:
+            # Only ecstasy is usable outside home city
+            try:
+                consume_type = self._queue.queue[0]
+            except IndexError:
+                return False
+            return consume_type == "ecstasy"
+        return True
 
     def _auto_consume_ready(self, state: GameState, c: dict, cons_cfg: dict) -> bool:
         if not cons_cfg.get("auto_consume", False):
