@@ -3,6 +3,7 @@ ActionExecutor: maps Action.kind to handler functions that drive the browser.
 """
 
 import json
+import queue
 import re
 import time
 import config as cfg
@@ -11,6 +12,10 @@ from bs4 import BeautifulSoup
 from tasks.base import Action
 from state import GameState, parse_state
 import browser
+
+
+# Cooldown set when pre-travel warrant check finds unresolvable warrants.
+_travel_warrant_cooldown_until: float = 0.0
 
 
 def _u(path: str) -> str:
@@ -2175,12 +2180,72 @@ def handle_repair_vehicle(action: Action, state: GameState) -> bool:
 
 def handle_travel(action: Action, state: GameState) -> int:
     from datetime import datetime
+    global _travel_warrant_cooldown_until
     target = action.params.get("target_city", "")
     method = action.params.get("method", "airport")
 
     if not target:
         state.add_log("Travel: no target city specified.")
         return 0
+
+    if state.current_city.lower() == target.lower():
+        state.add_log(f"Travel: already in {target}.")
+        return 1
+
+    # Pre-travel warrant check
+    if time.monotonic() < _travel_warrant_cooldown_until:
+        state.add_log("Travel: warrant cooldown active — skipping travel.")
+        return 0
+
+    warrant_mode = cfg.load().get("jail", {}).get("auto_warrant_handling", "none")
+    result_q = queue.Queue()
+    handle_check_warrants(Action("check_warrants", result_queue=result_q), state)
+    try:
+        warrants = result_q.get(timeout=10)
+    except queue.Empty:
+        warrants = []
+
+    if warrants:
+        def _jail_time_nonzero(s: str) -> bool:
+            s = s.strip().lower()
+            return bool(s) and s not in ("0", "—", "-", "none", "no jail", "")
+
+        turned_in_ids = set()
+        for w in warrants:
+            defense = w.get("defense", "").strip().lower()
+            jail_nz = _jail_time_nonzero(w.get("jail_time", ""))
+            is_failed = defense == "failed"
+
+            if defense not in ("failed", "no"):
+                if defense:
+                    state.add_log(
+                        f"Warrant {w['case_id']}: unexpected defense value "
+                        f"'{w['defense']}' — skipping."
+                    )
+                continue
+
+            should_turn_in = (
+                warrant_mode == "all"
+                or (warrant_mode == "failed_no_jail"   and is_failed and not jail_nz)
+                or (warrant_mode == "failed_incl_jail" and is_failed and jail_nz)
+            )
+
+            if should_turn_in:
+                handle_turn_in_warrant(
+                    Action("turn_in_warrant", url=w["turn_in_url"], case_id=w["case_id"]),
+                    state,
+                )
+                turned_in_ids.add(w["case_id"])
+
+        remaining = [w for w in warrants if w["case_id"] not in turned_in_ids]
+        if remaining:
+            ids = ", ".join(w["case_id"] for w in remaining)
+            msg = (f"Travel: {len(remaining)} outstanding warrant(s) ({ids}) — "
+                   f"aborting travel for 1 hour.")
+            state.add_log(msg)
+            _travel_warrant_cooldown_until = time.monotonic() + 3600
+            _notify(state, "warrants_outstanding", msg)
+            return 0
 
     if state.current_city.lower() == target.lower():
         state.add_log(f"Travel: already in {target}.")

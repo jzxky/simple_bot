@@ -27,6 +27,7 @@ NOTIFICATION_EVENTS = [
     ("jailed",              "Went to jail"),
     ("targets_exhausted",   "Crime targets exhausted"),
     ("mhs_protected",       "MHS protection triggered"),
+    ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
 ]
 
 _ui_root = os.path.join(paths.resource_dir(), "ui")
@@ -101,6 +102,7 @@ def save():
     c["jail"]["use_consumables"] = data.get("jail_use_consumables", False)
     c["jail"]["auto_jail_time"] = data.get("auto_jail_time", "off")
     c["jail"]["use_warrants"] = data.get("use_warrants", False)
+    c["jail"]["auto_warrant_handling"] = data.get("auto_warrant_handling", "none")
     c["jail"]["auto_jail_partner"] = data.get("auto_jail_partner", "")
     if c["jail"]["duty"] != prev_duty and bot.is_running():
         bot.request_clear_jail_duty_queue()
@@ -187,6 +189,13 @@ def notif_dismiss():
 @app.route("/notifications/clear", methods=["POST"])
 def notif_clear():
     bot.state.notifications = []
+    return jsonify({"ok": True})
+
+
+@app.route("/travel/clear-warrant-cooldown", methods=["POST"])
+def clear_warrant_cooldown():
+    import executor
+    executor._travel_warrant_cooldown_until = 0.0
     return jsonify({"ok": True})
 
 
