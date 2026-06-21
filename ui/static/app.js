@@ -2064,16 +2064,17 @@ function _fmtAge(mins) {
 }
 
 const _CAREER_GROUPS = {
-  "Gangster":          ["gangster"],
-  "Law Enforcement":   ["police officer", "customs"],
-  "Medical":           ["nurse", "doctor", "surgeon", "hospital director"],
-  "Engineering":       ["mechanic", "technician", "engineer", "chief engineer"],
-  "Fire Service":      ["fire fighter", "fire chief"],
-  "Legal":             ["lawyer", "supreme court judge"],
-  "Finance":           ["bank teller", "bank manager", "loan officer"],
-  "Mortuary":          ["mortician", "undertaker", "funeral director"],
-  "Government":        ["mayor"],
-  "Unemployed":        ["unemployed"],
+  "Gangster":   ["gangster"],
+  "Law":        ["legal secretary", "lawyer", "judge", "supreme court judge"],
+  "Police":     ["police officer"],
+  "Customs":    ["customs"],
+  "Hospital":   ["nurse", "doctor", "surgeon", "hospital director"],
+  "Engineering":["mechanic", "technician", "engineer", "chief engineer"],
+  "Fire":       ["volunteer fire fighter", "fire fighter", "fire chief"],
+  "Bank":       ["bank teller", "bank manager", "loan officer"],
+  "Funeral":    ["mortician assistant", "mortician", "undertaker", "funeral director"],
+  "Mayor":      ["mayor"],
+  "Unemployed": ["unemployed"],
 };
 const _OCC_TO_CAREER = {};
 Object.entries(_CAREER_GROUPS).forEach(([grp, occs]) => {
