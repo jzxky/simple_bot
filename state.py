@@ -5,6 +5,7 @@ All time comparisons use server time, never the system clock.
 
 from __future__ import annotations
 import re
+import time as _time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
@@ -37,6 +38,7 @@ class GameState:
     agg_pro_active: bool = False
     agg_pro_end: Optional[datetime] = None
     server_time: Optional[datetime] = None
+    server_time_monotonic: float = 0.0  # monotonic timestamp when server_time was last set
     logged_in: bool = False
     relog_suppressed: bool = False
     current_url: str = ""
@@ -83,11 +85,28 @@ class GameState:
     def in_home_city(self) -> bool:
         return self.current_city != "" and self.current_city == self.home_city
 
+    def _estimated_server_time(self) -> "datetime | None":
+        if not self.server_time:
+            return None
+        elapsed = _time.monotonic() - self.server_time_monotonic
+        return self.server_time + timedelta(seconds=elapsed)
+
     def action_available(self) -> bool:
         if self.action_timer_ready:
             return True
-        if self.action_timer_end and self.server_time:
-            return self.server_time >= self.action_timer_end
+        if self.action_timer_end:
+            now = self._estimated_server_time()
+            return now is not None and now >= self.action_timer_end
+        return False
+
+    def timer_ready(self, key: str) -> bool:
+        t = self.timers.get(key, {})
+        if t.get("ready", False):
+            return True
+        end = t.get("end")
+        if end:
+            now = self._estimated_server_time()
+            return now is not None and now >= end
         return False
 
     def add_log(self, message: str):
@@ -124,6 +143,7 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     if st:
         try:
             s.server_time = datetime.strptime(st.get_text(strip=True), SERVER_TIME_FMT)
+            s.server_time_monotonic = _time.monotonic()
         except ValueError:
             pass
 
