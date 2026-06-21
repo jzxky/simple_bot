@@ -1,7 +1,8 @@
+import queue
 import time
 import config as cfg
 import bot
-from tasks.base import Task
+from tasks.base import Task, Action
 from state import GameState
 
 
@@ -39,15 +40,19 @@ class AutoJailTimeTask(Task):
         target = None
 
         if use_warrants:
-            warrants = bot.request_warrants(timeout=15.0)
-            if warrants:
+            result_q = queue.Queue()
+            executor.execute(Action("check_warrants", result_queue=result_q), state)
+            try:
+                warrants = result_q.get(timeout=30)
                 for w in warrants:
                     if w.get("jail_time"):
                         target = w.get("victim") or w.get("escaper")
                         break
+            except queue.Empty:
+                state.add_log("Auto Jail Time: warrants check timed out.")
 
         if not target:
-            inmates = bot.request_jail_inmates(timeout=15.0)
+            inmates = bot._fetch_jail_inmates()
             names = (inmates or {}).get("inmates", [])
             if names:
                 target = names[0]
