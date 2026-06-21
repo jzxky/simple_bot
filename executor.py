@@ -229,8 +229,8 @@ def handle_check_earns(action: Action, state: GameState):
         cfg.save(c)
         return
 
-    # Read queue count
-    cap_span = soup.find("span", class_="mm-earn-queue-cap")
+    # Read queue count from current page content
+    cap_span = BeautifulSoup(page.content(), "html.parser").find("span", class_="mm-earn-queue-cap")
     current_count = 0
     if cap_span:
         try:
