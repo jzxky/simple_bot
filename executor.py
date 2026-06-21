@@ -2618,18 +2618,16 @@ def _finish_eng(state: GameState):
     html = browser.page().content()
     _save_casework_snapshot("engineering_result", html)
     result_soup = BeautifulSoup(html, "html.parser")
-    # Read only from the portion of the page before the first column_title section,
-    # so section-level divs don't shadow the top-level result message.
-    search_root = result_soup
-    holder = result_soup.find("div", id="holder_content")
-    if holder:
-        pre = []
-        for child in holder.children:
-            if hasattr(child, "get") and "column_title" in child.get("class", []):
+    # The result div lives inside div#content but before div#shop_holder.
+    # Search that outer region so section-level fail divs don't shadow it.
+    pre_body = []
+    content_div = result_soup.find("div", id="content")
+    if content_div:
+        for child in content_div.children:
+            if hasattr(child, "get") and child.get("id") == "shop_holder":
                 break
-            pre.append(str(child))
-        if pre:
-            search_root = BeautifulSoup("".join(pre), "html.parser")
+            pre_body.append(str(child))
+    search_root = BeautifulSoup("".join(pre_body), "html.parser") if pre_body else result_soup
     # Collect all success/fail divs in document order and pick the topmost one
     all_divs = search_root.find_all("div")
     result_div = None
