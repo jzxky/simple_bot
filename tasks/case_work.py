@@ -27,7 +27,7 @@ class CaseWorkTask(Task):
             return False
         if self.HOME_CITY_ONLY and not state.in_home_city():
             return False
-        if not state.timers.get("case", {}).get("ready", True):
+        if not state.timer_ready("case"):
             return False
         return time.monotonic() - self._last_checked >= self._poll_interval
 

@@ -67,8 +67,9 @@ def _passes_timer_gate(consume_type: str, state: GameState, cfg_cons: dict) -> b
     if end is None:
         return False
 
-    from datetime import datetime
-    now = state.server_time or datetime.utcnow()
+    now = state._estimated_server_time()
+    if now is None:
+        return False
     remaining_secs = max(0, int((end - now).total_seconds()))
     return remaining_secs > limit_secs
 
@@ -104,8 +105,9 @@ def _smart_count(consume_type: str, state: GameState, cfg_cons: dict, agg_cfg: d
         end = timer.get("end")
         if end is None:
             return 0
-        from datetime import datetime
-        now = state.server_time or datetime.utcnow()
+        now = state._estimated_server_time()
+        if now is None:
+            return 0
         remaining_secs = max(0, int((end - now).total_seconds()))
         count = math.floor(remaining_secs / 180)
 
