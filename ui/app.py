@@ -98,6 +98,9 @@ def save():
     c["jail"]["duty"] = data.get("jail_duty", "laundry")
     c["jail"]["action"] = data.get("jail_action", "gym")
     c["jail"]["use_consumables"] = data.get("jail_use_consumables", False)
+    c["jail"]["auto_jail_time"] = data.get("auto_jail_time", "off")
+    c["jail"]["use_warrants"] = data.get("use_warrants", False)
+    c["jail"]["auto_jail_partner"] = data.get("auto_jail_partner", "")
     if c["jail"]["duty"] != prev_duty and bot.is_running():
         bot.request_clear_jail_duty_queue()
 

@@ -361,6 +361,29 @@
                 </label>
               </label>
             </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Auto Jail Time</h3>
+              <div class="setting-row">
+                <label for="auto_jail_time">Mode</label>
+                <select id="auto_jail_time" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('off','Off'),('respect_change','Respect Change'),('always','Always')] %}
+                  <option value="{{ v }}" {% if jail.get('auto_jail_time','off') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="use_warrants">Use Warrants</label>
+                <select id="use_warrants" style="width:160px" onchange="autoSave()">
+                  <option value="true" {% if jail.get('use_warrants') %}selected{% endif %}>Yes</option>
+                  <option value="false" {% if not jail.get('use_warrants') %}selected{% endif %}>No</option>
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="auto_jail_partner">Partner</label>
+                <input type="text" id="auto_jail_partner" style="width:200px"
+                  value="{{ jail.get('auto_jail_partner','') }}" onchange="autoSave()">
+              </div>
+            </div>
           </div>
         </div>
         <div id="player-lists" class="tab-panel">

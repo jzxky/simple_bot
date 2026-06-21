@@ -124,7 +124,11 @@ DEFAULT_CONFIG = {
         "duty": "laundry",
         "action": "gym",
         "use_consumables": False,
-        "consumable": "cigarettes"
+        "consumable": "cigarettes",
+        "auto_jail_time": "off",
+        "auto_jail_partner": "",
+        "use_warrants": False,
+        "jailbreak_execute_at": 0,
     },
     "character_history": {
         "enabled": False,

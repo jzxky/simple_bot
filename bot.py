@@ -37,6 +37,7 @@ from tasks.withdraw import WithdrawTask
 from tasks.maintain_cash import MaintainCashTask
 from tasks.character_history import CharacterHistoryTask
 from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJailBreakTask
+from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask
 from tasks.journal import JournalCheckTask, ArchiveJournalsTask, set_drug_trade_queue, set_illness_queue
 from tasks.drug_trade import DrugTradeTask
 from tasks.illness import IllnessTask
@@ -167,6 +168,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(PlanJailBreakTask(_jailbreak_plan_queue))
     sched.add(ExecuteJailBreakTask(_jailbreak_execute_queue))
     sched.add(CallOffJailBreakTask(_jailbreak_calloff_queue))
+    sched.add(AutoJailTimeTask())
+    sched.add(AutoJailTimeExecuteTask())
     sched.add(JournalCheckTask())
     sched.add(ArchiveJournalsTask(_archive_journals_queue))
     sched.add(DrugTradeTask(_drug_trade_queue))
