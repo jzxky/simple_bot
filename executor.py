@@ -1526,6 +1526,7 @@ def handle_check_bionics(action: Action, state: GameState):
         state_updates = {"last_checked_at": task.last_checked_at}
 
         # Restock detection — compare stock counts against last snapshot
+        b = cfg.load().get("bionics", {})
         if b.get("auto_restock", False) and task.last_stock:
             restocked = [
                 item for item, d in store.items()
