@@ -5,10 +5,15 @@ import bot
 from tasks.base import Task, Action
 from state import GameState
 
+_WARRANT_CHECK_INTERVAL = 1800  # seconds between warrant checks
+
 
 class AutoJailTimeTask(Task):
     priority = 75
     label = "Auto Jail Time"
+
+    def __init__(self):
+        self._last_warrant_check: float = 0.0
 
     def can_run(self, state: GameState) -> bool:
         if not state.logged_in or state.in_jail or state.in_hospital:
@@ -29,7 +34,14 @@ class AutoJailTimeTask(Task):
             minutes_past_midnight = now.hour * 60 + now.minute
             if minutes_past_midnight >= 20:
                 return False
-        return True
+        use_warrants = jail_cfg.get("use_warrants", False)
+        if use_warrants:
+            # Rate-limit warrant checks to every 30 minutes
+            return time.time() - self._last_warrant_check >= _WARRANT_CHECK_INTERVAL
+        else:
+            # Only run if there are local jail targets visible on the current page
+            pop = bot.online_population()
+            return bool(pop.get("jail_inmates"))
 
     def run(self, state: GameState, executor):
         c = cfg.load()
@@ -40,6 +52,7 @@ class AutoJailTimeTask(Task):
         target = None
 
         if use_warrants:
+            self._last_warrant_check = time.time()
             result_q = queue.Queue()
             executor.execute(Action("check_warrants", result_queue=result_q), state)
             try:
@@ -52,8 +65,8 @@ class AutoJailTimeTask(Task):
                 state.add_log("Auto Jail Time: warrants check timed out.")
 
         if not target:
-            inmates = bot._fetch_jail_inmates()
-            names = (inmates or {}).get("inmates", [])
+            pop = bot.online_population()
+            names = pop.get("jail_inmates", [])
             if names:
                 target = names[0]
 
