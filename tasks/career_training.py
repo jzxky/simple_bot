@@ -2,6 +2,7 @@
 Performs career training when the action timer is ready.
 """
 
+import config as cfg
 import urls
 from tasks.base import Task, Action
 from state import GameState
@@ -22,6 +23,8 @@ class CareerTrainingTask(Task):
         self.career = career
 
     def can_run(self, state: GameState) -> bool:
+        if not cfg.load().get("action", {}).get("enabled", False):
+            return False
         if not (state.logged_in and not state.in_jail and state.action_available()
                 and state.in_home_city() and not state.hold_action_timer):
             return False
