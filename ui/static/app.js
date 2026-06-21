@@ -2062,6 +2062,33 @@ function _fmtAge(mins) {
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 
+const _CAREER_GROUPS = {
+  "Gangster":          ["gangster"],
+  "Law Enforcement":   ["police officer", "customs"],
+  "Medical":           ["nurse", "doctor", "surgeon", "hospital director"],
+  "Engineering":       ["mechanic", "technician", "engineer", "chief engineer"],
+  "Fire Service":      ["fire fighter", "fire chief"],
+  "Legal":             ["lawyer", "supreme court judge"],
+  "Finance":           ["bank teller", "bank manager", "loan officer"],
+  "Mortuary":          ["mortician", "undertaker", "funeral director"],
+  "Government":        ["mayor"],
+  "Unemployed":        ["unemployed"],
+};
+const _OCC_TO_CAREER = {};
+Object.entries(_CAREER_GROUPS).forEach(([grp, occs]) => {
+  occs.forEach(o => { _OCC_TO_CAREER[o] = grp; });
+});
+
+function _careerGroup(occupation) {
+  return _OCC_TO_CAREER[(occupation || "").toLowerCase()] || "Other";
+}
+
+function _onlineStatus(username) {
+  if (_botState.local_players.has(username)) return "local";
+  if (_botState.online_players.has(username)) return "online";
+  return "offline";
+}
+
 // ── Load & rebuild filters ────────────────────────────────────────────────────
 
 function loadPlayers() {
@@ -2085,13 +2112,15 @@ function loadPlayers() {
 function _plRebuildFilters() {
   const uniq = col => [...new Set(_plData.map(p => p[col] || "").filter(Boolean))].sort((a,b) => a.localeCompare(b));
   const uniqTags = [...new Set(_plData.flatMap(p => p.tags || []))].sort();
+  const uniqCareer = [...new Set(_plData.map(p => _careerGroup(p.occupation)).filter(Boolean))].sort((a,b) => a.localeCompare(b));
 
   const specs = [
-    { id: "pl-filter-rank",       vals: uniq("rank") },
-    { id: "pl-filter-occupation", vals: uniq("occupation") },
-    { id: "pl-filter-homecity",   vals: uniq("homecity") },
-    { id: "pl-filter-group",      vals: uniq("group") },
-    { id: "pl-filter-tag",        vals: uniqTags },
+    { id: "pl-filter-rank",         vals: uniq("rank") },
+    { id: "pl-filter-occupation",   vals: uniq("occupation") },
+    { id: "pl-filter-career-group", vals: uniqCareer },
+    { id: "pl-filter-homecity",     vals: uniq("homecity") },
+    { id: "pl-filter-group",        vals: uniq("group") },
+    { id: "pl-filter-tag",          vals: uniqTags },
   ];
   specs.forEach(({ id, vals }) => {
     const sel = document.getElementById(id);
@@ -2107,8 +2136,10 @@ function _plRebuildFilters() {
 
 function plFilter() {
   const search    = (document.getElementById("pl-search")?.value || "").toLowerCase();
+  const onlineFlt = document.getElementById("pl-filter-online")?.value || "";
   const rank      = document.getElementById("pl-filter-rank")?.value || "";
   const occ       = document.getElementById("pl-filter-occupation")?.value || "";
+  const careerGrp = document.getElementById("pl-filter-career-group")?.value || "";
   const city      = document.getElementById("pl-filter-homecity")?.value || "";
   const group     = document.getElementById("pl-filter-group")?.value || "";
   const tag       = document.getElementById("pl-filter-tag")?.value || "";
@@ -2119,8 +2150,10 @@ function plFilter() {
   _plFiltered = _plData.filter(p => {
     if (activeOnly && !p.active) return false;
     if (search && !p.username.toLowerCase().includes(search)) return false;
+    if (onlineFlt && _onlineStatus(p.username) !== onlineFlt) return false;
     if (rank  && p.rank !== rank) return false;
     if (occ   && p.occupation !== occ) return false;
+    if (careerGrp && _careerGroup(p.occupation) !== careerGrp) return false;
     if (city  && p.homecity !== city) return false;
     if (group && p.group !== group) return false;
     if (tag   && !(p.tags||[]).includes(tag)) return false;
@@ -2141,10 +2174,18 @@ function plSort(col) {
   _plRenderTable();
 }
 
+const _STATUS_ORDER = { local: 0, online: 1, offline: 2 };
+
+function _plSortVal(p, col) {
+  if (col === "career_group") return _careerGroup(p.occupation).toLowerCase();
+  if (col === "online_status") return String(_STATUS_ORDER[_onlineStatus(p.username)] ?? 2);
+  return (p[col] || "").toLowerCase();
+}
+
 function _plApplySort() {
   const col = _plSortCol, asc = _plSortAsc ? 1 : -1;
   _plFiltered = [..._plFiltered].sort((a, b) =>
-    asc * (a[col] || "").toLowerCase().localeCompare((b[col] || "").toLowerCase())
+    asc * _plSortVal(a, col).localeCompare(_plSortVal(b, col))
   );
   document.querySelectorAll(".pl-th[data-col]").forEach(th => {
     const icon = th.querySelector(".pl-sort-icon");
@@ -2167,7 +2208,7 @@ function _plRenderTable() {
   const colorMap = _plGroupColorMap();
 
   if (_plFiltered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
     return;
   }
 
@@ -2187,11 +2228,13 @@ function _plRenderTable() {
               : isOnline ? `<span title="Online" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f0c040"></span>`
               : "";
 
+    const careerGrp = _careerGroup(p.occupation);
     rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow(${escJsStr(p.username)})" style="cursor:pointer">
       <td style="text-align:center">${dot}</td>
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
       <td>${escHtml(p.rank||"—")}</td>
       <td>${escHtml(p.occupation||"—")}</td>
+      <td style="color:var(--text-muted);font-size:11px">${escHtml(careerGrp)}</td>
       <td>${escHtml(p.homecity||"—")}</td>
       <td>${groupCell}</td>
       <td>${tags||"—"}</td>
@@ -2200,7 +2243,7 @@ function _plRenderTable() {
     </tr>`);
 
     if (expanded) {
-      rows.push(`<tr class="pl-detail-row"><td colspan="9"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
+      rows.push(`<tr class="pl-detail-row"><td colspan="10"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
     }
   });
   tbody.innerHTML = rows.join("");
@@ -2311,6 +2354,33 @@ function plRenderRecentDead() {
       <td class="col-occupation">${escHtml(p.occupation || "—")}</td>
       <td class="col-homecity">${escHtml(p.homecity || "—")}</td>
       <td style="white-space:nowrap">${escHtml(diedDate)}</td>
+    </tr>`;
+  }).join("");
+}
+
+// ── Births ────────────────────────────────────────────────────────────────────
+
+function plRenderRecentBorn() {
+  const tbody = document.getElementById("pl-born-tbody");
+  if (!tbody) return;
+  const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
+  const born = (_plData || []).filter(p => {
+    if (!p.born_at) return false;
+    return new Date(p.born_at).getTime() >= cutoff;
+  }).sort((a, b) => new Date(b.born_at) - new Date(a.born_at));
+
+  if (!born.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="padding:12px;color:var(--text-muted);text-align:center">No new players in the last 3 days.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = born.map(p => {
+    const bornDate = new Date(p.born_at).toLocaleString();
+    return `<tr class="pl-data-row">
+      <td>${escHtml(p.username)}</td>
+      <td class="col-rank">${escHtml(p.rank || "—")}</td>
+      <td class="col-occupation">${escHtml(p.occupation || "—")}</td>
+      <td class="col-homecity">${escHtml(p.homecity || "—")}</td>
+      <td style="white-space:nowrap">${escHtml(bornDate)}</td>
     </tr>`;
   }).join("");
 }

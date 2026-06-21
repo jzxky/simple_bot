@@ -74,6 +74,7 @@ _MIGRATIONS = [
     ("players",  "scraped_at",             "TEXT DEFAULT ''"),
     ("groups",   "updated_at",             "TEXT DEFAULT ''"),
     ("players",  "died_at",               "TEXT DEFAULT ''"),
+    ("players",  "born_at",               "TEXT DEFAULT ''"),
 ]
 
 
@@ -213,7 +214,7 @@ def get_all_players() -> list:
             rows = con.execute(
                 """SELECT username, homecity, occupation, rank, active,
                           group_name, agg_crimes, case_work,
-                          character_age, jail_age, died_at
+                          character_age, jail_age, died_at, born_at
                    FROM players ORDER BY username COLLATE NOCASE"""
             ).fetchall()
             result = []
@@ -378,15 +379,15 @@ def upsert_players(player_list: list):
                            cur["rank"] != rank)
 
                 con.execute(
-                    """INSERT INTO players (username, homecity, occupation, rank, active, scraped_at)
-                       VALUES (?, ?, ?, ?, ?, ?)
+                    """INSERT INTO players (username, homecity, occupation, rank, active, scraped_at, born_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)
                        ON CONFLICT(username) DO UPDATE SET
                            homecity=excluded.homecity,
                            occupation=excluded.occupation,
                            rank=excluded.rank,
                            active=excluded.active,
                            scraped_at=excluded.scraped_at""",
-                    (name, homecity, occupation, rank, active, scraped_at),
+                    (name, homecity, occupation, rank, active, scraped_at, scraped_at),
                 )
                 if changed:
                     con.execute(
