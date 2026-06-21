@@ -18,17 +18,25 @@ BIONIC_PRICES = {"arms": 10000, "legs": 20000, "eyes": 35000, "brain": 50000, "h
 REVERSE_ORDER  = ["heart", "brain", "eyes", "legs", "arms"]
 
 
-def load_last_bionics_check() -> float:
-    """Return the Unix timestamp of the last bionics check, or 0 if never."""
+def load_bionics_state() -> dict:
     import config as cfg
-    return float(cfg.load().get("bionics_state", {}).get("last_checked_at", 0))
+    return cfg.load().get("bionics_state", {})
+
+
+def save_bionics_state(updates: dict):
+    import config as cfg
+    c = cfg.load()
+    c.setdefault("bionics_state", {}).update(updates)
+    cfg.save(c)
+
+
+# Keep old name so any other callers aren't broken
+def load_last_bionics_check() -> float:
+    return float(load_bionics_state().get("last_checked_at", 0))
 
 
 def save_last_bionics_check(ts: float):
-    import config as cfg
-    c = cfg.load()
-    c.setdefault("bionics_state", {})["last_checked_at"] = ts
-    cfg.save(c)
+    save_bionics_state({"last_checked_at": ts})
 
 
 class BionicsTask(Task):
@@ -36,7 +44,9 @@ class BionicsTask(Task):
     label = "Bionics Store"
 
     def __init__(self):
-        self.last_checked_at: float = load_last_bionics_check()
+        s = load_bionics_state()
+        self.last_checked_at: float = float(s.get("last_checked_at", 0))
+        self.last_stock: dict       = s.get("last_stock", {})
         self.last_views: "tuple[int,int] | None" = None
 
     def can_run(self, state: GameState) -> bool:
@@ -53,14 +63,18 @@ class BionicsTask(Task):
         if self.last_checked_at > 0 and time.time() - self.last_checked_at < interval_secs:
             return False
 
-        # Time window check
+        # Time window check (handles midnight wrap)
         ingame = state.ingame_mins
         if b.get("use_time_window", False) and ingame is not None:
             start = b.get("window_start", "00:00")
             end   = b.get("window_end",   "23:59")
             start_mins = int(start[:2]) * 60 + int(start[3:])
             end_mins   = int(end[:2])   * 60 + int(end[3:])
-            if not (start_mins < ingame < end_mins):
+            if start_mins < end_mins:
+                in_window = start_mins < ingame < end_mins
+            else:  # crosses midnight
+                in_window = ingame > start_mins or ingame < end_mins
+            if not in_window:
                 return False
 
         return True
