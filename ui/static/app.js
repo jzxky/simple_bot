@@ -1975,11 +1975,11 @@ function cjSearch() {
   if (!q) {
     _cjFiltered = _cjData;
   } else {
-    _cjFiltered = _cjData.filter(e =>
-      (e.title || "").toLowerCase().includes(q) ||
-      (e.text  || "").toLowerCase().includes(q) ||
-      (e.time  || "").toLowerCase().includes(q)
-    );
+    const words = q.split(/\s+/).filter(Boolean);
+    _cjFiltered = _cjData.filter(e => {
+      const haystack = [(e.title || ""), (e.text || ""), (e.time || "")].join(" ").toLowerCase();
+      return words.every(w => haystack.includes(w));
+    });
   }
   _cjPage = 1;
   cjRender();
