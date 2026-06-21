@@ -142,6 +142,7 @@ function _doSave() {
     jail_use_consumables: document.getElementById("jail_use_consumables").checked,
     auto_jail_time: document.getElementById("auto_jail_time")?.value ?? "off",
     use_warrants: document.getElementById("use_warrants")?.value === "true",
+    auto_warrant_handling: document.getElementById("auto_warrant_handling")?.value ?? "none",
     auto_jail_partner: document.getElementById("auto_jail_partner")?.value ?? "",
     show_scheduler: (document.getElementById("show_scheduler")||{checked:false}).checked,
     debug_logging: (document.getElementById("debug_logging")||{checked:false}).checked,
@@ -2796,14 +2797,20 @@ function _renderNotifList(notifs) {
   const list = document.getElementById("notif-list");
   if (!list) return;
   if (!notifs.length) { list.innerHTML = ""; return; }
-  list.innerHTML = notifs.map(n => `
+  list.innerHTML = notifs.map(n => {
+    const extra = n.event_type === "warrants_outstanding"
+      ? `<button class="btn-secondary" style="font-size:11px;padding:2px 8px;margin-top:4px" onclick="clearWarrantCooldown('${escHtml(n.id)}')">Clear Cooldown</button>`
+      : "";
+    return `
     <div class="notif-item">
       <div class="notif-item-body">
         <span class="notif-ts">${escHtml(n.ts)}</span>
         <span class="notif-msg">${escHtml(n.message)}</span>
+        ${extra}
       </div>
       <button class="notif-dismiss-btn" onclick="dismissNotif('${escHtml(n.id)}')" title="Dismiss">✕</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 function dismissNotif(id) {
@@ -2816,6 +2823,11 @@ function dismissNotif(id) {
 
 function clearAllNotifs() {
   fetch("/notifications/clear", {method: "POST"}).catch(() => {});
+}
+
+function clearWarrantCooldown(notifId) {
+  fetch("/travel/clear-warrant-cooldown", {method: "POST"}).catch(() => {});
+  dismissNotif(notifId);
 }
 
 function _collectNotifSettings() {

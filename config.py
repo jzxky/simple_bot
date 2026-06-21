@@ -128,6 +128,7 @@ DEFAULT_CONFIG = {
         "auto_jail_time": "off",
         "auto_jail_partner": "",
         "use_warrants": False,
+        "auto_warrant_handling": "none",
         "jailbreak_execute_at": 0,
     },
     "character_history": {
@@ -171,6 +172,7 @@ DEFAULT_CONFIG = {
         "jailed":              False,
         "targets_exhausted":   False,
         "mhs_protected":       True,
+        "warrants_outstanding": True,
     }
 }
 

@@ -362,6 +362,17 @@
               </label>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Warrants</h3>
+              <div class="setting-row">
+                <label for="auto_warrant_handling">Auto Handling</label>
+                <select id="auto_warrant_handling" style="width:200px" onchange="autoSave()">
+                  {% for v, l in [('none','None'),('failed_no_jail','Failed – No Jail'),('failed_incl_jail','Failed – Incl. Jail'),('all','All')] %}
+                  <option value="{{ v }}" {% if jail.get('auto_warrant_handling','none') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Auto Jail Time</h3>
               <div class="setting-row">
                 <label for="auto_jail_time">Mode</label>
@@ -539,7 +550,7 @@
               <h3>Notifications</h3>
               <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification badge in the header so you can see them when you return AFK.</p>
               {% set notif_cfg = config.get('notifications', {}) %}
-              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'bionics_restock': False, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'cloudflare_detected': True, 'jailed': False, 'targets_exhausted': False} %}
+              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'bionics_restock': False, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'cloudflare_detected': True, 'jailed': False, 'targets_exhausted': False, 'warrants_outstanding': True} %}
               {% for slug, label in notification_events %}
               <label class="inline-toggle setting-row">{{ label }}
                 <label class="toggle-label"><input type="checkbox" id="notif_{{ slug }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
