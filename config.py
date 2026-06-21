@@ -163,6 +163,7 @@ DEFAULT_CONFIG = {
     "notifications": {
         "bionics_in_stock":    True,
         "bionics_purchased":   True,
+        "bionics_restock":     False,
         "promotion_success":   True,
         "auto_promo":          True,
         "session_expired":     True,

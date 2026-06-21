@@ -19,6 +19,7 @@ import trait_requirements as tr
 NOTIFICATION_EVENTS = [
     ("bionics_in_stock",    "Bionics in stock"),
     ("bionics_purchased",   "Bionic purchased"),
+    ("bionics_restock",     "Bionics restock detected"),
     ("promotion_success",   "Rank promotion"),
     ("auto_promo",          "Auto-promotion triggered"),
     ("session_expired",     "Session expired"),
@@ -294,7 +295,11 @@ def _get_bionics_next_check_at(state) -> "float | None":
         start_mins = int(start[:2]) * 60 + int(start[3:])
         end_mins   = int(end[:2])   * 60 + int(end[3:])
         ingame = state.ingame_mins
-        if ingame is not None and not (start_mins < ingame < end_mins):
+        if start_mins < end_mins:
+            _outside = ingame is not None and not (start_mins < ingame < end_mins)
+        else:
+            _outside = ingame is not None and not (ingame > start_mins or ingame < end_mins)
+        if _outside:
             # Outside window — next check is at window start
             ingame_secs_now = (state.server_time.hour * 3600
                                + state.server_time.minute * 60

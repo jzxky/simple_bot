@@ -539,7 +539,7 @@
               <h3>Notifications</h3>
               <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification badge in the header so you can see them when you return AFK.</p>
               {% set notif_cfg = config.get('notifications', {}) %}
-              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'cloudflare_detected': True, 'jailed': False, 'targets_exhausted': False} %}
+              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'bionics_restock': False, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'cloudflare_detected': True, 'jailed': False, 'targets_exhausted': False} %}
               {% for slug, label in notification_events %}
               <label class="inline-toggle setting-row">{{ label }}
                 <label class="toggle-label"><input type="checkbox" id="notif_{{ slug }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>

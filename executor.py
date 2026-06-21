@@ -1516,9 +1516,36 @@ def handle_check_bionics(action: Action, state: GameState):
     # Step 6: Parse store, record last_checked
     store = _parse_store()
     if task is not None:
-        from tasks.bionics import save_last_bionics_check
+        from tasks.bionics import save_bionics_state
         task.last_checked_at = time.time()
-        save_last_bionics_check(task.last_checked_at)
+        state_updates = {"last_checked_at": task.last_checked_at}
+
+        # Restock detection — compare stock counts against last snapshot
+        if b.get("auto_restock", False) and task.last_stock:
+            restocked = [
+                item for item, d in store.items()
+                if d.get("stock", 0) > task.last_stock.get(item, 0)
+            ]
+            if restocked and state.ingame_mins is not None:
+                igm        = state.ingame_mins
+                start_mins = (igm + 10 * 60) % (24 * 60)
+                end_mins   = (igm + 13 * 60 + 30) % (24 * 60)
+                new_start  = f"{start_mins // 60:02d}:{start_mins % 60:02d}"
+                new_end    = f"{end_mins   // 60:02d}:{end_mins   % 60:02d}"
+                c = cfg.load()
+                c["bionics"]["use_time_window"] = True
+                c["bionics"]["window_start"]    = new_start
+                c["bionics"]["window_end"]      = new_end
+                cfg.save(c)
+                msg = (f"Bionics restock detected ({', '.join(restocked)}) — "
+                       f"buy window set to {new_start}–{new_end} in-game.")
+                state.add_log(msg)
+                _notify(state, "bionics_restock", msg)
+
+        # Update last_stock snapshot
+        task.last_stock = {item: d.get("stock", 0) for item, d in store.items()}
+        state_updates["last_stock"] = task.last_stock
+        save_bionics_state(state_updates)
 
     # Log anything currently in stock, regardless of whether the user wants it
     all_in_stock = [i for i, d in store.items() if d.get("stock", 0) > 0]
