@@ -118,10 +118,9 @@ class GameState:
         print(entry)
 
     def push_notification(self, event_type: str, message: str):
-        import time as _t
         ts = self.server_time.strftime("%H:%M:%S") if self.server_time else "?"
         self.notifications.append({
-            "id": str(int(_t.time() * 1000)),
+            "id": str(int(_time.time() * 1000)),
             "ts": ts,
             "event_type": event_type,
             "message": message,
@@ -197,7 +196,6 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
                     release_dt = datetime.strptime(m.group(1).strip(), SERVER_TIME_FMT)
                     # Anchor using server_time offset from real time
                     offset = (release_dt - s.server_time).total_seconds()
-                    import time as _time
                     s.hospital_release_at = _time.time() + offset
                 except ValueError:
                     pass
