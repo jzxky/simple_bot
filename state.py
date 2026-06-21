@@ -5,6 +5,7 @@ All time comparisons use server time, never the system clock.
 
 from __future__ import annotations
 import re
+import time as _time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
@@ -37,6 +38,7 @@ class GameState:
     agg_pro_active: bool = False
     agg_pro_end: Optional[datetime] = None
     server_time: Optional[datetime] = None
+    server_time_monotonic: float = 0.0  # monotonic timestamp when server_time was last set
     logged_in: bool = False
     relog_suppressed: bool = False
     current_url: str = ""
@@ -87,7 +89,9 @@ class GameState:
         if self.action_timer_ready:
             return True
         if self.action_timer_end and self.server_time:
-            return self.server_time >= self.action_timer_end
+            elapsed = _time.monotonic() - self.server_time_monotonic
+            estimated_now = self.server_time + timedelta(seconds=elapsed)
+            return estimated_now >= self.action_timer_end
         return False
 
     def add_log(self, message: str):
@@ -124,6 +128,7 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     if st:
         try:
             s.server_time = datetime.strptime(st.get_text(strip=True), SERVER_TIME_FMT)
+            s.server_time_monotonic = _time.monotonic()
         except ValueError:
             pass
 
