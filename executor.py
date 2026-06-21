@@ -2198,14 +2198,11 @@ def handle_travel(action: Action, state: GameState) -> int:
         return 0
 
     warrant_mode = cfg.load().get("jail", {}).get("auto_warrant_handling", "none")
-    if warrant_mode != "none":
-        result_q = queue.Queue()
-        handle_check_warrants(Action("check_warrants", result_queue=result_q), state)
-        try:
-            warrants = result_q.get(timeout=10)
-        except queue.Empty:
-            warrants = []
-    else:
+    result_q = queue.Queue()
+    handle_check_warrants(Action("check_warrants", result_queue=result_q), state)
+    try:
+        warrants = result_q.get(timeout=10)
+    except queue.Empty:
         warrants = []
 
     if warrants:
