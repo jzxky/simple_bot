@@ -2538,20 +2538,24 @@ def _finish_eng(state: GameState):
             pre.append(str(child))
         if pre:
             search_root = BeautifulSoup("".join(pre), "html.parser")
-    success = (
-        search_root.find("div", id="success") or
-        search_root.find("div", class_="info green") or
-        search_root.find("div", class_="success")
-    )
-    fail = (
-        search_root.find("div", id="fail") or
-        search_root.find("div", class_="info red") or
-        search_root.find("div", class_="fail")
-    )
-    if success:
-        state.add_log(f"Engineering result: {success.get_text(strip=True)}")
-    elif fail:
-        state.add_log(f"Engineering failed: {fail.get_text(strip=True)}")
+    # Collect all success/fail divs in document order and pick the topmost one
+    all_divs = search_root.find_all("div")
+    result_div = None
+    is_success = False
+    for div in all_divs:
+        div_id = div.get("id", "")
+        div_cls = set(div.get("class", []))
+        if div_id == "success" or "success" in div_cls or div_cls >= {"info", "green"}:
+            result_div = div
+            is_success = True
+            break
+        if div_id == "fail" or "fail" in div_cls or div_cls >= {"info", "red"}:
+            result_div = div
+            is_success = False
+            break
+    if result_div:
+        prefix = "Engineering result" if is_success else "Engineering failed"
+        state.add_log(f"{prefix}: {result_div.get_text(strip=True)}")
     else:
         state.add_log("Engineering case work: submitted.")
     _refresh_state(state)
