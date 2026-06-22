@@ -84,6 +84,7 @@ _clear_jail_duty_queue_event = threading.Event()
 _respect_refresh_queue: queue.Queue = queue.Queue()
 _profile_request: queue.Queue = queue.Queue(maxsize=1)
 _profile_result: queue.Queue = queue.Queue(maxsize=1)
+_navigate_queue: queue.Queue = queue.Queue()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
 state = GameState()
@@ -369,6 +370,14 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Travel error: {e}")
 
+            # Navigate requests from the Flask thread
+            if not _navigate_queue.empty():
+                try:
+                    params = _navigate_queue.get_nowait()
+                    executor.execute(Action("navigate", **params), state)
+                except Exception as e:
+                    state.add_log(f"Navigate error: {e}")
+
             # Travel destination fetch (for UI dropdowns)
             if not _travel_dests_request.empty():
                 try:
@@ -649,6 +658,10 @@ def request_warrants(timeout: float = 30.0) -> list:
     if isinstance(result, Exception):
         raise result
     return result
+
+
+def request_navigate(url: str):
+    _navigate_queue.put({"url": url})
 
 
 def request_turn_in_warrant(url: str, case_id: str):
