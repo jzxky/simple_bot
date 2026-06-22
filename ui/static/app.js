@@ -401,7 +401,7 @@ function openWeaponOverlay(el) {
     const btn = document.createElement("button");
     btn.className = "action-btn";
     btn.textContent = a.label;
-    btn.onclick = () => { closeWeaponOverlay(); navigateTo(a.url); };
+    btn.onclick = () => { closeWeaponOverlay(); navigateTo(a.url); loadProfile(); };
     body.appendChild(btn);
   });
   document.getElementById("weapon-overlay").classList.add("active");
@@ -420,7 +420,7 @@ function openVehicleOverlay(el) {
     const btn = document.createElement("button");
     btn.className = "action-btn";
     btn.textContent = a.label;
-    btn.onclick = () => { closeVehicleOverlay(); navigateTo(a.url); };
+    btn.onclick = () => { closeVehicleOverlay(); navigateTo(a.url); loadProfile(); };
     body.appendChild(btn);
   });
   document.getElementById("vehicle-overlay").classList.add("active");
@@ -440,7 +440,7 @@ function submitRepair() {
   closeRepairOverlay();
   fetch("/repair_vehicle", {method: "POST"})
     .then(r => r.json())
-    .then(d => { if (d.error) alert(d.error); })
+    .then(d => { if (d.error) alert(d.error); else loadProfile(); })
     .catch(e => alert(String(e)));
 }
 
@@ -2949,7 +2949,7 @@ function _renderProfile(d) {
     h.push('</div>');
   }
 
-  // Weapons — grouped by slot type, table layout per group
+  // Weapons — grouped by slot type, pill badges per group
   if (d.weapons && d.weapons.length) {
     h.push('<hr class="stat-divider"><div class="profile-section-title">Weapons</div>');
     const wgroups = {"On Hand": [], "Stash": [], "Vault": []};
@@ -2962,19 +2962,21 @@ function _renderProfile(d) {
     ["On Hand", "Stash", "Vault"].forEach(group => {
       if (!wgroups[group].length) return;
       h.push(`<div class="profile-weapon-group">${escHtml(group)}</div>`);
-      h.push('<table class="profile-weapons-table"><thead><tr><th>Slot</th><th>Item</th><th>Durability</th></tr></thead><tbody>');
+      h.push('<div class="profile-tags">');
       wgroups[group].forEach(w => {
         const hasActions = group !== "Vault" && w.actions && w.actions.length;
         if (hasActions) {
           const actionsAttr = JSON.stringify(w.actions).replace(/'/g, "&#39;");
-          h.push(`<tr class="profile-item-clickable" data-wname="${escHtml(w.item||"")}" data-wslot="${escHtml(w.slot||"")}" data-wdur="${escHtml(w.durability||"")}" data-wactions='${actionsAttr}' onclick="openWeaponOverlay(this)">`);
+          h.push(`<span class="profile-weapon-pill profile-item-clickable" data-wname="${escHtml(w.item||"")}" data-wslot="${escHtml(w.slot||"")}" data-wdur="${escHtml(w.durability||"")}" data-wactions='${actionsAttr}' onclick="openWeaponOverlay(this)">`);
         } else {
-          h.push('<tr>');
+          h.push('<span class="profile-weapon-pill">');
         }
-        h.push(`<td>${escHtml(w.slot||"—")}</td><td>${escHtml(w.item||"—")}</td><td class="muted">${escHtml(w.durability||"—")}</td>`);
-        h.push('</tr>');
+        h.push(`<span class="profile-slot">${escHtml(w.slot||"")}</span>`);
+        if (w.item) h.push(` <span class="profile-item-name">${escHtml(w.item)}</span>`);
+        if (w.durability) h.push(` <span class="muted">${escHtml(w.durability)}</span>`);
+        h.push('</span>');
       });
-      h.push('</tbody></table>');
+      h.push('</div>');
     });
   }
 
@@ -2984,10 +2986,20 @@ function _renderProfile(d) {
     d.vehicles.forEach(v => {
       const hasActions = v.actions && v.actions.length;
       const actionsAttr = hasActions ? JSON.stringify(v.actions).replace(/'/g, "&#39;") : "[]";
-      h.push(`<div class="profile-item${hasActions ? ' profile-item-clickable' : ''}" ${hasActions ? `data-vname="${escHtml(v.Type||"")}" data-vactions='${actionsAttr}' onclick="openVehicleOverlay(this)"` : ''}>`);
-      if (v.Type) h.push(`<span class="profile-item-name">${escHtml(v.Type)}</span>`);
-      if (v.Condition) h.push(` <span class="profile-slot profile-item-clickable" style="margin-left:8px" onclick="event.stopPropagation();openRepairOverlay('${escHtml(v.Condition)}')">${escHtml(v.Condition)}</span>`);
-      if (v.Location) h.push(` <span class="muted">${escHtml(v.Location)}</span>`);
+      h.push('<div class="stats-grid">');
+      if (v.Type) {
+        if (hasActions) {
+          h.push(`<div class="stat-item profile-item-clickable" data-vname="${escHtml(v.Type)}" data-vactions='${actionsAttr}' onclick="openVehicleOverlay(this)"><span class="stat-label">Type</span><span class="stat-value">${escHtml(v.Type)}</span></div>`);
+        } else {
+          h.push(row("Type", v.Type));
+        }
+      }
+      if (v.Condition) {
+        h.push(`<div class="stat-item profile-item-clickable" onclick="openRepairOverlay('${escHtml(v.Condition)}')"><span class="stat-label">Condition</span><span class="stat-value">${escHtml(v.Condition)}</span></div>`);
+      }
+      for (const k of ["Location", "Parking/security"]) {
+        if (v[k]) h.push(row(k, v[k]));
+      }
       h.push('</div>');
     });
   }
