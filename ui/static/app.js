@@ -2839,3 +2839,105 @@ function _collectNotifSettings() {
   return out;
 }
 
+let _profileLoading = false;
+function loadProfile() {
+  const el = document.getElementById("profile-content");
+  if (!el || _profileLoading) return;
+  _profileLoading = true;
+  el.innerHTML = '<span class="muted">Loading…</span>';
+  fetch("/profile")
+    .then(r => r.json())
+    .then(d => {
+      _profileLoading = false;
+      if (d.error) { el.innerHTML = `<span class="error">${escHtml(d.error)}</span>`; return; }
+      el.innerHTML = _renderProfile(d);
+    })
+    .catch(e => { _profileLoading = false; el.innerHTML = `<span class="error">${escHtml(String(e))}</span>`; });
+}
+
+function _renderProfile(d) {
+  const h = [];
+  const row = (label, val) => `<div class="stat-item"><span class="stat-label">${escHtml(label)}</span><span class="stat-value">${escHtml(val || "—")}</span></div>`;
+
+  // Basic info
+  h.push('<div class="stats-grid">');
+  for (const k of ["Username","Occupation","Status","Current rank","Age","Creation time"]) {
+    if (d[k] != null) h.push(row(k, d[k]));
+  }
+  h.push('</div>');
+
+  // Bionics
+  if (d.bionics && d.bionics.length) {
+    h.push('<hr class="stat-divider"><div class="profile-section-title">Bionics</div>');
+    h.push('<div class="profile-tags">');
+    d.bionics.forEach(b => h.push(`<span class="profile-tag">${escHtml(b)}</span>`));
+    h.push('</div>');
+  }
+
+  // Weapons
+  if (d.weapons && d.weapons.length) {
+    h.push('<hr class="stat-divider"><div class="profile-section-title">Weapons</div>');
+    d.weapons.forEach(w => {
+      h.push('<div class="profile-item">');
+      if (w.slot) h.push(`<span class="profile-slot">${escHtml(w.slot)}</span> `);
+      if (w.item) h.push(`<span class="profile-item-name">${escHtml(w.item)}</span>`);
+      if (w.durability) h.push(` <span class="muted">${escHtml(w.durability)}</span>`);
+      h.push('</div>');
+    });
+  }
+
+  // Vehicle
+  if (d.vehicles && d.vehicles.length) {
+    h.push('<hr class="stat-divider"><div class="profile-section-title">Vehicles</div>');
+    d.vehicles.forEach(v => {
+      h.push('<div class="stats-grid">');
+      for (const k of ["Type","Condition","Location","Parking/security"]) {
+        if (v[k]) h.push(row(k, v[k]));
+      }
+      h.push('</div>');
+    });
+  }
+
+  // Apartment
+  if (d.apartment && Object.keys(d.apartment).length) {
+    h.push('<hr class="stat-divider"><div class="profile-section-title">Apartment</div>');
+    h.push('<div class="stats-grid">');
+    for (const k of ["Apartment","Status","Storage"]) {
+      if (d.apartment[k]) h.push(row(k, d.apartment[k]));
+    }
+    h.push('</div>');
+  }
+
+  // Pets
+  if (d.pets && d.pets.length) {
+    h.push('<hr class="stat-divider"><div class="profile-section-title">Pets</div>');
+    d.pets.forEach(p => {
+      h.push('<div class="stats-grid">');
+      for (const k of ["slot","Name","Breed","Age","Fights won","Fights lost"]) {
+        if (p[k]) h.push(row(k === "slot" ? "Status" : k, p[k]));
+      }
+      h.push('</div>');
+    });
+  }
+
+  // Businesses
+  if (d.businesses && d.businesses.length) {
+    h.push('<hr class="stat-divider"><div class="profile-section-title">Businesses</div>');
+    d.businesses.forEach(b => {
+      h.push(`<div class="profile-item"><span class="profile-item-name">${escHtml(b.name)}</span>`);
+      if (b.next_restock && b.next_restock !== "N/A") h.push(` <span class="muted">restock: ${escHtml(b.next_restock)}</span>`);
+      h.push('</div>');
+    });
+  }
+
+  // Misc
+  if (d.misc && d.misc.length) {
+    h.push('<hr class="stat-divider"><div class="profile-section-title">Misc Items</div>');
+    h.push('<div class="profile-tags">');
+    d.misc.forEach(m => h.push(`<span class="profile-tag">${escHtml(m)}</span>`));
+    h.push('</div>');
+  }
+
+  return h.join("");
+}
+

@@ -531,6 +531,133 @@ def character_history_refresh():
     return jsonify({"ok": True})
 
 
+@app.route("/profile")
+def profile():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    try:
+        import browser as _browser
+        from bs4 import BeautifulSoup
+        import executor as _ex
+        page = _browser.page()
+        page.goto(_ex._u("/profile/default.asp"), wait_until="domcontentloaded", timeout=15000)
+        soup = BeautifulSoup(page.content(), "html.parser")
+
+        result = {}
+
+        # Basic info table
+        info_table = soup.select_one("#account_profile table.item_table")
+        if info_table:
+            for row in info_table.find_all("tr"):
+                cells = row.find_all("td")
+                for i in range(0, len(cells) - 1, 2):
+                    label = cells[i].get_text(strip=True).rstrip(":")
+                    value = cells[i + 1].get_text(strip=True)
+                    result[label] = value
+
+        # Bionics
+        bionics = []
+        for div in soup.select("#account_bionics [id^='player_bionic']"):
+            a = div.find("a", class_="title")
+            if a and a.get("title"):
+                name = a["title"].split("|")[0].replace(" installed", "").strip()
+                if name:
+                    bionics.append(name)
+        result["bionics"] = bionics
+
+        # Weapons (carried + stash/vault)
+        weapons = []
+        for tbl in soup.select(".showWeapons table.item_table"):
+            w = {}
+            slot_div = tbl.select_one("td[colspan] div")
+            if slot_div:
+                w["slot"] = slot_div.get_text(strip=True)
+            item_td = tbl.find("td", class_="item_content")
+            if item_td:
+                # extract name and serial
+                text = item_td.get_text(strip=True)
+                w["item"] = text
+            dur_div = tbl.select_one(".item_shots_content div")
+            if dur_div:
+                w["durability"] = dur_div.get_text(strip=True)
+            if w:
+                weapons.append(w)
+        result["weapons"] = weapons
+
+        # Apartment
+        apt = {}
+        for tbl in soup.select("#holder_content > table.item_table"):
+            rows = tbl.find_all("tr")
+            for row in rows:
+                cells = row.find_all("td")
+                if len(cells) >= 2:
+                    label = cells[-2].get_text(strip=True).rstrip(":")
+                    value = cells[-1].get_text(strip=True)
+                    if label in ("Apartment", "Status", "Storage"):
+                        apt[label] = value
+        if apt:
+            result["apartment"] = apt
+
+        # Vehicle
+        vehicles = []
+        for tbl in soup.select("#holder_content > table[cellspacing='2'].item_table"):
+            v = {}
+            for row in tbl.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) >= 2:
+                    label = cells[-2].get_text(strip=True).rstrip(":")
+                    val = cells[-1].get_text(strip=True)
+                    if label in ("Type", "Condition", "Location", "Parking/security"):
+                        v[label] = val
+            if v.get("Type"):
+                vehicles.append(v)
+        result["vehicles"] = vehicles
+
+        # Pets
+        pets = []
+        for tbl in soup.select(".showPets table.item_table"):
+            p = {}
+            for row in tbl.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) >= 2:
+                    label = cells[0].get_text(strip=True).rstrip(":")
+                    val = cells[-1].get_text(strip=True)
+                    if label in ("Name", "Breed", "Age", "Fights won", "Fights lost"):
+                        p[label] = val
+            slot_div = tbl.select_one("td[colspan] div")
+            if slot_div:
+                p["slot"] = slot_div.get_text(strip=True)
+            if p.get("Breed"):
+                pets.append(p)
+        result["pets"] = pets
+
+        # Businesses
+        businesses = []
+        for tbl in soup.select(".showBusinesses table.item_table"):
+            rows = tbl.find_all("tr")
+            for row in rows[1:]:  # skip header
+                cells = row.find_all("td")
+                if len(cells) >= 2:
+                    businesses.append({
+                        "name": cells[0].get_text(strip=True),
+                        "next_restock": cells[1].get_text(strip=True),
+                    })
+        result["businesses"] = businesses
+
+        # Misc items
+        misc = []
+        for tbl in soup.select("#holder_content > table.item_table"):
+            for td in tbl.select("td.item_info"):
+                text = td.get_text(strip=True)
+                if " - " in text:
+                    misc.append(text)
+        result["misc"] = misc
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/screenshot")
 def screenshot():
     import paths as _paths
