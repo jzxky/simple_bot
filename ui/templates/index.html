@@ -1329,6 +1329,15 @@
   }
 </script>
 
+<!-- Weapon action overlay -->
+<div id="weapon-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeWeaponOverlay()">
+  <div class="pl-modal-box">
+    <h3 id="weapon-overlay-title" style="margin:0 0 8px"></h3>
+    <div id="weapon-overlay-body" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div style="margin-top:8px"><button class="action-btn" onclick="closeWeaponOverlay()">Close</button></div>
+  </div>
+</div>
+
 <!-- Group delete confirm modal -->
 <div id="pl-delete-modal" class="pl-modal-overlay" onclick="if(event.target===this)plCloseDeleteModal()">
   <div class="pl-modal-box">
