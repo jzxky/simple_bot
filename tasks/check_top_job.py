@@ -13,23 +13,17 @@ from tasks.base import Task
 
 _CHECK_INTERVAL = 5 * 60  # seconds
 
-# Maps prerequisite occupation → (top job title, promo path)
+# Maps top job title → promo path
 _TOP_JOB_PATHS = {
-    "Fire Fighter":   ("Fire Chief",           "/promotion/firechief.asp"),
-    "Mortician":      ("Funeral Director",     "/promotion/funeraldirector.asp"),
-    "Undertaker":     ("Funeral Director",     "/promotion/funeraldirector.asp"),
-    "Loan Officer":   ("Bank Manager",         "/promotion/bankmanager.asp"),
-    "Surgeon":        ("Hospital Director",    "/promotion/hospitaldirector.asp"),
-    "Engineer":       ("Chief Engineer",       "/promotion/chiefengineer.asp"),
-    "Superintendent": ("Commissioner-General", "/promotion/commissionergeneral.asp"),
+    "Fire Chief":           "/promotion/firechief.asp",
+    "Funeral Director":     "/promotion/funeraldirector.asp",
+    "Bank Manager":         "/promotion/bankmanager.asp",
+    "Hospital Director":    "/promotion/hospitaldirector.asp",
+    "Chief Engineer":       "/promotion/chiefengineer.asp",
+    "Commissioner-General": "/promotion/commissionergeneral.asp",
 }
 
-
-def _top_job_map() -> dict:
-    return {occ: (title, urls.BASE_URL + path) for occ, (title, path) in _TOP_JOB_PATHS.items()}
-
-
-TOP_JOB_MAP = _top_job_map()
+TOP_JOB_MAP = {title: urls.BASE_URL + path for title, path in _TOP_JOB_PATHS.items()}
 
 
 class CheckTopJobTask(Task):
@@ -46,18 +40,17 @@ class CheckTopJobTask(Task):
             return False
         if not cfg.load().get("promo", {}).get("monitor_top_job", False):
             return False
-        if state.occupation not in _TOP_JOB_PATHS:
+        if state.next_rank not in _TOP_JOB_PATHS:
             return False
-        top_job = _TOP_JOB_PATHS[state.occupation][0]
-        if state.next_rank != top_job:
-            return False
+        top_job = state.next_rank
         if state.rank_progress < 100:
             return False
         return time.monotonic() - self._last_run >= _CHECK_INTERVAL
 
     def run(self, state: GameState, executor):
         self._last_run = time.monotonic()
-        top_job, promo_url = _top_job_map()[state.occupation]
+        top_job = state.next_rank
+        promo_url = TOP_JOB_MAP[top_job]
 
         try:
             browser.page().goto(urls.BASE_URL + "/skin/updateusers.php?q=1", wait_until="domcontentloaded", timeout=15000)
