@@ -82,6 +82,8 @@ _travel_dests_result: queue.Queue = queue.Queue(maxsize=1)
 _clear_earn_event = threading.Event()
 _clear_jail_duty_queue_event = threading.Event()
 _respect_refresh_queue: queue.Queue = queue.Queue()
+_profile_request: queue.Queue = queue.Queue(maxsize=1)
+_profile_result: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
 state = GameState()
@@ -405,6 +407,16 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Respect refresh error: {e}")
 
+            # Profile fetch requests from the Flask thread
+            if not _profile_request.empty():
+                try:
+                    _profile_request.get_nowait()
+                    result_q = queue.Queue()
+                    executor.execute(Action("fetch_profile", result_queue=result_q), state)
+                    _profile_result.put(result_q.get(timeout=30))
+                except Exception as e:
+                    _profile_result.put(e)
+
             # Clear earn queue if requested from UI
             if _clear_earn_event.is_set():
                 _clear_earn_event.clear()
@@ -617,6 +629,16 @@ def request_bar_threads(timeout: float = 15.0) -> dict:
         raise result
     return result
 
+
+
+def request_profile(timeout: float = 30.0) -> dict:
+    while not _profile_result.empty():
+        _profile_result.get_nowait()
+    _profile_request.put(True)
+    result = _profile_result.get(timeout=timeout)
+    if isinstance(result, Exception):
+        raise result
+    return result
 
 
 def request_warrants(timeout: float = 30.0) -> list:
