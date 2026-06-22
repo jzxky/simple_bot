@@ -41,9 +41,18 @@ pip install --quiet --upgrade -r requirements.txt
 pip install --quiet --upgrade pyinstaller
 
 :: Clean previous build artefacts
+:: The EXE must not be running — Windows locks it and PyInstaller will fail.
 echo Cleaning previous build...
 if exist "build\" rmdir /s /q build
-if exist "dist\MafiaMatrixBot.exe" del /q "dist\MafiaMatrixBot.exe"
+if exist "dist\MafiaMatrixBot.exe" (
+    del /q "dist\MafiaMatrixBot.exe" 2>nul
+    if exist "dist\MafiaMatrixBot.exe" (
+        echo.
+        echo ERROR: dist\MafiaMatrixBot.exe is locked ^(bot still running?^).
+        echo        Close MafiaMatrixBot.exe completely, then re-run this script.
+        pause & exit /b 1
+    )
+)
 
 :: Build — single portable EXE
 echo.
