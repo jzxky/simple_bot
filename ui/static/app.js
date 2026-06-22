@@ -386,6 +386,31 @@ function closeRespectOverlay() {
 }
 
 // ---------------------------------------------------------------------------
+// Weapon action overlay
+// ---------------------------------------------------------------------------
+
+function openWeaponOverlay(el) {
+  const name = el.dataset.wname || "";
+  const slot = el.dataset.wslot || "";
+  const dur = el.dataset.wdur || "";
+  const actions = JSON.parse(el.dataset.wactions || "[]");
+  document.getElementById("weapon-overlay-title").textContent = name + (slot ? " (" + slot + ")" : "");
+  const body = document.getElementById("weapon-overlay-body");
+  body.innerHTML = dur ? `<span class="muted">${escHtml(dur)}</span>` : "";
+  actions.forEach(a => {
+    const btn = document.createElement("button");
+    btn.className = "action-btn";
+    btn.textContent = a.label;
+    btn.onclick = () => { closeWeaponOverlay(); navigateTo(a.url); };
+    body.appendChild(btn);
+  });
+  document.getElementById("weapon-overlay").classList.add("active");
+}
+function closeWeaponOverlay() {
+  document.getElementById("weapon-overlay").classList.remove("active");
+}
+
+// ---------------------------------------------------------------------------
 // Earn catalog overlay
 // ---------------------------------------------------------------------------
 
@@ -2890,15 +2915,32 @@ function _renderProfile(d) {
     h.push('</div>');
   }
 
-  // Weapons
+  // Weapons — grouped by slot type
   if (d.weapons && d.weapons.length) {
     h.push('<hr class="stat-divider"><div class="profile-section-title">Weapons</div>');
+    const wgroups = {"On Hand": [], "Stash": [], "Vault": []};
     d.weapons.forEach(w => {
-      h.push('<div class="profile-item">');
-      if (w.slot) h.push(`<span class="profile-slot">${escHtml(w.slot)}</span> `);
-      if (w.item) h.push(`<span class="profile-item-name">${escHtml(w.item)}</span>`);
-      if (w.durability) h.push(` <span class="muted">${escHtml(w.durability)}</span>`);
-      h.push('</div>');
+      const s = (w.slot || "").toLowerCase();
+      if (s.includes("hand"))       wgroups["On Hand"].push(w);
+      else if (s.includes("stash")) wgroups["Stash"].push(w);
+      else                          wgroups["Vault"].push(w);
+    });
+    ["On Hand", "Stash", "Vault"].forEach(group => {
+      if (!wgroups[group].length) return;
+      h.push(`<div class="profile-weapon-group">${escHtml(group)}</div>`);
+      wgroups[group].forEach(w => {
+        const hasActions = group !== "Vault" && w.actions && w.actions.length;
+        if (hasActions) {
+          const actionsAttr = JSON.stringify(w.actions).replace(/'/g, "&#39;");
+          h.push(`<div class="profile-item profile-item-clickable" data-wname="${escHtml(w.item||"")}" data-wslot="${escHtml(w.slot||"")}" data-wdur="${escHtml(w.durability||"")}" data-wactions='${actionsAttr}' onclick="openWeaponOverlay(this)">`);
+        } else {
+          h.push('<div class="profile-item">');
+        }
+        if (w.slot) h.push(`<span class="profile-slot">${escHtml(w.slot)}</span> `);
+        if (w.item) h.push(`<span class="profile-item-name">${escHtml(w.item)}</span>`);
+        if (w.durability) h.push(` <span class="muted">${escHtml(w.durability)}</span>`);
+        h.push('</div>');
+      });
     });
   }
 

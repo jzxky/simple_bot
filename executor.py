@@ -2832,6 +2832,15 @@ def handle_fetch_profile(action: Action, state: GameState):
             dur_div = tbl.select_one(".item_shots_content div")
             if dur_div:
                 w["durability"] = dur_div.get_text(strip=True)
+            actions = []
+            action_td = tbl.select_one("td.item_content[align='center']")
+            if action_td:
+                for a in action_td.find_all("a"):
+                    href = a.get("href", "")
+                    label = a.get_text(strip=True)
+                    if href and label:
+                        actions.append({"label": label, "url": href})
+            w["actions"] = actions
             if w:
                 weapons.append(w)
         result["weapons"] = weapons
