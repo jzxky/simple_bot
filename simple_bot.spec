@@ -17,7 +17,6 @@ a = Analysis(
     datas=[
         ('ui/templates',         'ui/templates'),
         ('ui/static',            'ui/static'),
-        ('available_earns.json', '.'),
         ('VERSION',              '.'),
     ] + patchright_datas,
     hiddenimports=patchright_hiddenimports + [
