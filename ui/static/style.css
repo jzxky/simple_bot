@@ -286,6 +286,10 @@ button {
 .profile-nav-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .profile-weapon-group { font-size: 11px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; margin: 8px 0 2px; }
 .profile-item-clickable:hover { background: var(--surface2); border-radius: 4px; cursor: pointer; }
+.profile-weapons-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 4px; }
+.profile-weapons-table th { text-align: left; color: var(--text-muted); font-weight: 500; padding: 3px 6px; border-bottom: 1px solid var(--border); }
+.profile-weapons-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.profile-weapons-table tr.profile-item-clickable:hover { background: var(--surface2); cursor: pointer; }
 .profile-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
 .profile-tag {
   background: var(--card-bg);

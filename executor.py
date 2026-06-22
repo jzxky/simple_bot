@@ -2854,6 +2854,10 @@ def handle_fetch_profile(action: Action, state: GameState):
                     value = cells[-1].get_text(strip=True)
                     if label in ("Apartment", "Status", "Storage"):
                         apt[label] = value
+            apt_link = tbl.select_one("td.item_content[colspan='3'] a")
+            if apt_link:
+                apt["action_url"] = apt_link.get("href", "")
+                apt["action_label"] = apt_link.get_text(strip=True)
         if apt:
             result["apartment"] = apt
 
@@ -2864,9 +2868,16 @@ def handle_fetch_profile(action: Action, state: GameState):
                 cells = row.find_all("td")
                 if len(cells) >= 2:
                     label = cells[-2].get_text(strip=True).rstrip(":")
-                    val = cells[-1].get_text(strip=True)
                     if label in ("Type", "Condition", "Location", "Parking/security"):
-                        v[label] = val
+                        v[label] = cells[-1].get_text(strip=True)
+                    elif label == "Action":
+                        actions = []
+                        for a in cells[-1].find_all("a"):
+                            href = a.get("href", "")
+                            lbl = a.get_text(strip=True)
+                            if href and lbl:
+                                actions.append({"label": lbl, "url": href})
+                        v["actions"] = actions
             if v.get("Type"):
                 vehicles.append(v)
         result["vehicles"] = vehicles

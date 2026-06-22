@@ -554,6 +554,14 @@ def navigate():
     return jsonify({"ok": True})
 
 
+@app.route("/repair_vehicle", methods=["POST"])
+def repair_vehicle_route():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    bot.request_repair_vehicle()
+    return jsonify({"ok": True})
+
+
 @app.route("/screenshot")
 def screenshot():
     import paths as _paths

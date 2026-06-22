@@ -1338,6 +1338,27 @@
   </div>
 </div>
 
+<!-- Vehicle action overlay -->
+<div id="vehicle-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeVehicleOverlay()">
+  <div class="pl-modal-box">
+    <h3 id="vehicle-overlay-title" style="margin:0 0 8px"></h3>
+    <div id="vehicle-overlay-body" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div style="margin-top:8px"><button class="action-btn" onclick="closeVehicleOverlay()">Close</button></div>
+  </div>
+</div>
+
+<!-- Vehicle repair overlay -->
+<div id="repair-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeRepairOverlay()">
+  <div class="pl-modal-box">
+    <h3 style="margin:0 0 8px">Repair Vehicle</h3>
+    <div>Condition: <span id="repair-overlay-condition" class="muted"></span></div>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-secondary" onclick="closeRepairOverlay()">Cancel</button>
+      <button class="action-btn" onclick="submitRepair()">Book Repair</button>
+    </div>
+  </div>
+</div>
+
 <!-- Group delete confirm modal -->
 <div id="pl-delete-modal" class="pl-modal-overlay" onclick="if(event.target===this)plCloseDeleteModal()">
   <div class="pl-modal-box">
