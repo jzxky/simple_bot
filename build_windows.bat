@@ -44,11 +44,11 @@ pip install --quiet --upgrade pyinstaller
 :: The EXE must not be running — Windows locks it and PyInstaller will fail.
 echo Cleaning previous build...
 if exist "build\" rmdir /s /q build
-if exist "dist\MafiaMatrixBot.exe" (
-    del /q "dist\MafiaMatrixBot.exe" 2>nul
-    if exist "dist\MafiaMatrixBot.exe" (
+if exist "openBot\MafiaMatrixBot.exe" (
+    del /q "openBot\MafiaMatrixBot.exe" 2>nul
+    if exist "openBot\MafiaMatrixBot.exe" (
         echo.
-        echo ERROR: dist\MafiaMatrixBot.exe is locked ^(bot still running?^).
+        echo ERROR: openBot\MafiaMatrixBot.exe is locked ^(bot still running?^).
         echo        Close MafiaMatrixBot.exe completely, then re-run this script.
         pause & exit /b 1
     )
@@ -57,7 +57,7 @@ if exist "dist\MafiaMatrixBot.exe" (
 :: Build — single portable EXE
 echo.
 echo Building executable...
-pyinstaller simple_bot.spec --noconfirm
+pyinstaller simple_bot.spec --noconfirm --distpath openBot
 
 if errorlevel 1 (
     echo.
@@ -67,7 +67,7 @@ if errorlevel 1 (
 
 echo.
 echo BUILD COMPLETE.
-echo Output: dist\MafiaMatrixBot.exe
+echo Output: openBot\MafiaMatrixBot.exe
 echo.
 echo === First-time setup for end users ===
 echo 1. Copy MafiaMatrixBot.exe to any folder on the target machine.
