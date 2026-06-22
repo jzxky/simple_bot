@@ -91,6 +91,12 @@ a = Analysis(
         'tasks.refresh',
         'tasks.snipe_top_job',
         'tasks.withdraw',
+        # added modules
+        'tasks.auto_jail_time',
+        'tasks.auto_promo',
+        'tasks.respect',
+        'promotions',
+        'site_map',
     ],
     hookspath=[],
     hooksconfig={},
