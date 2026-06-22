@@ -410,6 +410,40 @@ function closeWeaponOverlay() {
   document.getElementById("weapon-overlay").classList.remove("active");
 }
 
+function openVehicleOverlay(el) {
+  const name = el.dataset.vname || "";
+  const actions = JSON.parse(el.dataset.vactions || "[]");
+  document.getElementById("vehicle-overlay-title").textContent = name;
+  const body = document.getElementById("vehicle-overlay-body");
+  body.innerHTML = "";
+  actions.forEach(a => {
+    const btn = document.createElement("button");
+    btn.className = "action-btn";
+    btn.textContent = a.label;
+    btn.onclick = () => { closeVehicleOverlay(); navigateTo(a.url); };
+    body.appendChild(btn);
+  });
+  document.getElementById("vehicle-overlay").classList.add("active");
+}
+function closeVehicleOverlay() {
+  document.getElementById("vehicle-overlay").classList.remove("active");
+}
+
+function openRepairOverlay(condition) {
+  document.getElementById("repair-overlay-condition").textContent = condition || "Unknown";
+  document.getElementById("repair-overlay").classList.add("active");
+}
+function closeRepairOverlay() {
+  document.getElementById("repair-overlay").classList.remove("active");
+}
+function submitRepair() {
+  closeRepairOverlay();
+  fetch("/repair_vehicle", {method: "POST"})
+    .then(r => r.json())
+    .then(d => { if (d.error) alert(d.error); })
+    .catch(e => alert(String(e)));
+}
+
 // ---------------------------------------------------------------------------
 // Earn catalog overlay
 // ---------------------------------------------------------------------------
@@ -2915,7 +2949,7 @@ function _renderProfile(d) {
     h.push('</div>');
   }
 
-  // Weapons — grouped by slot type
+  // Weapons — grouped by slot type, table layout per group
   if (d.weapons && d.weapons.length) {
     h.push('<hr class="stat-divider"><div class="profile-section-title">Weapons</div>');
     const wgroups = {"On Hand": [], "Stash": [], "Vault": []};
@@ -2928,30 +2962,32 @@ function _renderProfile(d) {
     ["On Hand", "Stash", "Vault"].forEach(group => {
       if (!wgroups[group].length) return;
       h.push(`<div class="profile-weapon-group">${escHtml(group)}</div>`);
+      h.push('<table class="profile-weapons-table"><thead><tr><th>Slot</th><th>Item</th><th>Durability</th></tr></thead><tbody>');
       wgroups[group].forEach(w => {
         const hasActions = group !== "Vault" && w.actions && w.actions.length;
         if (hasActions) {
           const actionsAttr = JSON.stringify(w.actions).replace(/'/g, "&#39;");
-          h.push(`<div class="profile-item profile-item-clickable" data-wname="${escHtml(w.item||"")}" data-wslot="${escHtml(w.slot||"")}" data-wdur="${escHtml(w.durability||"")}" data-wactions='${actionsAttr}' onclick="openWeaponOverlay(this)">`);
+          h.push(`<tr class="profile-item-clickable" data-wname="${escHtml(w.item||"")}" data-wslot="${escHtml(w.slot||"")}" data-wdur="${escHtml(w.durability||"")}" data-wactions='${actionsAttr}' onclick="openWeaponOverlay(this)">`);
         } else {
-          h.push('<div class="profile-item">');
+          h.push('<tr>');
         }
-        if (w.slot) h.push(`<span class="profile-slot">${escHtml(w.slot)}</span> `);
-        if (w.item) h.push(`<span class="profile-item-name">${escHtml(w.item)}</span>`);
-        if (w.durability) h.push(` <span class="muted">${escHtml(w.durability)}</span>`);
-        h.push('</div>');
+        h.push(`<td>${escHtml(w.slot||"—")}</td><td>${escHtml(w.item||"—")}</td><td class="muted">${escHtml(w.durability||"—")}</td>`);
+        h.push('</tr>');
       });
+      h.push('</tbody></table>');
     });
   }
 
-  // Vehicle
+  // Vehicles
   if (d.vehicles && d.vehicles.length) {
     h.push('<hr class="stat-divider"><div class="profile-section-title">Vehicles</div>');
     d.vehicles.forEach(v => {
-      h.push('<div class="stats-grid">');
-      for (const k of ["Type","Condition","Location","Parking/security"]) {
-        if (v[k]) h.push(row(k, v[k]));
-      }
+      const hasActions = v.actions && v.actions.length;
+      const actionsAttr = hasActions ? JSON.stringify(v.actions).replace(/'/g, "&#39;") : "[]";
+      h.push(`<div class="profile-item${hasActions ? ' profile-item-clickable' : ''}" ${hasActions ? `data-vname="${escHtml(v.Type||"")}" data-vactions='${actionsAttr}' onclick="openVehicleOverlay(this)"` : ''}>`);
+      if (v.Type) h.push(`<span class="profile-item-name">${escHtml(v.Type)}</span>`);
+      if (v.Condition) h.push(` <span class="profile-slot profile-item-clickable" style="margin-left:8px" onclick="event.stopPropagation();openRepairOverlay('${escHtml(v.Condition)}')">${escHtml(v.Condition)}</span>`);
+      if (v.Location) h.push(` <span class="muted">${escHtml(v.Location)}</span>`);
       h.push('</div>');
     });
   }
@@ -2964,6 +3000,9 @@ function _renderProfile(d) {
       if (d.apartment[k]) h.push(row(k, d.apartment[k]));
     }
     h.push('</div>');
+    if (d.apartment.action_url) {
+      h.push(`<div class="profile-nav-bar" style="margin-top:6px"><button class="action-btn" onclick="navigateTo('${escHtml(d.apartment.action_url)}')">${escHtml(d.apartment.action_label||"Enter/Manage")}</button></div>`);
+    }
   }
 
   // Pets

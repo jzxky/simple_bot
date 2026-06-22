@@ -85,6 +85,7 @@ _respect_refresh_queue: queue.Queue = queue.Queue()
 _profile_request: queue.Queue = queue.Queue(maxsize=1)
 _profile_result: queue.Queue = queue.Queue(maxsize=1)
 _navigate_queue: queue.Queue = queue.Queue()
+_repair_vehicle_queue: queue.Queue = queue.Queue()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
 state = GameState()
@@ -378,6 +379,14 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Navigate error: {e}")
 
+            # Repair vehicle requests from the Flask thread
+            if not _repair_vehicle_queue.empty():
+                try:
+                    _repair_vehicle_queue.get_nowait()
+                    executor.execute(Action("repair_vehicle"), state)
+                except Exception as e:
+                    state.add_log(f"Repair vehicle error: {e}")
+
             # Travel destination fetch (for UI dropdowns)
             if not _travel_dests_request.empty():
                 try:
@@ -662,6 +671,10 @@ def request_warrants(timeout: float = 30.0) -> list:
 
 def request_navigate(url: str):
     _navigate_queue.put({"url": url})
+
+
+def request_repair_vehicle():
+    _repair_vehicle_queue.put(True)
 
 
 def request_turn_in_warrant(url: str, case_id: str):
