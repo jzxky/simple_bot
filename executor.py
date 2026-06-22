@@ -164,6 +164,12 @@ def _scrape_earn_catalog(page, state: GameState):
     if not _check_session(state):
         return [], []
 
+    # Wait for the earn page body to be present before querying
+    try:
+        page.wait_for_selector("#content", timeout=10000)
+    except Exception:
+        pass
+
     auto_div = page.query_selector("div.mm-earn-mode-auto")
     if auto_div:
         style = auto_div.get_attribute("style") or ""
