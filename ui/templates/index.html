@@ -36,39 +36,48 @@
     </div>
 
     <!-- Status -->
-    <section class="card" id="s-character">
+    <section class="card tabs-card" id="s-character">
       <h2>
         <button class="collapse-btn" onclick="toggleSection('s-character')">▾</button>
         Status <span class="stat-name-header">— <span id="stat-name">--</span></span><span id="stat-jail-badge" style="display:none"> <span class="jail-badge">JAIL</span></span>
         <span class="section-pills" id="pills-s-character"></span>
       </h2>
       <div class="card-body">
-        <div class="stats-grid">
-          <div class="stat-item" id="stat-rank-item"><span class="stat-label" id="stat-rank-label">Rank</span><span class="stat-value" id="stat-rank">--</span></div>
-          <div class="stat-item" id="stat-occupation-item"><span class="stat-label">Occupation</span><span class="stat-value" id="stat-occupation">--</span></div>
-          <div class="stat-item"><span class="stat-label">Next Rank</span><span class="stat-value" id="stat-next-rank">--</span></div>
-          <div class="stat-item"><span class="stat-label">Progress</span><span class="stat-value" id="stat-rank-progress">--</span></div>
-          <div class="stat-item"><span class="stat-label">City</span><span class="stat-value" id="stat-city">--</span></div>
-          <div class="stat-item"><span class="stat-label">Home City</span><span class="stat-value" id="stat-home-city">--</span></div>
-          <div class="stat-item" id="stat-respect-item" style="display:none;cursor:pointer;" title="Click to view/refresh" onclick="openRespectOverlay()"><span class="stat-label">Respect</span><span class="stat-value" id="stat-respect">--</span></div>
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="showTab('status-stats', this)">Stats</button>
+          <button class="tab-btn" onclick="showTab('status-profile', this); loadProfile()">Profile</button>
         </div>
-        <hr class="stat-divider">
-        <div class="stats-grid">
-          <div class="stat-item"><span class="stat-label">HP</span><span class="stat-value" id="stat-health">--</span></div>
-          <div class="stat-item"><span class="stat-label">Energy</span><span class="stat-value" id="stat-energy">--</span></div>
-          <div class="stat-item"><span class="stat-label">Earns / 24h</span><span class="stat-value" id="stat-earns">--</span></div>
-          <div class="stat-item"><span class="stat-label">Consumables / 24h</span><span class="stat-value" id="stat-cons-24h">--</span></div>
+        <div id="status-stats" class="tab-panel active">
+          <div class="stats-grid">
+            <div class="stat-item" id="stat-rank-item"><span class="stat-label" id="stat-rank-label">Rank</span><span class="stat-value" id="stat-rank">--</span></div>
+            <div class="stat-item" id="stat-occupation-item"><span class="stat-label">Occupation</span><span class="stat-value" id="stat-occupation">--</span></div>
+            <div class="stat-item"><span class="stat-label">Next Rank</span><span class="stat-value" id="stat-next-rank">--</span></div>
+            <div class="stat-item"><span class="stat-label">Progress</span><span class="stat-value" id="stat-rank-progress">--</span></div>
+            <div class="stat-item"><span class="stat-label">City</span><span class="stat-value" id="stat-city">--</span></div>
+            <div class="stat-item"><span class="stat-label">Home City</span><span class="stat-value" id="stat-home-city">--</span></div>
+            <div class="stat-item" id="stat-respect-item" style="display:none;cursor:pointer;" title="Click to view/refresh" onclick="openRespectOverlay()"><span class="stat-label">Respect</span><span class="stat-value" id="stat-respect">--</span></div>
+          </div>
+          <hr class="stat-divider">
+          <div class="stats-grid">
+            <div class="stat-item"><span class="stat-label">HP</span><span class="stat-value" id="stat-health">--</span></div>
+            <div class="stat-item"><span class="stat-label">Energy</span><span class="stat-value" id="stat-energy">--</span></div>
+            <div class="stat-item"><span class="stat-label">Earns / 24h</span><span class="stat-value" id="stat-earns">--</span></div>
+            <div class="stat-item"><span class="stat-label">Consumables / 24h</span><span class="stat-value" id="stat-cons-24h">--</span></div>
+          </div>
+          <hr class="stat-divider">
+          <div class="stats-grid">
+            <div class="stat-item" id="stat-clean-item" title="Click for bank actions" style="cursor:pointer;" onclick="openCashOverlay()"><span class="stat-label">Clean Money</span><span class="stat-value" id="stat-clean">--</span></div>
+            <div class="stat-item"><span class="stat-label">Dirty Money</span><span class="stat-value" id="stat-dirty">--</span></div>
+            <div class="stat-item" title="Click to withdraw" style="cursor:pointer;" onclick="requestWithdraw()"><span class="stat-label">Bank Balance</span><span class="stat-value" id="stat-bank">--</span></div>
+          </div>
+          <hr class="stat-divider">
+          <div class="consumables-grid" id="stat-consumables"></div>
+          <hr class="stat-divider">
+          <div class="stats-grid" id="stat-timers-grid"></div>
         </div>
-        <hr class="stat-divider">
-        <div class="stats-grid">
-          <div class="stat-item" id="stat-clean-item" title="Click for bank actions" style="cursor:pointer;" onclick="openCashOverlay()"><span class="stat-label">Clean Money</span><span class="stat-value" id="stat-clean">--</span></div>
-          <div class="stat-item"><span class="stat-label">Dirty Money</span><span class="stat-value" id="stat-dirty">--</span></div>
-          <div class="stat-item" title="Click to withdraw" style="cursor:pointer;" onclick="requestWithdraw()"><span class="stat-label">Bank Balance</span><span class="stat-value" id="stat-bank">--</span></div>
+        <div id="status-profile" class="tab-panel">
+          <div id="profile-content"><span class="muted">Click "Profile" to load.</span></div>
         </div>
-        <hr class="stat-divider">
-        <div class="consumables-grid" id="stat-consumables"></div>
-        <hr class="stat-divider">
-        <div class="stats-grid" id="stat-timers-grid"></div>
       </div>
     </section>
 

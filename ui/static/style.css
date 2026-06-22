@@ -263,6 +263,36 @@ button {
 .stat-timers { }
 .stat-timer-value { color: var(--accent); font-variant-numeric: tabular-nums; }
 
+/* Profile tab */
+.profile-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  margin: 8px 0 4px;
+}
+.profile-item {
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.profile-item-name { font-weight: 600; color: var(--text); }
+.profile-slot {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--accent);
+  letter-spacing: .05em;
+}
+.profile-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.profile-tag {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+
 .consumables-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
