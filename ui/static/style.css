@@ -283,6 +283,7 @@ button {
   color: var(--accent);
   letter-spacing: .05em;
 }
+.profile-nav-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .profile-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
 .profile-tag {
   background: var(--card-bg);

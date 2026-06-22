@@ -2906,6 +2906,14 @@ def handle_fetch_profile(action: Action, state: GameState):
         raise
 
 
+def handle_navigate(action: Action, state: GameState):
+    url = action.params.get("url", "")
+    if url:
+        if url.startswith("/"):
+            url = _u(url)
+        _nav(url, state)
+
+
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
@@ -2947,6 +2955,7 @@ HANDLERS = {
     "travel": handle_travel,
     "fetch_respect": handle_fetch_respect,
     "fetch_profile": handle_fetch_profile,
+    "navigate": handle_navigate,
 }
 
 

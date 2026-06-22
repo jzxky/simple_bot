@@ -542,6 +542,18 @@ def profile():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/navigate", methods=["POST"])
+def navigate():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    bot.request_navigate(url)
+    return jsonify({"ok": True})
+
+
 @app.route("/screenshot")
 def screenshot():
     import paths as _paths

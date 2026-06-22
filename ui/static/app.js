@@ -2839,6 +2839,17 @@ function _collectNotifSettings() {
   return out;
 }
 
+function navigateTo(url) {
+  fetch("/navigate", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({url}),
+  })
+    .then(r => r.json())
+    .then(d => { if (d.error) alert(d.error); })
+    .catch(e => alert(String(e)));
+}
+
 let _profileLoading = false;
 function loadProfile() {
   const el = document.getElementById("profile-content");
@@ -2858,6 +2869,11 @@ function loadProfile() {
 function _renderProfile(d) {
   const h = [];
   const row = (label, val) => `<div class="stat-item"><span class="stat-label">${escHtml(label)}</span><span class="stat-value">${escHtml(val || "—")}</span></div>`;
+
+  // Navigation buttons
+  h.push('<div class="profile-nav-bar">');
+  h.push('<button class="action-btn" onclick="navigateTo(\'/profile/default.asp\')">Open Profile</button>');
+  h.push('</div>');
 
   // Basic info
   h.push('<div class="stats-grid">');
