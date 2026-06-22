@@ -2914,25 +2914,25 @@ function loadProfile() {
   const el = document.getElementById("profile-content");
   if (!el || _profileLoading) return;
   _profileLoading = true;
-  el.innerHTML = '<span class="muted">Loading…</span>';
+  el.classList.add("profile-refreshing");
   fetch("/profile")
     .then(r => r.json())
     .then(d => {
       _profileLoading = false;
+      el.classList.remove("profile-refreshing");
       if (d.error) { el.innerHTML = `<span class="error">${escHtml(d.error)}</span>`; return; }
       el.innerHTML = _renderProfile(d);
     })
-    .catch(e => { _profileLoading = false; el.innerHTML = `<span class="error">${escHtml(String(e))}</span>`; });
+    .catch(e => {
+      _profileLoading = false;
+      el.classList.remove("profile-refreshing");
+      el.innerHTML = `<span class="error">${escHtml(String(e))}</span>`;
+    });
 }
 
 function _renderProfile(d) {
   const h = [];
   const row = (label, val) => `<div class="stat-item"><span class="stat-label">${escHtml(label)}</span><span class="stat-value">${escHtml(val || "—")}</span></div>`;
-
-  // Navigation buttons
-  h.push('<div class="profile-nav-bar">');
-  h.push('<button class="action-btn" onclick="navigateTo(\'/profile/default.asp\')">Open Profile</button>');
-  h.push('</div>');
 
   // Basic info
   h.push('<div class="stats-grid">');

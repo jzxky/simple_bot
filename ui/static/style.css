@@ -288,6 +288,7 @@ button {
 .profile-item-clickable:hover { background: var(--surface2); border-radius: 4px; cursor: pointer; }
 .profile-weapon-pill { display:inline-flex; align-items:center; gap:4px; background:var(--card-bg); border:1px solid var(--border); border-radius:4px; padding:3px 10px; font-size:12px; color:var(--text); }
 .profile-weapon-pill.profile-item-clickable:hover { border-color:var(--accent); cursor:pointer; background:var(--surface2); }
+.profile-refreshing { opacity: 0.5; pointer-events: none; transition: opacity 0.15s; }
 .profile-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
 .profile-tag {
   background: var(--card-bg);
