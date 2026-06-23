@@ -2140,6 +2140,12 @@ def handle_check_vehicle(action: Action, state: GameState) -> int:
         state.add_log("Check vehicle: no vehicle available.")
         state.vehicle_health = None
         return 0
+    # Game shows this div when vehicle is at full health and needs no repairs
+    no_repairs = soup.find("div", id="fail")
+    if no_repairs and "doesn't need any repairs" in no_repairs.get_text():
+        state.vehicle_health = 100
+        state.add_log("Check vehicle: health 100% (no repairs needed).")
+        return 100
     bar = soup.find("div", id="respect_bar")
     if not bar:
         state.add_log("Check vehicle: could not find health bar.")
