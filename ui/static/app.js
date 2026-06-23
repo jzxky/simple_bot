@@ -185,15 +185,15 @@ function _doSave() {
     autobuy_qty_cocaine:     parseInt((document.getElementById("autobuy_qty_cocaine")||{value:0}).value)||0,
     bionics_enabled: (document.getElementById("bionics_enabled")||{checked:false}).checked,
     bionics_wanted_items: ["arms","legs","eyes","brain","heart"].filter(i => (document.getElementById("bionics_want_"+i)||{checked:false}).checked),
-    bionics_priority_order: (document.getElementById("bionics_priority_order")||{value:""}).value,
+    bionics_priority_order: _serializePriorityItems("bionics-priority-body"),
     bionics_interval: parseInt((document.getElementById("bionics_interval")||{value:5}).value)||5,
     bionics_use_time_window: (document.getElementById("bionics_use_time_window")||{checked:false}).checked,
     bionics_window_start: (document.getElementById("bionics_window_start")||{value:"00:00"}).value,
     bionics_window_end:   (document.getElementById("bionics_window_end")||{value:"23:59"}).value,
     bionics_auto_restock: (document.getElementById("bionics_auto_restock")||{checked:false}).checked,
     weapon_store_enabled: (document.getElementById("weapon_store_enabled")||{checked:false}).checked,
-    weapon_store_wanted_items: (document.getElementById("weapon_store_wanted_items")||{value:""}).value,
-    weapon_store_priority_order: (document.getElementById("weapon_store_priority_order")||{value:""}).value,
+    weapon_store_wanted_items: _wsCheckedItems(),
+    weapon_store_priority_order: _serializePriorityItems("weapon-store-priority-body"),
     weapon_store_interval: parseInt((document.getElementById("weapon_store_interval")||{value:5}).value)||5,
     weapon_store_use_time_window: (document.getElementById("weapon_store_use_time_window")||{checked:false}).checked,
     weapon_store_window_start: (document.getElementById("weapon_store_window_start")||{value:"00:00"}).value,
@@ -1289,6 +1289,67 @@ function _serializePriorityTable(tbodyId) {
     tasks.push(task);
   });
   return tasks;
+}
+
+// ── Priority list helpers for bionics + weapon store ──────────────────────────
+
+const WS_ITEMS = [
+  "Baseball Bat","Pistol","Hand Grenade","Assault Rifle","Katana","Shotgun",
+  "Lightsaber","Sniper Rifle","FlameThrower","Omega Death Laser","Plasma Rifle",
+  "Rail Gun","Protection Vest","Kevlar Bullet Proof Vest","Riot Shield"
+];
+
+const BIONIC_ITEMS = ["arms","legs","eyes","brain","heart"];
+
+function _serializePriorityItems(tbodyId) {
+  return [...document.querySelectorAll(`#${tbodyId} tr`)].map(r => r.dataset.item).filter(Boolean);
+}
+
+function _wsCheckedItems() {
+  return WS_ITEMS.filter(item => {
+    const el = document.getElementById("ws_want_" + item.replace(/ /g, "_"));
+    return el && el.checked;
+  });
+}
+
+function _syncPriorityList(tbodyId, checkedItems) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  // Remove rows for unchecked items
+  [...tbody.querySelectorAll("tr")].forEach(row => {
+    if (!checkedItems.includes(row.dataset.item)) row.remove();
+  });
+  // Append newly checked items not already present
+  const existing = [...tbody.querySelectorAll("tr")].map(r => r.dataset.item);
+  checkedItems.forEach(item => {
+    if (!existing.includes(item)) {
+      const tr = document.createElement("tr");
+      tr.dataset.item = item;
+      tr.innerHTML =
+        `<td class="priority-num"></td>` +
+        `<td>${escHtml(item)}</td>` +
+        `<td><div class="priority-move">` +
+        `<button type="button" onclick="_moveRow(this,-1)">▲</button>` +
+        `<button type="button" onclick="_moveRow(this,1)">▼</button>` +
+        `</div></td>`;
+      tbody.appendChild(tr);
+    }
+  });
+  _renumberTable(tbodyId);
+}
+
+function bionicsOnBuyListChange() {
+  const checked = BIONIC_ITEMS.filter(item => {
+    const el = document.getElementById("bionics_want_" + item);
+    return el && el.checked;
+  });
+  _syncPriorityList("bionics-priority-body", checked);
+  autoSave();
+}
+
+function wsOnBuyListChange() {
+  _syncPriorityList("weapon-store-priority-body", _wsCheckedItems());
+  autoSave();
 }
 
 // Up/down reorder for priority tables
