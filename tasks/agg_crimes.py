@@ -23,7 +23,10 @@ class AggCrimeTask(Task):
     def __init__(self, primary_crime: str, primary_threshold: int,
                  away_crime: str, away_threshold: int,
                  armed_agg_private: bool = False, armed_agg_drug_house: bool = False,
-                 fallback_to_away: bool = False):
+                 fallback_to_away: bool = False,
+                 torch_private: bool = False,
+                 torch_payback_public: str = "everyone",
+                 torch_payback_private: str = "everyone"):
         self.primary_crime = primary_crime
         self.primary_threshold = primary_threshold
         self.away_crime = away_crime
@@ -31,6 +34,9 @@ class AggCrimeTask(Task):
         self.armed_agg_private = armed_agg_private
         self.armed_agg_drug_house = armed_agg_drug_house
         self.fallback_to_away = fallback_to_away
+        self.torch_private = torch_private
+        self.torch_payback_public = torch_payback_public
+        self.torch_payback_private = torch_payback_private
         self._cooldown_until: float = 0.0
         self._hack_exhausted: bool = False
         self.scheduler = None  # set by bot.py after scheduler is built
@@ -91,6 +97,14 @@ class AggCrimeTask(Task):
                 threshold=threshold,
                 agg_private=self.armed_agg_private,
                 agg_drug_house=self.armed_agg_drug_house,
+                check_other_tasks=lambda: self._other_task_ready(state),
+            ), state)
+        elif crime == "torch":
+            executor.execute(Action("do_torch_business",
+                threshold=threshold,
+                torch_private=self.torch_private,
+                torch_payback_public=self.torch_payback_public,
+                torch_payback_private=self.torch_payback_private,
                 check_other_tasks=lambda: self._other_task_ready(state),
             ), state)
         else:

@@ -813,7 +813,7 @@
           <div class="row">
             <label>Home City
               <select id="primary_crime" onchange="toggleAwayCrime(); autoSave()">
-                {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('armed','Armed Robbery'),('hack','Hack Bank Account')] %}
+                {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('armed','Armed Robbery'),('torch','Torch Business'),('hack','Hack Bank Account')] %}
                 <option value="{{ crime }}" {% if config.aggravated_crimes.primary.crime == crime %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
@@ -829,7 +829,7 @@
           <div class="row" id="away_crime_row" style="display:none">
             <label>Out of Home City
               <select id="away_crime" onchange="autoSave()">
-                {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('armed','Armed Robbery')] %}
+                {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('armed','Armed Robbery'),('torch','Torch Business')] %}
                 <option value="{{ crime }}" {% if config.aggravated_crimes.get('away_crime', {}).get('crime') == crime %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
@@ -866,6 +866,28 @@
               <label class="inline-toggle setting-row">Agg Drug House
                 <label class="toggle-label"><input type="checkbox" id="armed_agg_drug_house" {% if config.aggravated_crimes.get('armed', {}).get('agg_drug_house') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+            </div>
+            <div class="settings-group">
+              <h3>Torch</h3>
+              <label class="inline-toggle setting-row">Torch Private
+                <label class="toggle-label"><input type="checkbox" id="torch_private" {% if config.aggravated_crimes.get('torch', {}).get('torch_private') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row">
+                <label for="torch_payback_public">Payback Public</label>
+                <select id="torch_payback_public" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
+                  <option value="{{ v }}" {% if config.aggravated_crimes.get('torch', {}).get('torch_payback_public', 'everyone') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row">
+                <label for="torch_payback_private">Payback Private</label>
+                <select id="torch_payback_private" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
+                  <option value="{{ v }}" {% if config.aggravated_crimes.get('torch', {}).get('torch_payback_private', 'everyone') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
             </div>
           </div>
         </div>

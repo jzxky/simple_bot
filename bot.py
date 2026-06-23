@@ -123,6 +123,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
         pri = ac.get("primary", {})
         away = ac.get("away_crime", {})
         armed = ac.get("armed", {})
+        torch = ac.get("torch", {})
         agg_task = AggCrimeTask(
             primary_crime=pri.get("crime", "pickpocket"),
             primary_threshold=pri.get("energy_threshold", 50),
@@ -131,6 +132,9 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             armed_agg_private=armed.get("agg_private", False),
             armed_agg_drug_house=armed.get("agg_drug_house", False),
             fallback_to_away=ac.get("fallback_to_away", False),
+            torch_private=torch.get("torch_private", False),
+            torch_payback_public=torch.get("torch_payback_public", "everyone"),
+            torch_payback_private=torch.get("torch_payback_private", "everyone"),
         )
         agg_task.scheduler = sched
         sched.add(agg_task)
@@ -242,8 +246,9 @@ def _fetch_jail_inmates() -> dict:
     return {"inmates": inmates}
 
 
-def _should_payback(target: str, c: dict) -> bool:
-    mode = c.get("payback_mode", "nobody")
+def _should_payback(target: str, c: dict, mode: str = None) -> bool:
+    if mode is None:
+        mode = c.get("payback_mode", "nobody")
     if mode == "nobody":
         return False
     if mode == "everyone":
@@ -455,9 +460,12 @@ def _run(c: dict):
             if getattr(state, "_last_crime_victim", None):
                 victim = state._last_crime_victim
                 amount = state._last_crime_amount
+                payback_mode_override = getattr(state, "_last_crime_payback_mode", None)
                 del state._last_crime_victim
                 del state._last_crime_amount
-                if _should_payback(victim, c):
+                if hasattr(state, "_last_crime_payback_mode"):
+                    del state._last_crime_payback_mode
+                if _should_payback(victim, c, mode=payback_mode_override):
                     executor.execute(Action("payback", amount=amount, target=victim), state)
 
             time.sleep(2)

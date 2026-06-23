@@ -79,6 +79,11 @@ PUBLIC_JOB_MAP = {
     "Airport": "Commissioner-General",
     "Construction Company": "Chief Engineer",
     "Bank Tills": "Bank Manager",
+    "Bank": "Bank Manager",
+}
+
+TORCH_PUBLIC_BUSINESSES = {
+    "Funeral Parlour", "Bank", "Airport", "Construction Company", "Town Hall", "Hospital"
 }
 
 ARMED_MAX_RETRIES = 6
@@ -1086,6 +1091,125 @@ def handle_armed_robbery(action: Action, state: GameState):
             _nav(_u("/loggedin.asp?display=play"), state)
             return
         state.add_log("No other tasks pending — retrying armed robbery.")
+
+
+def handle_torch_business(action: Action, state: GameState):
+    torch_private = action.params.get("torch_private", False)
+    torch_payback_public = action.params.get("torch_payback_public", "everyone")
+    torch_payback_private = action.params.get("torch_payback_private", "everyone")
+    threshold = action.params.get("threshold", 0)
+
+    page = browser.page()
+
+    _nav(_u("/income/agcrime.asp"), state)
+    if not _check_session(state):
+        return
+    if state.in_jail:
+        state.add_log("In jail — aborting torch business.")
+        return
+    if threshold and state.energy < threshold:
+        state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — aborting.")
+        return
+    if not page.query_selector("input[name='agcrime'][value='torchbusiness']"):
+        if not _check_cs_punishment(state):
+            state.add_log("Torch business option not available — aborting.")
+        return
+    page.check("input[name='agcrime'][value='torchbusiness']")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+    if state.in_hospital:
+        state.add_log("Torch business: redirected to hospital. Tasks paused until release.")
+        return
+
+    if _check_cs_punishment(state):
+        return
+
+    check_other_tasks = action.params.get("check_other_tasks")
+    pass_num = 0
+
+    while True:
+        pass_num += 1
+        for attempt in range(ARMED_MAX_RETRIES):
+            if attempt > 0 or pass_num > 1:
+                time.sleep(5)
+                page.once("dialog", lambda d: d.accept())
+                page.reload(wait_until="domcontentloaded")
+                _refresh_state(state)
+
+            soup = BeautifulSoup(page.content(), "html.parser")
+            select = soup.find("select", attrs={"name": "torchb"})
+            if not select:
+                state.add_log("Torch business: target select not found.")
+                _nav(_u("/loggedin.asp?display=play"), state)
+                return
+
+            target = None
+            for option in select.find_all("option"):
+                raw = option.get_text(strip=True)
+                value = option.get("value", "")
+                if not value or raw.startswith("Please"):
+                    continue
+                name = raw.rstrip("*").strip()
+                is_public = name in TORCH_PUBLIC_BUSINESSES
+                if name == "Drug House":
+                    continue
+                if not is_public and not torch_private:
+                    continue
+                target = (value, name, is_public)
+                break
+
+            if target:
+                value, name, is_public = target
+                page.select_option("select[name='torchb']", value)
+                page.click("input[type='submit'][name='B1']")
+                page.wait_for_load_state("domcontentloaded")
+                _refresh_state(state)
+
+                if state.in_hospital:
+                    state.add_log("Torch business: redirected to hospital. Tasks paused until release.")
+                    return
+
+                result_soup = BeautifulSoup(page.content(), "html.parser")
+                success_div = result_soup.find("div", id="success")
+                if success_div:
+                    msg = success_div.get_text(strip=True)
+                    state.add_log(f"Torch business success ({name}): {msg}")
+                    amounts = re.findall(r"\$([\d,]+)", msg)
+                    stolen = int(amounts[0].replace(",", "")) if amounts else 0
+                    if stolen > 0:
+                        payback_mode = torch_payback_public if is_public else torch_payback_private
+                        owner = None
+                        if is_public:
+                            owner = _get_public_business_owner(name, state)
+                        else:
+                            owner = _get_private_business_owner(name, state)
+                        if owner:
+                            state._last_crime_victim = owner
+                            state._last_crime_amount = stolen
+                            state._last_crime_payback_mode = payback_mode
+                    return
+
+                fail_div = result_soup.find("div", id="fail")
+                if fail_div:
+                    fail_msg = fail_div.get_text(strip=True)
+                    if "failed" in fail_msg.lower():
+                        state.record_agg_fail()
+                    state.add_log(f"Torch business failed: {fail_msg}")
+                else:
+                    state.add_log("Torch business: unexpected result page.")
+                _nav(_u("/loggedin.asp?display=play"), state)
+                return
+
+            state.add_log(f"No valid torch target (pass {pass_num}, attempt {attempt + 1}/{ARMED_MAX_RETRIES}).")
+
+        state.add_log(f"Torch business: no targets after pass {pass_num}. Checking task queue...")
+        if check_other_tasks and check_other_tasks():
+            state.add_log("Another task is ready — yielding torch business.")
+            _nav(_u("/loggedin.asp?display=play"), state)
+            return
+        state.add_log("No other tasks pending — retrying torch business.")
 
 
 def handle_drug_manufacturing(action: Action, state: GameState):
@@ -2958,6 +3082,7 @@ HANDLERS = {
     "do_fire_duties": handle_fire_duties,
     "do_career_training": handle_career_training,
     "do_armed_robbery": handle_armed_robbery,
+    "do_torch_business": handle_torch_business,
     "do_drug_manufacturing": handle_drug_manufacturing,
     "check_hospital_cases": handle_check_hospital_cases,
     "check_engineering_cases": handle_check_engineering_cases,
