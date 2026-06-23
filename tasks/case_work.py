@@ -66,7 +66,7 @@ class HospitalCaseWorkTask(CaseWorkTask):
 
 class FireCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Volunteer Fire Fighter", "Fire Fighter", "Fire Chief"}
-    HOME_CITY_ONLY = True
+    HOME_CITY_ONLY = False
 
     def _action(self) -> Action:
         return Action("check_fire_cases")
