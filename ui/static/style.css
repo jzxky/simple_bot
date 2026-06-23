@@ -393,6 +393,9 @@ button {
   min-width: 200px;
   max-width: 260px;
   flex-shrink: 0;
+  color: var(--text);
+  font-size: 13px;
+  flex-direction: row;
 }
 .setting-row:last-child { border-bottom: none; }
 .setting-row .toggle-label { flex-shrink: 0; }
