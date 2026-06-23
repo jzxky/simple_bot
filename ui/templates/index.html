@@ -33,6 +33,7 @@
       <button id="toggle-btn" onclick="toggleBot()">Start Bot</button>
       <button id="pause-btn" onclick="togglePause()" disabled>Pause</button>
       <button id="screenshot-btn" onclick="takeScreenshot()">Screenshot</button>
+      <button id="close-btn" onclick="closeBot()" style="width:calc(50% - 4px);background:var(--danger,#e63946);color:#fff;border-color:var(--danger,#e63946)">Close Bot</button>
     </div>
 
     <!-- Status -->
@@ -524,12 +525,6 @@
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>General</h3>
-              <label class="inline-toggle setting-row">Show Scheduler
-                <label class="toggle-label"><input type="checkbox" id="show_scheduler" {% if config.get('misc', {}).get('show_scheduler', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <label class="inline-toggle setting-row">Debug Logging
-                <label class="toggle-label"><input type="checkbox" id="debug_logging" {% if config.get('misc', {}).get('debug_logging', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
               <label class="inline-toggle setting-row">Headless Mode
                 <label class="toggle-label"><input type="checkbox" id="headless" {% if config.get('misc', {}).get('headless', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
@@ -559,7 +554,7 @@
               <h3>Notifications</h3>
               <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification badge in the header so you can see them when you return AFK.</p>
               {% set notif_cfg = config.get('notifications', {}) %}
-              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'bionics_restock': False, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'cloudflare_detected': True, 'jailed': False, 'targets_exhausted': False, 'warrants_outstanding': True} %}
+              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'bionics_restock': False, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'jailed': False, 'targets_exhausted': False, 'mhs_protected': True, 'warrants_outstanding': True} %}
               {% for slug, label in notification_events %}
               <label class="inline-toggle setting-row">{{ label }}
                 <label class="toggle-label"><input type="checkbox" id="notif_{{ slug }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
@@ -589,6 +584,15 @@
               </div>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Developer Settings</h3>
+              <label class="inline-toggle setting-row">Show Scheduler
+                <label class="toggle-label"><input type="checkbox" id="show_scheduler" {% if config.get('misc', {}).get('show_scheduler', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <label class="inline-toggle setting-row">Debug Logging
+                <label class="toggle-label"><input type="checkbox" id="debug_logging" {% if config.get('misc', {}).get('debug_logging', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Character History</h3>
               <label class="inline-toggle setting-row">Enable
                 <label class="toggle-label"><input type="checkbox" id="char_history_enabled" {% if config.get('character_history', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave(); toggleCharHistoryTab()"><span class="toggle"></span></label>
@@ -610,7 +614,7 @@
               <div class="row">
                 <label>Email
                   <div class="input-with-btn">
-                    <input type="password" id="email" value="{{ config.credentials.email }}" autocomplete="off" oninput="markCredsDirty()">
+                    <input type="text" id="email" value="{{ config.credentials.email }}" autocomplete="off" oninput="markCredsDirty()">
                     <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('email', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
                   </div>
                 </label>
@@ -1120,6 +1124,7 @@
                   <th class="pl-th pl-th-filter" onclick="plSort('homecity')" data-col="homecity">City <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('group')" data-col="group">Group <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter">Tags</th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('agg_crimes')" data-col="agg_crimes">Agg <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
                 </tr>
@@ -1137,6 +1142,7 @@
                   <th class="pl-filter-cell"><select id="pl-filter-homecity" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"><select id="pl-filter-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"><select id="pl-filter-tag" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"></th>
                   <th class="pl-filter-cell"><select id="pl-filter-agg" class="pl-filter-input" onchange="plFilter()">
                     <option value="">All</option>
                     <option value="__none__">None</option>
@@ -1227,15 +1233,24 @@
             <table class="pl-table" id="pl-dead-table">
               <thead>
                 <tr>
-                  <th class="pl-th">Name</th>
-                  <th class="pl-th col-rank">Rank</th>
-                  <th class="pl-th col-occupation">Occupation</th>
-                  <th class="pl-th col-homecity">City</th>
-                  <th class="pl-th">Died</th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-dead-icon-username">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-dead-icon-rank">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-dead-icon-occupation">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-dead-icon-homecity">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-dead-icon-character_age">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('died_at')" data-col="died_at">Died <span class="pl-sort-icon" id="pl-dead-icon-died_at">↕</span></th>
+                </tr>
+                <tr>
+                  <th class="pl-filter-cell"><input type="text" id="pl-dead-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderRecentDead()"></th>
+                  <th class="pl-filter-cell"><select id="pl-dead-filter-rank" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-dead-filter-occupation" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-dead-filter-homecity" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"></th>
+                  <th class="pl-filter-cell"></th>
                 </tr>
               </thead>
               <tbody id="pl-dead-tbody">
-                <tr><td colspan="5" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
+                <tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1247,15 +1262,24 @@
             <table class="pl-table" id="pl-born-table">
               <thead>
                 <tr>
-                  <th class="pl-th">Name</th>
-                  <th class="pl-th col-rank">Rank</th>
-                  <th class="pl-th col-occupation">Occupation</th>
-                  <th class="pl-th col-homecity">City</th>
-                  <th class="pl-th">First Seen</th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-born-icon-username">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-born-icon-rank">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-born-icon-occupation">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-born-icon-homecity">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-born-icon-character_age">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('born_at')" data-col="born_at">First Seen <span class="pl-sort-icon" id="pl-born-icon-born_at">↕</span></th>
+                </tr>
+                <tr>
+                  <th class="pl-filter-cell"><input type="text" id="pl-born-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderRecentBorn()"></th>
+                  <th class="pl-filter-cell"><select id="pl-born-filter-rank" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-born-filter-occupation" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-born-filter-homecity" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"></th>
+                  <th class="pl-filter-cell"></th>
                 </tr>
               </thead>
               <tbody id="pl-born-tbody">
-                <tr><td colspan="5" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
+                <tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
               </tbody>
             </table>
           </div>

@@ -23,10 +23,9 @@ NOTIFICATION_EVENTS = [
     ("promotion_success",   "Rank promotion"),
     ("auto_promo",          "Auto-promotion triggered"),
     ("session_expired",     "Session expired"),
-    ("cloudflare_detected", "Cloudflare challenge"),
     ("jailed",              "Went to jail"),
     ("targets_exhausted",   "Crime targets exhausted"),
-    ("mhs_protected",       "MHS protection triggered"),
+    ("mhs_protected",       "MHS Protection Attempt"),
     ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
 ]
 
@@ -367,6 +366,8 @@ def status():
         "last_gym_use": _get_last_gym_use(),
         "casino_release_at": _get_casino_release_at(),
         "bionics_next_check_at": _get_bionics_next_check_at(s),
+        "bionics_window_start": cfg.load().get("bionics", {}).get("window_start", "00:00"),
+        "bionics_window_end":   cfg.load().get("bionics", {}).get("window_end",   "23:59"),
         "bionics_views": ({"current": bot.get_bionics_task().last_views[0], "max": bot.get_bionics_task().last_views[1]} if bot.get_bionics_task() and bot.get_bionics_task().last_views else None),
         "is_git_repo": _is_git_repo(),
         "flight_departs_at": s.flight_departs_at,
@@ -377,6 +378,13 @@ def status():
         "respect_last_check": _get_respect_data().get("last_check", 0.0),
         "notifications": bot.state.notifications,
     })
+
+
+@app.route("/api/shutdown", methods=["POST"])
+def shutdown():
+    import signal, threading
+    threading.Timer(0.3, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
+    return jsonify({"ok": True})
 
 
 @app.route("/respect/refresh", methods=["POST"])
