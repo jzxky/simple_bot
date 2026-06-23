@@ -116,7 +116,7 @@
                 <div style="display:flex;flex-direction:column;gap:6px">
                   {% for item, label in [('arms','Bionic Arms ($10k)'),('legs','Bionic Legs ($20k)'),('eyes','Bionic Eyes ($35k)'),('brain','Bionic Brain ($50k)'),('heart','Bionic Heart ($50k)')] %}
                   <label class="inline-toggle">
-                    <input type="checkbox" id="bionics_want_{{ item }}" {% if item in bionics_cfg.get('wanted_items', []) %}checked{% endif %} onchange="autoSave()">
+                    <input type="checkbox" id="bionics_want_{{ item }}" {% if item in bionics_cfg.get('wanted_items', []) %}checked{% endif %} onchange="bionicsOnBuyListChange()">
                     {{ label }}
                   </label>
                   {% endfor %}
@@ -144,9 +144,41 @@
                   <input type="time" id="bionics_window_end" value="{{ bionics_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
                 </div>
               </div>
-              <div class="setting-row">
-                <label for="bionics_priority_order">Priority order</label>
-                <input type="text" id="bionics_priority_order" style="width:260px" placeholder="e.g. heart,brain,eyes,legs,arms" value="{{ ','.join(bionics_cfg.get('priority_order', [])) }}" onchange="autoSave()">
+              <div class="setting-row" style="align-items:flex-start">
+                <label style="padding-top:4px">Priority order</label>
+                <div>
+                  <p class="setting-note" style="margin:0 0 4px">Drag items to reorder. Checked buy-list items appear here automatically.</p>
+                  <table class="priority-table" style="width:260px">
+                    <tbody id="bionics-priority-body">
+                      {% set bp_ns = namespace(shown=[]) %}
+                      {% for item in (bionics_cfg.get('priority_order', []) or []) %}
+                        {% if item in (bionics_cfg.get('wanted_items', []) or []) %}
+                          <tr data-item="{{ item }}" draggable="true">
+                            <td class="priority-num">{{ loop.index }}</td>
+                            <td>{{ item }}</td>
+                            <td><div class="priority-move">
+                              <button type="button" onclick="_moveRow(this,-1)">▲</button>
+                              <button type="button" onclick="_moveRow(this,1)">▼</button>
+                            </div></td>
+                          </tr>
+                          {% set bp_ns.shown = bp_ns.shown + [item] %}
+                        {% endif %}
+                      {% endfor %}
+                      {% for item in (bionics_cfg.get('wanted_items', []) or []) %}
+                        {% if item not in bp_ns.shown %}
+                          <tr data-item="{{ item }}" draggable="true">
+                            <td class="priority-num">{{ bp_ns.shown|length + loop.index }}</td>
+                            <td>{{ item }}</td>
+                            <td><div class="priority-move">
+                              <button type="button" onclick="_moveRow(this,-1)">▲</button>
+                              <button type="button" onclick="_moveRow(this,1)">▼</button>
+                            </div></td>
+                          </tr>
+                        {% endif %}
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <label class="inline-toggle setting-row">Auto-restock detection
                 <label class="toggle-label">
@@ -165,6 +197,23 @@
             </div>
           </div>
           {% set weapon_store_cfg = config.get('weapon_store', {}) %}
+          {% set ws_items = [
+            ('Baseball Bat', '$1,000'),
+            ('Pistol', '$5,000'),
+            ('Hand Grenade', '$10,000'),
+            ('Assault Rifle', '$25,000'),
+            ('Katana', '$25,000'),
+            ('Shotgun', '$25,000'),
+            ('Lightsaber', '$40,000'),
+            ('Sniper Rifle', '$40,000'),
+            ('FlameThrower', '$50,000'),
+            ('Omega Death Laser', '$50,000'),
+            ('Plasma Rifle', '$50,000'),
+            ('Rail Gun', '$50,000'),
+            ('Protection Vest', '$2,000'),
+            ('Kevlar Bullet Proof Vest', '$10,000'),
+            ('Riot Shield', '$50,000')
+          ] %}
           <div class="settings-groups" style="margin-top:16px">
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Weapons Store (Auckland)</h3>
@@ -174,13 +223,52 @@
                   <span class="toggle"></span>
                 </label>
               </label>
-              <div class="setting-row">
-                <label for="weapon_store_wanted_items">Buy list</label>
-                <input type="text" id="weapon_store_wanted_items" style="width:260px" placeholder="e.g. Pistol,Baseball Bat" value="{{ ','.join(weapon_store_cfg.get('wanted_items', [])) }}" onchange="autoSave()">
+              <div class="setting-row" style="align-items:flex-start">
+                <label style="padding-top:4px">Buy list</label>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  {% for item, price in ws_items %}
+                  <label class="inline-toggle">
+                    <input type="checkbox" id="ws_want_{{ item|replace(' ','_') }}" {% if item in weapon_store_cfg.get('wanted_items', []) %}checked{% endif %} onchange="wsOnBuyListChange()">
+                    {{ item }} ({{ price }})
+                  </label>
+                  {% endfor %}
+                </div>
               </div>
-              <div class="setting-row">
-                <label for="weapon_store_priority_order">Priority order</label>
-                <input type="text" id="weapon_store_priority_order" style="width:260px" placeholder="e.g. Pistol,Baseball Bat" value="{{ ','.join(weapon_store_cfg.get('priority_order', [])) }}" onchange="autoSave()">
+              <div class="setting-row" style="align-items:flex-start">
+                <label style="padding-top:4px">Priority order</label>
+                <div>
+                  <p class="setting-note" style="margin:0 0 4px">Checked buy-list items appear here. Use arrows to set purchase order.</p>
+                  <table class="priority-table" style="width:300px">
+                    <tbody id="weapon-store-priority-body">
+                      {% set wp_ns = namespace(shown=[]) %}
+                      {% for item in (weapon_store_cfg.get('priority_order', []) or []) %}
+                        {% if item in (weapon_store_cfg.get('wanted_items', []) or []) %}
+                          <tr data-item="{{ item }}">
+                            <td class="priority-num">{{ loop.index }}</td>
+                            <td>{{ item }}</td>
+                            <td><div class="priority-move">
+                              <button type="button" onclick="_moveRow(this,-1)">▲</button>
+                              <button type="button" onclick="_moveRow(this,1)">▼</button>
+                            </div></td>
+                          </tr>
+                          {% set wp_ns.shown = wp_ns.shown + [item] %}
+                        {% endif %}
+                      {% endfor %}
+                      {% for item, _ in ws_items %}
+                        {% if item in (weapon_store_cfg.get('wanted_items', []) or []) and item not in wp_ns.shown %}
+                          <tr data-item="{{ item }}">
+                            <td class="priority-num">{{ wp_ns.shown|length + loop.index }}</td>
+                            <td>{{ item }}</td>
+                            <td><div class="priority-move">
+                              <button type="button" onclick="_moveRow(this,-1)">▲</button>
+                              <button type="button" onclick="_moveRow(this,1)">▼</button>
+                            </div></td>
+                          </tr>
+                        {% endif %}
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <div class="setting-row">
                 <label for="weapon_store_interval">Check every</label>

@@ -1809,7 +1809,7 @@ def handle_check_weapon_store(action: Action, state: GameState):
         soup = BeautifulSoup(page.content(), "html.parser")
         items = {}
         for row in soup.select("table tr"):
-            radio = row.find("input", {"name": "product", "type": "radio"})
+            radio = row.find("input", {"name": "weapon", "type": "radio"})
             if not radio:
                 continue
             item_val = radio.get("value", "")
@@ -1827,7 +1827,7 @@ def handle_check_weapon_store(action: Action, state: GameState):
         return items
 
     def _nav_to_store():
-        _nav(_u("/localcity/weaponstore.asp"), state)
+        _nav(_u("/localcity/weaponshop.asp"), state)
 
     def _withdraw_for(price: int):
         if state.clean_money < price:
@@ -1911,7 +1911,7 @@ def handle_check_weapon_store(action: Action, state: GameState):
         price = store[target]["price"]
         _withdraw_for(price)
         state.add_log(f"Weapon Store: purchasing {target} for ${price:,}.")
-        page.check(f"input[name='product'][value='{target}']")
+        page.check(f"input[name='weapon'][value='{target}']")
         page.click("input[type='submit'][name='B1'][value='Purchase']")
         page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)

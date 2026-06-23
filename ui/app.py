@@ -159,13 +159,13 @@ def save():
     c["bionics"]["use_time_window"] = data.get("bionics_use_time_window", False)
     c["bionics"]["window_start"] = data.get("bionics_window_start", "00:00")
     c["bionics"]["window_end"] = data.get("bionics_window_end", "23:59")
-    c["bionics"]["priority_order"] = [i.strip() for i in data.get("bionics_priority_order", "").split(",") if i.strip()]
+    c["bionics"]["priority_order"] = data.get("bionics_priority_order", [])
     c["bionics"]["auto_restock"] = data.get("bionics_auto_restock", False)
 
     c.setdefault("weapon_store", {})
     c["weapon_store"]["enabled"] = data.get("weapon_store_enabled", False)
-    c["weapon_store"]["wanted_items"] = [i.strip() for i in data.get("weapon_store_wanted_items", "").split(",") if i.strip()]
-    c["weapon_store"]["priority_order"] = [i.strip() for i in data.get("weapon_store_priority_order", "").split(",") if i.strip()]
+    c["weapon_store"]["wanted_items"] = data.get("weapon_store_wanted_items", [])
+    c["weapon_store"]["priority_order"] = data.get("weapon_store_priority_order", [])
     c["weapon_store"]["check_interval_minutes"] = max(1, int(data.get("weapon_store_interval", 5)))
     c["weapon_store"]["use_time_window"] = data.get("weapon_store_use_time_window", False)
     c["weapon_store"]["window_start"] = data.get("weapon_store_window_start", "00:00")
