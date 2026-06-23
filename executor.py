@@ -2350,7 +2350,8 @@ def handle_gym(action: Action, state: GameState):
             state.add_log("Gym: not in Chicago and auto-travel is off — skipping.")
             return
         state.add_log("Gym: travelling to Chicago...")
-        result = handle_travel(Action("travel", target_city=_CHICAGO, method="airport"), state)
+        method = "own_vehicle" if state.vehicle_health else "airport"
+        result = handle_travel(Action("travel", target_city=_CHICAGO, method=method), state)
         if result == 0:
             state.add_log("Gym: travel to Chicago failed — skipping.")
             return
