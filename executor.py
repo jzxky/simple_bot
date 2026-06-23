@@ -813,8 +813,13 @@ def handle_community_service(action: Action, state: GameState):
         page.check(f"input[name='comservice'][value='{last['value']}']")
         state.add_log(f"Community service (home city): {last['value']}")
     else:
-        page.check("input[name='csinothercities'][value='hospital']")
-        state.add_log("Community service (away city): assist local civilians")
+        options = soup.find_all("input", attrs={"name": "csinothercities", "type": "radio"})
+        if not options:
+            state.add_log("No community service options found (away city).")
+            return
+        last = options[-1]
+        page.check(f"input[name='csinothercities'][value='{last['value']}']")
+        state.add_log(f"Community service (away city): {last['value']}")
 
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
