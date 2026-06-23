@@ -376,7 +376,8 @@ button {
 }
 .settings-group h3 { margin-top: 0; }
 .setting-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 200px 1fr;
   align-items: center;
   justify-content: flex-start;
   width: 100%;
@@ -390,12 +391,8 @@ button {
 }
 .setting-row > span,
 .setting-row > label:first-child {
-  min-width: 200px;
-  max-width: 260px;
-  flex-shrink: 0;
   color: var(--text);
   font-size: 13px;
-  flex-direction: row;
 }
 .setting-row:last-child { border-bottom: none; }
 .setting-row .toggle-label { flex-shrink: 0; }
