@@ -569,8 +569,14 @@ function togglePause() {
     .then(d => updateBotState(d.running, d.paused));
 }
 
+function openCloseBotModal() {
+  document.getElementById("close-bot-overlay").style.display = "flex";
+}
+function closeCloseBotModal() {
+  document.getElementById("close-bot-overlay").style.display = "none";
+}
 function closeBot() {
-  if (!confirm("Kill the bot process? The UI will become unavailable.")) return;
+  closeCloseBotModal();
   fetch("/api/shutdown", {method: "POST"}).catch(() => {});
 }
 
