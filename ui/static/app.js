@@ -1364,30 +1364,39 @@ function _initPriorityDrag(tbodyId) {
     row.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
   });
+  function _clearDropIndicators() {
+    tbody.querySelectorAll(".drop-before,.drop-after").forEach(r => {
+      r.classList.remove("drop-before", "drop-after");
+    });
+  }
+  function _getDropTarget(e) {
+    const row = e.target.closest("tr[draggable]");
+    if (!row || row === dragSrc) return null;
+    const rect = row.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    return { row, after };
+  }
   tbody.addEventListener("dragend", () => {
     if (dragSrc) dragSrc.classList.remove("dragging");
-    tbody.querySelectorAll(".drag-over").forEach(r => r.classList.remove("drag-over"));
+    _clearDropIndicators();
     dragSrc = null;
   });
   tbody.addEventListener("dragover", e => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    const row = e.target.closest("tr[draggable]");
-    tbody.querySelectorAll(".drag-over").forEach(r => r.classList.remove("drag-over"));
-    if (row && row !== dragSrc) row.classList.add("drag-over");
+    _clearDropIndicators();
+    const dt = _getDropTarget(e);
+    if (dt) dt.row.classList.add(dt.after ? "drop-after" : "drop-before");
   });
   tbody.addEventListener("dragleave", e => {
-    if (!tbody.contains(e.relatedTarget)) {
-      tbody.querySelectorAll(".drag-over").forEach(r => r.classList.remove("drag-over"));
-    }
+    if (!tbody.contains(e.relatedTarget)) _clearDropIndicators();
   });
   tbody.addEventListener("drop", e => {
     e.preventDefault();
-    const target = e.target.closest("tr[draggable]");
-    if (!target || target === dragSrc || !dragSrc) return;
-    target.classList.remove("drag-over");
-    const rect = target.getBoundingClientRect();
-    const after = e.clientY > rect.top + rect.height / 2;
+    _clearDropIndicators();
+    const dt = _getDropTarget(e);
+    if (!dt || !dragSrc) return;
+    const { row: target, after } = dt;
     tbody.insertBefore(dragSrc, after ? target.nextSibling : target);
     _renumberTable(tbodyId);
     autoSave();
