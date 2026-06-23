@@ -144,6 +144,10 @@
                   <input type="time" id="bionics_window_end" value="{{ bionics_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
                 </div>
               </div>
+              <div class="setting-row">
+                <label for="bionics_priority_order">Priority order</label>
+                <input type="text" id="bionics_priority_order" style="width:260px" placeholder="e.g. heart,brain,eyes,legs,arms" value="{{ ','.join(bionics_cfg.get('priority_order', [])) }}" onchange="autoSave()">
+              </div>
               <label class="inline-toggle setting-row">Auto-restock detection
                 <label class="toggle-label">
                   <input type="checkbox" id="bionics_auto_restock" {% if bionics_cfg.get('auto_restock') %}checked{% endif %} onchange="autoSave()">
@@ -157,6 +161,58 @@
               <div class="setting-row">
                 <span class="stat-label">Next check</span>
                 <span id="bionics-next-check" class="stat-value" style="margin-left:8px">--</span>
+              </div>
+            </div>
+          </div>
+          {% set weapon_store_cfg = config.get('weapon_store', {}) %}
+          <div class="settings-groups" style="margin-top:16px">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Weapons Store (Auckland)</h3>
+              <label class="inline-toggle setting-row">Enable Weapons Store
+                <label class="toggle-label">
+                  <input type="checkbox" id="weapon_store_enabled" {% if weapon_store_cfg.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row">
+                <label for="weapon_store_wanted_items">Buy list</label>
+                <input type="text" id="weapon_store_wanted_items" style="width:260px" placeholder="e.g. Pistol,Baseball Bat" value="{{ ','.join(weapon_store_cfg.get('wanted_items', [])) }}" onchange="autoSave()">
+              </div>
+              <div class="setting-row">
+                <label for="weapon_store_priority_order">Priority order</label>
+                <input type="text" id="weapon_store_priority_order" style="width:260px" placeholder="e.g. Pistol,Baseball Bat" value="{{ ','.join(weapon_store_cfg.get('priority_order', [])) }}" onchange="autoSave()">
+              </div>
+              <div class="setting-row">
+                <label for="weapon_store_interval">Check every</label>
+                <select id="weapon_store_interval" style="width:100px" onchange="autoSave()">
+                  {% for m in range(1, 31) %}
+                  <option value="{{ m }}" {% if weapon_store_cfg.get('check_interval_minutes', 5) == m %}selected{% endif %}>{{ m }} min</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <label class="inline-toggle setting-row">Check during window only
+                <label class="toggle-label" style="margin-left:0">
+                  <input type="checkbox" id="weapon_store_use_time_window" {% if weapon_store_cfg.get('use_time_window') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row">
+                <label>Window</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="time" id="weapon_store_window_start" value="{{ weapon_store_cfg.get('window_start', '00:00') }}" onchange="autoSave()">
+                  <span>to</span>
+                  <input type="time" id="weapon_store_window_end" value="{{ weapon_store_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
+                </div>
+              </div>
+              <label class="inline-toggle setting-row">Auto-restock detection
+                <label class="toggle-label">
+                  <input type="checkbox" id="weapon_store_auto_restock" {% if weapon_store_cfg.get('auto_restock') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row" style="margin-top:6px">
+                <span class="stat-label">Next check</span>
+                <span id="weapon-store-next-check" class="stat-value" style="margin-left:8px">--</span>
               </div>
             </div>
           </div>

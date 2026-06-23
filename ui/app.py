@@ -17,9 +17,12 @@ import character_history as ch
 import trait_requirements as tr
 
 NOTIFICATION_EVENTS = [
-    ("bionics_in_stock",    "Bionics in stock"),
-    ("bionics_purchased",   "Bionic purchased"),
-    ("bionics_restock",     "Bionics restock detected"),
+    ("bionics_in_stock",       "Bionics in stock"),
+    ("bionics_purchased",      "Bionic purchased"),
+    ("bionics_restock",        "Bionics restock detected"),
+    ("weapon_store_in_stock",  "Weapon store in stock"),
+    ("weapon_store_purchased", "Weapon store purchased"),
+    ("weapon_store_restock",   "Weapon store restock detected"),
     ("promotion_success",   "Rank promotion"),
     ("auto_promo",          "Auto-promotion triggered"),
     ("session_expired",     "Session expired"),
@@ -156,7 +159,18 @@ def save():
     c["bionics"]["use_time_window"] = data.get("bionics_use_time_window", False)
     c["bionics"]["window_start"] = data.get("bionics_window_start", "00:00")
     c["bionics"]["window_end"] = data.get("bionics_window_end", "23:59")
+    c["bionics"]["priority_order"] = [i.strip() for i in data.get("bionics_priority_order", "").split(",") if i.strip()]
     c["bionics"]["auto_restock"] = data.get("bionics_auto_restock", False)
+
+    c.setdefault("weapon_store", {})
+    c["weapon_store"]["enabled"] = data.get("weapon_store_enabled", False)
+    c["weapon_store"]["wanted_items"] = [i.strip() for i in data.get("weapon_store_wanted_items", "").split(",") if i.strip()]
+    c["weapon_store"]["priority_order"] = [i.strip() for i in data.get("weapon_store_priority_order", "").split(",") if i.strip()]
+    c["weapon_store"]["check_interval_minutes"] = max(1, int(data.get("weapon_store_interval", 5)))
+    c["weapon_store"]["use_time_window"] = data.get("weapon_store_use_time_window", False)
+    c["weapon_store"]["window_start"] = data.get("weapon_store_window_start", "00:00")
+    c["weapon_store"]["window_end"] = data.get("weapon_store_window_end", "23:59")
+    c["weapon_store"]["auto_restock"] = data.get("weapon_store_auto_restock", False)
 
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
@@ -323,6 +337,38 @@ def _get_bionics_next_check_at(state) -> "float | None":
 
     return next_at
 
+
+def _get_weapon_store_next_check_at(state) -> "float | None":
+    import time as _time
+    task = bot.get_weapon_store_task()
+    if not task or task.last_checked_at <= 0:
+        return None
+    w = cfg.load().get("weapon_store", {})
+    interval_secs = int(w.get("check_interval_minutes", 5)) * 60
+    next_at = task.last_checked_at + interval_secs
+
+    if w.get("use_time_window", False) and state.server_time is not None:
+        start = w.get("window_start", "00:00")
+        end   = w.get("window_end",   "23:59")
+        start_mins = int(start[:2]) * 60 + int(start[3:])
+        end_mins   = int(end[:2])   * 60 + int(end[3:])
+        ingame = state.ingame_mins
+        if start_mins < end_mins:
+            _outside = ingame is not None and not (start_mins < ingame < end_mins)
+        else:
+            _outside = ingame is not None and not (ingame > start_mins or ingame < end_mins)
+        if _outside:
+            ingame_secs_now = (state.server_time.hour * 3600
+                               + state.server_time.minute * 60
+                               + state.server_time.second)
+            secs_until_start = start_mins * 60 - ingame_secs_now
+            if secs_until_start <= 0:
+                secs_until_start += 86400
+            next_at = _time.time() + secs_until_start
+
+    return next_at
+
+
 @app.route("/status")
 def status():
     s = bot.state
@@ -373,6 +419,9 @@ def status():
         "bionics_window_start": cfg.load().get("bionics", {}).get("window_start", "00:00"),
         "bionics_window_end":   cfg.load().get("bionics", {}).get("window_end",   "23:59"),
         "bionics_views": ({"current": bot.get_bionics_task().last_views[0], "max": bot.get_bionics_task().last_views[1]} if bot.get_bionics_task() and bot.get_bionics_task().last_views else None),
+        "weapon_store_next_check_at": _get_weapon_store_next_check_at(s),
+        "weapon_store_window_start": cfg.load().get("weapon_store", {}).get("window_start", "00:00"),
+        "weapon_store_window_end":   cfg.load().get("weapon_store", {}).get("window_end",   "23:59"),
         "is_git_repo": _is_git_repo(),
         "flight_departs_at": s.flight_departs_at,
         "vehicle_health": s.vehicle_health,
