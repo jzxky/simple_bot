@@ -856,7 +856,6 @@ function pollStatus() {
     .finally(() => setTimeout(pollStatus, 3000));
 }
 
-pollStatus();
 loadPlayers();
 
 const TIMER_LABELS = {
