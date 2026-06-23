@@ -456,7 +456,8 @@ button {
 /* Drag-and-drop for priority tables (desktop only) */
 .priority-table tr[draggable="true"] { cursor: grab; }
 .priority-table tr[draggable="true"].dragging { opacity: 0.35; }
-.priority-table tr[draggable="true"].drag-over { outline: 2px solid var(--accent); outline-offset: -1px; background: rgba(var(--accent-rgb,90,140,220),0.08); }
+.priority-table tr[draggable="true"].drop-before td { border-top: 2px solid var(--accent); }
+.priority-table tr[draggable="true"].drop-after td { border-bottom: 2px solid var(--accent); }
 /* Mobile: arrows are primary — larger tap targets, no grab cursor */
 @media (max-width: 600px) {
   .priority-table tr[draggable="true"] { cursor: default; }
