@@ -28,6 +28,11 @@ DEFAULT_CONFIG = {
             "payback_private": False,
             "payback_public": False
         },
+        "torch": {
+            "torch_private": False,
+            "torch_payback_public": "everyone",
+            "torch_payback_private": "everyone"
+        },
         "fallback_to_away": False
     },
     "action": {
