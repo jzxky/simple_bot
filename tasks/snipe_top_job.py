@@ -10,7 +10,7 @@ import browser
 import urls
 from state import GameState, parse_state, SERVER_TIME_FMT
 from tasks.base import Task
-from tasks.check_top_job import _top_job_map
+from tasks.check_top_job import TOP_JOB_MAP as _TOP_JOB_MAP
 from promotions import PROMO_BY_RANK, get_choice
 
 SNIPE_TIMEOUT = 30 * 60  # seconds
@@ -26,12 +26,12 @@ class SnipeTopJobTask(Task):
             and not state.in_jail
             and state.snipe_top_job_pending
             and bool(state.snipe_top_job_promo_url)
-            and state.occupation in _top_job_map()
+            and state.next_rank in _TOP_JOB_MAP
         )
 
     def run(self, state: GameState, executor):
         promo_url = state.snipe_top_job_promo_url
-        top_job = _top_job_map().get(state.occupation, ("Unknown", ""))[0]
+        top_job = state.next_rank or "Unknown"
         state.add_log(f"SnipeTopJob: starting — targeting {top_job}, hammering main.asp for up to 30 minutes.")
         deadline = time.monotonic() + SNIPE_TIMEOUT
         promoted = False
