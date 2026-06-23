@@ -213,7 +213,8 @@ def _scrape_earn_catalog(page, state: GameState):
             pass
         auto_labels = ", ".join(f"{v} ({l})" for v, l in auto_opts) or "none"
         manual_labels = ", ".join(f"{d}:{l}" + (" [trap]" if t else "") for d, l, t in manual_opts) or "none"
-        state.add_log(f"Earns detected — auto: [{auto_labels}] | manual: [{manual_labels}]")
+        if cfg.load().get("debug_logging", False):
+            state.add_log(f"Earns detected — auto: [{auto_labels}] | manual: [{manual_labels}]")
     else:
         state.add_log("Earns: no options detected on earn page.")
 

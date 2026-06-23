@@ -23,7 +23,7 @@ body {
   min-height: 100vh;
 }
 
-.container { max-width: 860px; margin: 0 auto; padding: 20px; }
+.container { max-width: 1290px; margin: 0 auto; padding: 20px; }
 
 header { margin-bottom: 20px; }
 header h1 {
