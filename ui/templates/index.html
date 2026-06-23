@@ -144,7 +144,7 @@
                   <input type="time" id="bionics_window_end" value="{{ bionics_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
                 </div>
               </div>
-              <div class="setting-row" style="align-items:flex-start">
+              <div class="setting-row" style="align-items:start">
                 <label style="padding-top:4px">Priority order</label>
                 <div>
                   <p class="setting-note" style="margin:0 0 4px">Drag to reorder on desktop · use arrows on mobile. Checked items appear here automatically.</p>
@@ -188,11 +188,11 @@
               </label>
               <div class="setting-row" style="margin-top:6px">
                 <span class="stat-label">Store visits</span>
-                <span id="bionics-views" class="stat-value" style="margin-left:8px">--</span>
+                <span id="bionics-views" class="stat-value">--</span>
               </div>
               <div class="setting-row">
                 <span class="stat-label">Next check</span>
-                <span id="bionics-next-check" class="stat-value" style="margin-left:8px">--</span>
+                <span id="bionics-next-check" class="stat-value">--</span>
               </div>
             </div>
           </div>
@@ -223,7 +223,7 @@
                   <span class="toggle"></span>
                 </label>
               </label>
-              <div class="setting-row" style="align-items:flex-start">
+              <div class="setting-row" style="align-items:start">
                 <label style="padding-top:4px">Buy list</label>
                 <div style="display:flex;flex-direction:column;gap:6px">
                   {% for item, price in ws_items %}
@@ -234,7 +234,7 @@
                   {% endfor %}
                 </div>
               </div>
-              <div class="setting-row" style="align-items:flex-start">
+              <div class="setting-row" style="align-items:start">
                 <label style="padding-top:4px">Priority order</label>
                 <div>
                   <p class="setting-note" style="margin:0 0 4px">Drag to reorder on desktop · use arrows on mobile. Checked items appear here automatically.</p>
@@ -300,7 +300,7 @@
               </label>
               <div class="setting-row" style="margin-top:6px">
                 <span class="stat-label">Next check</span>
-                <span id="weapon-store-next-check" class="stat-value" style="margin-left:8px">--</span>
+                <span id="weapon-store-next-check" class="stat-value">--</span>
               </div>
             </div>
           </div>
@@ -326,7 +326,7 @@
               </label>
               <div class="setting-row" style="margin-top:6px">
                 <span class="stat-label">Next gym use</span>
-                <span id="gym-timer" class="stat-value" style="margin-left:8px">--</span>
+                <span id="gym-timer" class="stat-value">--</span>
               </div>
             </div>
             {% set casino = config.get('casino', {}) %}
@@ -356,7 +356,7 @@
               </label>
               <div class="setting-row" style="margin-top:6px">
                 <span class="stat-label">Next casino use</span>
-                <span id="casino-timer" class="stat-value" style="margin-left:8px">--</span>
+                <span id="casino-timer" class="stat-value">--</span>
               </div>
             </div>
           </div>
