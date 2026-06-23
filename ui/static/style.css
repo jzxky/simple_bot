@@ -173,6 +173,13 @@ select option { background: var(--surface2); }
   font-size: 13px;
   min-width: unset;
 }
+/* Toggle rows: grid so the text node aligns with the label column */
+label.setting-row.inline-toggle {
+  display: grid;
+  grid-template-columns: 200px auto;
+  align-items: center;
+  gap: 10px;
+}
 
 /* Tabs */
 .tab-bar { display: flex; gap: 2px; margin-bottom: 14px; flex-wrap: wrap; }

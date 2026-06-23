@@ -104,15 +104,15 @@
           {% set gym = config.get('gym', {}) %}
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>
-                Bionics Store (Chicago)
+              <h3>Bionics Store (Chicago)</h3>
+              <label class="inline-toggle setting-row">Enable Bionics
                 <label class="toggle-label">
                   <input type="checkbox" id="bionics_enabled" {% if bionics_cfg.get('enabled') %}checked{% endif %} onchange="autoSave()">
                   <span class="toggle"></span>
                 </label>
-              </h3>
+              </label>
               <div class="setting-row">
-                <label>Wanted Items</label>
+                <label>Buy List</label>
                 <div style="display:flex;flex-direction:column;gap:6px">
                   {% for item, label in [('arms','Bionic Arms ($10k)'),('legs','Bionic Legs ($20k)'),('eyes','Bionic Eyes ($35k)'),('brain','Bionic Brain ($50k)'),('heart','Bionic Heart ($50k)')] %}
                   <label class="inline-toggle">
@@ -124,21 +124,25 @@
               </div>
               <div class="setting-row">
                 <label for="bionics_interval">Check every</label>
-                <select id="bionics_interval" onchange="autoSave()">
+                <select id="bionics_interval" style="width:100px" onchange="autoSave()">
                   {% for m in range(1, 31) %}
                   <option value="{{ m }}" {% if bionics_cfg.get('check_interval_minutes', 5) == m %}selected{% endif %}>{{ m }} min</option>
                   {% endfor %}
                 </select>
               </div>
-              <div class="setting-row">
-                <label>Check window</label>
-                <label class="toggle-label" style="margin-right:8px">
+              <label class="inline-toggle setting-row">Check during window only
+                <label class="toggle-label" style="margin-left:0">
                   <input type="checkbox" id="bionics_use_time_window" {% if bionics_cfg.get('use_time_window') %}checked{% endif %} onchange="autoSave()">
                   <span class="toggle"></span>
                 </label>
-                <input type="time" id="bionics_window_start" value="{{ bionics_cfg.get('window_start', '00:00') }}" onchange="autoSave()">
-                <span style="margin:0 6px">to</span>
-                <input type="time" id="bionics_window_end" value="{{ bionics_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
+              </label>
+              <div class="setting-row">
+                <label>Window</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="time" id="bionics_window_start" value="{{ bionics_cfg.get('window_start', '00:00') }}" onchange="autoSave()">
+                  <span>to</span>
+                  <input type="time" id="bionics_window_end" value="{{ bionics_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
+                </div>
               </div>
               <label class="inline-toggle setting-row">Auto-restock detection
                 <label class="toggle-label">
@@ -158,13 +162,13 @@
           </div>
           <div class="settings-groups" style="margin-top:16px">
             <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>
-                Gym
+              <h3>Gym</h3>
+              <label class="inline-toggle setting-row">Enable Gym
                 <label class="toggle-label">
                   <input type="checkbox" id="gym_enabled" {% if gym.get('enabled') %}checked{% endif %} onchange="autoSave()">
                   <span class="toggle"></span>
                 </label>
-              </h3>
+              </label>
               <div class="setting-row">
                 <label for="gym_activity">Activity</label>
                 <select id="gym_activity" style="width:200px" onchange="autoSave()">
@@ -183,13 +187,13 @@
             </div>
             {% set casino = config.get('casino', {}) %}
             <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>
-                Casino (Beirut)
+              <h3>Casino (Beirut)</h3>
+              <label class="inline-toggle setting-row">Enable Casino
                 <label class="toggle-label">
                   <input type="checkbox" id="casino_enabled" {% if casino.get('enabled') %}checked{% endif %} onchange="autoSave()">
                   <span class="toggle"></span>
                 </label>
-              </h3>
+              </label>
               <div class="setting-row">
                 <label for="casino_activity">Activity</label>
                 <select id="casino_activity" style="width:200px" onchange="autoSave()">
