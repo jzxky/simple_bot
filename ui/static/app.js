@@ -185,11 +185,20 @@ function _doSave() {
     autobuy_qty_cocaine:     parseInt((document.getElementById("autobuy_qty_cocaine")||{value:0}).value)||0,
     bionics_enabled: (document.getElementById("bionics_enabled")||{checked:false}).checked,
     bionics_wanted_items: ["arms","legs","eyes","brain","heart"].filter(i => (document.getElementById("bionics_want_"+i)||{checked:false}).checked),
+    bionics_priority_order: (document.getElementById("bionics_priority_order")||{value:""}).value,
     bionics_interval: parseInt((document.getElementById("bionics_interval")||{value:5}).value)||5,
     bionics_use_time_window: (document.getElementById("bionics_use_time_window")||{checked:false}).checked,
     bionics_window_start: (document.getElementById("bionics_window_start")||{value:"00:00"}).value,
     bionics_window_end:   (document.getElementById("bionics_window_end")||{value:"23:59"}).value,
     bionics_auto_restock: (document.getElementById("bionics_auto_restock")||{checked:false}).checked,
+    weapon_store_enabled: (document.getElementById("weapon_store_enabled")||{checked:false}).checked,
+    weapon_store_wanted_items: (document.getElementById("weapon_store_wanted_items")||{value:""}).value,
+    weapon_store_priority_order: (document.getElementById("weapon_store_priority_order")||{value:""}).value,
+    weapon_store_interval: parseInt((document.getElementById("weapon_store_interval")||{value:5}).value)||5,
+    weapon_store_use_time_window: (document.getElementById("weapon_store_use_time_window")||{checked:false}).checked,
+    weapon_store_window_start: (document.getElementById("weapon_store_window_start")||{value:"00:00"}).value,
+    weapon_store_window_end:   (document.getElementById("weapon_store_window_end")||{value:"23:59"}).value,
+    weapon_store_auto_restock: (document.getElementById("weapon_store_auto_restock")||{checked:false}).checked,
     gym_enabled:    (document.getElementById("gym_enabled")||{checked:false}).checked,
     gym_activity:   (document.getElementById("gym_activity")||{value:"weights"}).value,
     gym_auto_travel:(document.getElementById("gym_auto_travel")||{checked:false}).checked,
@@ -790,6 +799,32 @@ function pollStatus() {
       if (d.bionics_window_end) {
         const we = document.getElementById("bionics_window_end");
         if (we && we !== document.activeElement) we.value = d.bionics_window_end;
+      }
+
+      // Weapon store next check
+      const wsNextEl = document.getElementById("weapon-store-next-check");
+      if (wsNextEl) {
+        if (d.weapon_store_next_check_at) {
+          const secsLeft = Math.max(0, Math.round(d.weapon_store_next_check_at - Date.now() / 1000));
+          if (secsLeft <= 0) {
+            wsNextEl.textContent = "Ready";
+          } else {
+            const m = Math.floor(secsLeft / 60), s = secsLeft % 60;
+            wsNextEl.textContent = m + "m " + String(s).padStart(2, "0") + "s";
+          }
+        } else {
+          wsNextEl.textContent = "--";
+        }
+      }
+
+      // Weapon store window sync
+      if (d.weapon_store_window_start) {
+        const ws = document.getElementById("weapon_store_window_start");
+        if (ws && ws !== document.activeElement) ws.value = d.weapon_store_window_start;
+      }
+      if (d.weapon_store_window_end) {
+        const we = document.getElementById("weapon_store_window_end");
+        if (we && we !== document.activeElement) we.value = d.weapon_store_window_end;
       }
 
       // Log — only update live view; switch back to live if first log file matches
