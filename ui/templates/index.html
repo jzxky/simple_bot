@@ -113,7 +113,7 @@
               </label>
               <div class="setting-row">
                 <label>Buy List</label>
-                <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:6px 16px">
                   {% for item, label in [('arms','Bionic Arms ($10k)'),('legs','Bionic Legs ($20k)'),('eyes','Bionic Eyes ($35k)'),('brain','Bionic Brain ($50k)'),('heart','Bionic Heart ($50k)')] %}
                   <label class="inline-toggle">
                     <input type="checkbox" id="bionics_want_{{ item }}" {% if item in bionics_cfg.get('wanted_items', []) %}checked{% endif %} onchange="bionicsOnBuyListChange()">
@@ -305,7 +305,7 @@
             </div>
           </div>
           <div class="settings-groups" style="margin-top:16px">
-            <div class="settings-group" style="grid-column: 1 / -1">
+            <div class="settings-group">
               <h3>Gym</h3>
               <label class="inline-toggle setting-row">Enable Gym
                 <label class="toggle-label">
@@ -330,7 +330,7 @@
               </div>
             </div>
             {% set casino = config.get('casino', {}) %}
-            <div class="settings-group" style="grid-column: 1 / -1">
+            <div class="settings-group">
               <h3>Casino (Beirut)</h3>
               <label class="inline-toggle setting-row">Enable Casino
                 <label class="toggle-label">
