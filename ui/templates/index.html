@@ -147,7 +147,7 @@
               <div class="setting-row" style="align-items:flex-start">
                 <label style="padding-top:4px">Priority order</label>
                 <div>
-                  <p class="setting-note" style="margin:0 0 4px">Drag items to reorder. Checked buy-list items appear here automatically.</p>
+                  <p class="setting-note" style="margin:0 0 4px">Drag to reorder on desktop · use arrows on mobile. Checked items appear here automatically.</p>
                   <table class="priority-table" style="width:260px">
                     <tbody id="bionics-priority-body">
                       {% set bp_ns = namespace(shown=[]) %}
@@ -237,13 +237,13 @@
               <div class="setting-row" style="align-items:flex-start">
                 <label style="padding-top:4px">Priority order</label>
                 <div>
-                  <p class="setting-note" style="margin:0 0 4px">Checked buy-list items appear here. Use arrows to set purchase order.</p>
+                  <p class="setting-note" style="margin:0 0 4px">Drag to reorder on desktop · use arrows on mobile. Checked items appear here automatically.</p>
                   <table class="priority-table" style="width:300px">
                     <tbody id="weapon-store-priority-body">
                       {% set wp_ns = namespace(shown=[]) %}
                       {% for item in (weapon_store_cfg.get('priority_order', []) or []) %}
                         {% if item in (weapon_store_cfg.get('wanted_items', []) or []) %}
-                          <tr data-item="{{ item }}">
+                          <tr data-item="{{ item }}" draggable="true">
                             <td class="priority-num">{{ loop.index }}</td>
                             <td>{{ item }}</td>
                             <td><div class="priority-move">
@@ -256,7 +256,7 @@
                       {% endfor %}
                       {% for item, _ in ws_items %}
                         {% if item in (weapon_store_cfg.get('wanted_items', []) or []) and item not in wp_ns.shown %}
-                          <tr data-item="{{ item }}">
+                          <tr data-item="{{ item }}" draggable="true">
                             <td class="priority-num">{{ wp_ns.shown|length + loop.index }}</td>
                             <td>{{ item }}</td>
                             <td><div class="priority-move">

@@ -1324,6 +1324,7 @@ function _syncPriorityList(tbodyId, checkedItems) {
     if (!existing.includes(item)) {
       const tr = document.createElement("tr");
       tr.dataset.item = item;
+      tr.setAttribute("draggable", "true");
       tr.innerHTML =
         `<td class="priority-num"></td>` +
         `<td>${escHtml(item)}</td>` +
@@ -1350,6 +1351,53 @@ function wsOnBuyListChange() {
   _syncPriorityList("weapon-store-priority-body", _wsCheckedItems());
   autoSave();
 }
+
+function _initPriorityDrag(tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  let dragSrc = null;
+
+  tbody.addEventListener("dragstart", e => {
+    const row = e.target.closest("tr[draggable]");
+    if (!row) return;
+    dragSrc = row;
+    row.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+  });
+  tbody.addEventListener("dragend", () => {
+    if (dragSrc) dragSrc.classList.remove("dragging");
+    tbody.querySelectorAll(".drag-over").forEach(r => r.classList.remove("drag-over"));
+    dragSrc = null;
+  });
+  tbody.addEventListener("dragover", e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const row = e.target.closest("tr[draggable]");
+    tbody.querySelectorAll(".drag-over").forEach(r => r.classList.remove("drag-over"));
+    if (row && row !== dragSrc) row.classList.add("drag-over");
+  });
+  tbody.addEventListener("dragleave", e => {
+    if (!tbody.contains(e.relatedTarget)) {
+      tbody.querySelectorAll(".drag-over").forEach(r => r.classList.remove("drag-over"));
+    }
+  });
+  tbody.addEventListener("drop", e => {
+    e.preventDefault();
+    const target = e.target.closest("tr[draggable]");
+    if (!target || target === dragSrc || !dragSrc) return;
+    target.classList.remove("drag-over");
+    const rect = target.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    tbody.insertBefore(dragSrc, after ? target.nextSibling : target);
+    _renumberTable(tbodyId);
+    autoSave();
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  _initPriorityDrag("bionics-priority-body");
+  _initPriorityDrag("weapon-store-priority-body");
+});
 
 // Up/down reorder for priority tables
 function _moveRow(btn, dir) {
