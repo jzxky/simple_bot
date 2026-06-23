@@ -47,10 +47,12 @@ from tasks.respect import RespectTask
 from tasks.cs_punishment import CSPunishmentTask
 from tasks.online_age import OnlineAgeTask
 from tasks.bionics import BionicsTask
+from tasks.weapon_store import WeaponStoreTask
 from players import PlayerRefreshTask, SyncTask
 
 _thread: threading.Thread = None
 _bionics_task = None
+_weapon_store_task = None
 _scheduler_snapshot: list = []
 _sched: "Scheduler | None" = None
 _state: "GameState | None" = None
@@ -185,9 +187,11 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(GymTask())
     sched.add(CasinoTask())
     sched.add(OnlineAgeTask())
-    global _bionics_task
+    global _bionics_task, _weapon_store_task
     _bionics_task = BionicsTask()
     sched.add(_bionics_task)
+    _weapon_store_task = WeaponStoreTask()
+    sched.add(_weapon_store_task)
     sched.add(RespectTask())
     sched.add(PlayerRefreshTask())
     sched.add(SyncTask())
@@ -516,6 +520,10 @@ def resume():
 
 def get_bionics_task():
     return _bionics_task
+
+
+def get_weapon_store_task():
+    return _weapon_store_task
 
 
 def get_state():

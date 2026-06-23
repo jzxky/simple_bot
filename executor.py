@@ -1586,6 +1586,40 @@ def handle_deposit(action: Action, state: GameState):
     state.add_log(f"Deposit: deposited ${amount:,}.")
 
 
+def _stash_held_weapon(state: GameState, label: str) -> bool:
+    """Navigate to profile, check home city + apartment, then stash weapon in slot #1."""
+    page = browser.page()
+    if not state.in_home_city():
+        state.add_log(f"{label}: not in home city — skipping stash, stopping loop.")
+        return False
+    _nav(_u("/profile/default.asp"), state)
+    profile_soup = BeautifulSoup(page.content(), "html.parser")
+    apt_found = False
+    for tbl in profile_soup.select("#holder_content > table.item_table"):
+        for row in tbl.find_all("tr"):
+            cells = row.find_all("td")
+            if len(cells) >= 2 and cells[-2].get_text(strip=True).rstrip(":") == "Apartment":
+                apt_found = True
+                break
+        if apt_found:
+            break
+    if not apt_found:
+        state.add_log(f"{label}: no apartment on profile — skipping stash, stopping loop.")
+        return False
+    stash_link = page.query_selector("a[href='/weapons.asp?action=stash1']")
+    if not stash_link:
+        state.add_log(f"{label}: stash #1 link not found — stopping.")
+        return False
+    stash_link.click()
+    page.wait_for_load_state("domcontentloaded")
+    stash_soup = BeautifulSoup(page.content(), "html.parser")
+    if stash_soup.find("div", id="fail"):
+        state.add_log(f"{label}: stash failed — stopping.")
+        return False
+    state.add_log(f"{label}: stashed in slot #1.")
+    return True
+
+
 def handle_check_bionics(action: Action, state: GameState):
     from tasks.bionics import BIONIC_PRICES, REVERSE_ORDER
     import config as cfg
@@ -1596,8 +1630,12 @@ def handle_check_bionics(action: Action, state: GameState):
         state.add_log("Bionics: no wanted items configured.")
         return
 
-    # Items to consider in reverse price order
-    ordered_wanted = [i for i in REVERSE_ORDER if i in wanted]
+    # Items to consider — use configured priority_order if set, else default REVERSE_ORDER
+    priority_cfg = cfg.load().get("bionics", {}).get("priority_order", [])
+    if priority_cfg:
+        ordered_wanted = [i for i in priority_cfg if i in wanted]
+    else:
+        ordered_wanted = [i for i in REVERSE_ORDER if i in wanted]
     page = browser.page()
 
     def _parse_store() -> dict:
@@ -1735,19 +1773,9 @@ def handle_check_bionics(action: Action, state: GameState):
         if not can_buy:
             break
 
-        # Stash before next purchase
-        _nav(_u("/profile/default.asp"), state)
-        stash_link = page.query_selector("a[href='/weapons.asp?action=stash1']")
-        if not stash_link:
-            state.add_log("Bionics: stash #1 not available — stopping.")
+        # Stash before next purchase (guarded: home city + apartment required)
+        if not _stash_held_weapon(state, "Bionics"):
             break
-        stash_link.click()
-        page.wait_for_load_state("domcontentloaded")
-        stash_soup = BeautifulSoup(page.content(), "html.parser")
-        if stash_soup.find("div", id="fail"):
-            state.add_log(f"Bionics: stash failed — stopping.")
-            break
-        state.add_log("Bionics: stashed in slot #1.")
 
         # Withdraw for next item, then wait 30s, then navigate back
         next_price = BIONIC_PRICES[can_buy[0]]
@@ -1763,6 +1791,170 @@ def handle_check_bionics(action: Action, state: GameState):
 
     if purchased:
         state.add_log(f"Bionics session complete — purchased: {', '.join(purchased)}.")
+
+
+def handle_check_weapon_store(action: Action, state: GameState):
+    import config as cfg
+    ws_cfg = cfg.load().get("weapon_store", {})
+    wanted = ws_cfg.get("wanted_items", [])
+    task = action.params.get("_task")
+
+    if not wanted:
+        state.add_log("Weapon Store: no wanted items configured.")
+        return
+
+    page = browser.page()
+
+    def _parse_store() -> dict:
+        soup = BeautifulSoup(page.content(), "html.parser")
+        items = {}
+        for row in soup.select("table tr"):
+            radio = row.find("input", {"name": "product", "type": "radio"})
+            if not radio:
+                continue
+            item_val = radio.get("value", "")
+            tds = row.find_all("td")
+            if len(tds) < 4:
+                continue
+            price_text = tds[2].get_text(strip=True)
+            stock_text = tds[3].get_text(strip=True)
+            try:
+                price = int(re.sub(r"[^0-9]", "", price_text) or 0)
+                stock = int(stock_text)
+            except ValueError:
+                continue
+            items[item_val] = {"price": price, "stock": stock}
+        return items
+
+    def _nav_to_store():
+        _nav(_u("/localcity/weaponstore.asp"), state)
+
+    def _withdraw_for(price: int):
+        if state.clean_money < price:
+            needed = min(price - state.clean_money, state.bank_balance)
+            if needed > 0:
+                state.add_log(f"Weapon Store: withdrawing ${needed:,}.")
+                handle_withdraw(Action("withdraw", amount=needed), state)
+
+    def _in_stock_affordable():
+        return [i for i in ordered_wanted
+                if store.get(i, {}).get("stock", 0) > 0
+                and store.get(i, {}).get("price", 0) <= state.clean_money + state.bank_balance]
+
+    # Build ordered_wanted from priority_order config, falling back to wanted order
+    priority_cfg = ws_cfg.get("priority_order", [])
+    if priority_cfg:
+        ordered_wanted = [i for i in priority_cfg if i in wanted]
+    else:
+        ordered_wanted = list(wanted)
+
+    # Pre-withdraw for the most expensive wanted item (using current store prices requires
+    # visiting first, so we make a best-effort with whatever cash we have and withdraw later)
+    _nav_to_store()
+    if not _check_session(state):
+        return
+
+    store = _parse_store()
+    if task is not None:
+        from tasks.weapon_store import save_weapon_store_state
+        task.last_checked_at = time.time()
+        state_updates = {"last_checked_at": task.last_checked_at}
+
+        # Restock detection
+        ws = cfg.load().get("weapon_store", {})
+        if ws.get("auto_restock", False) and task.last_stock:
+            restocked = [
+                item for item, d in store.items()
+                if d.get("stock", 0) > task.last_stock.get(item, 0)
+            ]
+            if restocked and state.ingame_mins is not None:
+                igm        = state.ingame_mins
+                start_mins = (igm + 10 * 60) % (24 * 60)
+                end_mins   = (igm + 13 * 60 + 30) % (24 * 60)
+                new_start  = f"{start_mins // 60:02d}:{start_mins % 60:02d}"
+                new_end    = f"{end_mins   // 60:02d}:{end_mins   % 60:02d}"
+                c = cfg.load()
+                c["weapon_store"]["use_time_window"] = True
+                c["weapon_store"]["window_start"]    = new_start
+                c["weapon_store"]["window_end"]      = new_end
+                cfg.save(c)
+                msg = (f"Weapon Store restock detected ({', '.join(restocked)}) — "
+                       f"buy window set to {new_start}–{new_end} in-game.")
+                state.add_log(msg)
+                _notify(state, "weapon_store_restock", msg)
+
+        task.last_stock = {item: d.get("stock", 0) for item, d in store.items()}
+        state_updates["last_stock"] = task.last_stock
+        save_weapon_store_state(state_updates)
+
+    all_in_stock = [i for i, d in store.items() if d.get("stock", 0) > 0]
+    if all_in_stock:
+        msg = f"Weapon Store: in stock — {', '.join(all_in_stock)}."
+        state.add_log(msg)
+        _notify(state, "weapon_store_in_stock", msg)
+
+    can_buy = _in_stock_affordable()
+    if not [i for i in ordered_wanted if store.get(i, {}).get("stock", 0) > 0]:
+        state.add_log("Weapon Store: no wanted items in stock.")
+        return
+
+    if not can_buy:
+        in_stock = [i for i in ordered_wanted if store.get(i, {}).get("stock", 0) > 0]
+        parts = [f"{i} ${store[i]['price']:,}" for i in in_stock]
+        state.add_log(f"Weapon Store: in stock but cannot afford — {', '.join(parts)}.")
+        return
+
+    # Purchase loop
+    purchased = []
+    while can_buy:
+        target = can_buy[0]
+        price = store[target]["price"]
+        _withdraw_for(price)
+        state.add_log(f"Weapon Store: purchasing {target} for ${price:,}.")
+        page.check(f"input[name='product'][value='{target}']")
+        page.click("input[type='submit'][name='B1'][value='Purchase']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+
+        result_soup = BeautifulSoup(page.content(), "html.parser")
+        success_div = result_soup.find("div", id="success")
+        fail_div    = result_soup.find("div", id="fail")
+
+        if success_div:
+            msg = f"Weapon Store: purchased {target} — {success_div.get_text(strip=True)}"
+            state.add_log(msg)
+            _notify(state, "weapon_store_purchased", msg)
+            purchased.append(target)
+            store[target] = {"price": price, "stock": 0}
+        elif fail_div:
+            state.add_log(f"Weapon Store: purchase failed — {fail_div.get_text(strip=True)}")
+            break
+        else:
+            state.add_log("Weapon Store: unexpected page after purchase — aborting.")
+            break
+
+        can_buy = _in_stock_affordable()
+        if not can_buy:
+            break
+
+        # Stash before next purchase (guarded: home city + apartment required)
+        if not _stash_held_weapon(state, "Weapon Store"):
+            break
+
+        # Withdraw for next item, wait 30s, navigate back
+        next_price = store[can_buy[0]]["price"]
+        _withdraw_for(next_price)
+        state.add_log("Weapon Store: waiting 30s before next purchase.")
+        time.sleep(30)
+
+        _nav_to_store()
+        if not _check_session(state):
+            break
+        store = _parse_store()
+        can_buy = _in_stock_affordable()
+
+    if purchased:
+        state.add_log(f"Weapon Store session complete — purchased: {', '.join(purchased)}.")
 
 
 def handle_withdraw(action: Action, state: GameState):
@@ -3078,6 +3270,7 @@ HANDLERS = {
     "payback": handle_payback,
     "probe_agcrime":        handle_probe_agcrime,
     "check_bionics":        handle_check_bionics,
+    "check_weapon_store":   handle_check_weapon_store,
     "do_community_service": handle_community_service,
     "do_fire_duties": handle_fire_duties,
     "do_career_training": handle_career_training,
