@@ -1417,6 +1417,81 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def handle_check_fire_cases(action: Action, state: GameState):
+    page = browser.page()
+
+    # Step 1 — active fires
+    _nav(_u("/localcity/firestation.asp?display=fires"), state)
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    table = soup.find("table", style=lambda s: s and "90%" in s)
+    attend_links = []
+    if table:
+        for row in table.find_all("tr"):
+            link = row.find("a", href=lambda h: h and "FightFire" in h)
+            if link:
+                href = link["href"]
+                if not href.startswith("http"):
+                    href = _u("/localcity/") + href
+                victim_td = row.find("td", class_="display_border")
+                victim = victim_td.get_text(strip=True) if victim_td else "?"
+                attend_links.append((victim, href))
+
+    if attend_links:
+        victim, url = attend_links[-1]
+        state.add_log(f"Fire case work: attending fire for {victim}.")
+        _nav(url, state)
+        result_soup = BeautifulSoup(page.content(), "html.parser")
+        success = result_soup.find("div", id="success")
+        fail    = result_soup.find("div", id="fail")
+        if success:
+            state.add_log(f"Fire case work result: {success.get_text(strip=True)}")
+        elif fail:
+            state.add_log(f"Fire case work failed: {fail.get_text(strip=True)}")
+        else:
+            state.add_log("Fire case work: submitted (no result div).")
+        _refresh_state(state)
+
+    # Step 2 — inspections (only if case timer is still free)
+    if not state.timer_ready("case"):
+        return
+
+    _nav(_u("/localcity/firestation.asp?display=inspections"), state)
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    table = soup.find("table", style=lambda s: s and "90%" in s)
+    inspect_link = None
+    if table:
+        for row in table.find_all("tr"):
+            link = row.find("a", href=True)
+            if link and "colspan" not in str(row):
+                href = link["href"]
+                if not href.startswith("http"):
+                    href = _u("/localcity/") + href
+                inspect_link = href
+                break
+
+    if not inspect_link:
+        return
+
+    state.add_log("Fire case work: performing inspection.")
+    _nav(inspect_link, state)
+    result_soup = BeautifulSoup(page.content(), "html.parser")
+    success = result_soup.find("div", id="success")
+    fail    = result_soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Fire inspection result: {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Fire inspection failed: {fail.get_text(strip=True)}")
+    else:
+        state.add_log("Fire inspection: submitted (no result div).")
+    _refresh_state(state)
+
+
 def handle_clear_jail_duty_queue(action: Action, state: GameState):
     page = browser.page()
     _nav(_u("/jail/duties.asp"), state)
@@ -3278,6 +3353,7 @@ HANDLERS = {
     "do_torch_business": handle_torch_business,
     "do_drug_manufacturing": handle_drug_manufacturing,
     "check_hospital_cases": handle_check_hospital_cases,
+    "check_fire_cases": handle_check_fire_cases,
     "check_engineering_cases": handle_check_engineering_cases,
     "jail_duties": handle_jail_duties,
     "jail_action": handle_jail_action,
