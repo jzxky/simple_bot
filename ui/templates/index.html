@@ -103,7 +103,7 @@
           {% set bionics_cfg = config.get('bionics', {}) %}
           {% set gym = config.get('gym', {}) %}
           <div class="settings-groups">
-            <div class="settings-group" style="grid-column: 1 / -1">
+            <div class="settings-group">
               <h3>Bionics Store (Chicago)</h3>
               <label class="inline-toggle setting-row">Enable Bionics
                 <label class="toggle-label">
@@ -113,7 +113,7 @@
               </label>
               <div class="setting-row">
                 <label>Buy List</label>
-                <div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:6px 16px">
+                <div style="display:flex;flex-direction:column;gap:6px">
                   {% for item, label in [('arms','Bionic Arms ($10k)'),('legs','Bionic Legs ($20k)'),('eyes','Bionic Eyes ($35k)'),('brain','Bionic Brain ($50k)'),('heart','Bionic Heart ($50k)')] %}
                   <label class="inline-toggle">
                     <input type="checkbox" id="bionics_want_{{ item }}" {% if item in bionics_cfg.get('wanted_items', []) %}checked{% endif %} onchange="bionicsOnBuyListChange()">
@@ -147,7 +147,6 @@
               <div class="setting-row" style="align-items:start">
                 <label style="padding-top:4px">Priority order</label>
                 <div>
-                  <p class="setting-note" style="margin:0 0 4px">Drag to reorder on desktop · use arrows on mobile. Checked items appear here automatically.</p>
                   <table class="priority-table" style="width:260px">
                     <tbody id="bionics-priority-body">
                       {% set bp_ns = namespace(shown=[]) %}
@@ -195,27 +194,25 @@
                 <span id="bionics-next-check" class="stat-value">--</span>
               </div>
             </div>
-          </div>
-          {% set weapon_store_cfg = config.get('weapon_store', {}) %}
-          {% set ws_items = [
-            ('Baseball Bat', '$1,000'),
-            ('Pistol', '$5,000'),
-            ('Hand Grenade', '$10,000'),
-            ('Assault Rifle', '$25,000'),
-            ('Katana', '$25,000'),
-            ('Shotgun', '$25,000'),
-            ('Lightsaber', '$40,000'),
-            ('Sniper Rifle', '$40,000'),
-            ('FlameThrower', '$50,000'),
-            ('Omega Death Laser', '$50,000'),
-            ('Plasma Rifle', '$50,000'),
-            ('Rail Gun', '$50,000'),
-            ('Protection Vest', '$2,000'),
-            ('Kevlar Bullet Proof Vest', '$10,000'),
-            ('Riot Shield', '$50,000')
-          ] %}
-          <div class="settings-groups" style="margin-top:16px">
-            <div class="settings-group" style="grid-column: 1 / -1">
+            {% set weapon_store_cfg = config.get('weapon_store', {}) %}
+            {% set ws_items = [
+              ('Baseball Bat', '$1,000'),
+              ('Pistol', '$5,000'),
+              ('Hand Grenade', '$10,000'),
+              ('Assault Rifle', '$25,000'),
+              ('Katana', '$25,000'),
+              ('Shotgun', '$25,000'),
+              ('Lightsaber', '$40,000'),
+              ('Sniper Rifle', '$40,000'),
+              ('FlameThrower', '$50,000'),
+              ('Omega Death Laser', '$50,000'),
+              ('Plasma Rifle', '$50,000'),
+              ('Rail Gun', '$50,000'),
+              ('Protection Vest', '$2,000'),
+              ('Kevlar Bullet Proof Vest', '$10,000'),
+              ('Riot Shield', '$50,000')
+            ] %}
+            <div class="settings-group">
               <h3>Weapons Store (Auckland)</h3>
               <label class="inline-toggle setting-row">Enable Weapons Store
                 <label class="toggle-label">
@@ -237,7 +234,6 @@
               <div class="setting-row" style="align-items:start">
                 <label style="padding-top:4px">Priority order</label>
                 <div>
-                  <p class="setting-note" style="margin:0 0 4px">Drag to reorder on desktop · use arrows on mobile. Checked items appear here automatically.</p>
                   <table class="priority-table" style="width:300px">
                     <tbody id="weapon-store-priority-body">
                       {% set wp_ns = namespace(shown=[]) %}
