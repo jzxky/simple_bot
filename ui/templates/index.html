@@ -497,7 +497,10 @@
                   <option value="{{ v }}" {% if jail.get('duty','laundry') == v %}selected{% endif %}>{{ l }}</option>
                   {% endfor %}
                 </select>
-                <button id="jail-clear-queue-btn" class="btn-secondary" style="margin-left:8px" onclick="clearJailDutyQueue(event)" disabled>Clear Queue</button>
+              </div>
+              <div class="setting-row">
+                <label></label>
+                <button id="jail-clear-queue-btn" class="btn-secondary" onclick="clearJailDutyQueue(event)" disabled>Clear Queue</button>
               </div>
               <div class="setting-row" style="margin-top:8px">
                 <label for="jail_action">Jail Action</label>
@@ -1280,7 +1283,12 @@
         <!-- Player List tab -->
         <div id="pl-tab-list" class="tab-panel active">
           <div class="pl-toolbar">
-            <button class="btn-secondary" onclick="plWhitelistBolds()" id="pl-bolds-btn" title="Whitelist all Boss / Don / Godfather / Capo di tutti capi">Whitelist Bolds</button>
+            <label class="inline-toggle" title="Auto-whitelist Boss / Don / Godfather / Capo di tutti capi on every list update">Whitelist Bolds
+              <label class="toggle-label">
+                <input type="checkbox" id="pl-bolds-toggle" onchange="plBoldsToggleChanged()">
+                <span class="toggle"></span>
+              </label>
+            </label>
             <span id="pl-bolds-status" style="font-size:0.8rem;color:var(--text-muted)"></span>
             <label class="inline-toggle" style="white-space:nowrap;margin-left:auto">Active only
               <label class="toggle-label">
