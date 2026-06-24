@@ -38,7 +38,7 @@ from tasks.maintain_cash import MaintainCashTask
 from tasks.character_history import CharacterHistoryTask
 from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJailBreakTask
 from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask
-from tasks.journal import JournalCheckTask, ArchiveJournalsTask, set_drug_trade_queue, set_illness_queue
+from tasks.journal import JournalCheckTask, ArchiveJournalsTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue
 from tasks.drug_trade import DrugTradeTask
 from tasks.illness import IllnessTask
 from tasks.gym import GymTask
@@ -73,6 +73,8 @@ _drug_trade_queue: queue.Queue = queue.Queue()
 set_drug_trade_queue(_drug_trade_queue)
 _illness_queue: queue.Queue = queue.Queue()
 set_illness_queue(_illness_queue)
+_repair_complete_queue: queue.Queue = queue.Queue()
+set_repair_complete_queue(_repair_complete_queue)
 _jail_inmates_request: queue.Queue = queue.Queue(maxsize=1)
 _jail_inmates_result: queue.Queue = queue.Queue(maxsize=1)
 _warrants_request: queue.Queue = queue.Queue(maxsize=1)
@@ -381,6 +383,19 @@ def _run(c: dict):
                     executor.execute(Action("travel", **params), state)
                 except Exception as e:
                     state.add_log(f"Travel error: {e}")
+
+            # Repair complete → resume deferred vehicle travel
+            if not _repair_complete_queue.empty():
+                try:
+                    _repair_complete_queue.get_nowait()
+                    from executor import get_pending_vehicle_travel_target, clear_pending_vehicle_travel_target
+                    pending = get_pending_vehicle_travel_target()
+                    clear_pending_vehicle_travel_target()
+                    if pending:
+                        state.add_log(f"Repair complete — resuming deferred travel to {pending}.")
+                        _travel_queue.put({"target_city": pending, "method": "own_vehicle"})
+                except Exception as e:
+                    state.add_log(f"Repair complete handler error: {e}")
 
             # Navigate requests from the Flask thread
             if not _navigate_queue.empty():
@@ -709,13 +724,17 @@ def _fetch_travel_dests(method: str) -> list:
     if method == "own_vehicle":
         html = browser.navigate(_urls.BASE_URL + "/travel/travel.asp")
         soup = _BS(html, "html.parser")
-        sel = soup.find("select", attrs={"name": "vehicletravel"})
-        if not sel:
-            return []
-        return [
-            {"value": o["value"], "label": o.get_text(strip=True)}
-            for o in sel.find_all("option") if o.get("value")
-        ]
+        results = []
+        for div in soup.find_all("div", class_="city-container"):
+            inner = div.find("div", class_="city-travel-container")
+            if not inner:
+                continue
+            city_name = inner.get("id", "")
+            import re as _re
+            link = inner.find("a", href=_re.compile(r"depart\.asp\?destination="))
+            if city_name and link:
+                results.append({"value": city_name, "label": city_name})
+        return results
     else:
         html = browser.navigate(_urls.BASE_URL + "/travel/airport.asp")
         soup = _BS(html, "html.parser")

@@ -120,6 +120,7 @@ def _next_page_url(soup) -> str | None:
 
 _drug_trade_queue: "queue.Queue | None" = None
 _illness_queue: "queue.Queue | None" = None
+_repair_complete_queue: "queue.Queue | None" = None
 
 _FLU_TEXT = "you have a slightly nauseous feeling in your stomach"
 
@@ -132,6 +133,11 @@ def set_drug_trade_queue(q: "queue.Queue"):
 def set_illness_queue(q: "queue.Queue"):
     global _illness_queue
     _illness_queue = q
+
+
+def set_repair_complete_queue(q: "queue.Queue"):
+    global _repair_complete_queue
+    _repair_complete_queue = q
 
 
 def dispatch_journal_action(entry: dict, state: GameState):
@@ -148,6 +154,10 @@ def dispatch_journal_action(entry: dict, state: GameState):
         if cfg.load().get("notifications", {}).get("mhs_protected", False):
             attacker = entry.get("text", "")
             state.push_notification("mhs_protected", f"MHS blocked: {attacker}")
+    if entry.get("title") == "REPAIRS":
+        if "completed the repairs on your vehicle" in entry.get("text", "").lower():
+            if _repair_complete_queue is not None:
+                _repair_complete_queue.put(True)
 
 
 # ---------------------------------------------------------------------------
