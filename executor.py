@@ -60,7 +60,7 @@ RESIDENT_CRIMES = {"hack", "breaking"}
 # Typeahead writable input (not the readonly tt-hint shadow field)
 _TARGET_INPUT = "input.tt-input, input[type='text']:not(.tt-hint)"
 
-QUEUE_MIN = 10
+QUEUE_MIN = 50
 QUEUE_MAX = 200
 
 MUGGING_WEAPONS = {"Baseball Bat", "Pistol"}

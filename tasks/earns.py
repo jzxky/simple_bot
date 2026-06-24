@@ -1,5 +1,5 @@
 """
-Checks the earn queue on a timer and tops it up to 200 if below 10.
+Checks the earn queue on a timer and tops it up to 200 if below 50.
 """
 
 import time
