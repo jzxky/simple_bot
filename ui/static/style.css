@@ -1099,6 +1099,24 @@ input.input-unsaved { color: var(--red) !important; }
 .pl-sort-icon { font-size: 0.7rem; margin-left: 3px; opacity: 0.6; }
 .pl-th-sorted .pl-sort-icon { opacity: 1; }
 
+/* Columns dropdown sections */
+.pl-col-section { margin-bottom: 8px; }
+.pl-col-section:last-child { margin-bottom: 0; }
+.pl-col-section-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); cursor: pointer; user-select: none;
+  padding: 2px 0 4px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+}
+.pl-col-section-hdr:hover { color: var(--text); }
+.pl-col-chevron { font-size: 10px; }
+.pl-col-section-body label {
+  display: flex; flex-direction: row-reverse; justify-content: flex-end;
+  align-items: center; gap: 8px;
+  padding: 3px 0; cursor: pointer; font-size: 13px;
+}
+.pl-col-section-body label input[type="checkbox"] { flex-shrink: 0; }
+
 /* Filter row under headers */
 .pl-filter-cell {
   padding: 3px 4px;

@@ -555,9 +555,6 @@
           </div>
         </div>
         <div id="player-lists" class="tab-panel">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-            <button class="btn-secondary" onclick="window.open('/players','_blank')">Open in new tab ↗</button>
-          </div>
           <div class="settings-groups">
             <div class="settings-group">
               <h3>General</h3>
@@ -1275,7 +1272,6 @@
         <div class="tab-bar">
           <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Player List</button>
           <button class="tab-btn" onclick="showTab('pl-tab-groups', this)">Groups</button>
-          <button class="tab-btn" onclick="showTab('pl-tab-import', this)">Import</button>
           <button class="tab-btn" onclick="showTab('pl-tab-dead', this); plRenderRecentDead()">Obituaries</button>
           <button class="tab-btn" onclick="showTab('pl-tab-born', this); plRenderRecentBorn()">Births</button>
         </div>
@@ -1298,21 +1294,36 @@
             </label>
             <div style="position:relative">
               <button class="btn-secondary" onclick="togglePlColMenu()" id="pl-col-menu-btn">Columns ▾</button>
-              <div id="pl-col-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;z-index:200;white-space:nowrap;min-width:140px">
-                <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Show columns</div>
-                <label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" checked onchange="plToggleCol('rank',this.checked)"> Rank</label>
-                <label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" checked onchange="plToggleCol('occupation',this.checked)"> Occupation</label>
-                <label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" checked onchange="plToggleCol('career_group',this.checked)"> Career</label>
-                <label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" checked onchange="plToggleCol('homecity',this.checked)"> City</label>
-                <label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" checked onchange="plToggleCol('group',this.checked)"> Group</label>
-                <label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" checked onchange="plToggleCol('tags',this.checked)"> Tags</label>
-                <label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" checked onchange="plToggleCol('character_age',this.checked)"> Age</label>
-                <label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" checked onchange="plToggleCol('agg_crimes',this.checked)"> Agg</label>
-                <label style="display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer"><input type="checkbox" checked onchange="plToggleCol('case_work',this.checked)"> Case Work</label>
+              <div id="pl-col-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;z-index:200;white-space:nowrap;min-width:160px">
+                <div class="pl-col-section">
+                  <div class="pl-col-section-hdr" onclick="plToggleColSection(this)">Character <span class="pl-col-chevron">▾</span></div>
+                  <div class="pl-col-section-body">
+                    <label><input type="checkbox" checked onchange="plToggleCol('rank',this.checked)"> Rank</label>
+                    <label><input type="checkbox" checked onchange="plToggleCol('occupation',this.checked)"> Occupation</label>
+                    <label><input type="checkbox" checked onchange="plToggleCol('career_group',this.checked)"> Career</label>
+                    <label><input type="checkbox" checked onchange="plToggleCol('homecity',this.checked)"> City</label>
+                    <label><input type="checkbox" checked onchange="plToggleCol('character_age',this.checked)"> Age</label>
+                  </div>
+                </div>
+                <div class="pl-col-section">
+                  <div class="pl-col-section-hdr" onclick="plToggleColSection(this)">Organisation <span class="pl-col-chevron">▾</span></div>
+                  <div class="pl-col-section-body">
+                    <label><input type="checkbox" checked onchange="plToggleCol('group',this.checked)"> Group</label>
+                    <label><input type="checkbox" checked onchange="plToggleCol('tags',this.checked)"> Tags</label>
+                  </div>
+                </div>
+                <div class="pl-col-section">
+                  <div class="pl-col-section-hdr" onclick="plToggleColSection(this)">Lists <span class="pl-col-chevron">▾</span></div>
+                  <div class="pl-col-section-body">
+                    <label><input type="checkbox" checked onchange="plToggleCol('agg_crimes',this.checked)"> Agg</label>
+                    <label><input type="checkbox" checked onchange="plToggleCol('case_work',this.checked)"> Case Work</label>
+                  </div>
+                </div>
               </div>
             </div>
             <button class="btn-secondary" onclick="plRefresh()" id="pl-refresh-btn">Refresh</button>
             <span id="pl-refresh-status" style="font-size:0.8rem;color:var(--error,#f87171)"></span>
+            <button class="btn-secondary" onclick="window.open('/players','_blank')" title="Open player list in new tab">↗</button>
           </div>
           <div style="overflow-x:auto;margin-top:8px">
             <table class="pl-table" id="pl-table">
@@ -1406,27 +1417,6 @@
               <tbody id="pl-groups-tbody"></tbody>
             </table>
           </div>
-        </div>
-
-        <!-- Import tab -->
-        <div id="pl-tab-import" class="tab-panel">
-          <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">
-            Paste one username per line. Matched players are assigned to the selected list.
-          </p>
-          <textarea id="pl-import-text" class="pl-import-textarea"
-            placeholder="Player1&#10;Player2&#10;Player3"></textarea>
-          <div class="import-row" style="margin-top:8px">
-            <select id="pl-import-context">
-              <option value="agg_crimes">Aggravated Crimes</option>
-              <option value="case_work">Case Work</option>
-            </select>
-            <select id="pl-import-assignment">
-              <option value="whitelist">Whitelist</option>
-              <option value="blacklist">Blacklist</option>
-            </select>
-            <button class="action-btn" onclick="plRunImport()">Import</button>
-          </div>
-          <div id="pl-import-report" class="import-report" style="display:none"></div>
         </div>
 
         <!-- Obituaries tab -->

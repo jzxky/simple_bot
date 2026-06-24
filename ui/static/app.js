@@ -2508,6 +2508,15 @@ function togglePlColMenu() {
   const m = document.getElementById("pl-col-menu");
   if (m) m.style.display = m.style.display === "none" ? "block" : "none";
 }
+
+function plToggleColSection(hdr) {
+  const body = hdr.nextElementSibling;
+  const chevron = hdr.querySelector(".pl-col-chevron");
+  if (!body) return;
+  const collapsed = body.style.display === "none";
+  body.style.display = collapsed ? "" : "none";
+  if (chevron) chevron.textContent = collapsed ? "▾" : "▸";
+}
 document.addEventListener("click", e => {
   const menu = document.getElementById("pl-col-menu");
   const btn  = document.getElementById("pl-col-menu-btn");
@@ -2558,11 +2567,11 @@ function _plRenderTable() {
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
       <td>${escHtml(p.rank||"—")}</td>
       <td>${escHtml(p.occupation||"—")}</td>
-      <td style="color:var(--text-muted);font-size:11px">${escHtml(careerGrp)}</td>
+      <td>${escHtml(careerGrp)}</td>
       <td>${escHtml(p.homecity||"—")}</td>
       <td>${groupCell}</td>
       <td>${tags||"—"}</td>
-      <td style="white-space:nowrap;font-size:11px;color:var(--text-muted)">${ageCell}</td>
+      <td style="white-space:nowrap">${ageCell}</td>
       <td>${aggCell}</td>
       <td>${cwCell}</td>
     </tr>`);
