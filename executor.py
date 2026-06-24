@@ -1568,11 +1568,11 @@ def handle_check_fire_cases(action: Action, state: GameState):
     inspect_link = None
     if table:
         for row in table.find_all("tr"):
-            link = row.find("a", href=True)
-            if link and "colspan" not in str(row):
-                href = link["href"]
+            link = row.find("a", href=lambda h: h and "inspect" in h)
+            if link:
+                href = link["href"]  # BeautifulSoup already decodes &amp; → &
                 if not href.startswith("http"):
-                    href = _u("/localcity/") + href
+                    href = _u("/localcity/") + href.lstrip("/")
                 inspect_link = href
                 break
 
