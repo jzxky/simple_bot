@@ -368,6 +368,15 @@ def _nav_to_target_input(crime: str, state: GameState) -> bool:
     """Navigate to agcrime.asp, select crime, submit — returns True if text input found."""
     page = browser.page()
     _nav(_u("/income/agcrime.asp"), state)
+    if not page.query_selector(f"input[name='agcrime'][value='{crime}']"):
+        msg = f"Agg crime '{crime}' not on the available list — disabling."
+        state.add_log(msg)
+        c = cfg.load()
+        c.setdefault("aggravated_crimes", {})["enabled"] = False
+        cfg.save(c)
+        if c.get("notifications", {}).get("agg_not_available", False):
+            state.push_notification("agg_not_available", msg)
+        return False
     page.check(f"input[name='agcrime'][value='{crime}']")
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
