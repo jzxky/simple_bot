@@ -5,541 +5,241 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MafiaMatrix Bot — Players</title>
 <link rel="stylesheet" href="/static/style.css">
-<style>
-  .filter-bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-  .filter-bar input[type="text"] { max-width:220px; flex:1; min-width:100px; }
-  .filter-bar .inline-toggle { white-space:nowrap; }
-
-  @media (max-width: 600px) {
-    .col-homecity, .col-rank, .col-occupation { display:none; }
-  }
-
-  .priority-table th[data-col] { cursor:pointer; user-select:none; white-space:nowrap; }
-  .priority-table th[data-col]:hover { color:var(--accent); }
-  .sort-arrow { margin-left:4px; opacity:0.5; font-size:10px; }
-  .sort-arrow.active { opacity:1; color:var(--accent); }
-
-  .priority-table .col-filter-row th { padding:4px 6px; }
-  .priority-table .col-filter-row input {
-    width:100%; box-sizing:border-box;
-    background:var(--bg-card); color:var(--text);
-    border:1px solid var(--border); border-radius:3px;
-    padding:3px 5px; font-size:11px;
-  }
-  .priority-table .col-filter-row select { width:100%; box-sizing:border-box; background:var(--surface2,#1e2a3a); color:var(--text); border:1px solid var(--border); border-radius:3px; padding:3px 5px; font-size:11px; }
-
-  /* Player row group highlight */
-  .player-row { border-left: 3px solid transparent; }
-
-  /* Import / Groups collapsible */
-  .import-toggle-row, .group-toggle-row {
-    display:flex; align-items:center; justify-content:space-between;
-    cursor:pointer; user-select:none;
-  }
-  .import-toggle-row h2, .group-toggle-row h2 { margin:0; }
-  .import-chevron { font-size:16px; color:var(--text-muted); transition:transform 0.2s; }
-  .import-chevron.open { transform:rotate(180deg); }
-  .import-body, .group-body { display:none; margin-top:12px; }
-  .import-body.open, .group-body.open { display:block; }
-
-  .import-card textarea {
-    width:100%; box-sizing:border-box; min-height:120px; resize:vertical;
-    background:var(--bg-card); color:var(--text);
-    border:1px solid var(--border); border-radius:4px;
-    padding:8px; font-size:13px; font-family:inherit;
-  }
-  .import-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px; }
-  .import-row select { padding:5px 8px; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:4px; }
-
-  .import-report { margin-top:14px; font-size:13px; }
-  .import-report h4 { margin:0 0 6px; color:var(--accent); }
-  .import-report .report-stat { color:var(--text); margin-bottom:4px; }
-  .import-report .unmatched-list { color:var(--warn, #f59e0b); margin-top:8px; }
-  .import-report .unmatched-list li { margin:2px 0; }
-
-  /* Groups management */
-  .group-chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
-  .group-chip {
-    display:flex; align-items:center; gap:6px;
-    background:var(--surface2); border:1px solid var(--border);
-    border-radius:4px; padding:4px 8px; font-size:13px;
-  }
-  .group-chip-swatch {
-    width:14px; height:14px; border-radius:50%;
-    border:1px solid rgba(255,255,255,0.15); flex-shrink:0; cursor:pointer;
-    position:relative;
-  }
-  .group-chip-swatch input[type="color"] {
-    position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; padding:0; border:0;
-  }
-  .group-chip-name { color:var(--text); }
-  .group-chip-delete {
-    background:none; border:none; color:var(--muted); cursor:pointer;
-    font-size:14px; line-height:1; padding:0 2px;
-  }
-  .group-chip-delete:hover { color:var(--error, #f87171); }
-  .group-create-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .group-create-row input[type="text"] { flex:1; min-width:140px; max-width:240px; }
-  .group-create-row input[type="color"] {
-    width:36px; height:32px; padding:2px; cursor:pointer;
-    border:1px solid var(--border); border-radius:4px; background:var(--bg-card);
-  }
-
-  /* Mass apply bar */
-  .mass-apply-bar {
-    display:flex; gap:8px; align-items:center; flex-wrap:wrap;
-    padding:8px 0 12px; font-size:13px; color:var(--text-muted);
-  }
-  .mass-apply-bar select { padding:4px 8px; background:var(--bg-card); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:13px; }
-  .mass-apply-bar .action-btn { padding:5px 14px; font-size:13px; }
-</style>
 </head>
 <body>
 <div class="container">
-  <header>
-    <h1 style="margin-bottom:10px"><a href="/" style="color:var(--accent);text-decoration:none">← Back</a> &nbsp; Player Lists</h1>
-    <div class="status-bar">
-      <span>Updated: <span id="last-updated">{{ last_updated or "Never" }}</span></span>
-      <span class="spacer"></span>
-      <span id="player-count" class="muted">{{ active_count }} active</span>
-      <button id="refresh-btn" class="action-btn" onclick="refreshPlayers()">Refresh List</button>
-    </div>
+  <header style="position:relative">
+    <h1><a href="/" style="color:var(--accent);text-decoration:none">← Back</a> &nbsp; Players</h1>
   </header>
 
   <main>
-    <!-- Groups management (collapsible) -->
-    <section class="card">
-      <div class="group-toggle-row" onclick="toggleGroups()">
-        <h2>Groups</h2>
-        <span class="import-chevron" id="group-chevron">▼</span>
-      </div>
-      <div class="group-body" id="group-body">
-        <div class="group-chips" id="group-chips">
-          {% for g in groups %}
-          <div class="group-chip" id="chip-{{ loop.index }}" data-name="{{ g.name }}">
-            <span class="group-chip-swatch" style="background:{{ g.color }}">
-              <input type="color" value="{{ g.color }}" onchange="updateGroupColor('{{ g.name }}', this.value, this.parentElement)">
-            </span>
-            <span class="group-chip-name">{{ g.name }}</span>
-            <button class="group-chip-delete" onclick="deleteGroup('{{ g.name }}')" title="Delete group">×</button>
+    <section class="card tabs-card">
+      <div class="card-body">
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Player List</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-groups', this)">Groups</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-dead', this); plRenderRecentDead()">Obituaries</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-born', this); plRenderRecentBorn()">Births</button>
+        </div>
+
+        <!-- Player List tab -->
+        <div id="pl-tab-list" class="tab-panel active">
+          <div class="pl-toolbar">
+            <label class="inline-toggle" title="Auto-whitelist Boss / Don / Godfather / Capo di tutti capi on every list update">Whitelist Bolds
+              <label class="toggle-label">
+                <input type="checkbox" id="pl-bolds-toggle" onchange="plBoldsToggleChanged()">
+                <span class="toggle"></span>
+              </label>
+            </label>
+            <label class="inline-toggle" style="white-space:nowrap;margin-left:auto">Active only
+              <label class="toggle-label">
+                <input type="checkbox" id="pl-filter-active" checked onchange="plFilter()">
+                <span class="toggle"></span>
+              </label>
+            </label>
+            <div style="position:relative">
+              <button class="btn-secondary" onclick="togglePlColMenu()" id="pl-col-menu-btn">Columns ▾</button>
+              <div id="pl-col-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;z-index:200;white-space:nowrap;min-width:150px">
+                <div class="pl-col-section-body">
+                  <label>Rank <input type="checkbox" checked onchange="plToggleCol('rank',this.checked)"></label>
+                  <label>Occupation <input type="checkbox" checked onchange="plToggleCol('occupation',this.checked)"></label>
+                  <label>Career <input type="checkbox" checked onchange="plToggleCol('career_group',this.checked)"></label>
+                  <label>City <input type="checkbox" checked onchange="plToggleCol('homecity',this.checked)"></label>
+                  <label>Age <input type="checkbox" checked onchange="plToggleCol('character_age',this.checked)"></label>
+                  <label>Group <input type="checkbox" checked onchange="plToggleCol('group',this.checked)"></label>
+                  <label>Tags <input type="checkbox" checked onchange="plToggleCol('tags',this.checked)"></label>
+                  <label>Agg <input type="checkbox" checked onchange="plToggleCol('agg_crimes',this.checked)"></label>
+                  <label>Case Work <input type="checkbox" checked onchange="plToggleCol('case_work',this.checked)"></label>
+                </div>
+              </div>
+            </div>
+            <button class="btn-secondary" onclick="plRefresh()" id="pl-refresh-btn">Refresh</button>
+            <span id="pl-refresh-status" style="font-size:0.8rem;color:var(--error,#f87171)"></span>
           </div>
-          {% else %}
-          <span id="no-groups-msg" style="font-size:13px;color:var(--muted)">No groups yet.</span>
-          {% endfor %}
+          <div style="overflow-x:auto;margin-top:8px">
+            <table class="pl-table" id="pl-table">
+              <thead>
+                <tr>
+                  <th class="pl-th pl-th-filter" onclick="plSort('online_status')" data-col="online_status" style="width:18px" title="Online status"><span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('username')" data-col="username">Name <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('rank')" data-col="rank">Rank <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('career_group')" data-col="career_group">Career <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('homecity')" data-col="homecity">City <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('group')" data-col="group">Group <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter">Tags</th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('agg_crimes')" data-col="agg_crimes">Agg <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
+                </tr>
+                <tr id="pl-filter-row">
+                  <th class="pl-filter-cell"><select id="pl-filter-online" class="pl-filter-input" onchange="plFilter()">
+                    <option value="">All</option>
+                    <option value="local">Local</option>
+                    <option value="online">Online</option>
+                    <option value="offline">Offline</option>
+                  </select></th>
+                  <th class="pl-filter-cell"><input type="text" id="pl-search" class="pl-filter-input" placeholder="Name…" oninput="plFilter()"></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-rank" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-occupation" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-career-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-homecity" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-tag" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-agg" class="pl-filter-input" onchange="plFilter()">
+                    <option value="">All</option>
+                    <option value="__none__">None</option>
+                    <option value="whitelist">Whitelist</option>
+                    <option value="blacklist">Blacklist</option>
+                  </select></th>
+                  <th class="pl-filter-cell"><select id="pl-filter-casework" class="pl-filter-input" onchange="plFilter()">
+                    <option value="">All</option>
+                    <option value="__none__">None</option>
+                    <option value="whitelist">Whitelist</option>
+                    <option value="blacklist">Blacklist</option>
+                  </select></th>
+                </tr>
+              </thead>
+              <tbody id="pl-tbody"></tbody>
+            </table>
+          </div>
         </div>
-        <div class="group-create-row">
-          <input type="text" id="new-group-name" placeholder="Group name…" onkeydown="if(event.key==='Enter')createGroup()">
-          <input type="color" id="new-group-color" value="#888888">
-          <button class="action-btn" onclick="createGroup()">Create Group</button>
-          <span id="group-create-error" style="font-size:12px;color:var(--error,#f87171);display:none"></span>
+
+        <!-- Groups tab -->
+        <div id="pl-tab-groups" class="tab-panel">
+          <div class="pl-toolbar" style="margin-bottom:10px">
+            <input type="text" id="pl-new-group-name" class="task-select" placeholder="Group name…"
+              onkeydown="if(event.key==='Enter')plCreateGroup()" style="min-width:140px">
+            <select id="pl-new-group-type" class="task-select">
+              <option value="neutral">Neutral</option>
+              <option value="friendly">Friendly</option>
+              <option value="enemy">Enemy</option>
+            </select>
+            <select id="pl-new-group-color" class="task-select pl-color-select" style="--pl-sel-color:#3498db"
+              onchange="this.style.setProperty('--pl-sel-color',this.value)">
+              <option value="#e74c3c">&#9679; Red</option>
+              <option value="#e67e22">&#9679; Orange</option>
+              <option value="#f1c40f">&#9679; Yellow</option>
+              <option value="#2ecc71">&#9679; Green</option>
+              <option value="#3498db" selected>&#9679; Blue</option>
+              <option value="#9b59b6">&#9679; Purple</option>
+              <option value="#e91e8c">&#9679; Pink</option>
+              <option value="#1abc9c">&#9679; Teal</option>
+              <option value="#aaaaaa">&#9679; Light Grey</option>
+              <option value="#555555">&#9679; Dark Grey</option>
+            </select>
+            <button class="action-btn" onclick="plCreateGroup()">Create Group</button>
+            <span id="pl-group-create-error" style="font-size:12px;color:var(--error,#f87171)"></span>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="pl-table" id="pl-groups-table">
+              <thead>
+                <tr>
+                  <th class="pl-th">Name</th>
+                  <th class="pl-th">Type</th>
+                  <th class="pl-th">Colour</th>
+                  <th class="pl-th">Agg</th>
+                  <th class="pl-th">Case Work</th>
+                  <th class="pl-th">Members</th>
+                  <th class="pl-th" style="width:70px"></th>
+                </tr>
+              </thead>
+              <tbody id="pl-groups-tbody"></tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </section>
 
-    <!-- Import tool (collapsible) -->
-    <section class="card import-card">
-      <div class="import-toggle-row" onclick="toggleImport()">
-        <h2>Import List</h2>
-        <span class="import-chevron" id="import-chevron">▼</span>
-      </div>
-      <div class="import-body" id="import-body">
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Paste one username per line. Matched players will be assigned to the selected list and context.</p>
-        <textarea id="import-text" placeholder="Player1&#10;Player2&#10;Player3"></textarea>
-        <div class="import-row">
-          <select id="import-context">
-            <option value="agg_crimes">Aggravated Crimes</option>
-            <option value="case_work">Case Work</option>
-          </select>
-          <select id="import-assignment">
-            <option value="whitelist">Whitelist</option>
-            <option value="blacklist">Blacklist</option>
-          </select>
-          <button class="action-btn" onclick="runImport()">Import</button>
+        <!-- Obituaries tab -->
+        <div id="pl-tab-dead" class="tab-panel">
+          <div style="overflow-x:auto;margin-top:8px">
+            <table class="pl-table" id="pl-dead-table">
+              <thead>
+                <tr>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-dead-icon-username">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-dead-icon-rank">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-dead-icon-occupation">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-dead-icon-homecity">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-dead-icon-character_age">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plDeadSort('died_at')" data-col="died_at">Died <span class="pl-sort-icon" id="pl-dead-icon-died_at">↕</span></th>
+                </tr>
+                <tr>
+                  <th class="pl-filter-cell"><input type="text" id="pl-dead-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderRecentDead()"></th>
+                  <th class="pl-filter-cell"><select id="pl-dead-filter-rank" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-dead-filter-occupation" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-dead-filter-homecity" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"></th>
+                  <th class="pl-filter-cell"></th>
+                </tr>
+              </thead>
+              <tbody id="pl-dead-tbody">
+                <tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div id="import-report" class="import-report" style="display:none"></div>
-      </div>
-    </section>
 
-    <!-- Player table -->
-    <section class="card">
-      <h2>Player Lists</h2>
-
-      <div class="tab-bar">
-        <button class="tab-btn active" onclick="showTab('tab-agg', this)">Aggravated Crimes</button>
-        <button class="tab-btn" onclick="showTab('tab-casework', this)">Case Work</button>
-      </div>
-
-      <div class="filter-bar">
-        <label class="inline-toggle">
-          Hide unemployed
-          <label class="toggle-label">
-            <input type="checkbox" id="hide-unemployed" onchange="applyFilters()">
-            <span class="toggle"></span>
-          </label>
-        </label>
-        <select id="filter-group" onchange="applyFilters()" style="background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:13px">
-          <option value="">All groups</option>
-          <option value="__ungrouped__">Ungrouped</option>
-          {% for g in groups %}
-          <option value="{{ g.name }}">{{ g.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      {% macro player_table(context, tid, groups) %}
-      <table class="priority-table" style="font-size:12px" id="{{ tid }}">
-        <thead>
-          <tr>
-            <th data-col="name" style="width:150px">Username <span class="sort-arrow" id="{{ tid }}-arrow-name">▲</span></th>
-            <th data-col="homecity" class="col-homecity">Home City <span class="sort-arrow" id="{{ tid }}-arrow-homecity">▲</span></th>
-            <th data-col="occupation" class="col-occupation">Occupation <span class="sort-arrow" id="{{ tid }}-arrow-occupation">▲</span></th>
-            <th data-col="rank" class="col-rank">Rank <span class="sort-arrow" id="{{ tid }}-arrow-rank">▲</span></th>
-            <th data-col="group" style="width:120px">Group <span class="sort-arrow" id="{{ tid }}-arrow-group">▲</span></th>
-            <th data-col="assignment" style="width:130px">Assignment <span class="sort-arrow" id="{{ tid }}-arrow-assignment">▲</span></th>
-          </tr>
-          <tr class="col-filter-row">
-            <th><input type="text" placeholder="Name…" oninput="applyFilters()" data-filter="name"></th>
-            <th class="col-homecity"><select onchange="applyFilters()" data-filter="homecity"><option value="">All cities</option></select></th>
-            <th class="col-occupation"><select onchange="applyFilters()" data-filter="occupation"><option value="">All</option></select></th>
-            <th class="col-rank"><select onchange="applyFilters()" data-filter="rank"><option value="">All</option></select></th>
-            <th>
-              <select onchange="applyFilters()" data-filter="group">
-                <option value="">All</option>
-                <option value="__none__">None</option>
-                {% for g in groups %}
-                <option value="{{ g.name | lower }}">{{ g.name }}</option>
-                {% endfor %}
-              </select>
-            </th>
-            <th>
-              <select onchange="applyFilters()" data-filter="assignment">
-                <option value="">All</option>
-                <option value="__none__">None</option>
-                <option value="whitelist">Whitelist</option>
-                <option value="blacklist">Blacklist</option>
-              </select>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for name, p in players | dictsort %}
-          {% if p.active %}
-          {% set pg = p.get('group', '') %}
-          <tr class="player-row"
-              data-name="{{ name | lower }}"
-              data-homecity="{{ p.homecity | lower }}"
-              data-occupation="{{ p.occupation | lower }}"
-              data-rank="{{ p.rank | lower }}"
-              data-group="{{ pg | lower }}"
-              data-group-raw="{{ pg }}"
-              data-assignment="{{ lists[context].get(name, '') | lower }}">
-            <td>{{ name }}</td>
-            <td class="col-homecity">{{ p.homecity }}</td>
-            <td class="col-occupation">{{ p.occupation }}</td>
-            <td class="col-rank">{{ p.rank }}</td>
-            <td>
-              <select class="cw-select" onchange="setPlayerGroup('{{ name }}', this.value, this)">
-                <option value="" {% if not pg %}selected{% endif %}>None</option>
-                {% for g in groups %}
-                <option value="{{ g.name }}" {% if pg == g.name %}selected{% endif %}>{{ g.name }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            <td>
-              <select class="cw-select" onchange="setAssignment('{{ name }}', '{{ context }}', this.value, this)">
-                <option value="" {% if lists[context].get(name, '') == '' %}selected{% endif %}>None</option>
-                <option value="whitelist" {% if lists[context].get(name) == 'whitelist' %}selected{% endif %}>Whitelist</option>
-                <option value="blacklist" {% if lists[context].get(name) == 'blacklist' %}selected{% endif %}>Blacklist</option>
-              </select>
-            </td>
-          </tr>
-          {% endif %}
-          {% endfor %}
-        </tbody>
-      </table>
-      {% endmacro %}
-
-      <div id="tab-agg" class="tab-panel active">
-        {{ player_table("agg_crimes", "tbl-agg", groups) }}
-      </div>
-      <div id="tab-casework" class="tab-panel">
-        {{ player_table("case_work", "tbl-cw", groups) }}
+        <!-- Births tab -->
+        <div id="pl-tab-born" class="tab-panel">
+          <div style="overflow-x:auto;margin-top:8px">
+            <table class="pl-table" id="pl-born-table">
+              <thead>
+                <tr>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-born-icon-username">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-born-icon-rank">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-born-icon-occupation">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-born-icon-homecity">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-born-icon-character_age">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBornSort('born_at')" data-col="born_at">First Seen <span class="pl-sort-icon" id="pl-born-icon-born_at">↕</span></th>
+                </tr>
+                <tr>
+                  <th class="pl-filter-cell"><input type="text" id="pl-born-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderRecentBorn()"></th>
+                  <th class="pl-filter-cell"><select id="pl-born-filter-rank" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-born-filter-occupation" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-born-filter-homecity" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"></th>
+                  <th class="pl-filter-cell"></th>
+                </tr>
+              </thead>
+              <tbody id="pl-born-tbody">
+                <tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
   </main>
 </div>
 
+<!-- Modals required by app.js player functions -->
+<div id="pl-delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:24px;max-width:360px;width:90%">
+    <p style="margin:0 0 16px">Remove <strong id="pl-delete-name"></strong> from player list?</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-secondary" onclick="plCloseDeleteModal()">Cancel</button>
+      <button class="action-btn" style="background:var(--error,#f87171)" onclick="plConfirmDelete()">Remove</button>
+    </div>
+  </div>
+</div>
+
+<div id="pl-group-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:24px;min-width:320px;max-width:480px;width:90%">
+    <h3 id="pl-group-modal-title" style="margin:0 0 16px">Edit Group</h3>
+    <div id="pl-group-modal-body"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn-secondary" onclick="plCloseGroupModal()">Cancel</button>
+      <button class="action-btn" onclick="plSaveGroupModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
 <script>
-// Group data injected from server
-const GROUPS = {{ groups | tojson }};
-const _groupColorMap = {};
-GROUPS.forEach(g => { _groupColorMap[g.name] = g.color; });
-
-// Apply group color highlights to all player rows
-function applyGroupColors() {
-  document.querySelectorAll(".player-row").forEach(row => {
-    const g = row.dataset.groupRaw || "";
-    row.style.borderLeft = g && _groupColorMap[g]
-      ? `3px solid ${_groupColorMap[g]}`
-      : "3px solid transparent";
-  });
-}
-
-// ── Tab switching ────────────────────────────────────────────────────────────
-function showTab(id, btn) {
-  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
-  btn.classList.add("active");
-  applyFilters();
-}
-
-// ── Column select population ─────────────────────────────────────────────────
-function buildColumnSelects() {
-  const dynamicCols = ["homecity", "occupation", "rank"];
-  const allValues = {};
-  dynamicCols.forEach(c => { allValues[c] = new Set(); });
-
-  // Collect unique values from all player rows across both tables
-  document.querySelectorAll(".player-row").forEach(row => {
-    dynamicCols.forEach(col => {
-      const v = (row.dataset[col] || "").trim();
-      if (v) allValues[col].add(v);
-    });
-  });
-
-  const titleCase = s => s.replace(/\b\w/g, c => c.toUpperCase());
-
-  document.querySelectorAll(".col-filter-row select[data-filter]").forEach(sel => {
-    const col = sel.dataset.filter;
-    if (!dynamicCols.includes(col)) return; // group and assignment are hardcoded
-    const firstOption = sel.options[0];
-    sel.innerHTML = "";
-    sel.appendChild(firstOption);
-    [...allValues[col]].sort().forEach(v => {
-      const opt = document.createElement("option");
-      opt.value = v;
-      opt.textContent = titleCase(v);
-      sel.appendChild(opt);
-    });
-  });
-}
-
-// ── Filtering ────────────────────────────────────────────────────────────────
-function applyFilters() {
-  const hideUnemployed = document.getElementById("hide-unemployed").checked;
-  const groupFilter = document.getElementById("filter-group").value;
-
-  const panel = document.querySelector(".tab-panel.active");
-  if (!panel) return;
-
-  const colFilters = {};
-  panel.querySelectorAll(".col-filter-row [data-filter]").forEach(el => {
-    colFilters[el.dataset.filter] = el.value;
-  });
-
-  panel.querySelectorAll(".player-row").forEach(row => {
-    const d = row.dataset;
-    if (hideUnemployed && d.occupation === "unemployed") { row.style.display = "none"; return; }
-    if (groupFilter === "__ungrouped__" && d.groupRaw) { row.style.display = "none"; return; }
-    if (groupFilter && groupFilter !== "__ungrouped__" && d.groupRaw !== groupFilter) { row.style.display = "none"; return; }
-    for (const [col, q] of Object.entries(colFilters)) {
-      if (!q) continue;
-      const val = (d[col] || "").toLowerCase();
-      let match;
-      if (col === "name") {
-        match = val.includes(q.toLowerCase());
-      } else if (q === "__none__") {
-        match = val === "";
-      } else {
-        match = val === q.toLowerCase();
-      }
-      if (!match) { row.style.display = "none"; return; }
-    }
-    row.style.display = "";
-  });
-}
-
-// ── Sorting ──────────────────────────────────────────────────────────────────
-const _sortState = {};
-
-function initSortHeaders() {
-  document.querySelectorAll(".priority-table th[data-col]").forEach(th => {
-    th.addEventListener("click", () => {
-      const table = th.closest("table");
-      const col = th.dataset.col;
-      const tid = table.id;
-      const prev = _sortState[tid] || {};
-      const asc = (prev.col === col) ? !prev.asc : true;
-      _sortState[tid] = {col, asc};
-
-      table.querySelectorAll(".sort-arrow").forEach(a => a.classList.remove("active"));
-      const arrow = document.getElementById(`${tid}-arrow-${col}`);
-      if (arrow) { arrow.textContent = asc ? "▲" : "▼"; arrow.classList.add("active"); }
-
-      const tbody = table.querySelector("tbody");
-      const rows = Array.from(tbody.querySelectorAll(".player-row"));
-      rows.sort((a, b) => {
-        const av = (a.dataset[col] || "").toLowerCase();
-        const bv = (b.dataset[col] || "").toLowerCase();
-        return asc ? av.localeCompare(bv) : bv.localeCompare(av);
-      });
-      rows.forEach(r => tbody.appendChild(r));
-      applyFilters();
-    });
-  });
-}
-
-// ── Assignment ───────────────────────────────────────────────────────────────
-function setAssignment(username, context, value, selectEl) {
-  if (selectEl) selectEl.closest("tr").dataset.assignment = value.toLowerCase();
-  fetch("/players/assign", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({username, context, value}),
-  });
-}
-
-// ── Group per player ──────────────────────────────────────────────────────────
-function setPlayerGroup(username, group, selectEl) {
-  const row = selectEl ? selectEl.closest("tr") : null;
-  if (row) {
-    row.dataset.group = group.toLowerCase();
-    row.dataset.groupRaw = group;
-    row.style.borderLeft = group && _groupColorMap[group]
-      ? `3px solid ${_groupColorMap[group]}`
-      : "3px solid transparent";
-  }
-  fetch("/players/set_group", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({username, group}),
-  });
-}
-
-// ── Group management ──────────────────────────────────────────────────────────
-function toggleGroups() {
-  document.getElementById("group-body").classList.toggle("open");
-  document.getElementById("group-chevron").classList.toggle("open");
-}
-
-function createGroup() {
-  const name = document.getElementById("new-group-name").value.trim();
-  const color = document.getElementById("new-group-color").value;
-  const errEl = document.getElementById("group-create-error");
-  if (!name) return;
-
-  fetch("/players/groups/create", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name, color}),
-  })
-    .then(r => r.json())
-    .then(d => {
-      if (!d.ok) {
-        errEl.textContent = d.error || "Failed.";
-        errEl.style.display = "";
-        return;
-      }
-      errEl.style.display = "none";
-      document.getElementById("new-group-name").value = "";
-      location.reload();
-    });
-}
-
-function deleteGroup(name) {
-  if (!confirm(`Delete group "${name}"? Players in this group will become ungrouped.`)) return;
-  fetch("/players/groups/delete", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name}),
-  }).then(() => location.reload());
-}
-
-function updateGroupColor(name, color, swatchEl) {
-  swatchEl.style.background = color;
-  _groupColorMap[name] = color;
-  applyGroupColors();
-  fetch("/players/groups/update_color", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({name, color}),
-  });
-}
-
-// ── Refresh ──────────────────────────────────────────────────────────────────
-function refreshPlayers() {
-  const btn = document.getElementById("refresh-btn");
-  btn.textContent = "Refreshing...";
-  btn.disabled = true;
-  fetch("/players/refresh", {method: "POST"})
-    .then(r => r.json())
-    .then(d => {
-      document.getElementById("last-updated").textContent = d.last_updated || "";
-      document.getElementById("player-count").textContent = d.active_count + " active";
-      btn.textContent = "Done";
-      setTimeout(() => { btn.textContent = "Refresh List"; btn.disabled = false; }, 1500);
-    })
-    .catch(() => { btn.textContent = "Refresh List"; btn.disabled = false; });
-}
-
-// ── Import ───────────────────────────────────────────────────────────────────
-function toggleImport() {
-  document.getElementById("import-body").classList.toggle("open");
-  document.getElementById("import-chevron").classList.toggle("open");
-}
-
-function runImport() {
-  const text = document.getElementById("import-text").value;
-  const context = document.getElementById("import-context").value;
-  const assignment = document.getElementById("import-assignment").value;
-  const names = text.split("\n").map(n => n.trim()).filter(Boolean);
-  if (!names.length) return;
-
-  fetch("/players/import", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({names, context, assignment}),
-  })
-    .then(r => r.json())
-    .then(d => {
-      const el = document.getElementById("import-report");
-      el.style.display = "";
-      const contextLabel = context === "agg_crimes" ? "Aggravated Crimes" : "Case Work";
-      let html = `<h4>Import Result</h4>`;
-      html += `<div class="report-stat">${d.assigned} player(s) assigned to <strong>${assignment}</strong> in <strong>${contextLabel}</strong>.</div>`;
-      if (d.unmatched.length) {
-        html += `<div class="unmatched-list"><strong>${d.unmatched.length} name(s) not found:</strong><ul>`;
-        d.unmatched.forEach(n => { html += `<li>${n}</li>`; });
-        html += `</ul></div>`;
-      } else {
-        html += `<div style="color:var(--ok,#4ade80);margin-top:6px">All names matched.</div>`;
-      }
-      el.innerHTML = html;
-
-      if (d.assigned > 0) {
-        d.matched.forEach(name => {
-          document.querySelectorAll(".tab-panel.active .player-row").forEach(row => {
-            if (row.dataset.name === name.toLowerCase()) {
-              const sel = row.querySelectorAll("select")[1];
-              if (sel) sel.value = assignment;
-              row.dataset.assignment = assignment.toLowerCase();
-            }
-          });
-        });
-        applyFilters();
-      }
-    })
-    .catch(() => {
-      const el = document.getElementById("import-report");
-      el.style.display = "";
-      el.innerHTML = `<div style="color:var(--error,#f87171)">Import failed.</div>`;
-    });
-}
-
-initSortHeaders();
-applyGroupColors();
-buildColumnSelects();
+// Stubs for save functions that only apply to the main settings page
+function autoSave() {}
+function markDirty() {}
+loadPlayers();
 </script>
 </body>
 </html>

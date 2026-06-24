@@ -747,24 +747,7 @@ def api_available_earns():
 
 @app.route("/players")
 def players_page():
-    import player_db as _db
-    players_list = _db.get_all_players()
-    players = {p["username"]: p for p in players_list}
-    groups = _db.get_groups()
-    lists = {
-        "agg_crimes": {p["username"]: p.get("agg_crimes", "") for p in players_list},
-        "case_work":  {p["username"]: p.get("case_work",  "") for p in players_list},
-    }
-    active_count = sum(1 for p in players_list if p.get("active"))
-    last_updated = _db.get_last_updated()
-    return render_template(
-        "players.html",
-        players=players,
-        groups=groups,
-        lists=lists,
-        active_count=active_count,
-        last_updated=last_updated,
-    )
+    return render_template("players.html")
 
 
 @app.route("/api/players")
