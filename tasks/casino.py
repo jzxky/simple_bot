@@ -41,7 +41,10 @@ class CasinoTask(Task):
         if not state.logged_in or state.in_jail or state.in_hospital:
             return False
         import config as cfg
-        if not cfg.load().get("casino", {}).get("enabled", False):
+        casino_cfg = cfg.load().get("casino", {})
+        if not casino_cfg.get("enabled", False):
+            return False
+        if state.current_city.lower() != "beirut" and not casino_cfg.get("auto_travel", False):
             return False
         return time.time() >= load_casino_release_at()
 
