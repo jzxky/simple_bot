@@ -1285,7 +1285,6 @@
                 <span class="toggle"></span>
               </label>
             </label>
-            <span id="pl-bolds-status" style="font-size:0.8rem;color:var(--text-muted)"></span>
             <label class="inline-toggle" style="white-space:nowrap;margin-left:auto">Active only
               <label class="toggle-label">
                 <input type="checkbox" id="pl-filter-active" checked onchange="plFilter()">
@@ -1294,30 +1293,17 @@
             </label>
             <div style="position:relative">
               <button class="btn-secondary" onclick="togglePlColMenu()" id="pl-col-menu-btn">Columns ▾</button>
-              <div id="pl-col-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;z-index:200;white-space:nowrap;min-width:160px">
-                <div class="pl-col-section">
-                  <div class="pl-col-section-hdr" onclick="plToggleColSection(this)">Character <span class="pl-col-chevron">▾</span></div>
-                  <div class="pl-col-section-body">
-                    <label><input type="checkbox" checked onchange="plToggleCol('rank',this.checked)"> Rank</label>
-                    <label><input type="checkbox" checked onchange="plToggleCol('occupation',this.checked)"> Occupation</label>
-                    <label><input type="checkbox" checked onchange="plToggleCol('career_group',this.checked)"> Career</label>
-                    <label><input type="checkbox" checked onchange="plToggleCol('homecity',this.checked)"> City</label>
-                    <label><input type="checkbox" checked onchange="plToggleCol('character_age',this.checked)"> Age</label>
-                  </div>
-                </div>
-                <div class="pl-col-section">
-                  <div class="pl-col-section-hdr" onclick="plToggleColSection(this)">Organisation <span class="pl-col-chevron">▾</span></div>
-                  <div class="pl-col-section-body">
-                    <label><input type="checkbox" checked onchange="plToggleCol('group',this.checked)"> Group</label>
-                    <label><input type="checkbox" checked onchange="plToggleCol('tags',this.checked)"> Tags</label>
-                  </div>
-                </div>
-                <div class="pl-col-section">
-                  <div class="pl-col-section-hdr" onclick="plToggleColSection(this)">Lists <span class="pl-col-chevron">▾</span></div>
-                  <div class="pl-col-section-body">
-                    <label><input type="checkbox" checked onchange="plToggleCol('agg_crimes',this.checked)"> Agg</label>
-                    <label><input type="checkbox" checked onchange="plToggleCol('case_work',this.checked)"> Case Work</label>
-                  </div>
+              <div id="pl-col-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;z-index:200;white-space:nowrap;min-width:150px">
+                <div class="pl-col-section-body">
+                  <label>Rank <input type="checkbox" checked onchange="plToggleCol('rank',this.checked)"></label>
+                  <label>Occupation <input type="checkbox" checked onchange="plToggleCol('occupation',this.checked)"></label>
+                  <label>Career <input type="checkbox" checked onchange="plToggleCol('career_group',this.checked)"></label>
+                  <label>City <input type="checkbox" checked onchange="plToggleCol('homecity',this.checked)"></label>
+                  <label>Age <input type="checkbox" checked onchange="plToggleCol('character_age',this.checked)"></label>
+                  <label>Group <input type="checkbox" checked onchange="plToggleCol('group',this.checked)"></label>
+                  <label>Tags <input type="checkbox" checked onchange="plToggleCol('tags',this.checked)"></label>
+                  <label>Agg <input type="checkbox" checked onchange="plToggleCol('agg_crimes',this.checked)"></label>
+                  <label>Case Work <input type="checkbox" checked onchange="plToggleCol('case_work',this.checked)"></label>
                 </div>
               </div>
             </div>

@@ -868,9 +868,13 @@ def players_whitelist_bolds():
     BOLD_RANKS = {"Boss", "Don", "Godfather", "Capo di tutti capi"}
     all_players = _db.get_all_players()
     targets = [p["username"] for p in all_players if p.get("rank", "") in BOLD_RANKS]
+    already = {p["username"] for p in all_players if p.get("agg_crimes") == "whitelist"}
+    newly = [u for u in targets if u not in already]
     if targets:
         _db.bulk_set_assignment(targets, "agg_crimes", "whitelist")
-    return jsonify({"ok": True, "count": len(targets), "players": targets})
+    if newly:
+        bot.state.add_log(f"Whitelist bolds: {len(newly)} new — {', '.join(newly)}")
+    return jsonify({"ok": True, "count": len(targets), "newly": len(newly), "players": targets})
 
 
 @app.route("/players/set_group", methods=["POST"])

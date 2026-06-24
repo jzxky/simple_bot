@@ -848,6 +848,7 @@ function pollStatus() {
       if ((d.char_history_updated_at || 0) > _chLastUpdated) {
         _chLastUpdated = d.char_history_updated_at;
         loadPlayers();
+        if (document.getElementById("pl-bolds-toggle")?.checked) _plRunWhitelistBolds();
         if (document.getElementById("s-char-history") &&
             document.getElementById("s-char-history").style.display !== "none") {
           loadCharHistory();
@@ -2405,7 +2406,6 @@ function loadPlayers() {
         const active = _plData.filter(p => p.active).length;
         pill.innerHTML = _pill(`👥 ${active}`);
       }
-      if (document.getElementById("pl-bolds-toggle")?.checked) _plRunWhitelistBolds();
     })
     .catch(() => {});
 }
@@ -2876,16 +2876,9 @@ function plBoldsToggleChanged() {
 }
 
 function _plRunWhitelistBolds() {
-  const status = document.getElementById("pl-bolds-status");
   fetch("/players/whitelist_bolds", {method: "POST"})
     .then(r => r.json())
-    .then(d => {
-      if (status && d.count > 0) {
-        status.textContent = `Whitelisted ${d.count} player(s).`;
-        setTimeout(() => { if (status) status.textContent = ""; }, 4000);
-        loadPlayers();
-      }
-    })
+    .then(d => { if (d.newly > 0) loadPlayers(); })
     .catch(() => {});
 }
 

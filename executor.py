@@ -631,6 +631,8 @@ def handle_do_crime(action: Action, state: GameState):
                 continue
             if crime in ("pickpocket", "mugging", "breaking") and "recently survived" in fail_msg.lower():
                 continue
+            if "doesn't exist" in fail_msg.lower() or "does not exist" in fail_msg.lower():
+                continue
             _flush_fails()
             _nav(_u("/loggedin.asp?display=play"), state)
             return
