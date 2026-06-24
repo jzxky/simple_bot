@@ -915,6 +915,91 @@ def handle_career_training(action: Action, state: GameState):
     state.add_log(f"Career training submitted for {career}.")
 
 
+def handle_university(action: Action, state: GameState):
+    import re as _re
+    url = action.params["url"]
+    page = browser.page()
+    _nav(url, state)
+
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    select = soup.find("select", attrs={"name": "action"})
+    if not select:
+        state.add_log("University: form not found.")
+        return
+
+    options = {opt.get("value", ""): opt.get_text(strip=True) for opt in select.find_all("option")}
+
+    # --- Studying page: already enrolled, just study ---
+    if "Yes" in options:
+        page.select_option("select[name='action']", "Yes")
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+        soup2 = BeautifulSoup(page.content(), "html.parser")
+        page_text = soup2.get_text(" ").lower()
+        # Detect degree completion
+        if any(w in page_text for w in ("congratulations", "completed", "graduated", "degree awarded")):
+            degree_match = _re.search(r"degree in (\w+)", page_text, _re.I)
+            degree = degree_match.group(1).capitalize() if degree_match else None
+            if degree and degree in [d.lower() for d in ["Law", "Science", "Business", "Engineering"]]:
+                degree = next(d for d in ["Law", "Science", "Business", "Engineering"] if d.lower() == degree.lower())
+            if degree:
+                c = cfg.load()
+                completed = c.setdefault("university", {}).setdefault("completed", [])
+                if degree not in completed:
+                    completed.append(degree)
+                    cfg.save(c)
+                    state.add_log(f"University: completed {degree} degree.")
+        else:
+            state.add_log("University: studied.")
+        return
+
+    # --- Enrollment confirmation page: accept the degree ---
+    accept_val = next((v for v in options if v.lower().startswith("accept")), None)
+    if accept_val:
+        # Check cost and withdraw if needed
+        page_text = soup.get_text(" ")
+        fee_match = _re.search(r"\$([0-9,]+)", page_text)
+        if fee_match:
+            fee = int(fee_match.group(1).replace(",", ""))
+            if (state.clean_money or 0) < fee:
+                needed = fee - (state.clean_money or 0)
+                state.add_log(f"University: need ${fee:,} to enroll, withdrawing ${needed:,}.")
+                handle_withdraw(Action("withdraw", amount=needed), state)
+                if (state.clean_money or 0) < fee:
+                    state.add_log("University: insufficient funds after withdrawal — skipping.")
+                    return
+        page.select_option("select[name='action']", accept_val)
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+        state.add_log(f"University: enrolled ({accept_val}).")
+        return
+
+    # --- Initial selection page: pick next uncompleted degree ---
+    from tasks.university import DEGREES as _DEGREES
+    c = cfg.load()
+    completed = c.get("university", {}).get("completed", [])
+    next_degree = next((d for d in _DEGREES if d not in completed), None)
+    if next_degree is None:
+        state.add_log("University: all degrees completed — disabling actions.")
+        c["action"]["enabled"] = False
+        cfg.save(c)
+        return
+    # The option value matches the degree name exactly (e.g. "Law", "Business")
+    if next_degree not in options:
+        state.add_log(f"University: degree option '{next_degree}' not found on page.")
+        return
+    page.select_option("select[name='action']", next_degree)
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log(f"University: selected {next_degree} course.")
+
+
 def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
     """Returns True if transfer succeeded, False otherwise."""
     page = browser.page()
@@ -3403,6 +3488,7 @@ HANDLERS = {
     "do_community_service": handle_community_service,
     "do_fire_duties": handle_fire_duties,
     "do_career_training": handle_career_training,
+    "do_university":      handle_university,
     "do_armed_robbery": handle_armed_robbery,
     "do_torch_business": handle_torch_business,
     "do_drug_manufacturing": handle_drug_manufacturing,
