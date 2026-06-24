@@ -233,8 +233,6 @@ def handle_refresh_earn_catalog(action: Action, state: GameState):
 
 def handle_check_earns(action: Action, state: GameState):
     earn_type = action.params["earn_type"]
-    if not earn_type:
-        return
     page = browser.page()
 
     auto_opts, available_values = _scrape_earn_catalog(page, state)
@@ -3557,8 +3555,10 @@ class ActionExecutor:
                 handler(action, state)
             except Exception as e:
                 err = str(e)
+                import re as _re
+
+                # Build a human-readable log message
                 if "Timeout" in err and "ms exceeded" in err:
-                    import re as _re
                     ms_match = _re.search(r"(\d+)ms exceeded", err)
                     url_match = _re.search(r'navigating to "([^"]+)"', err)
                     ms = ms_match.group(1) if ms_match else "?"
@@ -3576,6 +3576,8 @@ class ActionExecutor:
                     )
                 else:
                     state.add_log(f"Error executing {action.kind}: {e}")
+
+                # Recovery — get the browser back to a known safe page
                 if "Page crashed" in err:
                     state.add_log("Page crashed — restarting browser.")
                     try:
@@ -3586,5 +3588,19 @@ class ActionExecutor:
                         state.logged_in = False
                     except Exception as restart_err:
                         state.add_log(f"Browser restart failed: {restart_err}")
+                elif any(kw in err for kw in ("Timeout", "interrupted by another navigation", "net::", "ERR_")):
+                    state.add_log(f"Recovering from {action.kind} error — navigating to safe page.")
+                    try:
+                        page = browser.page()
+                        page.goto(
+                            _u("/loggedin.asp?display=play"),
+                            wait_until="domcontentloaded",
+                            timeout=15000,
+                        )
+                        _refresh_state(state)
+                        state.add_log("Recovery successful.")
+                    except Exception as rec_err:
+                        state.add_log(f"Recovery navigation failed: {rec_err} — marking as logged out.")
+                        state.logged_in = False
         else:
             state.add_log(f"No handler for action: {action.kind}")
