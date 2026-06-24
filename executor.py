@@ -928,7 +928,9 @@ def handle_career_training(action: Action, state: GameState):
 
 def handle_university(action: Action, state: GameState):
     import re as _re
+    from tasks.university import DEGREES as _DEGREES
     url = action.params["url"]
+    degree_cfg = action.params.get("degree", "")  # empty = all degrees in order
     page = browser.page()
     _nav(url, state)
 
@@ -954,16 +956,15 @@ def handle_university(action: Action, state: GameState):
         # Detect degree completion
         if any(w in page_text for w in ("congratulations", "completed", "graduated", "degree awarded")):
             degree_match = _re.search(r"degree in (\w+)", page_text, _re.I)
-            degree = degree_match.group(1).capitalize() if degree_match else None
-            if degree and degree in [d.lower() for d in ["Law", "Science", "Business", "Engineering"]]:
-                degree = next(d for d in ["Law", "Science", "Business", "Engineering"] if d.lower() == degree.lower())
-            if degree:
+            completed_name = degree_match.group(1).capitalize() if degree_match else None
+            if completed_name:
+                canonical = next((d for d in _DEGREES if d.lower() == completed_name.lower()), completed_name)
                 c = cfg.load()
                 completed = c.setdefault("university", {}).setdefault("completed", [])
-                if degree not in completed:
-                    completed.append(degree)
+                if canonical not in completed:
+                    completed.append(canonical)
                     cfg.save(c)
-                    state.add_log(f"University: completed {degree} degree.")
+                state.add_log(f"University: completed {canonical} degree.")
         else:
             state.add_log("University: studied.")
         return
@@ -990,8 +991,17 @@ def handle_university(action: Action, state: GameState):
         state.add_log(f"University: enrolled ({accept_val}).")
         return
 
-    # --- Initial selection page: pick next uncompleted degree ---
-    from tasks.university import DEGREES as _DEGREES
+    # --- Initial selection page ---
+    if degree_cfg:
+        # Specific degree configured: bot should already be enrolled; landing here means
+        # something went wrong (degree not started or completed). Disable actions.
+        state.add_log(f"University: on selector page while configured for '{degree_cfg}' — disabling actions.")
+        c = cfg.load()
+        c["action"]["enabled"] = False
+        cfg.save(c)
+        return
+
+    # All-degrees mode: pick next uncompleted degree in order
     c = cfg.load()
     completed = c.get("university", {}).get("completed", [])
     next_degree = next((d for d in _DEGREES if d not in completed), None)
@@ -1000,7 +1010,6 @@ def handle_university(action: Action, state: GameState):
         c["action"]["enabled"] = False
         cfg.save(c)
         return
-    # The option value matches the degree name exactly (e.g. "Law", "Business")
     if next_degree not in options:
         state.add_log(f"University: degree option '{next_degree}' not found on page.")
         return
