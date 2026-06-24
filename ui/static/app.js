@@ -3010,13 +3010,16 @@ function _plLoadGroupMembers(groupName) {
   fetch(`/api/players/group/${encodeURIComponent(groupName)}`)
     .then(r => r.json())
     .then(data => {
+      // Re-query — table may have been re-rendered while fetch was in flight
+      const el = document.getElementById(`plgmembers-${groupName}`);
+      if (!el) return;
       const members = (data.players || []).map(p => ({ ...p, group: p.group_name ?? "" }));
       if (!members.length) {
-        container.innerHTML = '<p style="color:var(--muted);padding:4px 0">No members.</p>';
+        el.innerHTML = '<p style="color:var(--muted);padding:4px 0">No members.</p>';
         return;
       }
       const colorMap = _plGroupColorMap();
-      container.innerHTML = `<table class="pl-history-table" style="width:100%">
+      el.innerHTML = `<table class="pl-history-table" style="width:100%">
         <thead><tr>
           <th>Name</th><th>Rank</th><th>Occupation</th><th>City</th>
           <th>Agg (individual)</th><th>Case Work (individual)</th>
@@ -3034,7 +3037,10 @@ function _plLoadGroupMembers(groupName) {
         }).join("")}</tbody>
       </table>`;
     })
-    .catch(() => { container.innerHTML = '<p style="color:var(--muted)">Failed to load.</p>'; });
+    .catch(() => {
+      const el = document.getElementById(`plgmembers-${groupName}`);
+      if (el) el.innerHTML = '<p style="color:var(--muted)">Failed to load.</p>';
+    });
 }
 
 function plCreateGroup() {

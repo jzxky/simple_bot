@@ -3545,8 +3545,27 @@ class ActionExecutor:
             try:
                 handler(action, state)
             except Exception as e:
-                state.add_log(f"Error executing {action.kind}: {e}")
-                if "Page crashed" in str(e):
+                err = str(e)
+                if "Timeout" in err and "ms exceeded" in err:
+                    import re as _re
+                    ms_match = _re.search(r"(\d+)ms exceeded", err)
+                    url_match = _re.search(r'navigating to "([^"]+)"', err)
+                    ms = ms_match.group(1) if ms_match else "?"
+                    url = url_match.group(1) if url_match else "?"
+                    state.add_log(
+                        f"Error executing {action.kind}: navigation timed out after {ms}ms — {url} "
+                        f"(city={state.current_city}, logged_in={state.logged_in})"
+                    )
+                elif "interrupted by another navigation" in err:
+                    url_match = _re.search(r'navigating to "([^"]+)"', err)
+                    url = url_match.group(1) if url_match else "?"
+                    state.add_log(
+                        f"Error executing {action.kind}: navigation interrupted — {url} "
+                        f"(another task likely navigated concurrently)"
+                    )
+                else:
+                    state.add_log(f"Error executing {action.kind}: {e}")
+                if "Page crashed" in err:
                     state.add_log("Page crashed — restarting browser.")
                     try:
                         headless = cfg.load().get("misc", {}).get("headless", False)
