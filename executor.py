@@ -2508,6 +2508,17 @@ _AIRPORT_URL = "/travel/airport.asp"
 _CHICAGO = "Chicago"
 _NO_VEHICLE_TEXT = "you don't own a vehicle, it's parked or it's stashed in your vehicles vault"
 
+_pending_vehicle_travel_target: str = ""
+
+
+def get_pending_vehicle_travel_target() -> str:
+    return _pending_vehicle_travel_target
+
+
+def clear_pending_vehicle_travel_target():
+    global _pending_vehicle_travel_target
+    _pending_vehicle_travel_target = ""
+
 _CASINO_URL = "/localcity/businesses.asp?name=Casino"
 _BEIRUT = "Beirut"
 _CASINO_STOP_TEXT = "don't you think"
@@ -2530,6 +2541,10 @@ def _card_rank_value(img_src: str) -> "int | None":
 def handle_check_vehicle(action: Action, state: GameState) -> int:
     _nav(_u(_REPAIRS_URL), state)
     if not _check_session(state):
+        return 0
+    if "/localcity/local.asp" in browser.current_url():
+        state.add_log("Check vehicle: repairs unavailable (local.asp redirect).")
+        state.vehicle_health = None
         return 0
     soup = BeautifulSoup(state.page_html, "html.parser")
     if _NO_VEHICLE_TEXT in state.page_html.lower():
@@ -2558,6 +2573,9 @@ def handle_repair_vehicle(action: Action, state: GameState) -> bool:
     if _REPAIRS_URL not in (state.current_url or ""):
         _nav(_u(_REPAIRS_URL), state)
     if not _check_session(state):
+        return False
+    if "/localcity/local.asp" in browser.current_url():
+        state.add_log("Repair vehicle: repairs unavailable (local.asp redirect).")
         return False
     if _NO_VEHICLE_TEXT in state.page_html.lower():
         state.add_log("Repair vehicle: no vehicle to repair.")
@@ -2657,19 +2675,50 @@ def handle_travel(action: Action, state: GameState) -> int:
             _notify(state, "warrants_outstanding", msg)
             return 0
 
-    if state.current_city.lower() == target.lower():
-        state.add_log(f"Travel: already in {target}.")
-        return 1
-
     if method == "own_vehicle":
         pct = handle_check_vehicle(Action("check_vehicle"), state)
         if state.vehicle_health is None:
             return 0
         if pct == 0:
             ok = handle_repair_vehicle(Action("repair_vehicle"), state)
-            return 1 if ok else 0
-        _nav(_u(_DEPART_URL) + f"?destination={target}", state)
+            if ok:
+                global _pending_vehicle_travel_target
+                _pending_vehicle_travel_target = target
+                state.add_log(f"Travel: vehicle sent for repair — travel to {target} deferred until repair complete.")
+                return 1
+            return 0
+
+        # Navigate to travel.asp and parse available destinations
+        _nav(_u(_TRAVEL_URL), state)
         if not _check_session(state):
+            return 0
+        soup = BeautifulSoup(state.page_html, "html.parser")
+        dest_map = {}
+        for div in soup.find_all("div", class_="city-container"):
+            inner = div.find("div", class_="city-travel-container")
+            if not inner:
+                continue
+            city_name = inner.get("id", "")
+            link = inner.find("a", href=re.compile(r"depart\.asp\?destination="))
+            if city_name and link:
+                dest_map[city_name.lower()] = link["href"]
+        match_href = dest_map.get(target.lower())
+        if not match_href:
+            state.add_log(f"Travel: {target} not available on travel.asp.")
+            return 0
+        url = _u(match_href) if match_href.startswith("/") else urls.BASE_URL + "/travel/" + match_href
+        _nav(url, state)
+        if not _check_session(state):
+            return 0
+        soup = BeautifulSoup(state.page_html, "html.parser")
+        breakdown = soup.find(lambda tag: tag.name and "out of the blue, your" in tag.get_text(strip=True).lower())
+        if breakdown:
+            state.add_log(f"Travel: vehicle broke down en route to {target} — booking repair.")
+            ok = handle_repair_vehicle(Action("repair_vehicle"), state)
+            if ok:
+                _pending_vehicle_travel_target = target
+                state.add_log(f"Travel: repair booked — travel to {target} deferred until repair complete.")
+                return 1
             return 0
         state.add_log(f"Travel: departing to {target} by vehicle.")
         return 1
@@ -2752,7 +2801,7 @@ def handle_gym(action: Action, state: GameState):
             state.add_log("Gym: not in Chicago and auto-travel is off — skipping.")
             return
         state.add_log("Gym: travelling to Chicago...")
-        method = "own_vehicle" if state.vehicle_health else "airport"
+        method = "own_vehicle"
         result = handle_travel(Action("travel", target_city=_CHICAGO, method=method), state)
         if result == 0:
             state.add_log("Gym: travel to Chicago failed — skipping.")
