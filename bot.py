@@ -158,7 +158,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
         elif action_type == "drug_manufacturing":
             sched.add(DrugManufacturingTask())
         elif action_type == "university":
-            sched.add(UniversityTask())
+            sched.add(UniversityTask(degree=sub))
 
     cw_cfg = c.get("case_work", {})
     if cw_cfg.get("enabled", False):
