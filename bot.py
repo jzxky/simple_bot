@@ -20,6 +20,7 @@ from tasks.earns import EarnsTask
 from tasks.agg_crimes import AggCrimeTask
 from tasks.community_service import CommunityServiceTask
 from tasks.career_training import CareerTrainingTask
+from tasks.university import UniversityTask
 from tasks.fire_duties import FireDutiesTask
 from tasks.drug_manufacturing import DrugManufacturingTask
 from tasks.case_work import HospitalCaseWorkTask, EngineeringCaseWorkTask, FireCaseWorkTask
@@ -156,6 +157,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             sched.add(FireDutiesTask())
         elif action_type == "drug_manufacturing":
             sched.add(DrugManufacturingTask())
+        elif action_type == "university":
+            sched.add(UniversityTask())
 
     cw_cfg = c.get("case_work", {})
     if cw_cfg.get("enabled", False):

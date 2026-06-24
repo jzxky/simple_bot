@@ -45,6 +45,9 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "type": "drug_manufacturing"
     },
+    "university": {
+        "completed": []
+    },
     "payback_mode": "everyone",
     "career_training": {
         "career": "fire"
