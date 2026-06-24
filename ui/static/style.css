@@ -1324,8 +1324,19 @@ input.input-unsaved { color: var(--red) !important; }
 }
 
 @media (max-width: 600px) {
-  .setting-row { flex-wrap: wrap; }
-  .setting-row select { width: auto !important; flex: 1; min-width: 120px; }
+  .setting-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .setting-row > span,
+  .setting-row > label:first-child {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  label.setting-row.inline-toggle {
+    grid-template-columns: 1fr auto;
+  }
+  .setting-row select { width: auto !important; }
   .setting-btn-row { width: 100%; }
 }
 
