@@ -820,8 +820,8 @@ function pollStatus() {
           if (secsLeft <= 0) {
             bionicsNextEl.textContent = "Ready";
           } else {
-            const m = Math.floor(secsLeft / 60), s = secsLeft % 60;
-            bionicsNextEl.textContent = m + "m " + String(s).padStart(2, "0") + "s";
+            const h = Math.floor(secsLeft / 3600), m = Math.floor((secsLeft % 3600) / 60), s = secsLeft % 60;
+            bionicsNextEl.textContent = (h ? h + "h " : "") + String(m).padStart(2, "0") + "m " + String(s).padStart(2, "0") + "s";
           }
         } else {
           bionicsNextEl.textContent = "--";
@@ -872,8 +872,8 @@ function pollStatus() {
           if (secsLeft <= 0) {
             wsNextEl.textContent = "Ready";
           } else {
-            const m = Math.floor(secsLeft / 60), s = secsLeft % 60;
-            wsNextEl.textContent = m + "m " + String(s).padStart(2, "0") + "s";
+            const h = Math.floor(secsLeft / 3600), m = Math.floor((secsLeft % 3600) / 60), s = secsLeft % 60;
+            wsNextEl.textContent = (h ? h + "h " : "") + String(m).padStart(2, "0") + "m " + String(s).padStart(2, "0") + "s";
           }
         } else {
           wsNextEl.textContent = "--";
@@ -2405,6 +2405,7 @@ function loadPlayers() {
         const active = _plData.filter(p => p.active).length;
         pill.innerHTML = _pill(`👥 ${active}`);
       }
+      if (document.getElementById("pl-bolds-toggle")?.checked) _plRunWhitelistBolds();
     })
     .catch(() => {});
 }
@@ -2860,19 +2861,23 @@ function plSetGroup(username, group, el) {
   }).catch(() => {});
 }
 
-function plWhitelistBolds() {
-  const btn    = document.getElementById("pl-bolds-btn");
+function plBoldsToggleChanged() {
+  const on = document.getElementById("pl-bolds-toggle")?.checked;
+  if (on) _plRunWhitelistBolds();
+}
+
+function _plRunWhitelistBolds() {
   const status = document.getElementById("pl-bolds-status");
-  if (btn) btn.disabled = true;
   fetch("/players/whitelist_bolds", {method: "POST"})
     .then(r => r.json())
     .then(d => {
-      if (btn) btn.disabled = false;
-      if (status) status.textContent = `Whitelisted ${d.count} player(s).`;
-      setTimeout(() => { if (status) status.textContent = ""; }, 4000);
-      loadPlayers();
+      if (status && d.count > 0) {
+        status.textContent = `Whitelisted ${d.count} player(s).`;
+        setTimeout(() => { if (status) status.textContent = ""; }, 4000);
+        loadPlayers();
+      }
     })
-    .catch(() => { if (btn) btn.disabled = false; });
+    .catch(() => {});
 }
 
 // ── Refresh & import ──────────────────────────────────────────────────────────
