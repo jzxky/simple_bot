@@ -1220,6 +1220,7 @@
           <div class="row">
             <label>Action
               <select id="away_action_type" onchange="autoSave()">
+                <option value=""                  {% if not config.get('away_action', {}).get('type') or config.get('away_action', {}).get('type') == '' %}selected{% endif %}>None</option>
                 <option value="drug_manufacturing" {% if config.get('away_action', {}).get('type') == 'drug_manufacturing' %}selected{% endif %}>Drug Manufacturing</option>
                 <option value="community_service"  {% if config.get('away_action', {}).get('type') == 'community_service'  %}selected{% endif %}>Community Service</option>
                 <option value="dog_trains"         {% if config.get('away_action', {}).get('type') == 'dog_trains'         %}selected{% endif %}>Dog Trains</option>

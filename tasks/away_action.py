@@ -16,6 +16,8 @@ class AwayActionTask(Task):
         self.action_type = action_type
 
     def can_run(self, state: GameState) -> bool:
+        if not self.action_type:
+            return False
         if not (state.logged_in and not state.in_jail and state.action_available()
                 and not state.in_home_city() and not state.hold_action_timer):
             return False
