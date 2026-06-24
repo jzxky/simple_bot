@@ -3004,7 +3004,10 @@ def _play_slots(state: GameState, bet_amount: int):
     while True:
         soup = BeautifulSoup(page.content(), "html.parser")
         if not soup.find("input", attrs={"name": "bet"}):
-            state.add_log("Casino (Slots): bet input not found — stopping.")
+            if _casino_stopped(soup):
+                _handle_casino_stop(soup, state, "Casino (Slots)")
+            else:
+                state.add_log("Casino (Slots): bet input not found — stopping.")
             return
         page.fill("input[name='bet']", str(bet))
         page.click("input[name='B1']")
@@ -3029,7 +3032,10 @@ def _play_blackjack_hand(state: GameState, bet_amount: int) -> bool:
 
     soup = BeautifulSoup(page.content(), "html.parser")
     if not soup.find("input", attrs={"name": "bet"}):
-        state.add_log("Casino (Blackjack): bet input not found — stopping.")
+        if _casino_stopped(soup):
+            _handle_casino_stop(soup, state, "Casino (Blackjack)")
+        else:
+            state.add_log("Casino (Blackjack): bet input not found — stopping.")
         return False
     page.fill("input[name='bet']", str(bet))
     page.click("input[name='B1']")
