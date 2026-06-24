@@ -209,6 +209,9 @@ function _doSave() {
     sync_enabled:       (document.getElementById("sync_enabled")||{checked:false}).checked,
     sync_server_url:    (document.getElementById("sync_server_url")||{value:""}).value.trim(),
     sync_interval:      parseInt((document.getElementById("sync_interval")||{value:"2"}).value)||2,
+    sync_online_time:   (document.getElementById("sync_online_time")||{checked:true}).checked,
+    sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
+    sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
     ..._collectNotifSettings(),
   };
 
@@ -481,6 +484,60 @@ async function openEarnCatalog() {
 function closeEarnCatalog() {
   const ov = document.getElementById("earn-catalog-overlay");
   if (ov) ov.style.display = "none";
+}
+
+function showEarnCatalogTab(tab) {
+  document.getElementById("earn-cat-panel-assign").style.display = tab === "assign" ? "" : "none";
+  document.getElementById("earn-cat-panel-edit").style.display   = tab === "edit"   ? "" : "none";
+  document.getElementById("earn-cat-tab-assign").classList.toggle("active", tab === "assign");
+  document.getElementById("earn-cat-tab-edit").classList.toggle("active",   tab === "edit");
+  if (tab === "edit") _renderEarnCategoryEditor();
+}
+
+function _earnCategoryList() {
+  const seen = new Set(), cats = [];
+  _earnCatalog.forEach(e => { const c = e.category || "Uncategorized"; if (!seen.has(c)) { seen.add(c); cats.push(c); } });
+  return cats;
+}
+
+function _renderEarnCategoryEditor() {
+  const container = document.getElementById("earn-cat-edit-list");
+  if (!container) return;
+  const cats = _earnCategoryList();
+  container.innerHTML = cats.map(cat => `
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="text" value="${escHtml(cat)}" data-orig="${escHtml(cat)}" style="flex:1" oninput="this.dataset.dirty='1'">
+      <button class="btn-secondary" onclick="applyEarnCategoryRename(this)">Rename</button>
+      <button class="btn-danger" onclick="deleteEarnCategory('${escHtml(cat)}')" title="Delete">✕</button>
+    </div>`).join("");
+}
+
+function applyEarnCategoryRename(btn) {
+  const input = btn.parentElement.querySelector("input");
+  const orig  = input.dataset.orig;
+  const next  = input.value.trim();
+  if (!next || next === orig) return;
+  _earnCatalog = _earnCatalog.map(e => e.category === orig ? {...e, category: next} : e);
+  input.dataset.orig = next;
+  input.dataset.dirty = "";
+  _renderEarnCategoryEditor();
+}
+
+function deleteEarnCategory(cat) {
+  if (!confirm(`Delete category "${cat}"? Its earns will move to Uncategorized.`)) return;
+  _earnCatalog = _earnCatalog.map(e => e.category === cat ? {...e, category: "Uncategorized"} : e);
+  _renderEarnCategoryEditor();
+}
+
+function addEarnCategory() {
+  const input = document.getElementById("earn-cat-new-name");
+  const name  = input.value.trim();
+  if (!name) return;
+  if (_earnCategoryList().includes(name)) { input.value = ""; return; }
+  _earnCatalog = _earnCatalog.map(e => e);
+  _earnCatalog.push({ label: "__placeholder__", schedule_value: "", category: name, available: false });
+  input.value = "";
+  _renderEarnCategoryEditor();
 }
 
 function _renderEarnCatalogRows() {
@@ -2287,6 +2344,8 @@ let _plExpanded = {};
 let _plGroups   = [];
 let _plSortCol  = "username";
 let _plSortAsc  = true;
+const _plColVisible = {rank:true, occupation:true, career_group:true, homecity:true, group:true, tags:true, character_age:true, agg_crimes:true, case_work:true};
+const _PL_COL_INDEX = {rank:2, occupation:3, career_group:4, homecity:5, group:6, tags:7, character_age:8, agg_crimes:9, case_work:10};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -2420,6 +2479,7 @@ const _STATUS_ORDER = { local: 0, online: 1, offline: 2 };
 function _plSortVal(p, col) {
   if (col === "career_group") return _careerGroup(p.occupation).toLowerCase();
   if (col === "online_status") return String(_STATUS_ORDER[_onlineStatus(p.username)] ?? 2);
+  if (col === "character_age") return String(p.character_age || 0).padStart(10, "0");
   return (p[col] || "").toLowerCase();
 }
 
@@ -2438,6 +2498,27 @@ function _plApplySort() {
       icon.textContent = "↕";
       th.classList.remove("pl-th-sorted");
     }
+  });
+}
+
+// ── Column visibility ─────────────────────────────────────────────────────────
+
+function togglePlColMenu() {
+  const m = document.getElementById("pl-col-menu");
+  if (m) m.style.display = m.style.display === "none" ? "block" : "none";
+}
+document.addEventListener("click", e => {
+  const menu = document.getElementById("pl-col-menu");
+  const btn  = document.getElementById("pl-col-menu-btn");
+  if (menu && !menu.contains(e.target) && e.target !== btn) menu.style.display = "none";
+});
+
+function plToggleCol(col, visible) {
+  _plColVisible[col] = visible;
+  const idx = _PL_COL_INDEX[col];
+  if (idx == null) return;
+  document.querySelectorAll(`#pl-table th:nth-child(${idx + 1}), #pl-table td:nth-child(${idx + 1})`).forEach(cell => {
+    cell.style.display = visible ? "" : "none";
   });
 }
 

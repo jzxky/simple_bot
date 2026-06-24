@@ -179,6 +179,9 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "server_url": "",
         "interval_minutes": 2,
+        "sync_online_time": True,
+        "sync_lists": True,
+        "sync_groups": True,
     },
     "notifications": {
         "bionics_in_stock":        True,
@@ -195,6 +198,7 @@ DEFAULT_CONFIG = {
         "targets_exhausted":   False,
         "mhs_protected":       True,
         "warrants_outstanding": True,
+        "agg_not_available":   False,
     }
 }
 

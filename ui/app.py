@@ -30,6 +30,7 @@ NOTIFICATION_EVENTS = [
     ("targets_exhausted",   "Crime targets exhausted"),
     ("mhs_protected",       "MHS Protection Attempt"),
     ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
+    ("agg_not_available",   "Agg crime not available"),
 ]
 
 _ui_root = os.path.join(paths.resource_dir(), "ui")
@@ -125,6 +126,9 @@ def save():
     c["sync"]["enabled"]          = data.get("sync_enabled", False)
     c["sync"]["server_url"]       = data.get("sync_server_url", "").strip()
     c["sync"]["interval_minutes"] = int(data.get("sync_interval", 2))
+    c["sync"]["sync_online_time"] = data.get("sync_online_time", True)
+    c["sync"]["sync_lists"]       = data.get("sync_lists", True)
+    c["sync"]["sync_groups"]      = data.get("sync_groups", True)
 
     c.setdefault("character_history", {})
     c["character_history"]["enabled"] = data.get("char_history_enabled", False)
