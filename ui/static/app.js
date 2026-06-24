@@ -27,9 +27,7 @@ function loadAvailableEarns() {
       _earnCatalog = opts;
       _populateEarnCategories(currentType);
     })
-    .catch(() => {
-      if (earnTypeSel) earnTypeSel.innerHTML = '<option value="">— could not load earns —</option>';
-    });
+    .catch(() => {});
 }
 
 function _populateEarnCategories(selectedEarnType) {
@@ -62,7 +60,11 @@ function _renderEarnSelect(selectedValue) {
   const cat = catSel ? catSel.value : "";
   const items = _earnCatalog.filter(e => e.schedule_value && (e.category || "Uncategorized") === cat);
   if (!items.length) {
-    sel.innerHTML = '<option value="">— no earns in this category —</option>';
+    // Preserve current value so a failed/empty catalog load doesn't overwrite config
+    const preserved = sel.dataset.current || sel.value || "";
+    sel.innerHTML = preserved
+      ? `<option value="${preserved}">${preserved}</option>`
+      : '<option value="">— no earns in this category —</option>';
     _updateEarnsPills();
     return;
   }

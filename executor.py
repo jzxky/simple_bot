@@ -233,8 +233,6 @@ def handle_refresh_earn_catalog(action: Action, state: GameState):
 
 def handle_check_earns(action: Action, state: GameState):
     earn_type = action.params["earn_type"]
-    if not earn_type:
-        return
     page = browser.page()
 
     auto_opts, available_values = _scrape_earn_catalog(page, state)
