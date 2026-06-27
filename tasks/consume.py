@@ -185,10 +185,36 @@ class ConsumeTask(Task):
         return _passes_timer_gate(auto_type, state, cons_cfg)
 
     def _ecstasy_bootstrap(self, state: GameState, executor, cons_cfg: dict, agg_cfg: dict, respect_buffer: bool) -> int:
-        """Consume 1 ecstasy probe when energy is 0%, refresh state, then return remaining count."""
+        """Consume 1 ecstasy probe when energy is 0%, then estimate the remaining
+        count by self-calibrating off the energy the probe actually restored.
+
+        The probe measures the real per-ecstasy energy gain (energy went 0% → measured%),
+        so the remaining count is derived directly in the energy-percent domain rather than
+        the non-linear minutes table, which mis-modelled ecstasy as a fixed 3 minutes."""
         executor.execute(Action("consume", type="ecstasy", count=1), state)
         executor.execute(Action("refresh_state"), state)
-        return _smart_count("ecstasy", state, cons_cfg, agg_cfg, respect_buffer)
+
+        measured = state.energy if state.energy is not None else 0.0
+        if measured <= 0:
+            return 0  # probe didn't register — bail rather than guess
+
+        in_home = (state.current_city == state.home_city)
+        if in_home:
+            threshold_pct = float(agg_cfg.get("primary", {}).get("energy_threshold", 50))
+        else:
+            threshold_pct = float(agg_cfg.get("away_crime", {}).get("energy_threshold", 50))
+
+        remaining_pct = threshold_pct - measured
+        if remaining_pct <= 0:
+            return 0
+        count = math.ceil(remaining_pct / measured)  # measured = energy gained per ecstasy
+
+        # Cap by daily headroom and stock (probe already consumed one unit)
+        limit = int(cons_cfg.get("consumable_limit", 33))
+        buffer_ = int(cons_cfg.get("buffer", 0)) if respect_buffer else 0
+        headroom = max(0, (limit - buffer_) - (state.consumables_24h or 0))
+        stock = state.consumables.get("ecstasy", 0)
+        return min(max(0, count), headroom, stock)
 
     def run(self, state: GameState, executor):
         c = cfg.load()
