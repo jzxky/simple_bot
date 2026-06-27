@@ -46,6 +46,21 @@ def _ecstasy_blocked_by_fails(state: GameState) -> bool:
     return state.agg_fail_count() >= 3
 
 
+def _ecstasy_target_threshold(state: GameState, agg_cfg: dict) -> float:
+    """Energy % that ecstasy should fill up to.
+
+    - Selected (primary) crime is not hack → primary threshold (hack is the only
+      crime with a distinct away variant, so non-hack uses primary everywhere).
+    - Selected crime is hack:
+        • away from home → away (secondary) crime threshold
+        • in home city   → primary threshold
+    """
+    primary_crime = agg_cfg.get("primary", {}).get("crime", "")
+    if primary_crime == "hack" and not state.in_home_city():
+        return float(agg_cfg.get("away_crime", {}).get("energy_threshold", 50))
+    return float(agg_cfg.get("primary", {}).get("energy_threshold", 50))
+
+
 def _passes_timer_gate(consume_type: str, state: GameState, cfg_cons: dict) -> bool:
     """Return True if the consumable's timer condition allows consuming."""
     limit_secs = _timer_limit_secs(cfg_cons)
@@ -87,11 +102,7 @@ def _smart_count(consume_type: str, state: GameState, cfg_cons: dict, agg_cfg: d
     if consume_type == "ecstasy":
         if _ecstasy_blocked_by_fails(state):
             return 0
-        in_home = (state.current_city == state.home_city)
-        if in_home:
-            threshold_pct = float(agg_cfg.get("primary", {}).get("energy_threshold", 50))
-        else:
-            threshold_pct = float(agg_cfg.get("away_crime", {}).get("energy_threshold", 50))
+        threshold_pct = _ecstasy_target_threshold(state, agg_cfg)
         current_pct = state.energy if state.energy is not None else 0.0
         gap_mins = _energy_to_mins(threshold_pct) - _energy_to_mins(current_pct)
         count = math.ceil(gap_mins / 3)
@@ -124,12 +135,7 @@ def _ecstasy_passes_gate(state: GameState, cfg_cons: dict, agg_cfg: dict) -> boo
 
     limit_mins = math.floor(limit_secs / 60)
 
-    # Pick threshold based on current city
-    in_home = (state.current_city == state.home_city)
-    if in_home:
-        threshold_pct = float(agg_cfg.get("primary", {}).get("energy_threshold", 50))
-    else:
-        threshold_pct = float(agg_cfg.get("away_crime", {}).get("energy_threshold", 50))
+    threshold_pct = _ecstasy_target_threshold(state, agg_cfg)
 
     current_pct = state.energy if state.energy is not None else 0.0
     gap = _energy_to_mins(threshold_pct) - _energy_to_mins(current_pct)
@@ -196,11 +202,7 @@ class ConsumeTask(Task):
         count = _smart_count("ecstasy", state, cons_cfg, agg_cfg, respect_buffer)
 
         # Diagnostics — surface the limiting factor (energy gap vs daily cap vs stock)
-        in_home = (state.current_city == state.home_city)
-        threshold_pct = float(
-            (agg_cfg.get("primary", {}) if in_home else agg_cfg.get("away_crime", {}))
-            .get("energy_threshold", 50)
-        )
+        threshold_pct = _ecstasy_target_threshold(state, agg_cfg)
         gap_mins = _energy_to_mins(threshold_pct) - _energy_to_mins(state.energy or 0.0)
         raw = math.ceil(gap_mins / 3)
         limit = int(cons_cfg.get("consumable_limit", 33))
