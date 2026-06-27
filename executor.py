@@ -260,6 +260,29 @@ def handle_check_earns(action: Action, state: GameState):
         return
 
     top_up = QUEUE_MAX - current_count
+
+    # Earn planner — enforce lifetime cap for this earn if one is configured
+    limit = cfg.load().get("earn_planner", {}).get("limits", {}).get(earn_type)
+    if limit:
+        try:
+            import earn_planner as _ep
+            completed = _ep.completed_count(earn_type)
+            remaining = int(limit) - completed - current_count
+            if remaining <= 0:
+                state.add_log(
+                    f"Earn planner: '{earn_type}' at cap "
+                    f"({completed} done + {current_count} queued ≥ {limit}) — skipping top-up."
+                )
+                return
+            if remaining < top_up:
+                top_up = remaining
+                state.add_log(
+                    f"Earn planner: capping top-up to {top_up} "
+                    f"({completed} done + {current_count} queued, limit {limit})."
+                )
+        except Exception as e:
+            state.add_log(f"Earn planner: limit check failed ({e}) — proceeding without cap.")
+
     state.add_log(f"Earn queue at {current_count}/200, topping up by {top_up}.")
 
     page.select_option("select[name='schedule_earn_identifier']", earn_type)

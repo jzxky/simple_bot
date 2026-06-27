@@ -956,6 +956,25 @@
             <button type="button" id="clear-earn-btn" class="action-btn" onclick="clearEarnQueue()">Clear Queue</button>
             <button type="button" class="btn-secondary" onclick="openEarnCatalog()">Manage Categories</button>
           </div>
+
+          <!-- Earn Planner (only shown when character history earn data is available) -->
+          <div id="earn-planner-group" class="settings-group" style="display:none;margin-top:18px">
+            <h3>Earn Planner</h3>
+            <p style="font-size:0.82rem;color:var(--muted);margin:0 0 12px;">
+              Cap how many of each earn the bot will ever complete (lifetime).
+              Earns not listed here have no limit.
+            </p>
+            <div class="row" style="align-items:flex-end;gap:8px">
+              <label style="flex:1">Earn
+                <select id="earn-planner-add-select"></select>
+              </label>
+              <label style="width:110px">Limit
+                <input type="number" id="earn-planner-add-limit" min="1" step="1" placeholder="e.g. 500">
+              </label>
+              <button type="button" class="action-btn" onclick="earnPlannerAdd()">Add</button>
+            </div>
+            <div id="earn-planner-list" style="margin-top:12px"></div>
+          </div>
         </div>
 
         <!-- Aggravated Crimes tab -->
@@ -1519,6 +1538,7 @@
   try {
     const INITIAL_ACTION_SUB = "{{ config.action.sub_option }}";
     loadAvailableEarns();
+    loadEarnPlanner();
     populateActionSub(INITIAL_ACTION_SUB);
     toggleAwayCrime();
     initCollapse();

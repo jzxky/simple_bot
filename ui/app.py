@@ -55,6 +55,20 @@ def save():
     c["earns"]["enabled"] = data.get("earns_enabled", False)
     c["earns"]["earn_type"] = data.get("earn_type", "surgeon")
 
+    if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
+        import earn_planner as _ep
+        clean = {}
+        for k, v in data["earn_planner_limits"].items():
+            if k not in _ep.HISTORY_NAME:
+                continue
+            try:
+                n = int(v)
+            except (TypeError, ValueError):
+                continue
+            if n > 0:
+                clean[k] = n
+        c.setdefault("earn_planner", {})["limits"] = clean
+
     c["aggravated_crimes"]["enabled"] = data.get("crimes_enabled", False)
     c["aggravated_crimes"]["primary"]["crime"] = data.get("primary_crime", "pickpocket")
     c["aggravated_crimes"]["primary"]["energy_threshold"] = float(data.get("primary_threshold", 50))
@@ -743,6 +757,15 @@ def api_available_earns():
             return jsonify(_json.load(f))
     except Exception:
         return jsonify([])
+
+
+@app.route("/api/earn_planner")
+def api_earn_planner():
+    import earn_planner as _ep
+    c = cfg.load()
+    limits = c.get("earn_planner", {}).get("limits", {})
+    active = c.get("earns", {}).get("earn_type", "")
+    return jsonify(_ep.planner_view(limits, active))
 
 
 @app.route("/players")

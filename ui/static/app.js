@@ -76,6 +76,109 @@ function _renderEarnSelect(selectedValue) {
   _updateEarnsPills();
 }
 
+// ── Earn Planner ─────────────────────────────────────────────────────────────
+let _earnPlannerLimits = {};   // {schedule_value: limit} — current save payload
+let _earnPlannerData = null;   // last /api/earn_planner response
+
+function loadEarnPlanner() {
+  fetch("/api/earn_planner")
+    .then(r => r.json())
+    .then(d => {
+      _earnPlannerData = d;
+      _earnPlannerLimits = {};
+      (d.earns || []).forEach(e => { _earnPlannerLimits[e.value] = e.limit; });
+      const group = document.getElementById("earn-planner-group");
+      if (group) group.style.display = d.available ? "" : "none";
+      _renderEarnPlanner();
+    })
+    .catch(() => {});
+}
+
+function _renderEarnPlanner() {
+  if (!_earnPlannerData) return;
+  const d = _earnPlannerData;
+
+  // Populate add-dropdown with mappable earns not already listed
+  const addSel = document.getElementById("earn-planner-add-select");
+  if (addSel) {
+    const mappable = d.mappable || {};
+    const listed = new Set(Object.keys(_earnPlannerLimits));
+    const opts = Object.keys(mappable)
+      .filter(v => !listed.has(v))
+      .map(v => `<option value="${v}">${mappable[v]}</option>`)
+      .join("");
+    addSel.innerHTML = opts || '<option value="">— all earns listed —</option>';
+  }
+
+  // Render listed earns. Merge live completed counts from last fetch.
+  const completedByValue = {};
+  (d.earns || []).forEach(e => { completedByValue[e.value] = e.completed; });
+
+  const listEl = document.getElementById("earn-planner-list");
+  if (!listEl) return;
+
+  const values = Object.keys(_earnPlannerLimits);
+  if (!values.length) {
+    listEl.innerHTML = '<p style="color:var(--muted);font-size:0.82rem">No limits set — every earn is unlimited.</p>';
+    return;
+  }
+
+  const mappable = d.mappable || {};
+  listEl.innerHTML = values.map(value => {
+    const name = mappable[value] || value;
+    const limit = _earnPlannerLimits[value];
+    const completed = completedByValue[value] || 0;
+    const isActive = value === d.active;
+    const pct = limit > 0 ? Math.min(100, Math.round((completed / limit) * 100)) : 0;
+    let barColor = "var(--accent,#89b4fa)";
+    let warn = "";
+    if (completed >= limit) { barColor = "var(--error,#f87171)"; warn = " ⛔ at cap"; }
+    else if (pct >= 90)     { barColor = "var(--warn,#f59e0b)"; warn = " ⚠ near cap"; }
+    return `<div class="earn-planner-row" style="padding:8px 0;border-top:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="flex:1;font-weight:${isActive ? "600" : "400"}">${name}${isActive ? ' <span style="color:var(--accent);font-size:0.75rem">(active)</span>' : ""}</span>
+        <span style="font-size:0.8rem;color:var(--muted)">${completed} done</span>
+        <span style="color:var(--muted)">/</span>
+        <input type="number" min="1" step="1" value="${limit}" style="width:80px"
+          onchange="earnPlannerSetLimit('${value}', this.value)">
+        <button type="button" class="pl-icon-btn pl-icon-btn-danger" title="Remove limit"
+          onclick="earnPlannerRemove('${value}')">✕</button>
+      </div>
+      <div style="height:6px;background:var(--surface2,#1e2a3a);border-radius:3px;margin-top:5px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${barColor}"></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-top:2px">${pct}%${warn}</div>
+    </div>`;
+  }).join("");
+}
+
+function earnPlannerAdd() {
+  const sel = document.getElementById("earn-planner-add-select");
+  const limitEl = document.getElementById("earn-planner-add-limit");
+  if (!sel || !limitEl) return;
+  const value = sel.value;
+  const limit = parseInt(limitEl.value, 10);
+  if (!value || !limit || limit < 1) return;
+  _earnPlannerLimits[value] = limit;
+  limitEl.value = "";
+  _renderEarnPlanner();
+  autoSave();
+}
+
+function earnPlannerSetLimit(value, raw) {
+  const limit = parseInt(raw, 10);
+  if (!limit || limit < 1) return;
+  _earnPlannerLimits[value] = limit;
+  _renderEarnPlanner();
+  autoSave();
+}
+
+function earnPlannerRemove(value) {
+  delete _earnPlannerLimits[value];
+  _renderEarnPlanner();
+  autoSave();
+}
+
 function populateActionSub(selectedValue) {
   const type = document.getElementById("action_type").value;
   const sel = document.getElementById("action_sub");
@@ -119,6 +222,7 @@ function _doSave() {
     password: document.getElementById("password").value,
     earns_enabled: document.getElementById("earns_enabled").checked,
     earn_type: document.getElementById("earn_type").value,
+    earn_planner_limits: _earnPlannerLimits,
     crimes_enabled: document.getElementById("crimes_enabled").checked,
     primary_crime: document.getElementById("primary_crime").value,
     primary_threshold: document.getElementById("primary_threshold").value,
@@ -855,6 +959,7 @@ function pollStatus() {
             document.getElementById("s-char-history").style.display !== "none") {
           loadCharHistory();
         }
+        loadEarnPlanner();
       }
 
       // Bionics window sync — update UI fields when auto-detected window changes
