@@ -185,36 +185,34 @@ class ConsumeTask(Task):
         return _passes_timer_gate(auto_type, state, cons_cfg)
 
     def _ecstasy_bootstrap(self, state: GameState, executor, cons_cfg: dict, agg_cfg: dict, respect_buffer: bool) -> int:
-        """Consume 1 ecstasy probe when energy is 0%, then estimate the remaining
-        count by self-calibrating off the energy the probe actually restored.
+        """Consume 1 ecstasy probe when energy is 0% to escape the ambiguous
+        low-energy band (minutes 0/1/2 all read 0%), refresh, then compute the
+        remaining count from the now-disambiguated energy reading.
 
-        The probe measures the real per-ecstasy energy gain (energy went 0% → measured%),
-        so the remaining count is derived directly in the energy-percent domain rather than
-        the non-linear minutes table, which mis-modelled ecstasy as a fixed 3 minutes."""
+        Each ecstasy restores a fixed 3 minutes of energy; _smart_count maps the
+        energy% to elapsed minutes and divides the gap by 3."""
         executor.execute(Action("consume", type="ecstasy", count=1), state)
         executor.execute(Action("refresh_state"), state)
+        count = _smart_count("ecstasy", state, cons_cfg, agg_cfg, respect_buffer)
 
-        measured = state.energy if state.energy is not None else 0.0
-        if measured <= 0:
-            return 0  # probe didn't register — bail rather than guess
-
+        # Diagnostics — surface the limiting factor (energy gap vs daily cap vs stock)
         in_home = (state.current_city == state.home_city)
-        if in_home:
-            threshold_pct = float(agg_cfg.get("primary", {}).get("energy_threshold", 50))
-        else:
-            threshold_pct = float(agg_cfg.get("away_crime", {}).get("energy_threshold", 50))
-
-        remaining_pct = threshold_pct - measured
-        if remaining_pct <= 0:
-            return 0
-        count = math.ceil(remaining_pct / measured)  # measured = energy gained per ecstasy
-
-        # Cap by daily headroom and stock (probe already consumed one unit)
+        threshold_pct = float(
+            (agg_cfg.get("primary", {}) if in_home else agg_cfg.get("away_crime", {}))
+            .get("energy_threshold", 50)
+        )
+        gap_mins = _energy_to_mins(threshold_pct) - _energy_to_mins(state.energy or 0.0)
+        raw = math.ceil(gap_mins / 3)
         limit = int(cons_cfg.get("consumable_limit", 33))
         buffer_ = int(cons_cfg.get("buffer", 0)) if respect_buffer else 0
         headroom = max(0, (limit - buffer_) - (state.consumables_24h or 0))
         stock = state.consumables.get("ecstasy", 0)
-        return min(max(0, count), headroom, stock)
+        state.add_log(
+            f"Ecstasy probe: energy now {state.energy or 0:.1f}% (target {threshold_pct:.0f}%), "
+            f"need {raw} more; headroom {headroom} (limit {limit} - buffer {buffer_} - {state.consumables_24h or 0} used/24h), "
+            f"stock {stock} → consuming {count}."
+        )
+        return count
 
     def run(self, state: GameState, executor):
         c = cfg.load()
