@@ -12,6 +12,9 @@ DEFAULT_CONFIG = {
         "earn_type": "surgeon",
         "check_interval_minutes": 30
     },
+    "earn_planner": {
+        "limits": {}
+    },
     "aggravated_crimes": {
         "enabled": True,
         "primary": {

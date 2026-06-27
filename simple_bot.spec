@@ -47,6 +47,7 @@ a = Analysis(
         'browser',
         'character_history',
         'config',
+        'earn_planner',
         'executor',
         'paths',
         'player_db',
