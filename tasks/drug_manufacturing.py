@@ -12,6 +12,9 @@ class DrugManufacturingTask(Task):
     label = 'Drug Manufacturing'
 
     def can_run(self, state: GameState) -> bool:
+        import executor
+        if executor.drug_manufacture_cooldown_active():
+            return False
         return (state.logged_in
                 and not state.in_jail
                 and state.action_available()
