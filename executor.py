@@ -253,6 +253,29 @@ def _scrape_earn_catalog(page, state: GameState):
     return auto_opts, available_values
 
 
+def _parse_earn_queue_rows(soup) -> list:
+    """Parse the earn queue list into (name, completed, total) tuples.
+    Each .mm-earn-queue-row has a name and a 'completed/total' count cell."""
+    rows = []
+    for row in soup.find_all("div", class_="mm-earn-queue-row"):
+        name_el = row.find("div", class_="mm-earn-queue-row-name")
+        count_el = row.find("div", class_="mm-earn-queue-row-count")
+        if not name_el or not count_el:
+            continue
+        name = name_el.get_text(strip=True)
+        txt = count_el.get_text(strip=True)
+        if "/" not in txt:
+            continue
+        done_s, _, total_s = txt.partition("/")
+        try:
+            done = int(done_s.strip())
+            total = int(total_s.strip())
+        except ValueError:
+            continue
+        rows.append((name, done, total))
+    return rows
+
+
 def handle_refresh_earn_catalog(action: Action, state: GameState):
     """Scrape the earn page and update available_earns.json — no queue action."""
     _scrape_earn_catalog(browser.page(), state)
@@ -274,7 +297,8 @@ def handle_check_earns(action: Action, state: GameState):
         return
 
     # Read queue count from current page content
-    cap_span = BeautifulSoup(page.content(), "html.parser").find("span", class_="mm-earn-queue-cap")
+    earn_soup = BeautifulSoup(page.content(), "html.parser")
+    cap_span = earn_soup.find("span", class_="mm-earn-queue-cap")
     current_count = 0
     if cap_span:
         try:
@@ -293,19 +317,21 @@ def handle_check_earns(action: Action, state: GameState):
     if limit:
         try:
             import earn_planner as _ep
+            queue_rows = _parse_earn_queue_rows(earn_soup)
+            queued = _ep.queued_remaining(earn_type, queue_rows)
             completed = _ep.completed_count(earn_type)
-            remaining = int(limit) - completed - current_count
+            remaining = int(limit) - completed - queued
             if remaining <= 0:
                 state.add_log(
                     f"Earn planner: '{earn_type}' at cap "
-                    f"({completed} done + {current_count} queued ≥ {limit}) — skipping top-up."
+                    f"({completed} done + {queued} queued ≥ {limit}) — skipping top-up."
                 )
                 return
             if remaining < top_up:
                 top_up = remaining
                 state.add_log(
                     f"Earn planner: capping top-up to {top_up} "
-                    f"({completed} done + {current_count} queued, limit {limit})."
+                    f"({completed} done + {queued} queued, limit {limit})."
                 )
         except Exception as e:
             state.add_log(f"Earn planner: limit check failed ({e}) — proceeding without cap.")
