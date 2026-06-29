@@ -21,6 +21,10 @@ class AwayActionTask(Task):
         if not (state.logged_in and not state.in_jail and state.action_available()
                 and not state.in_home_city() and not state.hold_action_timer):
             return False
+        if self.action_type == "drug_manufacturing":
+            import executor
+            if executor.drug_manufacture_cooldown_active():
+                return False
         cooldown_key = "community_service_away" if self.action_type == "community_service" else self.action_type
         cooldown = ACTION_COOLDOWNS.get(cooldown_key, 10)
         return not should_skip_action_for_armed_robbery(state, cooldown)

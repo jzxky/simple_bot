@@ -44,8 +44,13 @@ class CasinoTask(Task):
         casino_cfg = cfg.load().get("casino", {})
         if not casino_cfg.get("enabled", False):
             return False
-        if state.current_city.lower() != "beirut" and not casino_cfg.get("auto_travel", False):
-            return False
+        if state.current_city.lower() != "beirut":
+            if not casino_cfg.get("auto_travel", False):
+                return False
+            # Don't keep retrying auto-travel while warrants block it
+            import executor
+            if executor.travel_warrant_cooldown_active():
+                return False
         return time.time() >= load_casino_release_at()
 
     def run(self, state: GameState, executor):

@@ -18,6 +18,22 @@ import browser
 _travel_warrant_cooldown_until: float = 0.0
 
 
+def travel_warrant_cooldown_active() -> bool:
+    """True while the post-warrant travel cooldown is in effect. Auto-travel tasks
+    (casino, gym) check this so they don't re-attempt travel every cycle while
+    outstanding warrants block it."""
+    return time.monotonic() < _travel_warrant_cooldown_until
+
+
+# Cooldown set when drug manufacturing returns a fail div.
+_drug_manufacture_cooldown_until: float = 0.0
+
+
+def drug_manufacture_cooldown_active() -> bool:
+    """True while the drug-manufacturing fail cooldown is in effect."""
+    return time.monotonic() < _drug_manufacture_cooldown_until
+
+
 def _u(path: str) -> str:
     return urls.BASE_URL + path
 
@@ -1380,7 +1396,21 @@ def handle_drug_manufacturing(action: Action, state: GameState):
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
-    state.add_log("Drug manufacturing: submitted.")
+
+    global _drug_manufacture_cooldown_until
+    result_soup = BeautifulSoup(page.content(), "html.parser")
+    success_div = result_soup.find("div", id="success")
+    fail_div = result_soup.find("div", id="fail")
+    if success_div:
+        state.add_log(f"Drug manufacturing: {success_div.get_text(strip=True)}")
+    elif fail_div:
+        _drug_manufacture_cooldown_until = time.monotonic() + 1800
+        state.add_log(
+            f"Drug manufacturing failed: {fail_div.get_text(strip=True)} "
+            f"— cooling down for 30 minutes."
+        )
+    else:
+        state.add_log("Drug manufacturing: submitted (no result div).")
 
 
 
