@@ -962,6 +962,15 @@ function pollStatus() {
         loadEarnPlanner();
       }
 
+      // Active earn sync — reflect planner-driven earn switches in the Earns tab
+      if (d.earn_type) {
+        const es = document.getElementById("earn_type");
+        if (es && es.value !== d.earn_type && es !== document.activeElement) {
+          es.dataset.current = d.earn_type;
+          _populateEarnCategories(d.earn_type);
+        }
+      }
+
       // Bionics window sync — update UI fields when auto-detected window changes
       if (d.bionics_window_start) {
         const ws = document.getElementById("bionics_window_start");
