@@ -89,6 +89,17 @@ TORCH_PUBLIC_BUSINESSES = {
 ARMED_MAX_RETRIES = 6
 
 
+def _match_public_business(name: str, public_set) -> "str | None":
+    """Return the canonical public-business type if `name` matches it exactly or
+    as a city-prefixed variant (e.g. 'Auckland Bank Tills' → 'Bank Tills'); else None.
+    The leading-space check keeps the match to a city prefix, avoiding loose
+    substring false positives on private business names."""
+    for pub in public_set:
+        if name == pub or name.endswith(" " + pub):
+            return pub
+    return None
+
+
 def _refresh_state(state: GameState):
     html = browser.page().content()
     url = browser.current_url()
@@ -1068,6 +1079,10 @@ def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
 def _get_public_business_owner(business_name: str, state: GameState) -> "str | None":
     job = PUBLIC_JOB_MAP.get(business_name)
     if not job:
+        # Loosen to city-prefixed names, e.g. "Auckland Bank Tills" → "Bank Tills"
+        matched = _match_public_business(business_name, PUBLIC_JOB_MAP.keys())
+        job = PUBLIC_JOB_MAP.get(matched) if matched else None
+    if not job:
         state.add_log(f"No job mapping for {business_name}.")
         return None
     # The owner is whoever holds the top job in the city where the robbery
@@ -1164,7 +1179,7 @@ def handle_armed_robbery(action: Action, state: GameState):
                 if "*" not in raw:
                     continue
                 name = raw.rstrip("*").strip()
-                is_public = name in PUBLIC_BUSINESSES
+                is_public = _match_public_business(name, PUBLIC_BUSINESSES) is not None
                 is_drug_house = name == "Drug House"
                 is_private = not is_public
 
@@ -1285,7 +1300,7 @@ def handle_torch_business(action: Action, state: GameState):
                 if not value or raw.startswith("Please"):
                     continue
                 name = raw.rstrip("*").strip()
-                is_public = name in TORCH_PUBLIC_BUSINESSES
+                is_public = _match_public_business(name, TORCH_PUBLIC_BUSINESSES) is not None
                 if name == "Drug House":
                     continue
                 if not is_public and not torch_private:
