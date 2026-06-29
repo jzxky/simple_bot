@@ -45,8 +45,13 @@ class GymTask(Task):
         gym_cfg = cfg.load().get("gym", {})
         if not gym_cfg.get("enabled", False):
             return False
-        if state.current_city.lower() != "chicago" and not gym_cfg.get("auto_travel", False):
-            return False
+        if state.current_city.lower() != "chicago":
+            if not gym_cfg.get("auto_travel", False):
+                return False
+            # Don't keep retrying auto-travel while warrants block it
+            import executor
+            if executor.travel_warrant_cooldown_active():
+                return False
         elapsed_hours = (time.time() - load_last_gym_use()) / 3600
         return elapsed_hours >= _GYM_COOLDOWN_HOURS
 

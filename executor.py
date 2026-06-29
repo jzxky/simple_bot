@@ -18,6 +18,13 @@ import browser
 _travel_warrant_cooldown_until: float = 0.0
 
 
+def travel_warrant_cooldown_active() -> bool:
+    """True while the post-warrant travel cooldown is in effect. Auto-travel tasks
+    (casino, gym) check this so they don't re-attempt travel every cycle while
+    outstanding warrants block it."""
+    return time.monotonic() < _travel_warrant_cooldown_until
+
+
 def _u(path: str) -> str:
     return urls.BASE_URL + path
 
