@@ -276,6 +276,36 @@ def _parse_earn_queue_rows(soup) -> list:
     return rows
 
 
+def _ensure_auto_earn_mode(page):
+    """Make sure the AUTO earn panel is visible (it can collapse after a page reload)."""
+    auto_div = page.query_selector("div.mm-earn-mode-auto")
+    if not auto_div:
+        return
+    style = auto_div.get_attribute("style") or ""
+    if "display: none" in style or "display:none" in style:
+        page.click("span.mm-earn-toggle-knob")
+        page.wait_for_function(
+            "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
+            "return el && !el.style.display.includes('none'); }",
+            timeout=5000,
+        )
+
+
+def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
+    """Add `amount` of one auto-earn to the queue. Returns True on success."""
+    try:
+        _ensure_auto_earn_mode(page)
+        page.select_option("select[name='schedule_earn_identifier']", value)
+        page.fill("input[name='schedule_count']", str(amount))
+        page.click("button.mm-earn-add-btn")
+        page.wait_for_load_state("domcontentloaded")
+        state.add_log(f"Earn queue: added {amount} x {value}.")
+        return True
+    except Exception as e:
+        state.add_log(f"Earn queue: failed to add {value} ({e}).")
+        return False
+
+
 def handle_refresh_earn_catalog(action: Action, state: GameState):
     """Scrape the earn page and update available_earns.json — no queue action."""
     _scrape_earn_catalog(browser.page(), state)
@@ -310,40 +340,59 @@ def handle_check_earns(action: Action, state: GameState):
         state.add_log(f"Earn queue at {current_count}/200, no top-up needed.")
         return
 
-    top_up = QUEUE_MAX - current_count
+    available_capacity = QUEUE_MAX - current_count
 
-    # Earn planner — enforce lifetime cap for this earn if one is configured
-    limit = cfg.load().get("earn_planner", {}).get("limits", {}).get(earn_type)
-    if limit:
-        try:
-            import earn_planner as _ep
-            queue_rows = _parse_earn_queue_rows(earn_soup)
-            queued = _ep.queued_remaining(earn_type, queue_rows)
-            completed = _ep.completed_count(earn_type)
-            remaining = int(limit) - completed - queued
-            if remaining <= 0:
-                state.add_log(
-                    f"Earn planner: '{earn_type}' at cap "
-                    f"({completed} done + {queued} queued ≥ {limit}) — skipping top-up."
-                )
-                return
-            if remaining < top_up:
-                top_up = remaining
-                state.add_log(
-                    f"Earn planner: capping top-up to {top_up} "
-                    f"({completed} done + {queued} queued, limit {limit})."
-                )
-        except Exception as e:
-            state.add_log(f"Earn planner: limit check failed ({e}) — proceeding without cap.")
+    import earn_planner as _ep
+    queue_rows = _parse_earn_queue_rows(earn_soup)
+    limits = cfg.load().get("earn_planner", {}).get("limits", {})
 
-    state.add_log(f"Earn queue at {current_count}/200, topping up by {top_up}.")
+    # Queue order: the active earn first, then any other planner earns (those with
+    # limits), all restricted to currently auto-earnable values.
+    candidates = [earn_type] + [v for v in limits if v != earn_type]
+    candidates = [v for v in candidates if v in available_values]
 
-    page.select_option("select[name='schedule_earn_identifier']", earn_type)
-    page.fill("input[name='schedule_count']", str(top_up))
-    page.click("button.mm-earn-add-btn")
-    page.wait_for_load_state("domcontentloaded")
+    new_active = None
+    for value in candidates:
+        if available_capacity <= 0:
+            break
+        limit = limits.get(value)
+        if limit:
+            # Progress toward the lifetime cap = completed (history) + already queued.
+            completed = _ep.completed_count(value)
+            queued = _ep.queued_remaining(value, queue_rows)
+            need = int(limit) - completed - queued
+            if need <= 0:
+                if value == earn_type:
+                    state.add_log(
+                        f"Earn planner: '{value}' at cap "
+                        f"({completed} done + {queued} queued ≥ {limit}) — moving to next earn."
+                    )
+                continue
+            amount = min(need, available_capacity)
+        else:
+            # No cap configured for this earn — fill the remaining capacity.
+            amount = available_capacity
+
+        if amount <= 0:
+            continue
+        if not _queue_earn(page, value, amount, state):
+            continue
+        available_capacity -= amount
+        if new_active is None:
+            new_active = value
+
+    if new_active is None:
+        state.add_log("Earn planner: nothing to queue (all listed earns at cap or no capacity).")
+        return
+
     _refresh_state(state)
-    state.add_log("Earn queue topped up.")
+
+    # Reflect a planner-driven earn switch in config so the UI updates.
+    if new_active != earn_type:
+        c = cfg.load()
+        c["earns"]["earn_type"] = new_active
+        cfg.save(c)
+        state.add_log(f"Earn planner: active earn updated to {new_active}.")
 
 
 def handle_clear_earn_queue(action: Action, state: GameState):

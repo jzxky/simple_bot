@@ -418,6 +418,7 @@ def status():
         "consumables": s.consumables,
         "own_name": s.own_name,
         "earns_enabled": cfg.load().get("earns", {}).get("enabled", True),
+        "earn_type": cfg.load().get("earns", {}).get("earn_type", ""),
         "current_task": s.current_task,
         "in_jail": s.in_jail,
         "jail_rank": s.jail_rank,
