@@ -465,6 +465,81 @@ def _get_city_residents(city: str, own_name: str) -> list:
     ]
 
 
+_LAUNDER_EXCLUDE_CITIES = {"Heaven", "Hell", "Manila", "Locked"}
+
+
+def handle_bulk_add_launder_contacts(action: Action, state: GameState):
+    """Establish a money-laundering deal with every eligible player.
+
+    Eligible = not in an excluded city/state, not in the bot's own home city,
+    not Unemployed, and not the bot itself."""
+    page = browser.page()
+
+    if not state.in_home_city():
+        state.add_log("Bulk launder: not in home city — aborting.")
+        return
+
+    try:
+        page.goto(_u("/skin/updateusers.php?q=1"), wait_until="domcontentloaded", timeout=15000)
+        data = json.loads(page.inner_text("body"))
+    except Exception as e:
+        state.add_log(f"Bulk launder: failed to load user list ({e}).")
+        return
+
+    names = [
+        p["userName"] for p in data
+        if p.get("userHomeCity") not in _LAUNDER_EXCLUDE_CITIES
+        and p.get("userHomeCity") != state.home_city
+        and p.get("userOccupation") != "Unemployed"
+        and p.get("userName") != state.own_name
+    ]
+    if not names:
+        state.add_log("Bulk launder: no eligible candidates found.")
+        return
+
+    state.add_log(f"Bulk launder: establishing deals with {len(names)} contact(s).")
+    page.goto(_u("/income/banklaunder.asp?display=establish"), wait_until="domcontentloaded", timeout=15000)
+    if not _check_session(state):
+        return
+
+    established = 0
+    failed = 0
+    for i, name in enumerate(names):
+        try:
+            if not page.query_selector("input[name='gangster']"):
+                state.add_log("Bulk launder: establish form not found — aborting.")
+                break
+            page.fill("input[name='gangster']", name)
+            page.click("input[name='B1']")
+            page.wait_for_load_state("domcontentloaded")
+
+            soup = BeautifulSoup(page.content(), "html.parser")
+            fail_div = soup.find("div", id="fail")
+            success_div = soup.find("div", id="success")
+            if fail_div:
+                failed += 1
+                state.add_log(f"Bulk launder {name}: {fail_div.get_text(strip=True)}")
+            elif success_div:
+                established += 1
+                state.add_log(f"Bulk launder {name}: {success_div.get_text(strip=True)}")
+            else:
+                state.add_log(f"Bulk launder {name}: submitted (no result div).")
+
+            # Return to the establish form via back-navigation (cheaper than re-loading).
+            if i < len(names) - 1:
+                page.go_back(wait_until="domcontentloaded")
+        except Exception as e:
+            failed += 1
+            state.add_log(f"Bulk launder {name}: error ({e}).")
+            try:
+                page.goto(_u("/income/banklaunder.asp?display=establish"), wait_until="domcontentloaded", timeout=15000)
+            except Exception:
+                break
+
+    _refresh_state(state)
+    state.add_log(f"Bulk launder: done ({established} established, {failed} failed).")
+
+
 def _check_cs_punishment(state: GameState) -> bool:
     """
     Call after navigating to agcrime.asp when no target input is found.
@@ -3646,6 +3721,7 @@ HANDLERS = {
     "check_earns": handle_check_earns,
     "refresh_earn_catalog": handle_refresh_earn_catalog,
     "clear_earn_queue": handle_clear_earn_queue,
+    "bulk_add_launder_contacts": handle_bulk_add_launder_contacts,
     "do_crime": handle_do_crime,
     "check_weapon": handle_check_weapon,
     "consume": handle_consume,
