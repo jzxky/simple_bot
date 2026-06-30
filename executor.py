@@ -2501,6 +2501,11 @@ def handle_jailbreak_plan(action: Action, state: GameState):
     partner = action.params.get("partner", "")
     hold = action.params.get("hold_action_timer", False)
 
+    # Only gangsters can plan a jail break away from their home city.
+    if "gangster" not in (state.occupation or "").lower() and not state.in_home_city():
+        state.add_log("Jail break plan: non-gangster cannot plan outside home city — skipping.")
+        return
+
     page = browser.page()
     page.goto(_u("/income/jailbreak.asp"), wait_until="domcontentloaded", timeout=15000)
     url = browser.current_url()
