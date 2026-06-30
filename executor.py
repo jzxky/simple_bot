@@ -498,20 +498,31 @@ def handle_bulk_add_launder_contacts(action: Action, state: GameState):
         return
 
     state.add_log(f"Bulk launder: establishing deals with {len(names)} contact(s).")
-    page.goto(_u("/income/banklaunder.asp?display=establish"), wait_until="domcontentloaded", timeout=15000)
-    if not _check_session(state):
+
+    _ESTABLISH_URL = _u("/income/banklaunder.asp?display=establish")
+
+    def _ensure_form() -> bool:
+        """Mirror the crime loop: only navigate to the establish page when the
+        gangster input isn't already on the current page."""
+        if page.query_selector("input[name='gangster']"):
+            return True
+        page.goto(_ESTABLISH_URL, wait_until="domcontentloaded", timeout=15000)
+        return bool(page.query_selector("input[name='gangster']"))
+
+    if not _ensure_form() or not _check_session(state):
+        state.add_log("Bulk launder: establish form not available — aborting.")
         return
 
     established = 0
     failed = 0
-    for i, name in enumerate(names):
+    for name in names:
         try:
-            if not page.query_selector("input[name='gangster']"):
-                state.add_log("Bulk launder: establish form not found — aborting.")
+            if not _ensure_form():
+                state.add_log("Bulk launder: lost establish form mid-run — aborting.")
                 break
             page.fill("input[name='gangster']", name)
             page.click("input[name='B1']")
-            page.wait_for_load_state("load")
+            page.wait_for_load_state("domcontentloaded")
 
             soup = BeautifulSoup(page.content(), "html.parser")
             fail_div = soup.find("div", id="fail")
@@ -524,18 +535,9 @@ def handle_bulk_add_launder_contacts(action: Action, state: GameState):
                 state.add_log(f"Bulk launder {name}: {success_div.get_text(strip=True)}")
             else:
                 state.add_log(f"Bulk launder {name}: submitted (no result div).")
-
-            # Return to the establish form via back-navigation (cheaper than re-loading);
-            # wait for a full load before submitting the next name.
-            if i < len(names) - 1:
-                page.go_back(wait_until="load")
         except Exception as e:
             failed += 1
             state.add_log(f"Bulk launder {name}: error ({e}).")
-            try:
-                page.goto(_u("/income/banklaunder.asp?display=establish"), wait_until="domcontentloaded", timeout=15000)
-            except Exception:
-                break
 
     _refresh_state(state)
     state.add_log(f"Bulk launder: done ({established} established, {failed} failed).")
