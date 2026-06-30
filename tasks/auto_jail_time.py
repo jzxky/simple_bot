@@ -25,6 +25,10 @@ class AutoJailTimeTask(Task):
             return False
         if state.hold_action_timer:
             return False
+        # Planning consumes the action timer — wait until it's free. Priority 75
+        # (above the 50–60 action-timer tasks) ensures it runs first once free.
+        if not state.action_available():
+            return False
         if jail_cfg.get("jailbreak_execute_at", 0) > 0:
             return False
         if mode == "respect_change":
