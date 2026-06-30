@@ -264,6 +264,7 @@ function _doSave() {
     case_work_enabled: document.getElementById("case_work_enabled").checked,
     hospital_poll_interval: parseInt(document.getElementById("hospital_poll_interval").value) || 31,
     fire_poll_interval: parseInt(document.getElementById("fire_poll_interval").value) || 31,
+    banking_poll_interval: parseInt(document.getElementById("banking_poll_interval")?.value) || 60,
     hospital_tasks: _serializePriorityTable("hospital-priority-body"),
     engineering_tasks: _serializePriorityTable("engineering-priority-body"),
     player_list_enabled: document.getElementById("player_list_enabled").checked,

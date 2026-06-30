@@ -15,6 +15,7 @@ class CaseWorkTask(Task):
 
     ELIGIBLE_OCCUPATIONS: set = set()
     HOME_CITY_ONLY: bool = True
+    USES_CASE_TIMER: bool = True  # banking laundering is poll-driven, not case-timer gated
 
     def __init__(self, poll_interval: int = 31):
         self._poll_interval = poll_interval
@@ -27,7 +28,7 @@ class CaseWorkTask(Task):
             return False
         if self.HOME_CITY_ONLY and not state.in_home_city():
             return False
-        if not state.timer_ready("case"):
+        if self.USES_CASE_TIMER and not state.timer_ready("case"):
             return False
         return time.monotonic() - self._last_checked >= self._poll_interval
 
@@ -70,3 +71,15 @@ class FireCaseWorkTask(CaseWorkTask):
 
     def _action(self) -> Action:
         return Action("check_fire_cases")
+
+
+class BankingCaseWorkTask(CaseWorkTask):
+    ELIGIBLE_OCCUPATIONS = {"Bank Teller", "Loan Officer", "Bank Manager"}
+    HOME_CITY_ONLY = True
+    USES_CASE_TIMER = False  # poll-driven: laundering isn't gated by the case timer
+
+    def __init__(self, poll_interval: int = 60):
+        super().__init__(poll_interval)
+
+    def _action(self) -> Action:
+        return Action("check_banking_cases")

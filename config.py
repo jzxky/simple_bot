@@ -86,6 +86,9 @@ DEFAULT_CONFIG = {
                 {"type": "repair_vehicle",      "target": "all"},
                 {"type": "construct_vault",     "target": "all"},
             ]
+        },
+        "banking": {
+            "poll_interval": 60
         }
     },
     "players": {

@@ -1204,6 +1204,18 @@
 
           <!-- Banking -->
           <div id="cw-banking" style="display:none">
+            <div class="cw-poll-row">
+              Check for money to launder every
+              <input type="number" id="banking_poll_interval" class="input-narrow" min="31"
+                value="{{ config.get('case_work', {}).get('banking', {}).get('poll_interval', 60) }}"
+                oninput="markNumDirty(this)">
+              <button class="num-save-btn" id="save-banking_poll_interval" onclick="saveNum('banking_poll_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
+              seconds
+            </div>
+            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 10px">
+              Polls the launder deals list and launders any gangster's balance over $5, then auto-transfers the cleaned funds back.
+            </p>
+            <hr class="stat-divider">
             <p style="font-size:0.85rem;color:var(--muted);margin:0 0 10px">
               Establish money-laundering deals with every eligible player (excludes Heaven/Hell/Manila/Locked,
               your own home city, and unemployed players). Must be in your home city.
