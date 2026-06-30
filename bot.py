@@ -93,6 +93,7 @@ _navigate_queue: queue.Queue = queue.Queue()
 _repair_vehicle_queue: queue.Queue = queue.Queue()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
+_bulk_launder_queue: queue.Queue = queue.Queue()
 state = GameState()
 
 
@@ -464,6 +465,14 @@ def _run(c: dict):
                 except Exception as e:
                     _profile_result.put(e)
 
+            # Bulk-add laundering contacts if requested from UI
+            if not _bulk_launder_queue.empty():
+                try:
+                    _bulk_launder_queue.get_nowait()
+                    executor.execute(Action("bulk_add_launder_contacts"), state)
+                except Exception as e:
+                    state.add_log(f"Bulk launder error: {e}")
+
             # Clear earn queue if requested from UI
             if _clear_earn_event.is_set():
                 _clear_earn_event.clear()
@@ -571,6 +580,10 @@ def request_reload():
     global _reload_requested_at
     _reload_requested_at = time.monotonic()
     _reload_event.set()
+
+
+def request_bulk_launder():
+    _bulk_launder_queue.put(True)
 
 
 def request_consume(consume_type: str):

@@ -1431,19 +1431,36 @@ loadLogFiles();
 const CW_HOSPITAL_OCCUPATIONS = new Set(["Nurse", "Doctor", "Surgeon", "Hospital Director"]);
 const CW_FIRE_OCCUPATIONS = new Set(["Volunteer Fire Fighter", "Fire Fighter", "Fire Chief"]);
 const CW_ENGINEERING_OCCUPATIONS = new Set(["Mechanic", "Technician", "Engineer", "Chief Engineer"]);
+const CW_BANKING_OCCUPATIONS = new Set(["Bank Teller", "Loan Officer", "Bank Manager"]);
 
 function updateCaseWorkSection(occupation) {
   const isHospital = CW_HOSPITAL_OCCUPATIONS.has(occupation);
   const isFire = CW_FIRE_OCCUPATIONS.has(occupation);
   const isEngineering = CW_ENGINEERING_OCCUPATIONS.has(occupation);
-  const hasWork = isHospital || isFire || isEngineering;
+  const isBanking = CW_BANKING_OCCUPATIONS.has(occupation);
+  const hasWork = isHospital || isFire || isEngineering || isBanking;
 
   document.getElementById("cw-none").style.display = hasWork ? "none" : "";
   document.getElementById("cw-hospital").style.display = isHospital ? "" : "none";
   document.getElementById("cw-fire").style.display = isFire ? "" : "none";
   document.getElementById("cw-engineering").style.display = isEngineering ? "" : "none";
+  document.getElementById("cw-banking").style.display = isBanking ? "" : "none";
   if (isHospital)    renderCwHospitalHistory();
   if (isEngineering) renderCwEngineeringHistory();
+}
+
+function bulkAddLaunderContacts() {
+  const btn = document.getElementById("bulk-launder-btn");
+  const status = document.getElementById("bulk-launder-status");
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = "Starting…";
+  fetch("/banklaunder/bulk_add", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      if (status) status.textContent = d.ok ? "Started — see activity log." : (d.error || "Failed.");
+    })
+    .catch(() => { if (status) status.textContent = "Request failed."; })
+    .finally(() => { setTimeout(() => { if (btn) btn.disabled = false; }, 2000); });
 }
 
 function _collectPromoChoices() {

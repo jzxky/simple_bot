@@ -272,6 +272,14 @@ def stop():
     return jsonify({"running": False, "paused": False})
 
 
+@app.route("/banklaunder/bulk_add", methods=["POST"])
+def banklaunder_bulk_add():
+    if not bot.is_running():
+        return jsonify({"ok": False, "error": "Bot is not running."})
+    bot.request_bulk_launder()
+    return jsonify({"ok": True})
+
+
 @app.route("/pause", methods=["POST"])
 def pause():
     bot.pause()
