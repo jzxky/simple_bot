@@ -76,7 +76,7 @@ class FireCaseWorkTask(CaseWorkTask):
 class BankingCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Bank Teller", "Loan Officer", "Bank Manager"}
     HOME_CITY_ONLY = True
-    USES_CASE_TIMER = False  # poll-driven: laundering isn't gated by the case timer
+    USES_CASE_TIMER = True  # gated by the case timer like the other case work tasks
 
     def __init__(self, poll_interval: int = 60):
         super().__init__(poll_interval)
