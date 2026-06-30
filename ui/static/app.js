@@ -1542,12 +1542,42 @@ function bionicsOnBuyListChange() {
     return el && el.checked;
   });
   _syncPriorityList("bionics-priority-body", checked);
+  _renderBuyListSummary("bionics-priority-body", "bionics-buylist-summary");
   autoSave();
 }
 
 function wsOnBuyListChange() {
   _syncPriorityList("weapon-store-priority-body", _wsCheckedItems());
+  _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
   autoSave();
+}
+
+// Comma-delimited summary of the priority list (wanted items in priority order).
+function _renderBuyListSummary(tbodyId, spanId) {
+  const span = document.getElementById(spanId);
+  if (!span) return;
+  const tbody = document.getElementById(tbodyId);
+  const items = tbody ? [...tbody.querySelectorAll("tr[data-item]")].map(r => r.dataset.item) : [];
+  span.textContent = items.length ? items.join(", ") : "None";
+}
+
+function openBionicsBuyList() {
+  const ov = document.getElementById("bionics-buylist-overlay");
+  if (ov) ov.style.display = "flex";
+}
+function closeBionicsBuyList() {
+  const ov = document.getElementById("bionics-buylist-overlay");
+  if (ov) ov.style.display = "none";
+  _renderBuyListSummary("bionics-priority-body", "bionics-buylist-summary");
+}
+function openWeaponBuyList() {
+  const ov = document.getElementById("weapon-buylist-overlay");
+  if (ov) ov.style.display = "flex";
+}
+function closeWeaponBuyList() {
+  const ov = document.getElementById("weapon-buylist-overlay");
+  if (ov) ov.style.display = "none";
+  _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
 }
 
 function _initPriorityDrag(tbodyId) {
@@ -1604,6 +1634,8 @@ function _initPriorityDrag(tbodyId) {
 document.addEventListener("DOMContentLoaded", () => {
   _initPriorityDrag("bionics-priority-body");
   _initPriorityDrag("weapon-store-priority-body");
+  _renderBuyListSummary("bionics-priority-body", "bionics-buylist-summary");
+  _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
 });
 
 // Up/down reorder for priority tables
@@ -1621,11 +1653,17 @@ function _moveRow(btn, dir) {
   autoSave();
 }
 
+const _BUYLIST_SUMMARY = {
+  "bionics-priority-body": "bionics-buylist-summary",
+  "weapon-store-priority-body": "weapon-store-buylist-summary",
+};
+
 function _renumberTable(tbodyId) {
   document.querySelectorAll(`#${tbodyId} tr`).forEach((row, i) => {
     const num = row.querySelector(".priority-num");
     if (num) num.textContent = i + 1;
   });
+  if (_BUYLIST_SUMMARY[tbodyId]) _renderBuyListSummary(tbodyId, _BUYLIST_SUMMARY[tbodyId]);
 }
 
 function findThreadId() {
