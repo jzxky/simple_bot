@@ -10,7 +10,7 @@ from state import GameState
 from action_cooldowns import ACTION_COOLDOWNS, should_skip_action_for_armed_robbery
 
 UNIVERSITY_PATH = "/localcity/university.asp"
-DEGREES = ["Business", "Science", "Medical", "Engineering", "Law"]
+DEGREES = ["Business", "Science", "Medicine", "Engineering", "Law"]
 
 
 class UniversityTask(Task):
