@@ -511,7 +511,7 @@ def handle_bulk_add_launder_contacts(action: Action, state: GameState):
                 break
             page.fill("input[name='gangster']", name)
             page.click("input[name='B1']")
-            page.wait_for_load_state("domcontentloaded")
+            page.wait_for_load_state("load")
 
             soup = BeautifulSoup(page.content(), "html.parser")
             fail_div = soup.find("div", id="fail")
@@ -525,9 +525,10 @@ def handle_bulk_add_launder_contacts(action: Action, state: GameState):
             else:
                 state.add_log(f"Bulk launder {name}: submitted (no result div).")
 
-            # Return to the establish form via back-navigation (cheaper than re-loading).
+            # Return to the establish form via back-navigation (cheaper than re-loading);
+            # wait for a full load before submitting the next name.
             if i < len(names) - 1:
-                page.go_back(wait_until="domcontentloaded")
+                page.go_back(wait_until="load")
         except Exception as e:
             failed += 1
             state.add_log(f"Bulk launder {name}: error ({e}).")
