@@ -25,6 +25,9 @@ class AutoJailTimeTask(Task):
             return False
         if state.hold_action_timer:
             return False
+        # Non-gangsters can only plan a jail break in their home city.
+        if "gangster" not in (state.occupation or "").lower() and not state.in_home_city():
+            return False
         # Planning consumes the action timer — wait until it's free. Priority 75
         # (above the 50–60 action-timer tasks) ensures it runs first once free.
         if not state.action_available():
