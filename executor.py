@@ -1276,10 +1276,33 @@ def handle_university(action: Action, state: GameState):
 
     # --- Initial selection page ---
     if degree_cfg:
-        # Specific degree configured: bot should already be enrolled; landing here means
-        # something went wrong (degree not started or completed). Disable actions.
-        state.add_log(f"University: on selector page while configured for '{degree_cfg}' — disabling actions.")
+        # Specific degree configured and we're on the selector page → not yet enrolled,
+        # so start that degree. (Normalise naming, e.g. "Medicine" → "Medical".)
+        canonical = next(
+            (d for d in _DEGREES
+             if d.lower() == degree_cfg.lower() or d.lower()[:5] == degree_cfg.lower()[:5]),
+            degree_cfg,
+        )
         c = cfg.load()
+        completed = c.get("university", {}).get("completed", [])
+        if canonical in completed:
+            state.add_log(f"University: '{canonical}' already completed — disabling actions.")
+            c["action"]["enabled"] = False
+            cfg.save(c)
+            return
+        match = next(
+            (v for v in options
+             if v.lower() == canonical.lower() or options[v].lower() == canonical.lower()),
+            None,
+        )
+        if match:
+            page.select_option("select[name='action']", match)
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
+            _refresh_state(state)
+            state.add_log(f"University: selected {canonical} course.")
+            return
+        state.add_log(f"University: degree '{degree_cfg}' not available on selector — disabling actions.")
         c["action"]["enabled"] = False
         cfg.save(c)
         return

@@ -10,7 +10,7 @@ const ACTION_SUB_MAP = {
   university: [
     ["Business","Business"],
     ["Science","Science"],
-    ["Medicine","Medicine"],
+    ["Medical","Medicine"],
     ["Engineering","Engineering"],
     ["Law","Law"],
   ],
