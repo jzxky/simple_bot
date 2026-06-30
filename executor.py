@@ -543,6 +543,86 @@ def handle_bulk_add_launder_contacts(action: Action, state: GameState):
     state.add_log(f"Bulk launder: done ({established} established, {failed} failed).")
 
 
+def _parse_money(text: str) -> int:
+    """Parse '$31,250' / '$0' → int."""
+    digits = re.sub(r"[^0-9]", "", text or "")
+    return int(digits) if digits else 0
+
+
+def handle_check_banking_cases(action: Action, state: GameState):
+    """Poll the bank-launder deals list; for any gangster with a balance to launder,
+    launder it and auto-transfer the cleaned funds back."""
+    page = browser.page()
+    _nav(_u("/income/banklaunder.asp"), state)
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    table = soup.find("table", style=lambda s: s and "90%" in s)
+    if not table:
+        return
+
+    pending = []  # (name, gangster_url)
+    for row in table.find_all("tr"):
+        cells = row.find_all("td", class_="display_border")
+        if len(cells) < 3:
+            continue
+        name = cells[0].get_text(strip=True)
+        balance = _parse_money(cells[2].get_text(strip=True))
+        if balance <= 5:
+            continue
+        link = cells[2].find("a", href=True)
+        if not link:
+            continue
+        href = link["href"]
+        url = _u("/income/") + href if not href.startswith("http") else href
+        pending.append((name, url))
+
+    if not pending:
+        return
+
+    state.add_log(f"Banking: {len(pending)} deal(s) with money to launder.")
+    laundered = 0
+    for name, url in pending:
+        try:
+            _nav(url, state)
+            # Step 1 — select "Launder Money" (display=result) and submit
+            sel = page.query_selector("select[name='display']")
+            if not sel:
+                state.add_log(f"Banking {name}: launder form not found — skipping.")
+                continue
+            page.select_option("select[name='display']", "result")
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Step 2 — Auto Funds Transfer
+            transfer_btn = page.query_selector("input[name='B1'][value='Auto Funds Transfer']")
+            if not transfer_btn:
+                soup2 = BeautifulSoup(page.content(), "html.parser")
+                fail = soup2.find("div", id="fail")
+                msg = fail.get_text(strip=True) if fail else "no transfer form"
+                state.add_log(f"Banking {name}: launder produced no transfer ({msg}).")
+                continue
+            transfer_btn.click()
+            page.wait_for_load_state("domcontentloaded")
+
+            soup3 = BeautifulSoup(page.content(), "html.parser")
+            success = soup3.find("div", id="success")
+            fail = soup3.find("div", id="fail")
+            if success:
+                laundered += 1
+                state.add_log(f"Banking {name}: {success.get_text(strip=True)}")
+            elif fail:
+                state.add_log(f"Banking {name}: transfer failed — {fail.get_text(strip=True)}")
+            else:
+                state.add_log(f"Banking {name}: transfer submitted (no result div).")
+        except Exception as e:
+            state.add_log(f"Banking {name}: error ({e}).")
+
+    _refresh_state(state)
+    state.add_log(f"Banking: laundered {laundered}/{len(pending)} deal(s).")
+
+
 def _check_cs_punishment(state: GameState) -> bool:
     """
     Call after navigating to agcrime.asp when no target input is found.
@@ -3725,6 +3805,7 @@ HANDLERS = {
     "refresh_earn_catalog": handle_refresh_earn_catalog,
     "clear_earn_queue": handle_clear_earn_queue,
     "bulk_add_launder_contacts": handle_bulk_add_launder_contacts,
+    "check_banking_cases": handle_check_banking_cases,
     "do_crime": handle_do_crime,
     "check_weapon": handle_check_weapon,
     "consume": handle_consume,
