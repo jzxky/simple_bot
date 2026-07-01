@@ -419,7 +419,9 @@ function _pill(text) {
 
 function _selText(id) {
   const sel = document.getElementById(id);
-  return sel ? sel.options[sel.selectedIndex].text : "";
+  if (!sel || sel.selectedIndex < 0) return "";
+  const opt = sel.options[sel.selectedIndex];
+  return opt ? opt.text : "";
 }
 
 function _updateCrimePills() {
