@@ -121,6 +121,11 @@ def _smart_count(consume_type: str, state: GameState, cfg_cons: dict, agg_cfg: d
             return 0
         remaining_secs = max(0, int((end - now).total_seconds()))
         count = math.floor(remaining_secs / 180)
+        # Reconcile with the timer-limit gate: if the timer still has more than the
+        # configured limit remaining, consume at least one unit. Avoids the dead band
+        # between `timer_limit` and 3:00 where the gate passes but floor() gives 0.
+        if count == 0 and remaining_secs > _timer_limit_secs(cfg_cons):
+            count = 1
 
     return min(max(0, count), cap)
 
