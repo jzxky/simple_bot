@@ -956,8 +956,7 @@ function pollStatus() {
         _chLastUpdated = d.char_history_updated_at;
         loadPlayers();
         if (document.getElementById("pl-bolds-toggle")?.checked) _plRunWhitelistBolds();
-        if (document.getElementById("s-char-history") &&
-            document.getElementById("s-char-history").style.display !== "none") {
+        if (document.getElementById("status-history")?.classList.contains("active")) {
           loadCharHistory();
         }
         loadEarnPlanner();
@@ -2037,9 +2036,16 @@ let _chReqs = null;
 
 function toggleCharHistoryTab() {
   const enabled = document.getElementById("char_history_enabled").checked;
-  const sec = document.getElementById("s-char-history");
-  if (sec) sec.style.display = enabled ? "" : "none";
-  if (enabled) loadCharHistory();
+  const btn = document.getElementById("status-tab-history-btn");
+  if (btn) btn.style.display = enabled ? "" : "none";
+  const panel = document.getElementById("status-history");
+  if (enabled) {
+    loadCharHistory();
+  } else if (panel && panel.classList.contains("active")) {
+    // History tab was open but is now disabled → fall back to Stats
+    const statsBtn = document.querySelector("#s-character .tab-bar .tab-btn");
+    if (statsBtn) statsBtn.click();
+  }
 }
 
 function refreshCharHistory() {
