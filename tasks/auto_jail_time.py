@@ -23,6 +23,9 @@ class AutoJailTimeTask(Task):
         mode = jail_cfg.get("auto_jail_time", "off")
         if mode == "off":
             return False
+        # A partner is required to plan a jail break.
+        if not jail_cfg.get("auto_jail_partner", "").strip():
+            return False
         if state.hold_action_timer:
             return False
         # Non-gangsters can only plan a jail break in their home city.

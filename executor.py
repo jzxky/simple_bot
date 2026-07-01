@@ -2501,6 +2501,11 @@ def handle_jailbreak_plan(action: Action, state: GameState):
     partner = action.params.get("partner", "")
     hold = action.params.get("hold_action_timer", False)
 
+    # A partner is required to plan a jail break.
+    if not (partner or "").strip():
+        state.add_log("Jail break plan: no partner set — skipping.")
+        return
+
     # Only gangsters can plan a jail break away from their home city.
     if "gangster" not in (state.occupation or "").lower() and not state.in_home_city():
         state.add_log("Jail break plan: non-gangster cannot plan outside home city — skipping.")
