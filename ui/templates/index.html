@@ -47,6 +47,7 @@
         <div class="tab-bar">
           <button class="tab-btn active" onclick="showTab('status-stats', this)">Stats</button>
           <button class="tab-btn" onclick="showTab('status-profile', this); loadProfile()">Profile</button>
+          <button class="tab-btn" id="status-tab-history-btn" onclick="showTab('status-history', this); loadCharHistory()" {% if not config.get('character_history', {}).get('enabled', False) %}style="display:none"{% endif %}>History</button>
         </div>
         <div id="status-stats" class="tab-panel active">
           <div class="stats-grid">
@@ -78,6 +79,17 @@
         </div>
         <div id="status-profile" class="tab-panel">
           <div id="profile-content"><span class="muted">Click "Profile" to load.</span></div>
+        </div>
+        <div id="status-history" class="tab-panel">
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:10px">
+            <span id="char-history-updated" style="font-size:0.75rem;color:#888;"></span>
+            <button class="btn-secondary icon-btn" onclick="refreshCharHistory()" title="Refresh">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+          </div>
+          <div id="char-history-body">
+            <p style="color:#888;font-size:0.9rem;">No data yet. Enable Character History and start the bot to fetch stats.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -1425,23 +1437,6 @@
             </table>
           </div>
         </div>
-      </div>
-    </section>
-
-    <!-- Character History -->
-    <section class="card" id="s-char-history" style="{% if not config.get('character_history', {}).get('enabled', False) %}display:none;{% endif %}">
-      <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-char-history')">▾</button>
-        Character History
-        <span style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-          <span id="char-history-updated" style="font-size:0.75rem;color:#888;font-weight:400;"></span>
-          <button class="btn-secondary icon-btn" onclick="refreshCharHistory()" title="Refresh">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          </button>
-        </span>
-      </h2>
-      <div class="card-body" id="char-history-body">
-        <p style="color:#888;font-size:0.9rem;">No data yet. Enable Character History and start the bot to fetch stats.</p>
       </div>
     </section>
 
