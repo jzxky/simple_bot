@@ -299,10 +299,15 @@ def jail_partner_candidates():
         name = p.get("username")
         if not name or name == own:
             continue
+        occ = (p.get("occupation") or "").lower()
         if is_gangster:
-            if (p.get("occupation") or "").lower() != "gangster":
+            # Gangster: any gangster character.
+            if occ != "gangster":
                 continue
         else:
+            # Non-gangster: only other non-gangster characters in the same home city.
+            if occ == "gangster":
+                continue
             if (p.get("homecity") or "").lower() != home:
                 continue
         rows.append((p.get("character_age") or 0, name))
