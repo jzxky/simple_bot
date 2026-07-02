@@ -2956,6 +2956,19 @@ def clear_pending_vehicle_travel_target():
     global _pending_vehicle_travel_target
     _pending_vehicle_travel_target = ""
 
+
+# Deferred travel: a manual travel requested while the travel timer wasn't free.
+_deferred_travel: "dict | None" = None
+
+
+def get_deferred_travel() -> "dict | None":
+    return _deferred_travel
+
+
+def clear_deferred_travel():
+    global _deferred_travel
+    _deferred_travel = None
+
 _CASINO_URL = "/localcity/businesses.asp?name=Casino"
 _BEIRUT = "Beirut"
 _CASINO_STOP_TEXT = "don't you think"
@@ -3112,6 +3125,14 @@ def handle_travel(action: Action, state: GameState) -> int:
             _notify(state, "warrants_outstanding", msg)
             return 0
 
+    # If the travel timer isn't free, defer this travel until it is (state is
+    # fresh from the warrant-check navigation above).
+    if not state.timer_ready("travel"):
+        global _deferred_travel
+        _deferred_travel = {"target_city": target, "method": method}
+        state.add_log(f"Travel: travel timer not ready — travel to {target} deferred until it's free.")
+        return 0
+
     if method == "own_vehicle":
         pct = handle_check_vehicle(Action("check_vehicle"), state)
         if state.vehicle_health is None:
@@ -3158,6 +3179,11 @@ def handle_travel(action: Action, state: GameState) -> int:
                 return 1
             return 0
         state.add_log(f"Travel: departing to {target} by vehicle.")
+        # After travelling, re-check the vehicle and book a repair if it broke down.
+        post_pct = handle_check_vehicle(Action("check_vehicle"), state)
+        if state.vehicle_health is not None and post_pct == 0:
+            state.add_log("Travel: vehicle broken down after travel — booking repair.")
+            handle_repair_vehicle(Action("repair_vehicle"), state)
         return 1
 
     # Airport method
