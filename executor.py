@@ -2796,12 +2796,18 @@ def handle_check_journals(action: Action, state: GameState):
         _save_journals(char, data)
         state.journals_updated_at = time.time()
 
-    # The new-journals indicator can also be lit by pending requests, which don't
-    # appear in the journal list. If it's still showing after reading journal.asp,
-    # visit the requests page so those are seen (and the indicator clears).
-    if state.has_new_journals:
+    # The new-journals indicator stays lit on the first journal view, so it's
+    # unreliable. Instead, only visit the requests page when the journal page shows
+    # a pending-requests count — a "requests" link with "(n)" where n > 0.
+    pending_requests = 0
+    req_link = soup.find("a", href=lambda h: h and "display=requests" in h)
+    if req_link:
+        m = re.search(r"\((\d+)\)", req_link.get_text())
+        if m:
+            pending_requests = int(m.group(1))
+    if pending_requests > 0:
         _nav(_u("/journal/journal.asp?display=requests"), state)
-        state.add_log("Journals: checked requests page for remaining unread items.")
+        state.add_log(f"Journals: {pending_requests} pending request(s) — checked requests page.")
 
     state.has_new_journals = False
 
