@@ -330,54 +330,48 @@ function _doSave() {
 }
 
 function autoSave() {
+  // Immediate save for checkboxes/selects.
   _doSave();
   _updateIncomePills();
   _updateIncomeTabColors();
 }
 
-// ── Credentials save ──────────────────────────────────────────────────────────
+// ── Debounced save (3s) for free-text/number inputs; also flushed on blur ─────
+
+let _saveTimer = null;
+
+function debouncedSave() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(flushSave, 3000);
+}
+
+function flushSave() {
+  if (!_saveTimer) return;
+  clearTimeout(_saveTimer);
+  _saveTimer = null;
+  _doSave().then(() => {
+    document.querySelectorAll(".input-unsaved").forEach(el => el.classList.remove("input-unsaved"));
+  });
+  _updateIncomePills();
+  _updateIncomeTabColors();
+}
+
+// Commit any pending edit as soon as the field loses focus.
+document.addEventListener("focusout", () => { if (_saveTimer) flushSave(); });
 
 function markCredsDirty() {
   document.getElementById("email").classList.add("input-unsaved");
   document.getElementById("password").classList.add("input-unsaved");
-  document.getElementById("creds-save-btn").classList.add("needed");
+  debouncedSave();
 }
-
-function saveCredentials() {
-  _doSave().then(() => {
-    document.getElementById("email").classList.remove("input-unsaved");
-    document.getElementById("password").classList.remove("input-unsaved");
-    document.getElementById("creds-save-btn").classList.remove("needed");
-  });
-}
-
-// ── Number input save ─────────────────────────────────────────────────────────
 
 function markNumDirty(el) {
   el.classList.add("input-unsaved");
-  const btn = document.getElementById("save-" + el.id);
-  if (btn) btn.classList.add("needed");
-}
-
-function saveNum(id) {
-  _doSave().then(() => {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove("input-unsaved");
-    const btn = document.getElementById("save-" + id);
-    if (btn) btn.classList.remove("needed");
-  });
+  debouncedSave();
 }
 
 function autobuyMarkDirty() {
-  const btn = document.getElementById("save-autobuy");
-  if (btn) btn.classList.add("needed");
-}
-
-function autobuyS() {
-  _doSave().then(() => {
-    const btn = document.getElementById("save-autobuy");
-    if (btn) btn.classList.remove("needed");
-  });
+  debouncedSave();
 }
 
 // ── Collapse ──────────────────────────────────────────────────────────────────
