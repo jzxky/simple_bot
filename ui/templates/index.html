@@ -31,7 +31,9 @@
   <div id="notif-panel" class="notif-panel" style="display:none">
     <div class="notif-panel-head">
       <span class="notif-panel-title">Notifications</span>
+      <span style="flex:1"></span>
       <button class="notif-clear-btn" onclick="clearAllNotifs()">Clear all</button>
+      <button class="notif-clear-btn" onclick="toggleNotifPanel()" title="Collapse" style="margin-left:6px">▲</button>
     </div>
     <div id="notif-list"></div>
   </div>
@@ -495,8 +497,7 @@
               </div>
               <div class="setting-row" style="margin-top:8px">
                 <label for="auto_jail_partner">Partner</label>
-                <input type="text" id="auto_jail_partner" style="width:200px"
-                  value="{{ jail.get('auto_jail_partner','') }}" onchange="autoSave()">
+                <select id="auto_jail_partner" data-current="{{ jail.get('auto_jail_partner','') }}" style="width:200px" onchange="autoSave()"></select>
               </div>
               <div class="setting-row" style="margin-top:8px">
                 <label></label>
@@ -881,7 +882,7 @@
           <button class="tab-btn" id="income-tab-crimes" onclick="showTab('income-crimes', this)"><span class="tab-label-short">Aggs</span><span class="tab-label-long">Aggravated Crimes</span></button>
           <button class="tab-btn" id="income-tab-actions" onclick="showTab('income-actions', this)">Actions</button>
           <button class="tab-btn" onclick="showTab('income-casework', this)">Case Work</button>
-          <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)" style="display:none">Jail</button>
+          <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)">Jail</button>
         </div>
         <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
         <div id="income-jail" class="tab-panel">
@@ -1492,6 +1493,8 @@
     const INITIAL_ACTION_SUB = "{{ config.action.sub_option }}";
     loadAvailableEarns();
     loadEarnPlanner();
+    _syncJailTab();
+    loadAutoJailPartners();
     populateActionSub(INITIAL_ACTION_SUB);
     toggleAwayCrime();
     initCollapse();

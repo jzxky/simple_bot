@@ -725,9 +725,9 @@ let _prevEarnsEnabled = null;
 
 function toggleBot() {
   if (_botRunning) {
-    fetch("/stop", {method: "POST"})
-      .then(r => r.json())
-      .then(d => updateBotState(d.running, d.paused));
+    // Stop is queued on the bot thread — don't change UI now; let pollStatus
+    // reflect the real state once the stop task actually runs.
+    fetch("/stop", {method: "POST"}).catch(() => {});
   } else {
     _doSave().then(() =>
       fetch("/start", {method: "POST"})
@@ -3104,22 +3104,31 @@ function _plRunWhitelistBolds() {
 // Relocate the jail General controls between the Settings→Jail tab and the
 // Income→Jail tab depending on whether the character is in jail.
 function _syncJailTab(inJail) {
+  // Jail tab is always available under Income; the jail General controls live there.
   const btn = document.getElementById("income-tab-jail-btn");
   const group = document.getElementById("jail-general-group");
   const mount = document.getElementById("income-jail-mount");
-  const anchor = document.getElementById("jail-general-anchor");
-  if (!btn || !group || !mount || !anchor) return;
-  if (inJail) {
-    if (group.parentElement !== mount) mount.appendChild(group);
-    btn.style.display = "";
-  } else {
-    if (group.parentElement === mount) anchor.after(group);
-    btn.style.display = "none";
-    const panel = document.getElementById("income-jail");
-    if (panel && panel.classList.contains("active")) {
-      document.getElementById("income-tab-earns")?.click();
-    }
-  }
+  if (!btn || !group || !mount) return;
+  if (group.parentElement !== mount) mount.appendChild(group);
+  btn.style.display = "";
+}
+
+function loadAutoJailPartners() {
+  const sel = document.getElementById("auto_jail_partner");
+  if (!sel) return;
+  const current = sel.dataset.current || sel.value || "";
+  fetch("/jail/partner_candidates")
+    .then(r => r.json())
+    .then(d => {
+      const names = d.partners || [];
+      // Keep the saved partner selectable even if not in the current candidate list.
+      if (current && !names.includes(current)) names.unshift(current);
+      const opts = ['<option value="">— none —</option>']
+        .concat(names.map(n => `<option value="${escHtml(n)}"${n === current ? " selected" : ""}>${escHtml(n)}</option>`));
+      sel.innerHTML = opts.join("");
+      sel.value = current;
+    })
+    .catch(() => {});
 }
 
 function triggerAutoJailCheck() {
@@ -3489,14 +3498,15 @@ let _notifPanelOpen = false;
 function _updateNotifBell(notifs) {
   const bell = document.getElementById("notif-bell");
   const badge = document.getElementById("notif-badge");
+  const panel = document.getElementById("notif-panel");
   if (!bell) return;
   if (notifs.length > 0) {
     badge.textContent = notifs.length;
-    bell.style.display = "";
+    // Bell is visible only when collapsed; when expanded the panel replaces it.
+    bell.style.display = _notifPanelOpen ? "none" : "";
   } else {
     bell.style.display = "none";
     _notifPanelOpen = false;
-    const panel = document.getElementById("notif-panel");
     if (panel) panel.style.display = "none";
   }
   if (_notifPanelOpen) _renderNotifList(notifs);
@@ -3504,9 +3514,11 @@ function _updateNotifBell(notifs) {
 
 function toggleNotifPanel() {
   const panel = document.getElementById("notif-panel");
+  const bell = document.getElementById("notif-bell");
   if (!panel) return;
   _notifPanelOpen = !_notifPanelOpen;
-  panel.style.display = _notifPanelOpen ? "" : "none";
+  panel.style.display = _notifPanelOpen ? "" : "none";   // expand into full section
+  if (bell) bell.style.display = _notifPanelOpen ? "none" : "";  // collapse back to bell
 }
 
 function _renderNotifList(notifs) {
