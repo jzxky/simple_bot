@@ -22,6 +22,11 @@ def _safe(name: str) -> str:
 def _per_char_path(name: str) -> str:
     return os.path.join(paths.data_dir(), f"chistory_{_safe(name)}.json")
 
+
+def has_saved(name: str) -> bool:
+    """True if a per-character history file already exists for this name."""
+    return bool(name) and os.path.exists(_per_char_path(name))
+
 _CAREER_SECTIONS = {
     "Mayor", "Funeral Work", "Banking Work", "Customs Work",
     "Medical Work", "Law Work", "Police Work", "Engineering", "Fire Fighter",
