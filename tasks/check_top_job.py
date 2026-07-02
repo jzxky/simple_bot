@@ -61,10 +61,13 @@ class CheckTopJobTask(Task):
             state.add_log(f"CheckTopJob: fetch error: {e}")
             return
 
+        # The incumbent's top-job title appears in userOccupation for most careers,
+        # but in userRank for Customs (occupation is the generic "Customs") — match either.
         match = next(
             (p["userName"] for p in raw
              if p.get("userHomeCity", "").strip() == state.home_city
-             and p.get("userOccupation", "").strip() == top_job),
+             and (p.get("userOccupation", "").strip() == top_job
+                  or p.get("userRank", "").strip() == top_job)),
             None,
         )
 
