@@ -147,7 +147,8 @@ DEFAULT_CONFIG = {
     },
     "character_history": {
         "enabled": False,
-        "refresh_interval_minutes": 30
+        "refresh_interval_minutes": 30,
+        "obituary_last_run": 0
     },
     "bionics": {
         "enabled": False,

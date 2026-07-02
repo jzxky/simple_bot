@@ -21,18 +21,19 @@ class ObituaryHistoryTask(Task):
     priority = 8  # low; below the live character-history task
     label = "Obituary History"
 
-    def __init__(self):
-        self._last_run: float = 0.0
-
     def can_run(self, state: GameState) -> bool:
         if not state.logged_in or state.in_jail or state.in_hospital:
             return False
-        if not cfg.load().get("character_history", {}).get("enabled", False):
+        c = cfg.load().get("character_history", {})
+        if not c.get("enabled", False):
             return False
-        return time.time() - self._last_run >= _DAY
+        # Last-run time is persisted in config so a restart doesn't re-trigger it.
+        return time.time() - float(c.get("obituary_last_run", 0) or 0) >= _DAY
 
     def run(self, state: GameState, executor):
-        self._last_run = time.time()
+        c = cfg.load()
+        c.setdefault("character_history", {})["obituary_last_run"] = int(time.time())
+        cfg.save(c)
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=_OBIT_WINDOW_DAYS)
         names = []
@@ -46,8 +47,12 @@ class ObituaryHistoryTask(Task):
                 dt = datetime.strptime(died, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
             except Exception:
                 continue
-            if dt >= cutoff:
-                names.append(p["username"])
+            if dt < cutoff:
+                continue
+            # Skip players that already have a saved history file.
+            if ch.has_saved(p["username"]):
+                continue
+            names.append(p["username"])
 
         if not names:
             return
