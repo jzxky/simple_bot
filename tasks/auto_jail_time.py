@@ -121,5 +121,7 @@ class AutoJailTimeExecuteTask(Task):
         c = cfg.load()
         c["jail"]["jailbreak_execute_at"] = 0
         cfg.save(c)
-        state.add_log("Auto Jail Time: 30 min elapsed — executing jailbreak.")
-        bot.request_jailbreak_execute()
+        # After the 30-minute wait the bot only needs to visit the jailbreak page;
+        # actually executing the break is not required.
+        state.add_log("Auto Jail Time: 30 min elapsed — visiting jailbreak page.")
+        executor.execute(Action("navigate", url="/income/jailbreak.asp"), state)
