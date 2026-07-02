@@ -681,9 +681,25 @@ input.input-unsaved { color: var(--red) !important; }
   color: #8ecb8e !important;
 }
 /* Jail variants for the rest of the status-section elements */
-.in-jail .tab-btn { color: #b0b0b0; border-color: #666; }
+.in-jail .tab-btn { background: #525252; color: #c0c0c0; border-color: #666; }
 .in-jail .tab-btn:hover { color: #f0f0f0; }
-.in-jail .tab-btn.active { color: #f0f0f0; border-color: #888; border-bottom-color: #4a4a4a; }
+.in-jail .tab-btn.active { background: #4a4a4a; color: #f0f0f0; border-color: #888; border-bottom-color: #4a4a4a; }
+/* Character history */
+.in-jail .ch-section { background: #525252; border-color: #666; }
+.in-jail .ch-section-head { background: #4a4a4a; border-bottom-color: #666; }
+.in-jail .ch-section-title { color: #dcdcdc; }
+.in-jail .ch-table td { color: #e8e8e8; border-bottom-color: #666; }
+.in-jail .ch-key,
+.in-jail .ch-earn-label,
+.in-jail .ch-earn-cat,
+.in-jail .ch-empty-note,
+.in-jail .ch-date,
+.in-jail .ch-st-type { color: #b0b0b0; }
+.in-jail .ch-money,
+.in-jail .ch-earn-count { color: #e0c890; }
+.in-jail .ch-st-name { color: #f0f0f0; }
+.in-jail .ch-promo-table th,
+.in-jail .ch-unlocked-item { border-color: #666; }
 .in-jail .pill { background: #525252; border-color: #666; color: #d8d8d8; }
 .in-jail select,
 .in-jail input,
@@ -1438,11 +1454,10 @@ button, [onclick] { touch-action: manipulation; }
 .notif-panel {
   width: 100%;
   max-height: 420px;
-  margin-bottom: 20px;
-  background: var(--card-bg, #1e1e2e);
+  margin-bottom: 14px;
+  background: var(--surface);   /* match the other sections */
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 6px 24px rgba(0,0,0,.5);
   overflow: hidden;
   display: flex;              /* inline display:none hides it; JS clears inline to show */
   flex-direction: column;
@@ -1461,7 +1476,14 @@ button, [onclick] { touch-action: manipulation; }
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.notif-panel-title { font-weight: 600; font-size: 0.9rem; }
+.notif-panel-title {
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--accent);          /* match section header font colour */
+}
+.notif-panel-head .notif-head-bell { color: var(--accent); display: flex; align-items: center; }
 .notif-clear-btn {
   background: none;
   border: 1px solid var(--border);
