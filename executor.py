@@ -2796,6 +2796,13 @@ def handle_check_journals(action: Action, state: GameState):
         _save_journals(char, data)
         state.journals_updated_at = time.time()
 
+    # The new-journals indicator can also be lit by pending requests, which don't
+    # appear in the journal list. If it's still showing after reading journal.asp,
+    # visit the requests page so those are seen (and the indicator clears).
+    if state.has_new_journals:
+        _nav(_u("/journal/journal.asp?display=requests"), state)
+        state.add_log("Journals: checked requests page for remaining unread items.")
+
     state.has_new_journals = False
 
 
