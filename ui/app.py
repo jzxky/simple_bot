@@ -282,15 +282,30 @@ def banklaunder_bulk_add():
     return jsonify({"ok": True})
 
 
+_GANGSTER_RANKS = {
+    "dealer", "giovane d'honore", "giovane d`honore", "enforcer", "piciotto",
+    "sgarrista", "capodecima", "caporegime", "boss", "don", "godfather",
+    "capo di tutti capi",
+}
+
+
+def _is_gangster(occupation: str, rank: str = "") -> bool:
+    """Robust gangster check: occupation contains 'gangster' (handles whitespace/
+    casing) or the rank is a known gangster rank (in case occupation shows a rank)."""
+    occ = (occupation or "").lower()
+    if "gangster" in occ:
+        return True
+    return (rank or "").strip().lower() in _GANGSTER_RANKS
+
+
 @app.route("/jail/partner_candidates")
 def jail_partner_candidates():
-    """Valid jail-break partners from the player-list DB (same logic as the plan
-    jail-break selector, but from the DB, including offline players, sorted by
-    character age ascending)."""
+    """Valid jail-break partners from the player-list DB (including offline players,
+    sorted by character age ascending)."""
     import player_db as _db
     s = bot.state
     own = (s.own_name if s else "") or ""
-    is_gangster = (s.occupation or "").lower() == "gangster" if s else False
+    self_gangster = _is_gangster(s.occupation if s else "", s.rank if s else "")
     home = ((s.home_city if s else "") or "").lower()
     rows = []
     for p in _db.get_all_players():
@@ -299,20 +314,26 @@ def jail_partner_candidates():
         name = p.get("username")
         if not name or name == own:
             continue
-        occ = (p.get("occupation") or "").lower()
-        if is_gangster:
+        p_gangster = _is_gangster(p.get("occupation", ""), p.get("rank", ""))
+        if self_gangster:
             # Gangster: any gangster character.
-            if occ != "gangster":
+            if not p_gangster:
                 continue
         else:
             # Non-gangster: only other non-gangster characters in the same home city.
-            if occ == "gangster":
+            if p_gangster:
                 continue
             if (p.get("homecity") or "").lower() != home:
                 continue
         rows.append((p.get("character_age") or 0, name))
     rows.sort(key=lambda r: r[0])  # character age ascending
-    return jsonify({"partners": [n for _, n in rows]})
+    return jsonify({
+        "partners": [n for _, n in rows],
+        # Diagnostics for troubleshooting the filter:
+        "self": {"name": own, "occupation": (s.occupation if s else ""),
+                 "rank": (s.rank if s else ""), "home_city": (s.home_city if s else ""),
+                 "is_gangster": self_gangster},
+    })
 
 
 @app.route("/jail/auto_jail_check", methods=["POST"])
