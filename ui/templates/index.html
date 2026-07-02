@@ -502,7 +502,6 @@
                 <input type="number" id="player_refresh_interval" min="1" max="1440"
                   value="{{ config.get('players', {}).get('refresh_interval_minutes', 30) }}"
                   style="width:70px" oninput="markNumDirty(this)">
-                <button class="num-save-btn" id="save-player_refresh_interval" onclick="saveNum('player_refresh_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               </div>
             </div>
             <div class="settings-group">
@@ -551,7 +550,6 @@
                 <input type="text" id="consume_timer_limit" style="width:80px"
                   value="{{ cons.get('timer_limit', '00:00') }}"
                   placeholder="00:00" oninput="markNumDirty(this)">
-                <button class="num-save-btn" id="save-consume_timer_limit" onclick="saveNum('consume_timer_limit')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               </div>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
@@ -584,7 +582,6 @@
                 <input type="number" id="consumable_buffer" min="0" style="width:80px"
                   value="{{ cons.get('buffer', 0) }}"
                   oninput="markNumDirty(this)">
-                <button class="num-save-btn" id="save-consumable_buffer" onclick="saveNum('consumable_buffer')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               </div>
             </div>
             {% set ab = config.get('autobuy', {}) %}
@@ -628,7 +625,6 @@
                 </tbody>
               </table>
               <div style="margin-top:10px;text-align:center">
-                <button class="num-save-btn" id="save-autobuy" onclick="autobuyS()" style="width:auto;padding:4px 14px;">Update Prices</button>
               </div>
             </div>
           </div>
@@ -651,7 +647,6 @@
                 <span>Min Cash on Hand</span>
                 <div style="display:flex;gap:6px;align-items:center;">
                   <input type="number" id="min_cash_on_hand" value="{{ config.get('misc', {}).get('min_cash_on_hand', 0) }}" min="0" step="1000" style="width:120px;" onchange="autoSave()" oninput="markNumDirty(this)">
-                  <button id="save-min_cash_on_hand" class="num-save-btn" onclick="saveNum('min_cash_on_hand')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
                 </div>
               </div>
               <div class="setting-row" id="update-row" style="display:none">
@@ -691,7 +686,6 @@
                 <span>Refresh Interval (minutes)</span>
                 <div style="display:flex;gap:6px;align-items:center;">
                   <input type="number" id="char_history_interval" value="{{ config.get('character_history', {}).get('refresh_interval_minutes', 30) }}" min="5" step="5" style="width:80px;" onchange="autoSave()" oninput="markNumDirty(this)">
-                  <button id="save-char_history_interval" class="num-save-btn" onclick="saveNum('char_history_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
                 </div>
               </div>
             </div>
@@ -715,7 +709,6 @@
                   </div>
                 </label>
               </div>
-              <button id="creds-save-btn" class="num-save-btn" style="margin-top:10px" onclick="saveCredentials()"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
             </div>
           </div>
         </div>
@@ -1020,7 +1013,6 @@
               <input type="number" id="hospital_poll_interval" class="input-narrow" min="31"
                 value="{{ config.get('case_work', {}).get('hospital', {}).get('poll_interval', 31) }}"
                 oninput="markNumDirty(this)">
-              <button class="num-save-btn" id="save-hospital_poll_interval" onclick="saveNum('hospital_poll_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               seconds
             </div>
             <table class="priority-table" id="hospital-priority-table">
@@ -1076,7 +1068,6 @@
               <input type="number" id="fire_poll_interval" class="input-narrow" min="31"
                 value="{{ config.get('case_work', {}).get('fire', {}).get('poll_interval', 31) }}"
                 oninput="markNumDirty(this)">
-              <button class="num-save-btn" id="save-fire_poll_interval" onclick="saveNum('fire_poll_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               seconds
             </div>
             <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 0">Attends active fires and performs building inspections automatically when the case timer is ready.</p>
@@ -1089,7 +1080,6 @@
               <input type="number" id="engineering_poll_interval" class="input-narrow" min="31"
                 value="{{ config.get('case_work', {}).get('engineering', {}).get('poll_interval', 31) }}"
                 oninput="markNumDirty(this)">
-              <button class="num-save-btn" id="save-engineering_poll_interval" onclick="saveNum('engineering_poll_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               seconds
             </div>
             <table class="priority-table" id="engineering-priority-table">
@@ -1143,7 +1133,6 @@
               <input type="number" id="banking_poll_interval" class="input-narrow" min="31"
                 value="{{ config.get('case_work', {}).get('banking', {}).get('poll_interval', 60) }}"
                 oninput="markNumDirty(this)">
-              <button class="num-save-btn" id="save-banking_poll_interval" onclick="saveNum('banking_poll_interval')"><svg class="save-icon" aria-label="Save" viewBox="0 0 16 16"><use href="#icon-save"/></svg></button>
               seconds
             </div>
             <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 10px">
