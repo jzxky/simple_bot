@@ -15,7 +15,7 @@ class CharacterHistoryTask(Task):
         self._last_run: float = 0.0
 
     def can_run(self, state: GameState) -> bool:
-        if not state.logged_in or state.in_jail:
+        if not state.logged_in:
             return False
         c = cfg.load().get("character_history", {})
         if not c.get("enabled", False):
