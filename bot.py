@@ -484,8 +484,12 @@ def _run(c: dict):
                 try:
                     _auto_jail_check_queue.get_nowait()
                     if _auto_jail_task is not None:
-                        state.add_log("Auto Jail Time: manual check triggered.")
-                        _auto_jail_task.run(state, executor)
+                        if _auto_jail_task.can_run(state):
+                            state.add_log("Auto Jail Time: manual check triggered.")
+                            _auto_jail_task.run(state, executor)
+                        else:
+                            state.add_log("Auto Jail Time: manual check skipped — conditions not met "
+                                          "(mode off, no partner, action timer busy, or no target).")
                 except Exception as e:
                     state.add_log(f"Auto Jail Time: manual check error: {e}")
 
