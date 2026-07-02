@@ -1220,110 +1220,95 @@ def handle_university(action: Action, state: GameState):
     if not _check_session(state):
         return
 
-    soup = BeautifulSoup(page.content(), "html.parser")
-    select = soup.find("select", attrs={"name": "action"})
-    if not select:
-        state.add_log("University: form not found.")
-        return
-
-    options = {opt.get("value", ""): opt.get_text(strip=True) for opt in select.find_all("option")}
-
-    # --- Studying page: already enrolled, just study ---
-    if "Yes" in options:
-        page.select_option("select[name='action']", "Yes")
+    def _submit(value: str):
+        page.select_option("select[name='action']", value)
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
-        soup2 = BeautifulSoup(page.content(), "html.parser")
-        page_text = soup2.get_text(" ").lower()
-        # Detect degree completion
-        if any(w in page_text for w in ("congratulations", "completed", "graduated", "degree awarded")):
-            degree_match = _re.search(r"degree in (\w+)", page_text, _re.I)
-            completed_name = degree_match.group(1).capitalize() if degree_match else None
-            if completed_name:
-                canonical = next((d for d in _DEGREES if d.lower() == completed_name.lower()), completed_name)
-                c = cfg.load()
-                completed = c.setdefault("university", {}).setdefault("completed", [])
-                if canonical not in completed:
-                    completed.append(canonical)
-                    cfg.save(c)
-                state.add_log(f"University: completed {canonical} degree.")
-        else:
-            state.add_log("University: studied.")
-        return
 
-    # --- Enrollment confirmation page: accept the degree ---
-    accept_val = next((v for v in options if v.lower().startswith("accept")), None)
-    if accept_val:
-        # Check cost and withdraw if needed
-        page_text = soup.get_text(" ")
-        fee_match = _re.search(r"\$([0-9,]+)", page_text)
-        if fee_match:
-            fee = int(fee_match.group(1).replace(",", ""))
-            if (state.clean_money or 0) < fee:
-                needed = fee - (state.clean_money or 0)
-                state.add_log(f"University: need ${fee:,} to enroll, withdrawing ${needed:,}.")
-                handle_withdraw(Action("withdraw", amount=needed), state)
+    # Walk the university flow in one run: select degree → accept enrollment → study.
+    # Each stage re-parses the resulting page so we don't rely on separate task cycles.
+    for _step in range(4):
+        soup = BeautifulSoup(page.content(), "html.parser")
+        select = soup.find("select", attrs={"name": "action"})
+        if not select:
+            state.add_log("University: form not found.")
+            return
+        options = {opt.get("value", ""): opt.get_text(strip=True) for opt in select.find_all("option")}
+
+        # --- Studying page: already enrolled, just study ---
+        if "Yes" in options:
+            _submit("Yes")
+            soup2 = BeautifulSoup(page.content(), "html.parser")
+            page_text = soup2.get_text(" ").lower()
+            if any(w in page_text for w in ("congratulations", "completed", "graduated", "degree awarded")):
+                degree_match = _re.search(r"degree in (\w+)", page_text, _re.I)
+                completed_name = degree_match.group(1).capitalize() if degree_match else None
+                if completed_name:
+                    canonical = next((d for d in _DEGREES if d.lower() == completed_name.lower()), completed_name)
+                    c = cfg.load()
+                    completed = c.setdefault("university", {}).setdefault("completed", [])
+                    if canonical not in completed:
+                        completed.append(canonical)
+                        cfg.save(c)
+                    state.add_log(f"University: completed {canonical} degree.")
+            else:
+                state.add_log("University: studied.")
+            return
+
+        # --- Enrollment confirmation page: accept the degree ---
+        accept_val = next((v for v in options if v.lower().startswith("accept")), None)
+        if accept_val:
+            page_text = soup.get_text(" ")
+            fee_match = _re.search(r"\$([0-9,]+)", page_text)
+            if fee_match:
+                fee = int(fee_match.group(1).replace(",", ""))
                 if (state.clean_money or 0) < fee:
-                    state.add_log("University: insufficient funds after withdrawal — skipping.")
-                    return
-        page.select_option("select[name='action']", accept_val)
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
-        _refresh_state(state)
-        state.add_log(f"University: enrolled ({accept_val}).")
-        return
+                    needed = fee - (state.clean_money or 0)
+                    state.add_log(f"University: need ${fee:,} to enroll, withdrawing ${needed:,}.")
+                    handle_withdraw(Action("withdraw", amount=needed), state)
+                    if (state.clean_money or 0) < fee:
+                        state.add_log("University: insufficient funds after withdrawal — skipping.")
+                        return
+            _submit(accept_val)
+            state.add_log(f"University: enrolled ({accept_val}).")
+            continue  # re-parse — should now be the studying page
 
-    # --- Initial selection page ---
-    if degree_cfg:
-        # Specific degree configured and we're on the selector page → not yet enrolled,
-        # so start that degree. (Normalise naming, e.g. "Medicine" → "Medical".)
-        canonical = next(
-            (d for d in _DEGREES
-             if d.lower() == degree_cfg.lower() or d.lower()[:5] == degree_cfg.lower()[:5]),
-            degree_cfg,
-        )
+        # --- Initial selection page: pick the degree to study ---
         c = cfg.load()
         completed = c.get("university", {}).get("completed", [])
-        if canonical in completed:
-            state.add_log(f"University: '{canonical}' already completed — disabling actions.")
-            c["action"]["enabled"] = False
-            cfg.save(c)
-            return
+        if degree_cfg:
+            canonical = next(
+                (d for d in _DEGREES
+                 if d.lower() == degree_cfg.lower() or d.lower()[:5] == degree_cfg.lower()[:5]),
+                degree_cfg,
+            )
+            if canonical in completed:
+                state.add_log(f"University: '{canonical}' already completed — disabling actions.")
+                c["action"]["enabled"] = False
+                cfg.save(c)
+                return
+        else:
+            canonical = next((d for d in _DEGREES if d not in completed), None)
+            if canonical is None:
+                state.add_log("University: all degrees completed — disabling actions.")
+                c["action"]["enabled"] = False
+                cfg.save(c)
+                return
+
         match = next(
             (v for v in options
              if v.lower() == canonical.lower() or options[v].lower() == canonical.lower()),
             None,
         )
-        if match:
-            page.select_option("select[name='action']", match)
-            page.click("input[type='submit'][name='B1']")
-            page.wait_for_load_state("domcontentloaded")
-            _refresh_state(state)
-            state.add_log(f"University: selected {canonical} course.")
+        if not match:
+            state.add_log(f"University: degree '{canonical}' not available on selector — disabling actions.")
+            c["action"]["enabled"] = False
+            cfg.save(c)
             return
-        state.add_log(f"University: degree '{degree_cfg}' not available on selector — disabling actions.")
-        c["action"]["enabled"] = False
-        cfg.save(c)
-        return
-
-    # All-degrees mode: pick next uncompleted degree in order
-    c = cfg.load()
-    completed = c.get("university", {}).get("completed", [])
-    next_degree = next((d for d in _DEGREES if d not in completed), None)
-    if next_degree is None:
-        state.add_log("University: all degrees completed — disabling actions.")
-        c["action"]["enabled"] = False
-        cfg.save(c)
-        return
-    if next_degree not in options:
-        state.add_log(f"University: degree option '{next_degree}' not found on page.")
-        return
-    page.select_option("select[name='action']", next_degree)
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
-    _refresh_state(state)
-    state.add_log(f"University: selected {next_degree} course.")
+        _submit(match)
+        state.add_log(f"University: selected {canonical} course.")
+        continue  # re-parse — should now be the enrollment confirmation page
 
 
 def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
