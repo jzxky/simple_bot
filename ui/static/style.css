@@ -700,6 +700,14 @@ input.input-unsaved { color: var(--red) !important; }
 .in-jail .ch-st-name { color: #f0f0f0; }
 .in-jail .ch-promo-table th,
 .in-jail .ch-unlocked-item { border-color: #666; }
+.in-jail .ch-promo-table th { color: #b0b0b0; }
+.in-jail .ch-earn-item { background: #4a4a4a; border-color: #666; }
+.in-jail .ch-locked-btn { background: #525252; border-color: #666; color: #d0d0d0; }
+.in-jail .ch-locked-btn:hover { border-color: #999; color: #f0f0f0; }
+.in-jail .ch-rank-badge { background: #525252; border-color: #666; color: #c8c8c8; }
+.in-jail .ch-locked-divider { background: #4a4a4a; border-color: #666; color: #b0b0b0; }
+.in-jail .ch-locked-name { color: #c0c0c0; }
+.in-jail .ch-locked-desc { color: #a0a0a0; }
 .in-jail .pill { background: #525252; border-color: #666; color: #d8d8d8; }
 .in-jail select,
 .in-jail input,
