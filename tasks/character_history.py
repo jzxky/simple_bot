@@ -34,7 +34,7 @@ class CharacterHistoryTask(Task):
             except Exception:
                 pass
         try:
-            ch.fetch_and_save()
+            ch.fetch_and_save(state.own_name or "")
             self._last_run = time.time()
             state.char_history_updated_at = self._last_run
             state.add_log("Character history updated.")

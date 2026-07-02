@@ -602,12 +602,18 @@ def journals():
 
 @app.route("/character_history")
 def character_history():
-    return jsonify(ch.load())
+    return jsonify(ch.load(request.args.get("char", "")))
+
+
+@app.route("/character_history/list")
+def character_history_list():
+    current = bot.state.own_name if bot.state else ""
+    return jsonify({"characters": ch.list_saved(), "current": current})
 
 
 @app.route("/trait_requirements")
 def trait_requirements():
-    data = ch.load()
+    data = ch.load(request.args.get("char", ""))
     result = {}
     for name, entry in tr.REQUIREMENTS.items():
         if name in tr.HIDDEN_FROM_LOCKED:
