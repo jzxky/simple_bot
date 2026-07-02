@@ -880,6 +880,9 @@ function pollStatus() {
         }
       }
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null, d.flight_departs_at || null, d.hospital_release_at || null);
+      // On login (transition to logged_in), refresh the auto-jail partner list
+      // now that own occupation/home city are known.
+      if (d.logged_in && !_botState.logged_in) loadAutoJailPartners();
       _botState = {
         logged_in: !!d.logged_in, in_jail: !!d.in_jail, in_hospital: !!d.in_hospital,
         action_ready: !!d.action_ready, hold_action_timer: !!d.hold_action_timer,
@@ -2623,6 +2626,8 @@ function loadPlayers() {
         const active = _plData.filter(p => p.active).length;
         pill.innerHTML = _pill(`👥 ${active}`);
       }
+      // Keep the auto-jail partner list current with the player DB.
+      loadAutoJailPartners();
     })
     .catch(() => {});
 }
