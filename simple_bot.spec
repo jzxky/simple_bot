@@ -69,6 +69,7 @@ a = Analysis(
         'tasks.case_work',
         'tasks.casino',
         'tasks.character_history',
+        'tasks.obituary_history',
         'tasks.check_top_job',
         'tasks.community_service',
         'tasks.consume',

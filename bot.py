@@ -37,6 +37,7 @@ from tasks.deposit import DepositTask
 from tasks.withdraw import WithdrawTask
 from tasks.maintain_cash import MaintainCashTask
 from tasks.character_history import CharacterHistoryTask
+from tasks.obituary_history import ObituaryHistoryTask
 from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJailBreakTask
 from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask
 from tasks.journal import JournalCheckTask, ArchiveJournalsTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue
@@ -187,6 +188,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(WithdrawTask(_withdraw_queue))
     sched.add(MaintainCashTask())
     sched.add(CharacterHistoryTask(_char_history_queue))
+    sched.add(ObituaryHistoryTask())
     sched.add(PlanJailBreakTask(_jailbreak_plan_queue))
     sched.add(ExecuteJailBreakTask(_jailbreak_execute_queue))
     sched.add(CallOffJailBreakTask(_jailbreak_calloff_queue))

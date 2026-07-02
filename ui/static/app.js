@@ -2056,15 +2056,40 @@ function refreshCharHistory() {
     });
 }
 
-function loadCharHistory() {
+let _chViewing = "";  // "" = current character
+
+function loadCharHistory(name) {
+  if (name === undefined) name = _chViewing;
+  _chViewing = name || "";
+  const q = _chViewing ? "?char=" + encodeURIComponent(_chViewing) : "";
+  _populateCharHistorySelect();
   Promise.all([
-    fetch("/character_history").then(r => r.json()),
-    fetch("/trait_requirements").then(r => r.json()),
+    fetch("/character_history" + q).then(r => r.json()),
+    fetch("/trait_requirements" + q).then(r => r.json()),
   ]).then(([data, reqs]) => {
     _chData = data;
     _chReqs = reqs;
     renderCharHistory(data, reqs);
   });
+}
+
+function _populateCharHistorySelect() {
+  const sel = document.getElementById("char-history-select");
+  if (!sel) return;
+  fetch("/character_history/list").then(r => r.json()).then(d => {
+    const names = d.characters || [];
+    const current = d.current || "";
+    const opts = [];
+    if (current) opts.push(`<option value="">${escHtml(current)} (current)</option>`);
+    names.filter(n => n !== current).forEach(n => opts.push(`<option value="${escHtml(n)}">${escHtml(n)}</option>`));
+    sel.innerHTML = opts.join("") || '<option value="">(none saved)</option>';
+    sel.value = _chViewing;
+  }).catch(() => {});
+}
+
+function onCharHistorySelect() {
+  const sel = document.getElementById("char-history-select");
+  if (sel) loadCharHistory(sel.value);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

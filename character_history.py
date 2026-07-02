@@ -12,7 +12,15 @@ import browser
 import urls
 import paths
 
-CACHE_PATH = os.path.join(paths.data_dir(), "character_history.json")
+CACHE_PATH = os.path.join(paths.data_dir(), "character_history.json")  # legacy / current character
+
+
+def _safe(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]", "_", name or "")
+
+
+def _per_char_path(name: str) -> str:
+    return os.path.join(paths.data_dir(), f"chistory_{_safe(name)}.json")
 
 _CAREER_SECTIONS = {
     "Mayor", "Funeral Work", "Banking Work", "Customs Work",
@@ -153,17 +161,76 @@ def _parse(html: str) -> dict:
     }
 
 
-def fetch_and_save() -> dict:
-    html = browser.navigate(urls.BASE_URL + "/stats/playerstats.asp")
+def fetch_and_save(char_name: str = "", alive_lookup: bool = False) -> "dict | None":
+    """Fetch and save a character's history.
+
+    - alive_lookup=False: the current character (playerstats.asp).
+    - alive_lookup=True: another player by name (playerstatsalive.asp?u=name).
+
+    Returns the parsed data, or None if the page had no stats table (navigation
+    unsuccessful / no such page)."""
+    if alive_lookup:
+        url = urls.BASE_URL + "/stats/playerstatsalive.asp?u=" + char_name
+    else:
+        url = urls.BASE_URL + "/stats/playerstats.asp"
+    html = browser.navigate(url)
+    soup = BeautifulSoup(html, "html.parser")
+    if not soup.find("table", id="playerstats"):
+        return None
+
     data = _parse(html)
-    os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
-    with open(CACHE_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    if char_name:
+        data["character"] = char_name
+    os.makedirs(paths.data_dir(), exist_ok=True)
+    if char_name:
+        with open(_per_char_path(char_name), "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    # The current character also writes the legacy file so the default view is unchanged.
+    if not alive_lookup:
+        with open(CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
     return data
 
 
-def load() -> dict:
-    if not os.path.exists(CACHE_PATH):
+def load(name: str = "") -> dict:
+    """Load a saved character history. name="" → current character (legacy file)."""
+    path = _per_char_path(name) if name else CACHE_PATH
+    if not os.path.exists(path):
+        # fall back to legacy for the current character
+        if name and os.path.exists(CACHE_PATH):
+            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            if d.get("character") == name:
+                return d
         return {}
-    with open(CACHE_PATH, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def list_saved() -> list:
+    """Return the names of all saved character histories (sorted)."""
+    names = set()
+    d = paths.data_dir()
+    try:
+        entries = os.listdir(d)
+    except FileNotFoundError:
+        return []
+    for fn in entries:
+        if fn.startswith("chistory_") and fn.endswith(".json"):
+            try:
+                with open(os.path.join(d, fn), "r", encoding="utf-8") as f:
+                    nm = json.load(f).get("character")
+            except Exception:
+                nm = fn[len("chistory_"):-len(".json")]
+            if nm:
+                names.add(nm)
+    # Include the current character from the legacy file
+    if os.path.exists(CACHE_PATH):
+        try:
+            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+                nm = json.load(f).get("character")
+            if nm:
+                names.add(nm)
+        except Exception:
+            pass
+    return sorted(names)
