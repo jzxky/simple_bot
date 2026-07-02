@@ -812,6 +812,9 @@ function pollStatus() {
       document.getElementById("stat-dirty").textContent = d.dirty_money != null ? fmt(d.dirty_money) : "--";
       document.getElementById("stat-bank").textContent = d.bank_balance ? fmt(d.bank_balance) : "--";
 
+      // Move the jail General controls into the income "Jail" tab while in jail.
+      _syncJailTab(!!d.in_jail);
+
       // Jail badge and status card tint
       const jailBadge = document.getElementById("stat-jail-badge");
       const statusCard = document.getElementById("s-character");
@@ -3058,6 +3061,41 @@ function _plRunWhitelistBolds() {
 
 // ── Refresh & import ──────────────────────────────────────────────────────────
 
+// Relocate the jail General controls between the Settings→Jail tab and the
+// Income→Jail tab depending on whether the character is in jail.
+function _syncJailTab(inJail) {
+  const btn = document.getElementById("income-tab-jail-btn");
+  const group = document.getElementById("jail-general-group");
+  const mount = document.getElementById("income-jail-mount");
+  const anchor = document.getElementById("jail-general-anchor");
+  if (!btn || !group || !mount || !anchor) return;
+  if (inJail) {
+    if (group.parentElement !== mount) mount.appendChild(group);
+    btn.style.display = "";
+  } else {
+    if (group.parentElement === mount) anchor.after(group);
+    btn.style.display = "none";
+    const panel = document.getElementById("income-jail");
+    if (panel && panel.classList.contains("active")) {
+      document.getElementById("income-tab-earns")?.click();
+    }
+  }
+}
+
+function triggerAutoJailCheck() {
+  const btn = document.getElementById("auto-jail-check-btn");
+  const status = document.getElementById("auto-jail-check-status");
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = "Checking…";
+  fetch("/jail/auto_jail_check", {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      if (status) status.textContent = d.ok ? "Triggered — see activity log." : (d.error || "Failed.");
+    })
+    .catch(() => { if (status) status.textContent = "Request failed."; })
+    .finally(() => { setTimeout(() => { if (btn) btn.disabled = false; }, 2000); });
+}
+
 function plRefresh() {
   const btn    = document.getElementById("pl-refresh-btn");
   const status = document.getElementById("pl-refresh-status");
@@ -3069,6 +3107,7 @@ function plRefresh() {
       if (btn) { btn.disabled = false; btn.textContent = "Refresh"; }
       if (d.error) { if (status) status.textContent = d.error; return; }
       loadPlayers();
+      if (document.getElementById("pl-bolds-toggle")?.checked) _plRunWhitelistBolds();
     })
     .catch(() => {
       if (btn) { btn.disabled = false; btn.textContent = "Refresh"; }

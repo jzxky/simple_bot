@@ -282,6 +282,14 @@ def banklaunder_bulk_add():
     return jsonify({"ok": True})
 
 
+@app.route("/jail/auto_jail_check", methods=["POST"])
+def jail_auto_check():
+    if not bot.is_running():
+        return jsonify({"ok": False, "error": "Bot is not running."})
+    bot.request_auto_jail_check()
+    return jsonify({"ok": True})
+
+
 @app.route("/pause", methods=["POST"])
 def pause():
     bot.pause()

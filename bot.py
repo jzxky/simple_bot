@@ -54,6 +54,8 @@ from players import PlayerRefreshTask, SyncTask
 _thread: threading.Thread = None
 _bionics_task = None
 _weapon_store_task = None
+_auto_jail_task = None
+_auto_jail_check_queue: queue.Queue = queue.Queue()
 _scheduler_snapshot: list = []
 _sched: "Scheduler | None" = None
 _state: "GameState | None" = None
@@ -188,7 +190,9 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(PlanJailBreakTask(_jailbreak_plan_queue))
     sched.add(ExecuteJailBreakTask(_jailbreak_execute_queue))
     sched.add(CallOffJailBreakTask(_jailbreak_calloff_queue))
-    sched.add(AutoJailTimeTask())
+    global _auto_jail_task
+    _auto_jail_task = AutoJailTimeTask()
+    sched.add(_auto_jail_task)
     sched.add(AutoJailTimeExecuteTask())
     sched.add(JournalCheckTask())
     sched.add(ArchiveJournalsTask(_archive_journals_queue))
@@ -475,6 +479,16 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Bulk launder error: {e}")
 
+            # Manual auto-jail check if requested from UI
+            if not _auto_jail_check_queue.empty():
+                try:
+                    _auto_jail_check_queue.get_nowait()
+                    if _auto_jail_task is not None:
+                        state.add_log("Auto Jail Time: manual check triggered.")
+                        _auto_jail_task.run(state, executor)
+                except Exception as e:
+                    state.add_log(f"Auto Jail Time: manual check error: {e}")
+
             # Clear earn queue if requested from UI
             if _clear_earn_event.is_set():
                 _clear_earn_event.clear()
@@ -586,6 +600,10 @@ def request_reload():
 
 def request_bulk_launder():
     _bulk_launder_queue.put(True)
+
+
+def request_auto_jail_check():
+    _auto_jail_check_queue.put(True)
 
 
 def request_consume(consume_type: str):
