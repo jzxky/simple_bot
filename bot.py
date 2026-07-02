@@ -396,6 +396,17 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Travel error: {e}")
 
+            # Resume deferred travel once the travel timer is free
+            try:
+                from executor import get_deferred_travel, clear_deferred_travel
+                _dt = get_deferred_travel()
+                if _dt and state.timer_ready("travel"):
+                    clear_deferred_travel()
+                    state.add_log(f"Travel timer free — resuming deferred travel to {_dt['target_city']}.")
+                    _travel_queue.put(_dt)
+            except Exception as e:
+                state.add_log(f"Deferred travel handler error: {e}")
+
             # Repair complete → resume deferred vehicle travel
             if not _repair_complete_queue.empty():
                 try:
