@@ -402,6 +402,21 @@ function initCollapse() {
       if (btn) btn.classList.add("collapsed");
       section.classList.add("is-collapsed");
     }
+
+    // Make the whole section header clickable to expand/collapse.
+    const header = section.querySelector("h2");
+    const cbtn = header && header.querySelector(".collapse-btn");
+    if (header && cbtn) {
+      const m = /toggleSection\('([^']+)'\)/.exec(cbtn.getAttribute("onclick") || "");
+      const id = m ? m[1] : section.id;
+      cbtn.style.pointerEvents = "none";  // clicks pass through to the header
+      header.style.cursor = "pointer";
+      header.addEventListener("click", (e) => {
+        // Ignore clicks on interactive controls inside the header.
+        if (e.target.closest("input, select, textarea, a, button:not(.collapse-btn)")) return;
+        toggleSection(id);
+      });
+    }
   });
 }
 
