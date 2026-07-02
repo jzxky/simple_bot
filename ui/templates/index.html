@@ -416,7 +416,8 @@
         <div id="jail" class="tab-panel">
           {% set jail = config.get('jail', {}) %}
           <div class="settings-groups">
-            <div class="settings-group" style="grid-column: 1 / -1">
+            <div id="jail-general-anchor"></div>
+            <div class="settings-group" id="jail-general-group" style="grid-column: 1 / -1">
               <h3>
                 General
                 <label class="toggle-label">
@@ -434,7 +435,7 @@
               </div>
               <div class="setting-row">
                 <label></label>
-                <button id="jail-clear-queue-btn" class="btn-secondary" onclick="clearJailDutyQueue(event)" disabled>Clear Queue</button>
+                <button id="jail-clear-queue-btn" class="action-btn" style="justify-self:start" onclick="clearJailDutyQueue(event)" disabled>Clear Queue</button>
               </div>
               <div class="setting-row" style="margin-top:8px">
                 <label for="jail_action">Jail Action</label>
@@ -484,6 +485,13 @@
                 <label for="auto_jail_partner">Partner</label>
                 <input type="text" id="auto_jail_partner" style="width:200px"
                   value="{{ jail.get('auto_jail_partner','') }}" onchange="autoSave()">
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label></label>
+                <div>
+                  <button type="button" id="auto-jail-check-btn" class="action-btn" style="justify-self:start" onclick="triggerAutoJailCheck()">Run Check Now</button>
+                  <span id="auto-jail-check-status" style="font-size:0.8rem;color:var(--muted);margin-left:8px"></span>
+                </div>
               </div>
             </div>
           </div>
@@ -861,6 +869,11 @@
           <button class="tab-btn" id="income-tab-crimes" onclick="showTab('income-crimes', this)"><span class="tab-label-short">Aggs</span><span class="tab-label-long">Aggravated Crimes</span></button>
           <button class="tab-btn" id="income-tab-actions" onclick="showTab('income-actions', this)">Actions</button>
           <button class="tab-btn" onclick="showTab('income-casework', this)">Case Work</button>
+          <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)" style="display:none">Jail</button>
+        </div>
+        <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
+        <div id="income-jail" class="tab-panel">
+          <div class="settings-groups" id="income-jail-mount"></div>
         </div>
 
         <!-- Earns tab -->
