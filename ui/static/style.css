@@ -1414,11 +1414,13 @@ button, [onclick] { touch-action: manipulation; }
   line-height: 1.4;
 }
 
-/* ── Notification panel ──────────────────────────── */
+/* ── Notification panel (expands from the bell icon) ── */
+.notif-wrap { position: relative; display: inline-flex; }
 .notif-panel {
-  position: fixed;
-  top: 56px;
-  right: 16px;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
   width: 340px;
   max-height: 420px;
   background: var(--card-bg, #1e1e2e);
@@ -1429,6 +1431,12 @@ button, [onclick] { touch-action: manipulation; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transform-origin: top right;
+  animation: notifExpand .14s ease-out;
+}
+@keyframes notifExpand {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
 }
 .notif-panel-head {
   display: flex;
