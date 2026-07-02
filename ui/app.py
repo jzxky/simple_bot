@@ -282,6 +282,34 @@ def banklaunder_bulk_add():
     return jsonify({"ok": True})
 
 
+@app.route("/jail/partner_candidates")
+def jail_partner_candidates():
+    """Valid jail-break partners from the player-list DB (same logic as the plan
+    jail-break selector, but from the DB, including offline players, sorted by
+    character age ascending)."""
+    import player_db as _db
+    s = bot.state
+    own = (s.own_name if s else "") or ""
+    is_gangster = (s.occupation or "").lower() == "gangster" if s else False
+    home = ((s.home_city if s else "") or "").lower()
+    rows = []
+    for p in _db.get_all_players():
+        if not p.get("active"):
+            continue
+        name = p.get("username")
+        if not name or name == own:
+            continue
+        if is_gangster:
+            if (p.get("occupation") or "").lower() != "gangster":
+                continue
+        else:
+            if (p.get("homecity") or "").lower() != home:
+                continue
+        rows.append((p.get("character_age") or 0, name))
+    rows.sort(key=lambda r: r[0])  # character age ascending
+    return jsonify({"partners": [n for _, n in rows]})
+
+
 @app.route("/jail/auto_jail_check", methods=["POST"])
 def jail_auto_check():
     if not bot.is_running():

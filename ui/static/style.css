@@ -680,6 +680,26 @@ input.input-unsaved { color: var(--red) !important; }
 .in-jail .stat-item-timer .stat-value.ready {
   color: #8ecb8e !important;
 }
+/* Jail variants for the rest of the status-section elements */
+.in-jail .tab-btn { color: #b0b0b0; border-color: #666; }
+.in-jail .tab-btn:hover { color: #f0f0f0; }
+.in-jail .tab-btn.active { color: #f0f0f0; border-color: #888; border-bottom-color: #4a4a4a; }
+.in-jail .pill { background: #525252; border-color: #666; color: #d8d8d8; }
+.in-jail select,
+.in-jail input,
+.in-jail textarea { background: #525252; color: #f0f0f0; border-color: #666; }
+.in-jail .btn-secondary,
+.in-jail .action-btn { background: #525252; border-color: #666; color: #e8e8e8; }
+.in-jail .consumable-item { background: #525252; border-color: #666; }
+.in-jail .consumable-name { color: #b0b0b0; }
+.in-jail .consumable-qty { color: #f0f0f0; }
+.in-jail .muted,
+.in-jail .status-task { color: #9a9a9a; }
+.in-jail h3, .in-jail h4 { color: #dcdcdc; }
+.in-jail a { color: #cbb58e; }
+.in-jail table, .in-jail th, .in-jail td { border-color: #666 !important; }
+.in-jail th { color: #b0b0b0; }
+.in-jail td { color: #e0e0e0; }
 .in-hospital {
   border-color: #a01010 !important;
   background: #750606 !important;
