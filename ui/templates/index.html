@@ -305,6 +305,46 @@
               </div>
             </div>
           </div>
+          {% set smart = config.get('smart_travel', {}) %}
+          <div class="settings-groups" style="margin-top:16px">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>
+                Auto-Travel Home / Smart Travel
+                <label class="toggle-label">
+                  <input type="checkbox" id="smart_travel_enabled" {% if smart.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <p style="font-size:0.82rem;color:var(--muted);margin:0 0 10px">
+                Routes travel around the gym/casino cooldowns and the bionics/weapon store windows —
+                minimising time in the gym/casino cities and covering the store windows fully, then heading home.
+              </p>
+              <div class="setting-row">
+                <label for="smart_travel_store_priority">Store priority (window overlap)</label>
+                <select id="smart_travel_store_priority" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('bionics','Bionics'),('weapon','Weapon')] %}
+                  <option value="{{ v }}" {% if smart.get('store_priority','bionics') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="smart_travel_window_vs_activity">Priority</label>
+                <select id="smart_travel_window_vs_activity" style="width:180px" onchange="autoSave()">
+                  {% for v, l in [('windows','Shop windows'),('activity','Gym & Casino')] %}
+                  <option value="{{ v }}" {% if smart.get('window_vs_activity','windows') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="smart_travel_home">Home</label>
+                <select id="smart_travel_home" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('home_city','Home City'),('Auckland','Auckland'),('Beirut','Beirut'),('Chicago','Chicago')] %}
+                  <option value="{{ v }}" {% if smart.get('home','home_city') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
         <div id="promotion" class="tab-panel">
           {% set promo = config.get('promo', {}) %}
