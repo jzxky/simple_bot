@@ -317,6 +317,8 @@ function _doSave() {
     smart_travel_store_priority:     (document.getElementById("smart_travel_store_priority")||{value:"bionics"}).value,
     smart_travel_window_vs_activity: (document.getElementById("smart_travel_window_vs_activity")||{value:"windows"}).value,
     smart_travel_home:               (document.getElementById("smart_travel_home")||{value:"home_city"}).value,
+    smart_travel_window_interval:    parseInt((document.getElementById("smart_travel_window_interval")||{}).value) || 5,
+    smart_travel_no_window_interval: parseInt((document.getElementById("smart_travel_no_window_interval")||{}).value) || 16,
     sync_enabled:       (document.getElementById("sync_enabled")||{checked:false}).checked,
     sync_server_url:    (document.getElementById("sync_server_url")||{value:""}).value.trim(),
     sync_interval:      parseInt((document.getElementById("sync_interval")||{value:"2"}).value)||2,
