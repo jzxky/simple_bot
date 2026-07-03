@@ -15,8 +15,6 @@ This module is pure decision logic (Phase 1): `decide_target_city()` returns a
 plan dict. Wiring it into travel is done separately.
 """
 
-from datetime import datetime, time as _dtime
-
 CHICAGO = "Chicago"
 AUCKLAND = "Auckland"
 BEIRUT = "Beirut"
@@ -25,27 +23,27 @@ GYM_COOLDOWN_SECS = 12 * 3600
 TWO_HOURS = 2 * 3600
 
 
-def _parse_hhmm(s: str) -> "_dtime | None":
+def _hhmm_to_mins(s: str) -> "int | None":
     try:
         h, m = str(s).split(":")
-        return _dtime(int(h), int(m))
+        return int(h) * 60 + int(m)
     except Exception:
         return None
 
 
-def _window_active(cfg_store: dict, now: datetime) -> bool:
-    """True if the store has a time window enabled and `now` falls within it.
-    Handles windows that wrap past midnight (start > end)."""
-    if not cfg_store.get("use_time_window", False):
+def window_active(cfg_store: dict, ingame_mins) -> bool:
+    """True if the store has a time window enabled and `ingame_mins` (in-game
+    minute-of-day) falls within it. Handles windows that wrap past midnight.
+    Matches the bionics/weapon task window logic."""
+    if not cfg_store.get("use_time_window", False) or ingame_mins is None:
         return False
-    start = _parse_hhmm(cfg_store.get("window_start", "00:00"))
-    end = _parse_hhmm(cfg_store.get("window_end", "23:59"))
+    start = _hhmm_to_mins(cfg_store.get("window_start", "00:00"))
+    end = _hhmm_to_mins(cfg_store.get("window_end", "23:59"))
     if start is None or end is None:
         return False
-    t = now.time()
-    if start <= end:
-        return start <= t <= end
-    return t >= start or t <= end   # wraps midnight
+    if start < end:
+        return start < ingame_mins < end
+    return ingame_mins > start or ingame_mins < end   # wraps midnight
 
 
 def _secs_until_gym(now_ts: float, last_gym_use: float) -> float:
@@ -77,7 +75,6 @@ def decide_target_city(ctx: dict) -> dict:
     Returns: {"target": <city or None>, "stay": bool, "reason": str}
         target == current_city / None with stay=True  → remain here.
     """
-    now = ctx["now"]
     now_ts = ctx["now_ts"]
     current = ctx.get("current_city", "") or ""
     smart = ctx.get("smart", {})
@@ -94,8 +91,9 @@ def decide_target_city(ctx: dict) -> dict:
     home = ctx.get("home_city", "") if home_sel == "home_city" else home_sel
 
     # --- Active store windows (ignore a store entirely until it has a window) ---
-    bionics_win = bionics.get("enabled", False) and _window_active(bionics, now)
-    weapon_win = weapon.get("enabled", False) and _window_active(weapon, now)
+    ingame_mins = ctx.get("ingame_mins")
+    bionics_win = bionics.get("enabled", False) and window_active(bionics, ingame_mins)
+    weapon_win = weapon.get("enabled", False) and window_active(weapon, ingame_mins)
 
     # Overlapping windows in different cities → keep the priority winner.
     if bionics_win and weapon_win:
