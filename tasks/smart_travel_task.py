@@ -5,7 +5,6 @@ the gym/casino/store tasks do the actual activity once it's in the right city.
 """
 
 import time
-from datetime import datetime
 
 import config as cfg
 import smart_travel as director
@@ -22,28 +21,36 @@ def _travel_free(state: GameState) -> bool:
     return ("travel" not in state.timers) or state.timer_ready("travel")
 
 
+_WINDOW_INTERVAL = 5    # minutes while a store window is set/active
+_NO_WINDOW_INTERVAL = 16  # minutes once a window has passed with no new one
+
+# config key → store label for logs
+_STORES = {"bionics": "Bionics", "weapon_store": "Weapon Store"}
+
+
 class SmartTravelTask(Task):
     priority = 45  # below gym (55)/casino (50) so activities run first when in-city
     label = "Smart Travel"
 
     def __init__(self):
         self._last: float = 0.0
+        self._win_seen = {"bionics": False, "weapon_store": False}
 
     def can_run(self, state: GameState) -> bool:
+        # Runs regardless of the travel timer so it can also manage store windows;
+        # actual travel is only issued when the timer is free (checked in run()).
         if not cfg.load().get("smart_travel", {}).get("enabled", False):
             return False
         if not state.logged_in or state.in_jail or state.in_hospital:
             return False
         if state.hold_action_timer:
             return False
-        if not _travel_free(state):
-            return False
         return time.monotonic() - self._last >= _POLL_INTERVAL
 
     def _build_ctx(self, state: GameState, c: dict) -> dict:
         return {
-            "now": state.server_time or datetime.now(),
             "now_ts": time.time(),
+            "ingame_mins": state.ingame_mins,
             "current_city": state.current_city or "",
             "home_city": state.home_city or "",
             "smart": c.get("smart_travel", {}),
@@ -55,8 +62,42 @@ class SmartTravelTask(Task):
             "casino_release_at": load_casino_release_at(),
         }
 
+    def _manage_windows(self, state: GameState):
+        """Phase 3: while a store window is set → 5-min interval; once it passes with
+        no new window → disable the window check and drop to a 16-min interval."""
+        c = cfg.load()
+        changed = False
+        for key in ("bionics", "weapon_store"):
+            store = c.get(key, {})
+            if not store.get("enabled", False):
+                continue
+            if store.get("use_time_window", False):
+                # A window is set — check frequently.
+                if int(store.get("check_interval_minutes", 5)) != _WINDOW_INTERVAL:
+                    store["check_interval_minutes"] = _WINDOW_INTERVAL
+                    changed = True
+                active = director.window_active(store, state.ingame_mins)
+                if active:
+                    self._win_seen[key] = True
+                elif self._win_seen[key]:
+                    # We covered the window and it's now over with no renewal.
+                    store["use_time_window"] = False
+                    store["check_interval_minutes"] = _NO_WINDOW_INTERVAL
+                    self._win_seen[key] = False
+                    changed = True
+                    state.add_log(f"{_STORES[key]}: buy window passed — window check off, "
+                                  f"interval → {_NO_WINDOW_INTERVAL}m.")
+            else:
+                self._win_seen[key] = False
+        if changed:
+            cfg.save(c)
+
     def run(self, state: GameState, executor):
         self._last = time.monotonic()
+        self._manage_windows(state)
+
+        if not _travel_free(state):
+            return
         c = cfg.load()
         plan = director.decide_target_city(self._build_ctx(state, c))
         if plan.get("stay") or not plan.get("target"):
