@@ -3126,8 +3126,9 @@ def handle_travel(action: Action, state: GameState) -> int:
             return 0
 
     # If the travel timer isn't free, defer this travel until it is (state is
-    # fresh from the warrant-check navigation above).
-    if not state.timer_ready("travel"):
+    # fresh from the warrant-check navigation above). A missing timer entry means
+    # travel is available (the game only shows the timer while on cooldown).
+    if "travel" in state.timers and not state.timer_ready("travel"):
         global _deferred_travel
         _deferred_travel = {"target_city": target, "method": method}
         state.add_log(f"Travel: travel timer not ready — travel to {target} deferred until it's free.")
