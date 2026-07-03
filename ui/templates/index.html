@@ -343,6 +343,20 @@
                   {% endfor %}
                 </select>
               </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="smart_travel_window_interval">Shop check — in window</label>
+                <div>
+                  <input type="number" id="smart_travel_window_interval" min="1" style="width:70px"
+                    value="{{ smart.get('window_interval_minutes', 5) }}" oninput="markNumDirty(this)"> min
+                </div>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="smart_travel_no_window_interval">Shop check — out of window</label>
+                <div>
+                  <input type="number" id="smart_travel_no_window_interval" min="1" style="width:70px"
+                    value="{{ smart.get('no_window_interval_minutes', 16) }}" oninput="markNumDirty(this)"> min
+                </div>
+              </div>
             </div>
           </div>
         </div>

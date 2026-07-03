@@ -175,6 +175,8 @@ def save():
     c["smart_travel"]["store_priority"] = data.get("smart_travel_store_priority", "bionics")
     c["smart_travel"]["window_vs_activity"] = data.get("smart_travel_window_vs_activity", "windows")
     c["smart_travel"]["home"] = data.get("smart_travel_home", "home_city")
+    c["smart_travel"]["window_interval_minutes"] = max(1, int(data.get("smart_travel_window_interval", 5) or 5))
+    c["smart_travel"]["no_window_interval_minutes"] = max(1, int(data.get("smart_travel_no_window_interval", 16) or 16))
 
     c.setdefault("bionics", {})
     c["bionics"]["enabled"] = data.get("bionics_enabled", False)

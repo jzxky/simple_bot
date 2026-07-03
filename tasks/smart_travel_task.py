@@ -21,9 +21,6 @@ def _travel_free(state: GameState) -> bool:
     return ("travel" not in state.timers) or state.timer_ready("travel")
 
 
-_WINDOW_INTERVAL = 5    # minutes while a store window is set/active
-_NO_WINDOW_INTERVAL = 16  # minutes once a window has passed with no new one
-
 # config key → store label for logs
 _STORES = {"bionics": "Bionics", "weapon_store": "Weapon Store"}
 
@@ -66,6 +63,9 @@ class SmartTravelTask(Task):
         """Phase 3: while a store window is set → 5-min interval; once it passes with
         no new window → disable the window check and drop to a 16-min interval."""
         c = cfg.load()
+        smart = c.get("smart_travel", {})
+        window_interval = max(1, int(smart.get("window_interval_minutes", 5) or 5))
+        no_window_interval = max(1, int(smart.get("no_window_interval_minutes", 16) or 16))
         changed = False
         for key in ("bionics", "weapon_store"):
             store = c.get(key, {})
@@ -73,8 +73,8 @@ class SmartTravelTask(Task):
                 continue
             if store.get("use_time_window", False):
                 # A window is set — check frequently.
-                if int(store.get("check_interval_minutes", 5)) != _WINDOW_INTERVAL:
-                    store["check_interval_minutes"] = _WINDOW_INTERVAL
+                if int(store.get("check_interval_minutes", 5)) != window_interval:
+                    store["check_interval_minutes"] = window_interval
                     changed = True
                 active = director.window_active(store, state.ingame_mins)
                 if active:
@@ -82,11 +82,11 @@ class SmartTravelTask(Task):
                 elif self._win_seen[key]:
                     # We covered the window and it's now over with no renewal.
                     store["use_time_window"] = False
-                    store["check_interval_minutes"] = _NO_WINDOW_INTERVAL
+                    store["check_interval_minutes"] = no_window_interval
                     self._win_seen[key] = False
                     changed = True
                     state.add_log(f"{_STORES[key]}: buy window passed — window check off, "
-                                  f"interval → {_NO_WINDOW_INTERVAL}m.")
+                                  f"interval → {no_window_interval}m.")
             else:
                 self._win_seen[key] = False
         if changed:
