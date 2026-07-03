@@ -124,11 +124,26 @@ def decide_target_city(ctx: dict) -> dict:
             return _plan(BEIRUT, current, "casino due (activity priority over window)")
         return _plan(window_city, current, f"honouring {window_city} store window")
 
-    # --- No window active: service due transient tasks, else home ---
+    # --- No window active: service due transient tasks, else chain/home ---
     if gym_due:
         return _plan(CHICAGO, current, "gym due")
     if casino_due:
         return _plan(BEIRUT, current, "casino due")
+
+    # Option-B chain-then-home: if we're sitting in a transient city (just finished
+    # a gym/casino run) and another transient is due within 2h in a different city,
+    # go there next rather than bouncing home; otherwise head home.
+    if current in (CHICAGO, BEIRUT) and current.lower() != (home or "").lower():
+        best_city, best_secs = None, None
+        if (gym.get("enabled", False) and gym.get("auto_travel", False) and current != CHICAGO):
+            s = _secs_until_gym(now_ts, ctx.get("last_gym_use", 0.0))
+            best_city, best_secs = CHICAGO, s
+        if (casino.get("enabled", False) and casino.get("auto_travel", False) and current != BEIRUT):
+            s = _secs_until_casino(now_ts, ctx.get("casino_release_at", 0.0))
+            if best_secs is None or s < best_secs:
+                best_city, best_secs = BEIRUT, s
+        if best_city is not None and best_secs is not None and best_secs <= TWO_HOURS:
+            return _plan(best_city, current, f"next transient ({best_city}) due within 2h — chaining")
 
     return _plan(home, current, "nothing pending — heading home")
 

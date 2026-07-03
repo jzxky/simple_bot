@@ -45,6 +45,10 @@ class CasinoTask(Task):
         if not casino_cfg.get("enabled", False):
             return False
         if state.current_city.lower() != "beirut":
+            # When smart travel is on, the director handles positioning — the casino
+            # task only runs the activity once already in Beirut.
+            if cfg.load().get("smart_travel", {}).get("enabled", False):
+                return False
             if not casino_cfg.get("auto_travel", False):
                 return False
             # Don't keep retrying auto-travel while warrants block it

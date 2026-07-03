@@ -45,6 +45,7 @@ from tasks.drug_trade import DrugTradeTask
 from tasks.illness import IllnessTask
 from tasks.gym import GymTask
 from tasks.casino import CasinoTask
+from tasks.smart_travel_task import SmartTravelTask
 from tasks.respect import RespectTask
 from tasks.cs_punishment import CSPunishmentTask
 from tasks.online_age import OnlineAgeTask
@@ -202,6 +203,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(IllnessTask(_illness_queue))
     sched.add(GymTask())
     sched.add(CasinoTask())
+    sched.add(SmartTravelTask())
     sched.add(OnlineAgeTask())
     global _bionics_task, _weapon_store_task
     _bionics_task = BionicsTask()

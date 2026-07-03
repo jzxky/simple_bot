@@ -46,6 +46,10 @@ class GymTask(Task):
         if not gym_cfg.get("enabled", False):
             return False
         if state.current_city.lower() != "chicago":
+            # When smart travel is on, the director handles positioning — the gym
+            # task only runs the activity once already in Chicago.
+            if cfg.load().get("smart_travel", {}).get("enabled", False):
+                return False
             if not gym_cfg.get("auto_travel", False):
                 return False
             # Don't keep retrying auto-travel while warrants block it
