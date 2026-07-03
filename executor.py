@@ -2995,7 +2995,7 @@ def handle_check_vehicle(action: Action, state: GameState) -> int:
     if "/localcity/local.asp" in browser.current_url():
         state.add_log("Check vehicle: repairs unavailable (local.asp redirect).")
         state.vehicle_health = None
-        return 0
+        return -1  # distinct from 0 so travel can proceed anyway
     soup = BeautifulSoup(state.page_html, "html.parser")
     if _NO_VEHICLE_TEXT in state.page_html.lower():
         state.add_log("Check vehicle: no vehicle available.")
@@ -3135,9 +3135,12 @@ def handle_travel(action: Action, state: GameState) -> int:
 
     if method == "own_vehicle":
         pct = handle_check_vehicle(Action("check_vehicle"), state)
-        if state.vehicle_health is None:
+        if pct == -1:
+            # Repairs page redirected to local.asp — attempt travel anyway.
+            state.add_log("Travel: repairs page unavailable (local redirect) — attempting travel anyway.")
+        elif state.vehicle_health is None:
             return 0
-        if pct == 0:
+        elif pct == 0:
             ok = handle_repair_vehicle(Action("repair_vehicle"), state)
             if ok:
                 global _pending_vehicle_travel_target
