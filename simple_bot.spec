@@ -48,6 +48,7 @@ a = Analysis(
         'character_history',
         'config',
         'earn_planner',
+        'smart_travel',
         'executor',
         'paths',
         'player_db',

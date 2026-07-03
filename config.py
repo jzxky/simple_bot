@@ -106,6 +106,12 @@ DEFAULT_CONFIG = {
         "bet_amount": 100,
         "auto_travel": False,
     },
+    "smart_travel": {
+        "enabled": False,
+        "store_priority": "bionics",       # "bionics" | "weapon" — overlap tie-break
+        "window_vs_activity": "windows",   # "windows" | "activity"
+        "home": "home_city",               # "home_city" | "Auckland" | "Beirut" | "Chicago"
+    },
     "promo": {
         "monitor_top_job": False,
         "top_job_thread_id": "",

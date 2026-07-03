@@ -170,6 +170,12 @@ def save():
     c["casino"]["bet_amount"] = max(100, min(99999, int(data.get("casino_bet_amount", 100) or 100)))
     c["casino"]["auto_travel"] = data.get("casino_auto_travel", False)
 
+    c.setdefault("smart_travel", {})
+    c["smart_travel"]["enabled"] = data.get("smart_travel_enabled", False)
+    c["smart_travel"]["store_priority"] = data.get("smart_travel_store_priority", "bionics")
+    c["smart_travel"]["window_vs_activity"] = data.get("smart_travel_window_vs_activity", "windows")
+    c["smart_travel"]["home"] = data.get("smart_travel_home", "home_city")
+
     c.setdefault("bionics", {})
     c["bionics"]["enabled"] = data.get("bionics_enabled", False)
     c["bionics"]["wanted_items"] = data.get("bionics_wanted_items", [])
