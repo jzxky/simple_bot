@@ -74,6 +74,7 @@ a = Analysis(
         'tasks.smart_travel_task',
         'tasks.check_top_job',
         'tasks.community_service',
+        'tasks.dog_trains',
         'tasks.consume',
         'tasks.cs_punishment',
         'tasks.deposit',

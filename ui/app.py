@@ -31,6 +31,7 @@ NOTIFICATION_EVENTS = [
     ("mhs_protected",       "MHS Protection Attempt"),
     ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
     ("agg_not_available",   "Agg crime not available"),
+    ("dog_trains_unavailable", "Dog trains unavailable"),
 ]
 
 _ui_root = os.path.join(paths.resource_dir(), "ui")

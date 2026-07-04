@@ -737,7 +737,7 @@
               <h3>Notifications</h3>
               <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification badge in the header so you can see them when you return AFK.</p>
               {% set notif_cfg = config.get('notifications', {}) %}
-              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'bionics_restock': False, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'jailed': False, 'targets_exhausted': False, 'mhs_protected': True, 'warrants_outstanding': True, 'agg_not_available': False} %}
+              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'bionics_restock': False, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'jailed': False, 'targets_exhausted': False, 'mhs_protected': True, 'warrants_outstanding': True, 'agg_not_available': False, 'dog_trains_unavailable': False} %}
               {% for slug, label in notification_events %}
               <label class="inline-toggle setting-row">{{ label }}
                 <label class="toggle-label"><input type="checkbox" id="notif_{{ slug }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
@@ -1246,6 +1246,7 @@
                 <option value="university"        {% if config.action.type == 'university'        %}selected{% endif %}>University Training</option>
                 <option value="training_centre"   {% if config.action.type == 'training_centre'   %}selected{% endif %}>Training Centre</option>
                 <option value="drug_manufacturing"{% if config.action.type == 'drug_manufacturing'%}selected{% endif %}>Drug Manufacturing</option>
+                <option value="dog_trains"        {% if config.action.type == 'dog_trains'        %}selected{% endif %}>Dog Trains</option>
               </select>
             </label>
             <label id="action_sub_label">Sub-option

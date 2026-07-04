@@ -1120,6 +1120,46 @@ def handle_community_service(action: Action, state: GameState):
     _refresh_state(state)
 
 
+_DOG_TRAIN_VALUES = {"walkdog", "throwstick", "givebone"}
+
+
+def handle_do_dog_trains(action: Action, state: GameState):
+    """Dog trains — reuses the community-service page. Picks a random dog option.
+    If the player has no dog, disables the relevant toggle by context."""
+    import random
+    context = action.params.get("context", "home")  # "home" | "away"
+    page = browser.page()
+    _nav(_u("/income/communityservice.asp"), state)
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    options = [o for o in soup.find_all("input", attrs={"name": "comservice", "type": "radio"})
+               if o.get("value") in _DOG_TRAIN_VALUES]
+
+    if not options:
+        msg = "Dog trains: no dog options found — player has no dog."
+        state.add_log(msg)
+        c = cfg.load()
+        if context == "away":
+            c.setdefault("away_action", {})["type"] = ""
+            state.add_log("Dog trains: away action set to None.")
+        else:
+            c.setdefault("action", {})["enabled"] = False
+            state.add_log("Dog trains: actions disabled.")
+        cfg.save(c)
+        _notify(state, "dog_trains_unavailable", msg)
+        return
+
+    choice = random.choice(options)
+    val = choice.get("value", "")
+    page.check(f"input[name='comservice'][value='{val}']")
+    state.add_log(f"Dog trains: {val}")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+
 def handle_fire_duties(action: Action, state: GameState):
     page = browser.page()
     _nav(_u("/income/fireduties.asp"), state)
@@ -3900,6 +3940,7 @@ HANDLERS = {
     "check_bionics":        handle_check_bionics,
     "check_weapon_store":   handle_check_weapon_store,
     "do_community_service": handle_community_service,
+    "do_dog_trains": handle_do_dog_trains,
     "do_fire_duties": handle_fire_duties,
     "do_career_training": handle_career_training,
     "do_university":      handle_university,

@@ -214,6 +214,7 @@ DEFAULT_CONFIG = {
         "mhs_protected":       True,
         "warrants_outstanding": True,
         "agg_not_available":   False,
+        "dog_trains_unavailable": False,
     }
 }
 
