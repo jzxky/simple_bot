@@ -35,6 +35,6 @@ class AwayActionTask(Task):
         elif self.action_type == "drug_manufacturing":
             executor.execute(Action("do_drug_manufacturing"), state)
         elif self.action_type == "dog_trains":
-            executor.execute(Action("do_dog_trains"), state)
+            executor.execute(Action("do_dog_trains", context="away"), state)
         else:
             state.add_log(f"Unknown away action type: {self.action_type}")
