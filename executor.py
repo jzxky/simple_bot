@@ -1940,6 +1940,22 @@ def handle_clear_jail_duty_queue(action: Action, state: GameState):
     state.add_log("Jail duty queue cleared.")
 
 
+# Jail-duty fallback order (highest tier → lowest). If the selected duty isn't
+# available, step down from its position to the first available option
+# (e.g. Workshop → Kitchen → Laundry).
+_JAIL_DUTY_ORDER = ["digtunnel", "makeshank", "workshop", "kitchen", "laundry"]
+
+
+def _pick_jail_duty(duty: str, available: list) -> "str | None":
+    if duty in available:
+        return duty
+    if duty in _JAIL_DUTY_ORDER:
+        for d in _JAIL_DUTY_ORDER[_JAIL_DUTY_ORDER.index(duty):]:
+            if d in available:
+                return d
+    return available[-1] if available else None
+
+
 def handle_jail_duties(action: Action, state: GameState):
     duty = action.params["duty"]
     page = browser.page()
@@ -1968,10 +1984,12 @@ def handle_jail_duties(action: Action, state: GameState):
         if sel:
             available_values = [o.get("value", "") for o in sel.find_all("option")]
 
-    chosen = duty if duty in available_values else (available_values[-1] if available_values else None)
+    chosen = _pick_jail_duty(duty, available_values)
     if not chosen:
         state.add_log("Jail duties: no duty options available on page.")
         return
+    if chosen != duty:
+        state.add_log(f"Jail duties: '{duty}' unavailable — stepping down to '{chosen}'.")
 
     cap_span = soup.find("span", class_="mm-earn-queue-cap")
     current_count = 0
@@ -2003,10 +2021,16 @@ def handle_jail_action(action: Action, state: GameState):
     if not _check_session(state):
         return
 
-    radio = page.query_selector(f"input[type='radio'][value='{jail_action}']")
-    if not radio:
-        state.add_log(f"Jail action: radio for '{jail_action}' not found on page.")
+    # If the selected action isn't available, fall back to gym workout.
+    order = [jail_action] + [a for a in ("gym",) if a != jail_action]
+    chosen = next((a for a in order
+                   if page.query_selector(f"input[type='radio'][value='{a}']")), None)
+    if not chosen:
+        state.add_log(f"Jail action: no radio available (wanted '{jail_action}').")
         return
+    if chosen != jail_action:
+        state.add_log(f"Jail action: '{jail_action}' unavailable — falling back to '{chosen}'.")
+    jail_action = chosen
 
     page.check(f"input[type='radio'][value='{jail_action}']")
     page.click("input[type='submit'][name='B1']")
