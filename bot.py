@@ -99,6 +99,8 @@ _repair_vehicle_queue: queue.Queue = queue.Queue()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
 _bulk_launder_queue: queue.Queue = queue.Queue()
+_interact_request: queue.Queue = queue.Queue(maxsize=1)
+_interact_result: queue.Queue = queue.Queue(maxsize=1)
 state = GameState()
 
 
@@ -367,6 +369,16 @@ def _run(c: dict):
                     _bar_threads_result.put(_fetch_bar_threads())
                 except Exception as e:
                     _bar_threads_result.put(e)
+
+            # Manual player-interaction requests from the Flask thread
+            if not _interact_request.empty():
+                try:
+                    params = _interact_request.get_nowait()
+                    result_q = queue.Queue()
+                    executor.execute(Action("interact", result_queue=result_q, **params), state)
+                    _interact_result.put(result_q.get(timeout=90))
+                except Exception as e:
+                    _interact_result.put(e)
 
             # Jail inmates requests from the Flask thread
             if not _jail_inmates_request.empty():
@@ -756,6 +768,17 @@ def request_warrants(timeout: float = 30.0) -> list:
         _warrants_result.get_nowait()
     _warrants_request.put(True)
     result = _warrants_result.get(timeout=timeout)
+    if isinstance(result, Exception):
+        raise result
+    return result
+
+
+def request_interact(crime: str, target: str, amount: int = 0, timeout: float = 90.0) -> dict:
+    """Queue a single manual player interaction on the bot thread and return its result."""
+    while not _interact_result.empty():
+        _interact_result.get_nowait()
+    _interact_request.put({"crime": crime, "target": target, "amount": amount})
+    result = _interact_result.get(timeout=timeout)
     if isinstance(result, Exception):
         raise result
     return result

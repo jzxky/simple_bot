@@ -943,6 +943,170 @@ def handle_do_crime(action: Action, state: GameState):
     state.add_log("All targets exhausted.")
 
 
+def _interact_nav(crime: str, state: GameState) -> bool:
+    """Navigate to agcrime.asp and select a crime for a single manual target.
+
+    Like _nav_to_target_input but WITHOUT the side effect of disabling the
+    aggravated-crimes automation when the crime isn't currently on the list —
+    a one-off manual attempt must never touch the user's config.
+    Returns True if the text target input is present.
+    """
+    page = browser.page()
+    _nav(_u("/income/agcrime.asp"), state)
+    if not page.query_selector(f"input[name='agcrime'][value='{crime}']"):
+        return False
+    page.check(f"input[name='agcrime'][value='{crime}']")
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    return bool(page.query_selector(_TARGET_INPUT))
+
+
+def _interact_simple_crime(crime: str, target: str, state: GameState) -> dict:
+    """One-shot pickpocket / mugging / hack against a single named target."""
+    page = browser.page()
+    if not _interact_nav(crime, state):
+        if _check_cs_punishment(state):
+            return {"ok": False, "message": f"Community service required before {crime}."}
+        return {"ok": False, "message": f"'{crime}' is not available right now."}
+    if not _check_session(state):
+        return {"ok": False, "message": "Session expired — will re-login."}
+
+    page.fill(_TARGET_INPUT, target)
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    success_div = soup.find("div", id="success")
+    if success_div:
+        msg = success_div.get_text(strip=True)
+        state.add_log(f"Interact {crime} vs {target}: {msg}")
+        amounts = re.findall(r"\$([\d,]+)", msg)
+        if amounts:
+            state._last_crime_victim = target
+            state._last_crime_amount = int(amounts[0].replace(",", ""))
+        return {"ok": True, "message": msg}
+
+    fail_div = soup.find("div", id="fail")
+    if fail_div:
+        msg = fail_div.get_text(strip=True)
+        if "failed" in msg.lower():
+            state.record_agg_fail()
+        state.add_log(f"Interact {crime} vs {target}: {msg}")
+        _nav(_u("/loggedin.asp?display=play"), state)
+        return {"ok": False, "message": msg}
+
+    return {"ok": False, "message": "No result parsed from the crime page."}
+
+
+def _interact_breaking(target: str, state: GameState) -> dict:
+    """One-shot Breaking & Entering against a single named target (mobile UA)."""
+    page = browser.page()
+    page.set_extra_http_headers({"User-Agent": _MOBILE_UA})
+    try:
+        _nav(_u("/income/agcrime.asp"), state)
+        if not _check_session(state):
+            return {"ok": False, "message": "Session expired — will re-login."}
+        if not page.query_selector("input[name='agcrime'][value='breaking']"):
+            if _check_cs_punishment(state):
+                return {"ok": False, "message": "Community service required before B&E."}
+            return {"ok": False, "message": "Breaking & Entering is not available right now."}
+        page.check("input[name='agcrime'][value='breaking']")
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+
+        soup = BeautifulSoup(page.content(), "html.parser")
+        select = soup.find("select", {"name": "breaking"})
+        if not select:
+            if _check_cs_punishment(state):
+                return {"ok": False, "message": "Community service required before B&E."}
+            return {"ok": False, "message": "No B&E target list available."}
+
+        # Match the target by the option's visible text (owner name); fall back
+        # to the value if the game keys options by name directly.
+        match_val = None
+        for o in select.find_all("option"):
+            val = o.get("value")
+            if not val:
+                continue
+            if o.get_text(strip=True).lower() == target.lower() or val.lower() == target.lower():
+                match_val = val
+                break
+        if match_val is None:
+            return {"ok": False, "message": f"{target} has no burglable apartment here."}
+
+        page.select_option("select[name='breaking']", value=match_val)
+        page.click("input[type='submit'][name='B1'][value='Commit Crime']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+
+        soup = BeautifulSoup(page.content(), "html.parser")
+        success_div = soup.find("div", id="success")
+        if success_div:
+            msg = success_div.get_text(strip=True)
+            state.add_log(f"Interact B&E vs {target}: {msg}")
+            amounts = re.findall(r"\$([\d,]+)", msg)
+            if amounts:
+                state._last_crime_victim = target
+                state._last_crime_amount = int(amounts[0].replace(",", ""))
+            return {"ok": True, "message": msg}
+        fail_div = soup.find("div", id="fail")
+        if fail_div:
+            msg = fail_div.get_text(strip=True)
+            if "failed" in msg.lower():
+                state.record_agg_fail()
+            state.add_log(f"Interact B&E vs {target}: {msg}")
+            return {"ok": False, "message": msg}
+        return {"ok": False, "message": "No result parsed from the B&E page."}
+    finally:
+        page.set_extra_http_headers({})
+
+
+def handle_interact(action: Action, state: GameState):
+    """Single manual player interaction requested from the Active players tab.
+    Puts a {"ok", "message"} dict on the result queue."""
+    rq = action.params.get("result_queue")
+    crime  = action.params.get("crime", "")
+    target = action.params.get("target", "")
+    amount = int(action.params.get("amount", 0) or 0)
+
+    def _reply(d):
+        if rq is not None:
+            rq.put(d)
+
+    if not state.logged_in:
+        _reply({"ok": False, "message": "Not logged in."})
+        return
+    if state.in_jail or state.in_hospital:
+        _reply({"ok": False, "message": "Cannot act while in jail or hospital."})
+        return
+    if not target:
+        _reply({"ok": False, "message": "No target specified."})
+        return
+
+    try:
+        if crime == "transfer":
+            if amount <= 0:
+                _reply({"ok": False, "message": "Enter an amount greater than 0."})
+                return
+            ok = _do_transfer(target, amount, state)
+            msg = (f"Transferred ${amount:,} to {target}." if ok
+                   else f"Transfer of ${amount:,} to {target} failed.")
+            state.add_log(f"Interact: {msg}")
+            _reply({"ok": ok, "message": msg})
+            return
+        if crime == "breaking":
+            _reply(_interact_breaking(target, state))
+            return
+        if crime in ("pickpocket", "mugging", "hack"):
+            _reply(_interact_simple_crime(crime, target, state))
+            return
+        _reply({"ok": False, "message": f"Unknown interaction '{crime}'."})
+    except Exception as e:
+        state.add_log(f"Interact error ({crime} vs {target}): {e}")
+        _reply({"ok": False, "message": f"Error: {e}"})
+
+
 def handle_check_weapon(action: Action, state: GameState):
     crime = action.params["crime"]
     page = browser.page()
@@ -3958,6 +4122,7 @@ HANDLERS = {
     "bulk_add_launder_contacts": handle_bulk_add_launder_contacts,
     "check_banking_cases": handle_check_banking_cases,
     "do_crime": handle_do_crime,
+    "interact": handle_interact,
     "check_weapon": handle_check_weapon,
     "consume": handle_consume,
     "refresh_state": handle_refresh_state,
