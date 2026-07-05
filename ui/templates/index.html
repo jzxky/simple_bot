@@ -92,12 +92,19 @@
           <div id="profile-content"><span class="muted">Click "Profile" to load.</span></div>
         </div>
         <div id="status-history" class="tab-panel">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-            <label style="font-size:0.8rem;color:var(--muted)">View
-              <select id="char-history-select" onchange="onCharHistorySelect()" style="margin-left:6px"></select>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <select id="char-history-select" onchange="onCharHistorySelect()"></select>
+            <label class="inline-toggle" style="white-space:nowrap;font-size:0.8rem" title="Hide subsections where every value is zero">Hide empty
+              <label class="toggle-label">
+                <input type="checkbox" id="ch-hide-empty-toggle" onchange="toggleChHideEmpty()">
+                <span class="toggle"></span>
+              </label>
             </label>
             <span style="flex:1"></span>
             <span id="char-history-updated" style="font-size:0.75rem;color:#888;"></span>
+            <button class="btn-secondary icon-btn" onclick="saveCharHistoryImage()" title="Save as shareable image">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
             <button class="btn-secondary icon-btn" onclick="refreshCharHistory()" title="Refresh">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             </button>
@@ -1332,13 +1339,8 @@
 
         <!-- Player List tab -->
         <div id="pl-tab-list" class="tab-panel active">
-          <div class="pl-toolbar">
-            <label class="inline-toggle" style="white-space:nowrap;margin-left:auto">Active only
-              <label class="toggle-label">
-                <input type="checkbox" id="pl-filter-active" checked onchange="plFilter()">
-                <span class="toggle"></span>
-              </label>
-            </label>
+          <div class="pl-toolbar" style="flex-direction:column;align-items:stretch">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
             <div style="position:relative">
               <button class="btn-secondary" onclick="togglePlColMenu()" id="pl-col-menu-btn">Columns ▾</button>
               <div id="pl-col-menu" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px 20px;z-index:1000;white-space:nowrap;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
@@ -1363,6 +1365,13 @@
             <button class="btn-secondary" onclick="plRefresh()" id="pl-refresh-btn">Refresh</button>
             <span id="pl-refresh-status" style="font-size:0.8rem;color:var(--error,#f87171)"></span>
             <button class="btn-secondary" onclick="window.open('/players','_blank')" title="Open player list in new tab">↗</button>
+            </div>
+            <label class="inline-toggle" style="white-space:nowrap">Active only
+              <label class="toggle-label">
+                <input type="checkbox" id="pl-filter-active" checked onchange="plFilter()">
+                <span class="toggle"></span>
+              </label>
+            </label>
           </div>
           <div style="overflow-x:auto;margin-top:8px">
             <table class="pl-table" id="pl-table">
