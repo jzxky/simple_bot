@@ -2573,8 +2573,8 @@ let _plExpanded = {};
 let _plGroups   = [];
 let _plSortCol  = "username";
 let _plSortAsc  = true;
-const _plColVisible = {rank:true, occupation:true, career_group:true, homecity:true, group:true, tags:true, character_age:true, agg_crimes:true, case_work:true};
-const _PL_COL_INDEX = {rank:2, occupation:3, career_group:4, homecity:5, group:6, tags:7, character_age:8, agg_crimes:9, case_work:10};
+const _plColVisible = {rank:true, occupation:true, career_group:true, homecity:true, group:true, tags:true, character_age:true, jail_age:true, agg_crimes:true, case_work:true};
+const _PL_COL_INDEX = {rank:2, occupation:3, career_group:4, homecity:5, group:6, tags:7, character_age:8, jail_age:9, agg_crimes:10, case_work:11};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -2725,6 +2725,7 @@ function _plSortVal(p, col) {
   if (col === "career_group") return _careerGroup(p.occupation).toLowerCase();
   if (col === "online_status") return String(_STATUS_ORDER[_onlineStatus(p.username)] ?? 2);
   if (col === "character_age") return String(p.character_age || 0).padStart(10, "0");
+  if (col === "jail_age") return String(p.jail_age || 0).padStart(10, "0");
   return (p[col] || "").toLowerCase();
 }
 
@@ -2784,7 +2785,7 @@ function _plRenderTable() {
   const colorMap = _plGroupColorMap();
 
   if (_plFiltered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
     return;
   }
 
@@ -2806,6 +2807,7 @@ function _plRenderTable() {
 
     const careerGrp = _careerGroup(p.occupation);
     const ageCell   = p.character_age ? _fmtAge(p.character_age) : "—";
+    const jailAgeCell = p.jail_age ? _fmtAge(p.jail_age) : "—";
     rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow(${escJsStr(p.username)})" style="cursor:pointer">
       <td style="text-align:center">${dot}</td>
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
@@ -2816,12 +2818,13 @@ function _plRenderTable() {
       <td>${groupCell}</td>
       <td>${tags||"—"}</td>
       <td style="white-space:nowrap">${ageCell}</td>
+      <td style="white-space:nowrap">${jailAgeCell}</td>
       <td>${aggCell}</td>
       <td>${cwCell}</td>
     </tr>`);
 
     if (expanded) {
-      rows.push(`<tr class="pl-detail-row"><td colspan="11"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
+      rows.push(`<tr class="pl-detail-row"><td colspan="12"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
     }
   });
   tbody.innerHTML = rows.join("");

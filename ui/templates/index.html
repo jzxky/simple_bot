@@ -1352,6 +1352,7 @@
                   <label>Career <input type="checkbox" checked onchange="plToggleCol('career_group',this.checked)"></label>
                   <label>City <input type="checkbox" checked onchange="plToggleCol('homecity',this.checked)"></label>
                   <label>Age <input type="checkbox" checked onchange="plToggleCol('character_age',this.checked)"></label>
+                  <label>Jail Age <input type="checkbox" checked onchange="plToggleCol('jail_age',this.checked)"></label>
                   <label>Group <input type="checkbox" checked onchange="plToggleCol('group',this.checked)"></label>
                   <label>Tags <input type="checkbox" checked onchange="plToggleCol('tags',this.checked)"></label>
                   <label>Agg <input type="checkbox" checked onchange="plToggleCol('agg_crimes',this.checked)"></label>
@@ -1376,6 +1377,7 @@
                   <th class="pl-th pl-th-filter" onclick="plSort('group')" data-col="group">Group <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter">Tags</th>
                   <th class="pl-th pl-th-filter" onclick="plSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('jail_age')" data-col="jail_age">Jail Age <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('agg_crimes')" data-col="agg_crimes">Agg <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
                 </tr>
@@ -1393,6 +1395,7 @@
                   <th class="pl-filter-cell"><select id="pl-filter-homecity" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"><select id="pl-filter-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"><select id="pl-filter-tag" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"></th>
                   <th class="pl-filter-cell"></th>
                   <th class="pl-filter-cell"><select id="pl-filter-agg" class="pl-filter-input" onchange="plFilter()">
                     <option value="">All</option>
