@@ -700,6 +700,23 @@ def character_history_refresh():
     return jsonify({"ok": True})
 
 
+@app.route("/api/interact", methods=["POST"])
+def api_interact():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    data = request.get_json(force=True) or {}
+    crime  = (data.get("crime") or "").strip()
+    target = (data.get("target") or "").strip()
+    amount = int(data.get("amount") or 0)
+    if not crime or not target:
+        return jsonify({"ok": False, "message": "Missing crime or target."}), 400
+    try:
+        result = bot.request_interact(crime, target, amount)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+
 @app.route("/profile")
 def profile():
     if not bot.is_running():

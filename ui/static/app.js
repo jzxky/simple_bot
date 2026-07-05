@@ -902,6 +902,9 @@ function pollStatus() {
       _updateStatPanel();
       _updateCharPills();
       _updatePlayerPills();
+      if (!_actMenuEl && document.getElementById("pl-tab-active")?.classList.contains("active")) {
+        plRenderActive();
+      }
 
       // Show check-for-updates row only when running inside a git repo
       const updateRow = document.getElementById("update-row");
@@ -2729,6 +2732,152 @@ function _peoplePill(count, color, label) {
   const fill = color || "currentColor";
   const icon = `<svg viewBox="0 0 640 512" width="14" height="12" style="vertical-align:-1px" fill="${fill}" aria-hidden="true"><path d="M144 0a80 80 0 1 1 0 160A80 80 0 1 1 144 0zM512 0a80 80 0 1 1 0 160A80 80 0 1 1 512 0zM0 298.7C0 239.8 47.8 192 106.7 192l42.7 0c15.9 0 31 3.5 44.6 9.7c-1.3 7.2-1.9 14.7-1.9 22.3c0 38.2 16.8 72.5 43.3 96c-.2 0-.4 0-.7 0L21.3 320C9.6 320 0 310.4 0 298.7zM405.3 320c-.2 0-.4 0-.7 0c26.6-23.5 43.3-57.8 43.3-96c0-7.6-.7-15-1.9-22.3c13.6-6.3 28.7-9.7 44.6-9.7l42.7 0C592.2 192 640 239.8 640 298.7c0 11.8-9.6 21.3-21.3 21.3l-213.3 0zM224 224a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zM128 485.3C128 411.7 187.7 352 261.3 352l117.3 0C452.3 352 512 411.7 512 485.3c0 14.7-11.9 26.7-26.7 26.7l-330.7 0c-14.7 0-26.7-11.9-26.7-26.7z"/></svg>`;
   return `<span class="pill" title="${escHtml(label)}" aria-label="${escHtml(label)}: ${count}">${icon} ${count}</span>`;
+}
+
+// ── Active players tab (live online / local / jail + quick interactions) ──────
+const _CAREER_COLORS = {
+  "Gangster":    "#ef4444",
+  "Police":      "#3b82f6",
+  "Law":         "#a855f7",
+  "Customs":     "#14b8a6",
+  "Hospital":    "#22c55e",
+  "Engineering": "#f59e0b",
+  "Fire":        "#f97316",
+  "Bank":        "#eab308",
+  "Funeral":     "#94a3b8",
+  "Mayor":       "#ec4899",
+  "Unemployed":  "#6b7280",
+  "Other":       "#9ca3af",
+};
+
+function _careerColor(occupation) {
+  return _CAREER_COLORS[_careerGroup(occupation)] || _CAREER_COLORS["Other"];
+}
+
+function _plOccByName() {
+  const m = {};
+  (_plData || []).forEach(p => { if (p.username) m[p.username.toLowerCase()] = p; });
+  return m;
+}
+
+function plRenderActive() {
+  const content  = document.getElementById("pl-active-content");
+  const legendEl = document.getElementById("pl-active-legend");
+  if (!content) return;
+
+  if (legendEl) {
+    legendEl.innerHTML = Object.entries(_CAREER_COLORS)
+      .filter(([g]) => g !== "Other")
+      .map(([g, c]) => `<span class="pl-legend-item"><span class="pl-legend-dot" style="background:${c}"></span>${g}</span>`)
+      .join("");
+  }
+
+  const occ      = _plOccByName();
+  const online   = _botState.online_players ? [..._botState.online_players] : [];
+  const local    = _botState.local_players  ? [..._botState.local_players]  : [];
+  const jail     = _botState.jail_players   ? [..._botState.jail_players]   : [];
+  const localSet = new Set(local);
+
+  const groups = [
+    { key: "online", title: "Online (other cities)", names: online.filter(n => !localSet.has(n)) },
+    { key: "local",  title: "Local City",            names: local },
+    { key: "jail",   title: "In Jail",               names: jail },
+  ];
+
+  content.innerHTML = groups.map(g => {
+    const names = g.names.slice().sort((a, b) => a.localeCompare(b));
+    const chips = names.length
+      ? names.map(n => {
+          const p     = occ[n.toLowerCase()];
+          const color = p ? _careerColor(p.occupation) : _CAREER_COLORS["Other"];
+          const title = p ? `${p.occupation || "?"} · ${p.homecity || "?"}` : "not in player DB";
+          return `<button class="pl-active-name" style="color:${color}" title="${escHtml(title)}"
+                    onclick="plOpenActMenu(event, ${escJsStr(n)}, '${g.key}')">${escHtml(n)}</button>`;
+        }).join("")
+      : `<span class="pl-active-empty">None</span>`;
+    return `<div class="pl-active-group">
+      <div class="pl-active-group-head">${escHtml(g.title)} <span class="pl-active-count">${names.length}</span></div>
+      <div class="pl-active-names">${chips}</div>
+    </div>`;
+  }).join("");
+}
+
+let _actMenuEl = null;
+
+function plOpenActMenu(ev, username, groupKey) {
+  ev.stopPropagation();
+  plCloseActMenu();
+
+  const actions = [];
+  if (groupKey === "local") {
+    actions.push(["pickpocket", "Pickpocket"], ["mugging", "Mug"],
+                 ["hack", "Hack"], ["breaking", "Break & Enter"]);
+  }
+  actions.push(["transfer", "Transfer Money"]);
+
+  const el = document.createElement("div");
+  el.className = "pl-act-menu";
+  el.innerHTML =
+    `<div class="pl-act-menu-head">${escHtml(username)}</div>` +
+    actions.map(([kind, label]) =>
+      `<button class="pl-act-btn" onclick="plDoInteract('${kind}', ${escJsStr(username)})">${escHtml(label)}</button>`
+    ).join("") +
+    `<div class="pl-act-result" style="display:none"></div>`;
+  document.body.appendChild(el);
+  _actMenuEl = el;
+
+  const pad  = 8;
+  const rect = el.getBoundingClientRect();
+  let x = ev.clientX, y = ev.clientY + 6;
+  if (x + rect.width  + pad > window.innerWidth)  x = window.innerWidth  - rect.width  - pad;
+  if (y + rect.height + pad > window.innerHeight) y = ev.clientY - rect.height - 6;
+  el.style.left = Math.max(pad, x) + "px";
+  el.style.top  = Math.max(pad, y) + "px";
+}
+
+function plCloseActMenu() {
+  if (_actMenuEl) { _actMenuEl.remove(); _actMenuEl = null; }
+}
+
+document.addEventListener("click", e => {
+  if (_actMenuEl && !_actMenuEl.contains(e.target)) plCloseActMenu();
+});
+
+function plDoInteract(crime, username) {
+  if (!_actMenuEl) return;
+  let amount = 0;
+  if (crime === "transfer") {
+    const val = prompt(`Transfer how much to ${username}?`, "1");
+    if (val === null) return;
+    amount = parseInt(String(val).replace(/[^0-9]/g, ""), 10) || 0;
+    if (amount <= 0) return;
+  }
+  const resultEl = _actMenuEl.querySelector(".pl-act-result");
+  const buttons  = _actMenuEl.querySelectorAll(".pl-act-btn");
+  buttons.forEach(b => b.disabled = true);
+  if (resultEl) {
+    resultEl.style.display = "block";
+    resultEl.className = "pl-act-result";
+    resultEl.textContent = "Working…";
+  }
+
+  fetch("/api/interact", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ crime, target: username, amount }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (resultEl) {
+        resultEl.textContent = d.message || (d.ok ? "Done." : "Failed.");
+        resultEl.classList.add(d.ok ? "pl-act-ok" : "pl-act-fail");
+      }
+      buttons.forEach(b => b.disabled = false);
+    })
+    .catch(() => {
+      if (resultEl) { resultEl.textContent = "Request failed."; resultEl.classList.add("pl-act-fail"); }
+      buttons.forEach(b => b.disabled = false);
+    });
 }
 
 function _onlineStatus(username) {

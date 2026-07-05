@@ -1332,6 +1332,7 @@
       <div class="card-body">
         <div class="tab-bar">
           <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Player List</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-active', this); plRenderActive()">Active</button>
           <button class="tab-btn" onclick="showTab('pl-tab-groups', this)">Groups</button>
           <button class="tab-btn" onclick="showTab('pl-tab-dead', this); plRenderRecentDead()">Obituaries</button>
           <button class="tab-btn" onclick="showTab('pl-tab-born', this); plRenderRecentBorn()">Births</button>
@@ -1423,6 +1424,15 @@
               <tbody id="pl-tbody"></tbody>
             </table>
           </div>
+        </div>
+
+        <!-- Active players tab -->
+        <div id="pl-tab-active" class="tab-panel">
+          <div class="pl-active-toolbar">
+            <span class="pl-active-hint">Click a name for interaction options. Lists update automatically.</span>
+            <div id="pl-active-legend" class="pl-active-legend"></div>
+          </div>
+          <div id="pl-active-content"></div>
         </div>
 
         <!-- Groups tab -->

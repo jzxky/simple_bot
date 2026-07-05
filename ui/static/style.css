@@ -1125,6 +1125,29 @@ input.input-unsaved { color: var(--red) !important; }
   margin-bottom: 8px;
 }
 
+/* Active players tab */
+.pl-active-toolbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.pl-active-hint { font-size: 0.8rem; color: var(--muted); }
+.pl-active-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.pl-legend-item { font-size: 0.72rem; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+.pl-legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.pl-active-group { margin-bottom: 14px; }
+.pl-active-group-head { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 6px; border-bottom: 1px solid var(--border); padding-bottom: 3px; }
+.pl-active-count { color: var(--text); font-weight: 400; }
+.pl-active-names { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.pl-active-name { background: none; border: none; padding: 2px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: 3px; text-transform: none; letter-spacing: 0; }
+.pl-active-name:hover { background: var(--surface2); text-decoration: underline; }
+.pl-active-empty { color: var(--muted); font-size: 0.82rem; font-style: italic; }
+
+.pl-act-menu { position: fixed; z-index: 2000; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.5); padding: 8px; min-width: 170px; max-width: 260px; display: flex; flex-direction: column; gap: 4px; }
+.pl-act-menu-head { font-weight: 700; font-size: 0.85rem; padding: 2px 4px 6px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+.pl-act-btn { text-align: left; background: #2e4060; border: 1px solid #3a4d70; color: var(--text); padding: 6px 10px; font-size: 0.8rem; text-transform: none; letter-spacing: 0; border-radius: 5px; }
+.pl-act-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.pl-act-btn:disabled { opacity: .5; cursor: default; }
+.pl-act-result { font-size: 0.78rem; padding: 6px 4px 2px; color: var(--muted); white-space: normal; }
+.pl-act-ok { color: #4ade80; }
+.pl-act-fail { color: #f87171; }
+
 /* Table */
 .pl-table {
   width: 100%;
