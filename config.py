@@ -93,7 +93,8 @@ DEFAULT_CONFIG = {
     },
     "players": {
         "enabled": True,
-        "refresh_interval_minutes": 30
+        "refresh_interval_minutes": 30,
+        "whitelist_bolds": True
     },
     "gym": {
         "enabled": False,
