@@ -2735,18 +2735,20 @@ function _peoplePill(count, color, label) {
 }
 
 // ── Active players tab (live online / local / jail + quick interactions) ──────
+// Career colours matched to the in-game "Players Currently Online" key.
+// (Gangster ≈ the game's "Crime", Mayor ≈ "Politics".)
 const _CAREER_COLORS = {
-  "Gangster":    "#ef4444",
-  "Police":      "#3b82f6",
-  "Law":         "#a855f7",
-  "Customs":     "#14b8a6",
-  "Hospital":    "#22c55e",
-  "Engineering": "#f59e0b",
-  "Fire":        "#f97316",
-  "Bank":        "#eab308",
-  "Funeral":     "#94a3b8",
-  "Mayor":       "#ec4899",
-  "Unemployed":  "#6b7280",
+  "Gangster":    "#e8e8e8",  // Crime — white
+  "Police":      "#4d7fe0",  // bright blue
+  "Law":         "#a95ecc",  // purple
+  "Customs":     "#5cbf5c",  // green
+  "Hospital":    "#6fa8dc",  // steel blue
+  "Engineering": "#cc9a4d",  // orange/tan
+  "Fire":        "#cc5555",  // red
+  "Bank":        "#4fb87a",  // green
+  "Funeral":     "#8f9499",  // gray
+  "Mayor":       "#cfcfcf",  // Politics — light gray
+  "Unemployed":  "#8f9499",  // gray
   "Other":       "#9ca3af",
 };
 
