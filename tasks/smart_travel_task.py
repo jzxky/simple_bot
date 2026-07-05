@@ -31,7 +31,10 @@ class SmartTravelTask(Task):
 
     def __init__(self):
         self._last: float = 0.0
-        self._win_seen = {"bionics": False, "weapon_store": False}
+        # Per-store signature (window_start, window_end) of the window last seen
+        # active. Used to tell a genuine expiry (unchanged when it passes) from a
+        # restock renewal (window moved to new times).
+        self._win_sig = {"bionics": None, "weapon_store": None}
 
     def can_run(self, state: GameState) -> bool:
         # Runs regardless of the travel timer so it can also manage store windows;
@@ -76,19 +79,27 @@ class SmartTravelTask(Task):
                 if int(store.get("check_interval_minutes", 5)) != window_interval:
                     store["check_interval_minutes"] = window_interval
                     changed = True
+                sig = (store.get("window_start", ""), store.get("window_end", ""))
                 active = director.window_active(store, state.ingame_mins)
                 if active:
-                    self._win_seen[key] = True
-                elif self._win_seen[key]:
-                    # We covered the window and it's now over with no renewal.
-                    store["use_time_window"] = False
-                    store["check_interval_minutes"] = no_window_interval
-                    self._win_seen[key] = False
-                    changed = True
-                    state.add_log(f"{_STORES[key]}: buy window passed — window check off, "
-                                  f"interval → {no_window_interval}m.")
+                    # Remember the exact window we're covering.
+                    self._win_sig[key] = sig
+                elif self._win_sig[key] is not None:
+                    if sig == self._win_sig[key]:
+                        # Same window we covered has now passed and nothing renewed
+                        # it (a restock would have changed window_start/end) → turn off.
+                        store["use_time_window"] = False
+                        store["check_interval_minutes"] = no_window_interval
+                        self._win_sig[key] = None
+                        changed = True
+                        state.add_log(f"{_STORES[key]}: buy window passed with no restock — "
+                                      f"window check off, interval → {no_window_interval}m.")
+                    else:
+                        # A restock moved the window — keep the toggle on and start
+                        # tracking the new window afresh.
+                        self._win_sig[key] = None
             else:
-                self._win_seen[key] = False
+                self._win_sig[key] = None
         if changed:
             cfg.save(c)
 
