@@ -46,6 +46,7 @@ class BionicsTask(Task):
     def __init__(self):
         s = load_bionics_state()
         self.last_checked_at: float = float(s.get("last_checked_at", 0))
+        self.last_checked_ingame: "int | None" = s.get("last_checked_ingame")
         self.last_stock: dict       = s.get("last_stock", {})
         self.last_views: "tuple[int,int] | None" = None
 
