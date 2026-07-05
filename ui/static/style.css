@@ -217,6 +217,13 @@ button {
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
+.btn-secondary {
+  background: #2e4060;
+  border: 1px solid #3a4d70;
+  color: var(--text);
+}
+.btn-secondary:hover { background: #364a6e; border-color: var(--accent); color: var(--accent); }
+
 #save-btn { background: var(--surface); border-color: var(--border); color: var(--text); }
 #save-btn:hover { border-color: var(--accent); color: var(--accent); }
 

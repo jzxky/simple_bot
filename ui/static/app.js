@@ -2145,6 +2145,21 @@ function toggleHideZeros(title) {
   reRenderCharHistory();
 }
 
+// Global toggle: hide entire subsections whose values are all zero.
+function _isChHideEmpty() {
+  return localStorage.getItem("ch-hide-empty") === "true";
+}
+
+function toggleChHideEmpty() {
+  localStorage.setItem("ch-hide-empty", _isChHideEmpty() ? "false" : "true");
+  reRenderCharHistory();
+}
+
+function _isSectionAllZero(sec) {
+  const rows = sec && sec.rows ? sec.rows : [];
+  return rows.length > 0 && rows.every(r => _isZero(r.value));
+}
+
 function _fmtVal(val) {
   if (typeof val === "string" && val.startsWith("$")) {
     return `<span class="ch-money">${val}</span>`;
@@ -2182,6 +2197,79 @@ function _hzToggle(title, hideZeros) {
 
 function reRenderCharHistory() {
   if (_chData) renderCharHistory(_chData, _chReqs);
+}
+
+// Collect same-origin stylesheet rules so the exported image is fully styled.
+function _collectAppCss() {
+  let css = "";
+  for (const sheet of document.styleSheets) {
+    let rules;
+    try { rules = sheet.cssRules; } catch (e) { continue; }
+    if (!rules) continue;
+    for (const rule of rules) css += rule.cssText + "\n";
+  }
+  return css;
+}
+
+// Render the character-history content to a downloadable PNG (no external libs).
+function saveCharHistoryImage() {
+  const src = document.getElementById("char-history-body");
+  if (!src || !_chData) { alert("No character history to save yet."); return; }
+
+  const pad = 20, scale = 2;
+  const w = Math.max(src.scrollWidth, src.getBoundingClientRect().width);
+  const h = Math.max(src.scrollHeight, src.getBoundingClientRect().height);
+  const totalW = Math.ceil(w + pad * 2);
+  const totalH = Math.ceil(h + pad * 2);
+
+  const bgRaw = getComputedStyle(document.body).getPropertyValue("--surface").trim();
+  const bg = bgRaw || "#232f42";
+
+  const wrapper = document.createElement("div");
+  wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  wrapper.style.cssText =
+    `width:${Math.ceil(w)}px;padding:${pad}px;background:${bg};box-sizing:content-box;`;
+  const styleEl = document.createElement("style");
+  styleEl.textContent = _collectAppCss();
+  wrapper.appendChild(styleEl);
+  wrapper.appendChild(src.cloneNode(true));
+
+  let xhtml;
+  try { xhtml = new XMLSerializer().serializeToString(wrapper); }
+  catch (e) { alert("Could not serialize content for image export."); return; }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}">` +
+    `<foreignObject x="0" y="0" width="${totalW}" height="${totalH}">${xhtml}</foreignObject></svg>`;
+  const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = totalW * scale;
+    canvas.height = totalH * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, totalW, totalH);
+    ctx.drawImage(img, 0, 0);
+    try {
+      canvas.toBlob(blob => {
+        if (!blob) { alert("Could not generate image."); return; }
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        const name = String(_chViewing || "character").replace(/[^a-zA-Z0-9_-]/g, "_");
+        a.download = `char_history_${name}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }, "image/png");
+    } catch (e) {
+      alert("Could not export image: " + e.message);
+    }
+  };
+  img.onerror = () => alert("Could not render image (browser limitation).");
+  img.src = url;
 }
 
 function renderCwEngineeringHistory() {
@@ -2300,6 +2388,9 @@ function renderCharHistory(data, reqs) {
 
   updEl.textContent = data.last_updated ? "Updated: " + data.last_updated : "";
 
+  const hideEmptyToggle = document.getElementById("ch-hide-empty-toggle");
+  if (hideEmptyToggle) hideEmptyToggle.checked = _isChHideEmpty();
+
   const byTitle = {};
   for (const sec of (data.stat_sections || [])) byTitle[sec.title] = sec;
 
@@ -2316,7 +2407,9 @@ function renderCharHistory(data, reqs) {
   ];
 
   // Two-column grid for sections
-  const secs = SECTION_ORDER.map(t => byTitle[t]).filter(Boolean);
+  const hideEmpty = _isChHideEmpty();
+  const secs = SECTION_ORDER.map(t => byTitle[t]).filter(Boolean)
+    .filter(sec => !(hideEmpty && sec.title !== "Character Information" && _isSectionAllZero(sec)));
   html += `<div class="ch-grid">`;
   for (const sec of secs) {
     const built = sec.title === "Crimes Committed" ? _buildCrimesSection(sec) : _buildStatSection(sec);
