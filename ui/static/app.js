@@ -2810,8 +2810,18 @@ function plOpenActMenu(ev, username, groupKey) {
 
   const actions = [];
   if (groupKey === "local") {
-    actions.push(["pickpocket", "Pickpocket"], ["mugging", "Mug"],
-                 ["hack", "Hack"], ["breaking", "Break & Enter"]);
+    // Hack / B&E require residency confirmation from the player DB:
+    //   B&E  → target's home city matches the bot's CURRENT city
+    //   Hack → the above AND target's home city matches the bot's HOME city
+    const p       = _plOccByName()[username.toLowerCase()];
+    const homeCity = p ? (p.homecity || "") : "";
+    const eq = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+    const canBreak = eq(homeCity, _botState.city || "");
+    const canHack  = canBreak && eq(homeCity, _botState.home_city || "");
+
+    actions.push(["pickpocket", "Pickpocket"], ["mugging", "Mug"]);
+    if (canHack)  actions.push(["hack", "Hack"]);
+    if (canBreak) actions.push(["breaking", "Break & Enter"]);
   }
   actions.push(["transfer", "Transfer Money"]);
 
