@@ -962,13 +962,12 @@ function pollStatus() {
       updateCaseWorkSection(d.occupation || "");
 
       // Journals live feed — refresh when journals_updated_at advances.
-      // Avoids the race where has_new_journals clears before the next poll.
+      // Always refresh the underlying data (cjRefreshData only re-renders when no
+      // filter is active, and rendering into a hidden panel is harmless), so the
+      // viewer is current whether or not its tab is showing.
       if ((d.journals_updated_at || 0) > _cjLastUpdated) {
         _cjLastUpdated = d.journals_updated_at;
-        const journalsTab = document.getElementById("cj-journals");
-        if (journalsTab && journalsTab.classList.contains("active")) {
-          cjRefreshData();
-        }
+        cjRefreshData();
       }
 
       // Notifications
@@ -2482,7 +2481,7 @@ function cjRefreshData() {
     .then(r => r.json())
     .then(data => {
       _cjData = Object.values(data).sort((a, b) => new Date(b.time) - new Date(a.time));
-      const q = (document.getElementById("cj-search").value || "").toLowerCase().trim();
+      const q = (document.getElementById("cj-search")?.value || "").toLowerCase().trim();
       if (!q) {
         // No filter — update the visible list too
         _cjFiltered = _cjData;
