@@ -42,6 +42,24 @@ def _notify(state: GameState, event_type: str, message: str):
     if cfg.load().get("notifications", {}).get(event_type, False):
         state.push_notification(event_type, message)
 
+
+def _window_start_offset(prev_ingame, cur_ingame) -> int:
+    """In-game minutes to add to the current game time for an auto-detected
+    restock window's *start*.
+
+    The restock happened at some point between the previous store check and now.
+    Start = lower of (time-since-last-check + 10.5h) or (0.5h + 10.5h)
+          = 10.5h + min(time-since-last-check, 0.5h).
+    When the previous in-game time is unknown, assume the full 0.5h cap.
+    (The window end stays at current time + 13.5h.)
+    """
+    cap = 30  # 0.5 hours, in game minutes
+    if prev_ingame is None or cur_ingame is None:
+        tslc = cap
+    else:
+        tslc = (int(cur_ingame) - int(prev_ingame)) % (24 * 60)
+    return 10 * 60 + 30 + min(tslc, cap)
+
 _DRUG_TRADE_NAME_MAP = {
     "marijuana": "marijuana",
     "cocaine":   "cocaine",
@@ -2249,6 +2267,7 @@ def handle_check_bionics(action: Action, state: GameState):
     store = _parse_store()
     if task is not None:
         from tasks.bionics import save_bionics_state
+        prev_ingame = task.last_checked_ingame
         task.last_checked_at = time.time()
         state_updates = {"last_checked_at": task.last_checked_at}
 
@@ -2261,7 +2280,7 @@ def handle_check_bionics(action: Action, state: GameState):
             ]
             if restocked and state.ingame_mins is not None:
                 igm        = state.ingame_mins
-                start_mins = (igm + 10 * 60) % (24 * 60)
+                start_mins = (igm + _window_start_offset(prev_ingame, igm)) % (24 * 60)
                 end_mins   = (igm + 13 * 60 + 30) % (24 * 60)
                 new_start  = f"{start_mins // 60:02d}:{start_mins % 60:02d}"
                 new_end    = f"{end_mins   // 60:02d}:{end_mins   % 60:02d}"
@@ -2278,6 +2297,9 @@ def handle_check_bionics(action: Action, state: GameState):
         # Update last_stock snapshot
         task.last_stock = {item: d.get("stock", 0) for item, d in store.items()}
         state_updates["last_stock"] = task.last_stock
+        if state.ingame_mins is not None:
+            task.last_checked_ingame = state.ingame_mins
+            state_updates["last_checked_ingame"] = state.ingame_mins
         save_bionics_state(state_updates)
 
     # Log anything currently in stock, regardless of whether the user wants it
@@ -2415,6 +2437,7 @@ def handle_check_weapon_store(action: Action, state: GameState):
     store = _parse_store()
     if task is not None:
         from tasks.weapon_store import save_weapon_store_state
+        prev_ingame = task.last_checked_ingame
         task.last_checked_at = time.time()
         state_updates = {"last_checked_at": task.last_checked_at}
 
@@ -2427,7 +2450,7 @@ def handle_check_weapon_store(action: Action, state: GameState):
             ]
             if restocked and state.ingame_mins is not None:
                 igm        = state.ingame_mins
-                start_mins = (igm + 10 * 60) % (24 * 60)
+                start_mins = (igm + _window_start_offset(prev_ingame, igm)) % (24 * 60)
                 end_mins   = (igm + 13 * 60 + 30) % (24 * 60)
                 new_start  = f"{start_mins // 60:02d}:{start_mins % 60:02d}"
                 new_end    = f"{end_mins   // 60:02d}:{end_mins   % 60:02d}"
@@ -2441,6 +2464,9 @@ def handle_check_weapon_store(action: Action, state: GameState):
                 state.add_log(msg)
                 _notify(state, "weapon_store_restock", msg)
 
+        if state.ingame_mins is not None:
+            task.last_checked_ingame = state.ingame_mins
+            state_updates["last_checked_ingame"] = state.ingame_mins
         task.last_stock = {item: d.get("stock", 0) for item, d in store.items()}
         state_updates["last_stock"] = task.last_stock
         save_weapon_store_state(state_updates)
