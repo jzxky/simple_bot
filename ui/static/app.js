@@ -2735,21 +2735,21 @@ function _peoplePill(count, color, label) {
 }
 
 // ── Active players tab (live online / local / jail + quick interactions) ──────
-// Career colours matched to the in-game "Players Currently Online" key.
-// (Gangster ≈ the game's "Crime", Mayor ≈ "Politics".)
+// Career colours taken verbatim from the game's own `.colored .*` CSS classes.
+// (Gangster = the game's "Crime", Mayor = "Politics".)
 const _CAREER_COLORS = {
-  "Gangster":    "#e8e8e8",  // Crime — white
-  "Police":      "#4d7fe0",  // bright blue
-  "Law":         "#a95ecc",  // purple
-  "Customs":     "#5cbf5c",  // green
-  "Hospital":    "#6fa8dc",  // steel blue
-  "Engineering": "#cc9a4d",  // orange/tan
-  "Fire":        "#cc5555",  // red
-  "Bank":        "#4fb87a",  // green
-  "Funeral":     "#8f9499",  // gray
-  "Mayor":       "#cfcfcf",  // Politics — light gray
-  "Unemployed":  "#8f9499",  // gray
-  "Other":       "#9ca3af",
+  "Gangster":    "#E8E68F",              // .crime
+  "Police":      "#33C4ff",              // .police
+  "Law":         "#D256FF",              // .law
+  "Customs":     "#05D5A4",              // .customs
+  "Hospital":    "#FFA4A4",              // .hospital
+  "Engineering": "#FFA455",              // .engineering
+  "Fire":        "#FF7745",              // .fire
+  "Bank":        "#1cfb3d",              // .bank
+  "Funeral":     "rgba(255,255,255,0.58)", // .funeral
+  "Mayor":       "#FFFFFF",              // .politics / .mayor
+  "Unemployed":  "#C0C0C0",              // .colored .none
+  "Other":       "#C0C0C0",
 };
 
 function _careerColor(occupation) {
