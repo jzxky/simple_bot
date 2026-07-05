@@ -65,6 +65,7 @@ class GameState:
     cs_sentence: int = 0      # community services still owed as agg-crime punishment
     online_players: set = field(default_factory=set)   # all usernames in whosonlinecell
     local_players: set = field(default_factory=set)    # subset with * (same city as bot)
+    jail_players: set = field(default_factory=set)     # usernames flagged in jail (jail class)
     notifications: list = field(default_factory=list)
 
     @property
@@ -371,11 +372,22 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
                 names.add(parts[1])
         return names
 
+    def _parse_jail(div) -> set:
+        names = set()
+        for a in div.find_all("a", id=True):
+            pid = a.get("id", "")
+            if pid.startswith("profileLink:") and "jail" in a.get("class", []):
+                parts = pid.split(":")
+                if len(parts) >= 2:
+                    names.add(parts[1])
+        return names
+
     global_woc = soup.find("div", id="whosonlinecell", class_="global")
     local_woc  = soup.find("div", id="whosonlinecell", class_="local")
     if global_woc or local_woc:
         s.online_players = _parse_woc(global_woc) if global_woc else set()
         s.local_players  = _parse_woc(local_woc)  if local_woc  else set()
+        s.jail_players   = _parse_jail(global_woc) if global_woc else set()
 
     # Login state
     s.logged_in = url.rstrip("/") != urls.BASE_URL + "/default.asp"

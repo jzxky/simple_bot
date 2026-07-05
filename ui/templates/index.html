@@ -579,6 +579,14 @@
                   value="{{ config.get('players', {}).get('refresh_interval_minutes', 30) }}"
                   style="width:70px" oninput="markNumDirty(this)">
               </div>
+              <label class="inline-toggle setting-row" title="Auto-whitelist Boss / Don / Godfather / Capo di tutti capi on every list update">Whitelist bolds
+                <label class="toggle-label">
+                  <input type="checkbox" id="pl-bolds-toggle"
+                    {% if config.get('players', {}).get('whitelist_bolds', True) %}checked{% endif %}
+                    onchange="plBoldsToggleChanged(); autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
             </div>
             <div class="settings-group">
               <h3>
@@ -1325,12 +1333,6 @@
         <!-- Player List tab -->
         <div id="pl-tab-list" class="tab-panel active">
           <div class="pl-toolbar">
-            <label class="inline-toggle" title="Auto-whitelist Boss / Don / Godfather / Capo di tutti capi on every list update">Whitelist Bolds
-              <label class="toggle-label">
-                <input type="checkbox" id="pl-bolds-toggle" onchange="plBoldsToggleChanged()">
-                <span class="toggle"></span>
-              </label>
-            </label>
             <label class="inline-toggle" style="white-space:nowrap;margin-left:auto">Active only
               <label class="toggle-label">
                 <input type="checkbox" id="pl-filter-active" checked onchange="plFilter()">
@@ -1339,13 +1341,18 @@
             </label>
             <div style="position:relative">
               <button class="btn-secondary" onclick="togglePlColMenu()" id="pl-col-menu-btn">Columns ▾</button>
-              <div id="pl-col-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;z-index:200;white-space:nowrap;min-width:150px">
+              <div id="pl-col-menu" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px 20px;z-index:1000;white-space:nowrap;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                  <strong>Columns</strong>
+                  <button class="btn-secondary" onclick="togglePlColMenu()" style="padding:2px 8px">✕</button>
+                </div>
                 <div class="pl-col-section-body">
                   <label>Rank <input type="checkbox" checked onchange="plToggleCol('rank',this.checked)"></label>
                   <label>Occupation <input type="checkbox" checked onchange="plToggleCol('occupation',this.checked)"></label>
                   <label>Career <input type="checkbox" checked onchange="plToggleCol('career_group',this.checked)"></label>
                   <label>City <input type="checkbox" checked onchange="plToggleCol('homecity',this.checked)"></label>
                   <label>Age <input type="checkbox" checked onchange="plToggleCol('character_age',this.checked)"></label>
+                  <label>Jail Age <input type="checkbox" checked onchange="plToggleCol('jail_age',this.checked)"></label>
                   <label>Group <input type="checkbox" checked onchange="plToggleCol('group',this.checked)"></label>
                   <label>Tags <input type="checkbox" checked onchange="plToggleCol('tags',this.checked)"></label>
                   <label>Agg <input type="checkbox" checked onchange="plToggleCol('agg_crimes',this.checked)"></label>
@@ -1370,6 +1377,7 @@
                   <th class="pl-th pl-th-filter" onclick="plSort('group')" data-col="group">Group <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter">Tags</th>
                   <th class="pl-th pl-th-filter" onclick="plSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plSort('jail_age')" data-col="jail_age">Jail Age <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('agg_crimes')" data-col="agg_crimes">Agg <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
                 </tr>
@@ -1387,6 +1395,7 @@
                   <th class="pl-filter-cell"><select id="pl-filter-homecity" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"><select id="pl-filter-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"><select id="pl-filter-tag" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"></th>
                   <th class="pl-filter-cell"></th>
                   <th class="pl-filter-cell"><select id="pl-filter-agg" class="pl-filter-input" onchange="plFilter()">
                     <option value="">All</option>

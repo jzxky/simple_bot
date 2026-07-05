@@ -269,6 +269,7 @@ function _doSave() {
     engineering_tasks: _serializePriorityTable("engineering-priority-body"),
     player_list_enabled: document.getElementById("player_list_enabled").checked,
     player_refresh_interval: parseInt(document.getElementById("player_refresh_interval").value) || 30,
+    player_whitelist_bolds: (document.getElementById("pl-bolds-toggle")||{checked:true}).checked,
     consume_timer_limit: document.getElementById("consume_timer_limit").value || "00:00",
     auto_consume: document.getElementById("auto_consume").checked,
     auto_consumable: document.getElementById("auto_consumable").value,
@@ -896,9 +897,11 @@ function pollStatus() {
         cs_sentence: d.cs_sentence || 0, agg_fail_count: d.agg_fail_count || 0,
         online_players: new Set(d.online_players || []),
         local_players: new Set(d.local_players || []),
+        jail_players: new Set(d.jail_players || []),
       };
       _updateStatPanel();
       _updateCharPills();
+      _updatePlayerPills();
 
       // Show check-for-updates row only when running inside a git repo
       const updateRow = document.getElementById("update-row");
@@ -1109,7 +1112,7 @@ let _botState = {
   logged_in: false, in_jail: false, in_hospital: false,
   action_ready: false, hold_action_timer: false,
   city: "", home_city: "", cs_sentence: 0, agg_fail_count: 0,
-  online_players: new Set(), local_players: new Set(),
+  online_players: new Set(), local_players: new Set(), jail_players: new Set(),
 };
 
 function updateTimers(timers, serverTimeStr, aggProActive, jailReleaseSecs, flightDepartsAt, hospitalReleaseAt) {
@@ -2570,8 +2573,8 @@ let _plExpanded = {};
 let _plGroups   = [];
 let _plSortCol  = "username";
 let _plSortAsc  = true;
-const _plColVisible = {rank:true, occupation:true, career_group:true, homecity:true, group:true, tags:true, character_age:true, agg_crimes:true, case_work:true};
-const _PL_COL_INDEX = {rank:2, occupation:3, career_group:4, homecity:5, group:6, tags:7, character_age:8, agg_crimes:9, case_work:10};
+const _plColVisible = {rank:true, occupation:true, career_group:true, homecity:true, group:true, tags:true, character_age:true, jail_age:true, agg_crimes:true, case_work:true};
+const _PL_COL_INDEX = {rank:2, occupation:3, career_group:4, homecity:5, group:6, tags:7, character_age:8, jail_age:9, agg_crimes:10, case_work:11};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -2609,6 +2612,24 @@ function _careerGroup(occupation) {
   return _OCC_TO_CAREER[(occupation || "").toLowerCase()] || "Other";
 }
 
+// Collapsed-header pills for the Player Lists section: active count (👥) plus
+// live totals for online / local-online / jail populations.
+function _updatePlayerPills() {
+  const pill = document.getElementById("pills-s-players");
+  if (!pill) return;
+  const active = (_plData || []).filter(p => p.active).length;
+  const online = _botState.online_players ? _botState.online_players.size : 0;
+  const local  = _botState.local_players  ? _botState.local_players.size  : 0;
+  const jail   = _botState.jail_players   ? _botState.jail_players.size   : 0;
+  const cpill = (text, bg, fg) =>
+    `<span class="pill" style="background:${bg};color:${fg};border-color:${bg}">${escHtml(text)}</span>`;
+  pill.innerHTML =
+    _pill(`👥 ${active}`) +
+    cpill(`🌐 ${online}`, "#000", "#fff") +
+    cpill(`📍 ${local}`,  "#eab308", "#000") +
+    cpill(`🔒 ${jail}`,   "#166534", "#fff");
+}
+
 function _onlineStatus(username) {
   if (_botState.local_players.has(username)) return "local";
   if (_botState.online_players.has(username)) return "online";
@@ -2626,11 +2647,7 @@ function loadPlayers() {
       _plRebuildFilters();
       plFilter();
       _plRenderGroupsTab(_plGroups);
-      const pill = document.getElementById("pills-s-players");
-      if (pill) {
-        const active = _plData.filter(p => p.active).length;
-        pill.innerHTML = _pill(`👥 ${active}`);
-      }
+      _updatePlayerPills();
       // Keep the auto-jail partner list current with the player DB.
       loadAutoJailPartners();
     })
@@ -2708,6 +2725,7 @@ function _plSortVal(p, col) {
   if (col === "career_group") return _careerGroup(p.occupation).toLowerCase();
   if (col === "online_status") return String(_STATUS_ORDER[_onlineStatus(p.username)] ?? 2);
   if (col === "character_age") return String(p.character_age || 0).padStart(10, "0");
+  if (col === "jail_age") return String(p.jail_age || 0).padStart(10, "0");
   return (p[col] || "").toLowerCase();
 }
 
@@ -2767,7 +2785,7 @@ function _plRenderTable() {
   const colorMap = _plGroupColorMap();
 
   if (_plFiltered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
     return;
   }
 
@@ -2789,6 +2807,7 @@ function _plRenderTable() {
 
     const careerGrp = _careerGroup(p.occupation);
     const ageCell   = p.character_age ? _fmtAge(p.character_age) : "—";
+    const jailAgeCell = p.jail_age ? _fmtAge(p.jail_age) : "—";
     rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow(${escJsStr(p.username)})" style="cursor:pointer">
       <td style="text-align:center">${dot}</td>
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
@@ -2799,12 +2818,13 @@ function _plRenderTable() {
       <td>${groupCell}</td>
       <td>${tags||"—"}</td>
       <td style="white-space:nowrap">${ageCell}</td>
+      <td style="white-space:nowrap">${jailAgeCell}</td>
       <td>${aggCell}</td>
       <td>${cwCell}</td>
     </tr>`);
 
     if (expanded) {
-      rows.push(`<tr class="pl-detail-row"><td colspan="11"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
+      rows.push(`<tr class="pl-detail-row"><td colspan="12"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
     }
   });
   tbody.innerHTML = rows.join("");

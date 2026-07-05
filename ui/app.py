@@ -99,6 +99,7 @@ def save():
     c.setdefault("players", {})
     c["players"]["enabled"] = data.get("player_list_enabled", True)
     c["players"]["refresh_interval_minutes"] = int(data.get("player_refresh_interval", 30))
+    c["players"]["whitelist_bolds"] = data.get("player_whitelist_bolds", True)
 
     c.setdefault("consumables", {})
     c["consumables"]["timer_limit"] = data.get("consume_timer_limit", "00:00")
@@ -511,6 +512,7 @@ def status():
         "agg_fail_count": s.agg_fail_count(),
         "online_players": list(s.online_players),
         "local_players": list(s.local_players),
+        "jail_players": list(s.jail_players),
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
         "last_gym_use": _get_last_gym_use(),
