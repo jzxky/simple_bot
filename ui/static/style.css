@@ -1145,6 +1145,13 @@ input.input-unsaved { color: var(--red) !important; }
 .pl-act-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .pl-act-btn:disabled { opacity: .5; cursor: default; }
 .pl-act-result { font-size: 0.78rem; padding: 6px 4px 2px; color: var(--muted); white-space: normal; }
+.pl-act-info { display: flex; gap: 8px; align-items: center; padding: 4px; }
+.pl-act-avatar { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); flex: 0 0 auto; }
+.pl-act-details { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pl-act-row { display: flex; gap: 6px; font-size: 0.76rem; }
+.pl-act-row > span { color: var(--muted); flex: 0 0 34px; }
+.pl-act-row > b { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-act-unknown { color: var(--muted); font-style: italic; }
 .pl-act-ok { color: #4ade80; }
 .pl-act-fail { color: #f87171; }
 

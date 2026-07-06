@@ -75,6 +75,7 @@ _MIGRATIONS = [
     ("groups",   "updated_at",             "TEXT DEFAULT ''"),
     ("players",  "died_at",               "TEXT DEFAULT ''"),
     ("players",  "born_at",               "TEXT DEFAULT ''"),
+    ("players",  "pic_url",               "TEXT DEFAULT ''"),
 ]
 
 
@@ -214,7 +215,7 @@ def get_all_players() -> list:
             rows = con.execute(
                 """SELECT username, homecity, occupation, rank, active,
                           group_name, agg_crimes, case_work,
-                          character_age, jail_age, died_at, born_at
+                          character_age, jail_age, died_at, born_at, pic_url
                    FROM players ORDER BY username COLLATE NOCASE"""
             ).fetchall()
             result = []
@@ -335,6 +336,16 @@ def get_group_assignment(group_name: str, context: str) -> str:
             con.close()
 
 
+def get_pic_url(username: str) -> str:
+    with _lock:
+        con = _conn()
+        try:
+            row = con.execute("SELECT pic_url FROM players WHERE username=?", (username,)).fetchone()
+            return (row[0] if row else "") or ""
+        finally:
+            con.close()
+
+
 def get_player_group(username: str) -> str:
     with _lock:
         con = _conn()
@@ -369,6 +380,7 @@ def upsert_players(player_list: list):
                 occupation = p.get("occupation", "")
                 rank       = p.get("rank", "")
                 active     = 1 if p.get("active", True) else 0
+                pic_url    = p.get("pic_url", "")
 
                 cur = con.execute(
                     "SELECT homecity, occupation, rank FROM players WHERE username=?", (name,)
@@ -379,15 +391,16 @@ def upsert_players(player_list: list):
                            cur["rank"] != rank)
 
                 con.execute(
-                    """INSERT INTO players (username, homecity, occupation, rank, active, scraped_at, born_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """INSERT INTO players (username, homecity, occupation, rank, active, pic_url, scraped_at, born_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                        ON CONFLICT(username) DO UPDATE SET
                            homecity=excluded.homecity,
                            occupation=excluded.occupation,
                            rank=excluded.rank,
                            active=excluded.active,
+                           pic_url=CASE WHEN excluded.pic_url != '' THEN excluded.pic_url ELSE players.pic_url END,
                            scraped_at=excluded.scraped_at""",
-                    (name, homecity, occupation, rank, active, scraped_at, scraped_at),
+                    (name, homecity, occupation, rank, active, pic_url, scraped_at, scraped_at),
                 )
                 if changed:
                     con.execute(
