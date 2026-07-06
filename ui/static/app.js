@@ -2827,10 +2827,23 @@ function plOpenActMenu(ev, username, groupKey) {
   }
   actions.push(["transfer", "Transfer Money"]);
 
+  const p       = _plOccByName()[username.toLowerCase()];
+  const nameCol = p ? _careerColor(p.occupation) : _CAREER_COLORS["Other"];
+  const rowsHtml = p
+    ? `<div class="pl-act-row"><span>City</span><b>${escHtml(p.homecity || "?")}</b></div>` +
+      `<div class="pl-act-row"><span>Job</span><b>${escHtml(p.occupation || "?")}</b></div>` +
+      `<div class="pl-act-row"><span>Rank</span><b>${escHtml(p.rank || "?")}</b></div>`
+    : `<div class="pl-act-row pl-act-unknown">Not in player DB</div>`;
+  const avatarHtml = (p && p.pic_url)
+    ? `<img class="pl-act-avatar" src="/api/player_image/${encodeURIComponent(username)}" alt=""
+            onerror="this.style.display='none'">`
+    : "";
+
   const el = document.createElement("div");
   el.className = "pl-act-menu";
   el.innerHTML =
-    `<div class="pl-act-menu-head">${escHtml(username)}</div>` +
+    `<div class="pl-act-menu-head" style="color:${nameCol}">${escHtml(username)}</div>` +
+    `<div class="pl-act-info">${avatarHtml}<div class="pl-act-details">${rowsHtml}</div></div>` +
     actions.map(([kind, label]) =>
       `<button class="pl-act-btn" onclick="plDoInteract('${kind}', ${escJsStr(username)})">${escHtml(label)}</button>`
     ).join("") +

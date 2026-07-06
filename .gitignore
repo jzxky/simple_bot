@@ -8,3 +8,4 @@ venv/
 data/
 *.db
 last_screenshot.png
+player_images/

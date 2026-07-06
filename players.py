@@ -70,6 +70,7 @@ def _refresh_impl() -> "tuple[int, int]":
 
     seen = set()
     player_list = []
+    pic_urls = []
     for p in raw:
         name = p.get("userName", "")
         if not name:
@@ -77,15 +78,20 @@ def _refresh_impl() -> "tuple[int, int]":
         homecity   = p.get("userHomeCity", "")
         occupation = p.get("userOccupation", p.get("userJob", ""))
         rank       = p.get("userRank", "")
+        pic_url    = p.get("userPicLink", "")
         is_dead    = homecity.lower() in DEAD_CITIES
         player_list.append({
             "username": name, "homecity": homecity,
             "occupation": occupation, "rank": rank, "active": not is_dead,
+            "pic_url": pic_url,
         })
+        if pic_url:
+            pic_urls.append(pic_url)
         if not is_dead:
             seen.add(name)
 
     _db.upsert_players(player_list)
+    _download_player_images(pic_urls)
 
     marked = 0
     prev_active = _db.get_active_count()
@@ -96,6 +102,33 @@ def _refresh_impl() -> "tuple[int, int]":
         marked = _db.mark_absent_dead(seen)
 
     return len(seen), marked
+
+
+def _download_player_images(pic_urls: list):
+    """Download unique player avatars not already cached, reusing the browser's
+    authenticated request context. Failures are best-effort/non-fatal."""
+    if not pic_urls:
+        return
+    try:
+        import player_images as _pi
+    except Exception:
+        return
+
+    def _fetch(url):
+        try:
+            resp = browser.page().request.get(url, timeout=15000)
+            if resp.ok:
+                return resp.body()
+        except Exception:
+            return None
+        return None
+
+    try:
+        n = _pi.download_missing(pic_urls, _fetch)
+        if n:
+            print(f"[players] Downloaded {n} new player image(s).")
+    except Exception as e:
+        print(f"[players] Image download error: {e}")
 
 
 # Thin wrappers — delegate to player_db

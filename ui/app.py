@@ -891,6 +891,15 @@ def api_players():
     })
 
 
+@app.route("/api/player_image/<username>")
+def api_player_image(username):
+    import player_images as _pi
+    path = _pi.path_for_username(username)
+    if not path:
+        abort(404)
+    return send_file(path)
+
+
 @app.route("/api/players/<username>/history")
 def api_player_history(username):
     import player_db as _db
