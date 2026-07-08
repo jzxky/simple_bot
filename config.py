@@ -63,6 +63,9 @@ DEFAULT_CONFIG = {
         "show_scheduler": False,
         "debug_logging": False
     },
+    "event_boss": {
+        "enabled": False
+    },
     "case_work": {
         "enabled": False,
         "hospital": {

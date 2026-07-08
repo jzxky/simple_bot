@@ -749,6 +749,13 @@
               </div>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Events</h3>
+              <label class="inline-toggle setting-row">Enable Events Boss Task
+                <label class="toggle-label"><input type="checkbox" id="event_boss_enabled" {% if config.get('event_boss', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <p class="setting-note">Attacks the event boss on the conflict page while a boss event is running.</p>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Notifications</h3>
               <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification badge in the header so you can see them when you return AFK.</p>
               {% set notif_cfg = config.get('notifications', {}) %}

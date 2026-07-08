@@ -12,6 +12,7 @@ task holds for 5 minutes before checking again.
 
 import time
 
+import config as cfg
 from tasks.base import Task, Action
 from state import GameState
 
@@ -35,7 +36,9 @@ class EventBossTask(Task):
         return False
 
     def can_run(self, state: GameState) -> bool:
-        # Guards: logged in, not in jail, event timer available.
+        # Guards: task enabled in config, logged in, not in jail, event timer available.
+        if not cfg.load().get("event_boss", {}).get("enabled", False):
+            return False
         if not state.logged_in or state.in_jail:
             return False
         now = time.monotonic()
