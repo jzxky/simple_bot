@@ -137,6 +137,8 @@ def save():
     c["misc"]["headless"] = data.get("headless", False)
     c["misc"]["show_scheduler"] = data.get("show_scheduler", False)
     c["misc"]["debug_logging"] = data.get("debug_logging", False)
+    c.setdefault("event_boss", {})
+    c["event_boss"]["enabled"] = data.get("event_boss_enabled", False)
 
     c.setdefault("sync", {})
     c["sync"]["enabled"]          = data.get("sync_enabled", False)
