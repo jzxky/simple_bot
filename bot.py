@@ -52,6 +52,7 @@ from tasks.cs_punishment import CSPunishmentTask
 from tasks.online_age import OnlineAgeTask
 from tasks.bionics import BionicsTask
 from tasks.weapon_store import WeaponStoreTask
+from tasks.event_boss import EventBossTask
 from players import PlayerRefreshTask, SyncTask
 
 _thread: threading.Thread = None
@@ -216,6 +217,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     _weapon_store_task = WeaponStoreTask()
     sched.add(_weapon_store_task)
     sched.add(RespectTask())
+    sched.add(EventBossTask())
     sched.add(PlayerRefreshTask())
     sched.add(SyncTask())
     sched.add(CheckTopJobTask())
@@ -292,8 +294,8 @@ def _should_payback(target: str, c: dict, mode: str = None) -> bool:
 def _run(c: dict):
     global state
     headless = c.get("misc", {}).get("headless", False)
-    # Headed runs use the .com domain; headless uses .net.
-    urls.set_domain("mafiamatrix.net" if headless else "mafiamatrix.com")
+    # Always use the .net domain (both normal and headless mode).
+    urls.set_domain("mafiamatrix.net")
 
     state = GameState()
     state.bot_running = True

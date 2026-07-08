@@ -4114,6 +4114,53 @@ def handle_navigate(action: Action, state: GameState):
         _nav(url, state)
 
 
+def handle_event_boss(action: Action, state: GameState):
+    """Attack the event boss on /conflict/bossevent.asp.
+
+    Follows the ATTACK! link (id changes over time — matched on action=attack,
+    not the exact URL) and logs the success/fail result. When no attack link is
+    present the boss is assumed to be respawning; sets state._event_boss_hold so
+    the task backs off for 5 minutes."""
+    page = browser.page()
+    _nav(_u("/conflict/bossevent.asp"), state)
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    attack_href = None
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if "bossevent.asp" in href and "action=attack" in href:
+            attack_href = href
+            break
+
+    if not attack_href:
+        state._event_boss_hold = True
+        state.add_log("Event Boss: no attack link — boss respawning, holding 5 min.")
+        return
+
+    if attack_href.startswith("http"):
+        url = attack_href
+    elif attack_href.startswith("/"):
+        url = _u(attack_href)
+    else:
+        url = _u("/conflict/" + attack_href)
+
+    _nav(url, state)
+    if not _check_session(state):
+        return
+
+    result_soup = BeautifulSoup(page.content(), "html.parser")
+    success = result_soup.find("div", id="success")
+    fail    = result_soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Event Boss attack: {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Event Boss attack: {fail.get_text(strip=True)}")
+    else:
+        state.add_log("Event Boss attack: no success/fail result parsed.")
+
+
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
@@ -4122,6 +4169,7 @@ HANDLERS = {
     "bulk_add_launder_contacts": handle_bulk_add_launder_contacts,
     "check_banking_cases": handle_check_banking_cases,
     "do_crime": handle_do_crime,
+    "event_boss": handle_event_boss,
     "interact": handle_interact,
     "check_weapon": handle_check_weapon,
     "consume": handle_consume,
