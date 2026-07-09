@@ -46,13 +46,26 @@ def index():
     return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS)
 
 
-@app.route("/save", methods=["POST"])
-def save():
-    data = request.get_json()
-    c = cfg.load()
+def _merge_changed(target: dict, before: dict, after: dict):
+    """Copy into `target` only the leaves that differ between `before` and
+    `after` (i.e. the ones this client actually changed). Recurses into nested
+    dicts so untouched sibling keys — and any values written by the bot in the
+    background — are preserved."""
+    for k, av in after.items():
+        bv = before.get(k) if isinstance(before, dict) else None
+        if isinstance(av, dict) and isinstance(bv, dict):
+            tv = target.get(k)
+            if not isinstance(tv, dict):
+                tv = {}
+                target[k] = tv
+            _merge_changed(tv, bv, av)
+        elif av != bv:
+            target[k] = av
 
-    cfg.save_env(data.get("email", ""), data.get("password", ""))
 
+def _apply_payload(c: dict, data: dict) -> dict:
+    """Populate config dict `c` from a settings payload `data`. Pure — no env
+    writes, no bot signals, no persistence (those are handled by save())."""
     c["earns"]["enabled"] = data.get("earns_enabled", False)
     c["earns"]["earn_type"] = data.get("earn_type", "surgeon")
 
@@ -118,7 +131,6 @@ def save():
         c["promo"]["choices"] = data["promo_choices"]
 
     c.setdefault("jail", {})
-    prev_duty = c["jail"].get("duty", "laundry")
     c["jail"]["enabled"] = data.get("jail_enabled", False)
     c["jail"]["duty"] = data.get("jail_duty", "laundry")
     c["jail"]["action"] = data.get("jail_action", "gym")
@@ -127,8 +139,6 @@ def save():
     c["jail"]["use_warrants"] = data.get("use_warrants", False)
     c["jail"]["auto_warrant_handling"] = data.get("auto_warrant_handling", "none")
     c["jail"]["auto_jail_partner"] = data.get("auto_jail_partner", "")
-    if c["jail"]["duty"] != prev_duty and bot.is_running():
-        bot.request_clear_jail_duty_queue()
 
     c.setdefault("misc", {})
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
@@ -221,10 +231,45 @@ def save():
     for slug, _ in NOTIFICATION_EVENTS:
         c["notifications"][slug] = data.get(f"notif_{slug}", False)
 
+    return c
+
+
+@app.route("/save", methods=["POST"])
+def save():
+    import copy
+    import settings_rev
+    data = request.get_json() or {}
+    base = data.pop("_base", None)
+
+    c_live = cfg.load()
+    prev_duty = c_live.get("jail", {}).get("duty", "laundry")
+
+    if isinstance(base, dict) and base:
+        # Partial/diff apply: only overwrite the leaves this client changed vs
+        # the snapshot it rendered from — never touching other tabs' fields or
+        # values the bot wrote in the background.
+        before = _apply_payload(copy.deepcopy(c_live), base)
+        after  = _apply_payload(copy.deepcopy(c_live), data)
+        _merge_changed(c_live, before, after)
+        c = c_live
+        creds_changed = (data.get("email") != base.get("email")
+                         or data.get("password") != base.get("password"))
+    else:
+        # Legacy full apply (no base sent — e.g. very first save).
+        c = _apply_payload(c_live, data)
+        creds_changed = True
+
+    if creds_changed:
+        cfg.save_env(data.get("email", ""), data.get("password", ""))
+
+    if c.get("jail", {}).get("duty", "laundry") != prev_duty and bot.is_running():
+        bot.request_clear_jail_duty_queue()
+
     cfg.save(c)
+    settings_rev.bump()
     if bot.is_running():
         bot.request_reload()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "settings_rev": settings_rev.get()})
 
 
 @app.route("/notifications/dismiss", methods=["POST"])
@@ -519,6 +564,7 @@ def status():
         "jail_players": list(s.jail_players),
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
+        "settings_rev": __import__("settings_rev").get(),
         "last_gym_use": _get_last_gym_use(),
         "casino_release_at": _get_casino_release_at(),
         "bionics_next_check_at": _get_bionics_next_check_at(s),

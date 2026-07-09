@@ -82,6 +82,8 @@ class WeaponStoreTask(Task):
         if sig == self._covered_sig:
             c["weapon_store"]["use_time_window"] = False
             cfg.save(c)
+            import settings_rev
+            settings_rev.bump()
             self._covered_sig = None
             save_weapon_store_state({"window_sig": None})
             state.add_log("Weapon Store: buy window passed with no restock — "

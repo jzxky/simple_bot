@@ -216,8 +216,8 @@ function showTab(id, btn) {
 
 // ── Save ─────────────────────────────────────────────────────────────────────
 
-function _doSave() {
-  const data = {
+function _buildPayload() {
+  return {
     email: document.getElementById("email").value,
     password: document.getElementById("password").value,
     earns_enabled: document.getElementById("earns_enabled").checked,
@@ -329,12 +329,51 @@ function _doSave() {
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
     ..._collectNotifSettings(),
   };
+}
 
+// Snapshot of the last config this tab synced with the server. Saves send only
+// the fields that differ from it, so one tab can't clobber another tab's — or
+// the bot's background — changes. `null` until the first baseline capture.
+let _savedConfig = null;
+let _knownSettingsRev = 0;
+let _settingsRevInit = false;
+let _foreignChangePending = false;
+
+function _doSave() {
+  const data = _buildPayload();
+  const body = _savedConfig ? Object.assign({ _base: _savedConfig }, data) : data;
   return fetch("/save", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(data),
-  }).then(r => r.json());
+    body: JSON.stringify(body),
+  }).then(r => r.json()).then(res => {
+    _savedConfig = data;
+    if (res && res.settings_rev != null) {
+      _knownSettingsRev = Math.max(_knownSettingsRev, res.settings_rev);
+    }
+    return res;
+  });
+}
+
+// ── Cross-tab settings sync (Option 3) ───────────────────────────────────────
+
+function _onForeignSettingsChange() {
+  if (_foreignChangePending) return;
+  const ae = document.activeElement;
+  const editing = ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName || "");
+  // If the user isn't mid-edit, just re-sync by reloading; otherwise show a
+  // non-destructive banner so we don't wipe an in-progress edit.
+  if (!editing) { location.reload(); return; }
+  _foreignChangePending = true;
+  if (document.getElementById("settings-sync-banner")) return;
+  const bar = document.createElement("div");
+  bar.id = "settings-sync-banner";
+  bar.className = "settings-sync-banner";
+  bar.innerHTML =
+    "Settings were changed in another window." +
+    ' <button type="button" onclick="location.reload()">Reload</button>' +
+    ' <button type="button" class="dismiss" onclick="this.parentNode.remove()">✕</button>';
+  document.body.appendChild(bar);
 }
 
 function autoSave() {
@@ -793,6 +832,18 @@ function pollStatus() {
     .then(r => r.json())
     .then(d => {
       updateBotState(d.running, d.paused);
+
+      // Cross-tab settings sync: a higher revision than we've seen means a
+      // different tab (or the bot) changed the config — re-sync this tab.
+      if (d.settings_rev != null) {
+        if (!_settingsRevInit) {
+          _knownSettingsRev = d.settings_rev;
+          _settingsRevInit = true;
+        } else if (d.settings_rev > _knownSettingsRev) {
+          _knownSettingsRev = d.settings_rev;
+          _onForeignSettingsChange();
+        }
+      }
 
       const taskEl = document.getElementById("status-task");
       if (taskEl) taskEl.textContent = (d.running && !d.paused && d.current_task) ? d.current_task : "";
@@ -1664,6 +1715,9 @@ document.addEventListener("DOMContentLoaded", () => {
   _initPriorityDrag("weapon-store-priority-body");
   _renderBuyListSummary("bionics-priority-body", "bionics-buylist-summary");
   _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
+  // Capture the baseline the diff-based save compares against, once dynamic
+  // tables/summaries have populated from the server-rendered values.
+  setTimeout(() => { _savedConfig = _buildPayload(); }, 1500);
 });
 
 // Up/down reorder for priority tables

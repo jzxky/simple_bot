@@ -2453,6 +2453,7 @@ def handle_check_bionics(action: Action, state: GameState):
                 c["bionics"]["window_start"]    = new_start
                 c["bionics"]["window_end"]      = new_end
                 cfg.save(c)
+                import settings_rev; settings_rev.bump()
                 msg = (f"Bionics restock detected ({', '.join(restocked)}) — "
                        f"buy window set to {new_start}–{new_end} in-game.")
                 state.add_log(msg)
@@ -2623,6 +2624,7 @@ def handle_check_weapon_store(action: Action, state: GameState):
                 c["weapon_store"]["window_start"]    = new_start
                 c["weapon_store"]["window_end"]      = new_end
                 cfg.save(c)
+                import settings_rev; settings_rev.bump()
                 msg = (f"Weapon Store restock detected ({', '.join(restocked)}) — "
                        f"buy window set to {new_start}–{new_end} in-game.")
                 state.add_log(msg)
