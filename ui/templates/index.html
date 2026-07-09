@@ -577,11 +577,9 @@
           <div class="settings-groups">
             <div class="settings-group">
               <h3>General</h3>
-              <div class="setting-row">
-                <label for="player_list_enabled">Enable player list updates</label>
-                <input type="checkbox" id="player_list_enabled" onchange="markDirty()"
-                  {% if config.get('players', {}).get('enabled', True) %}checked{% endif %}>
-              </div>
+              <label class="inline-toggle setting-row">Enable player list updates
+                <label class="toggle-label"><input type="checkbox" id="player_list_enabled" {% if config.get('players', {}).get('enabled', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
               <div class="setting-row">
                 <label for="player_refresh_interval">Refresh interval (minutes)</label>
                 <input type="number" id="player_refresh_interval" min="1" max="1440"
