@@ -1562,3 +1562,36 @@ button, [onclick] { touch-action: manipulation; }
   line-height: 1;
 }
 .notif-dismiss-btn:hover { color: var(--text); }
+
+/* Cross-tab settings-sync banner */
+.settings-sync-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3000;
+  background: var(--surface, #1b2a3a);
+  border: 1px solid var(--accent, #4d7fe0);
+  color: var(--text, #e8eef5);
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-sync-banner button {
+  background: var(--accent, #4d7fe0);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.settings-sync-banner button.dismiss {
+  background: transparent;
+  color: var(--muted, #9aa7b4);
+  padding: 3px 6px;
+}

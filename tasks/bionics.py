@@ -97,6 +97,8 @@ class BionicsTask(Task):
         if sig == self._covered_sig:
             c["bionics"]["use_time_window"] = False
             cfg.save(c)
+            import settings_rev
+            settings_rev.bump()
             self._covered_sig = None
             save_bionics_state({"window_sig": None})
             state.add_log("Bionics: buy window passed with no restock — "
