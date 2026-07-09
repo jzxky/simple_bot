@@ -10,6 +10,7 @@ for wanted items.
 """
 
 import time
+import store_windows
 from tasks.base import Task, Action
 from state import GameState
 
@@ -36,6 +37,7 @@ class WeaponStoreTask(Task):
         self.last_checked_ingame: "int | None" = s.get("last_checked_ingame")
         self.last_stock: dict = s.get("last_stock", {})
         self.last_views: "tuple[int,int] | None" = None
+        self._covered_sig: "str | None" = s.get("window_sig")
 
     def can_run(self, state: GameState) -> bool:
         import config as cfg
@@ -47,25 +49,53 @@ class WeaponStoreTask(Task):
         if not w.get("enabled", False):
             return False
 
-        interval_secs = int(w.get("check_interval_minutes", 5)) * 60
+        # Wake on the window/no-window interval. When the toggle is on but we're
+        # outside the window, run() still fires so it can detect the window
+        # passing — it just won't visit the shop.
+        interval_secs = store_windows.interval_secs(w, state.ingame_mins)
         if self.last_checked_at > 0 and time.time() - self.last_checked_at < interval_secs:
             return False
-
-        # Time window check (handles midnight wrap)
-        ingame = state.ingame_mins
-        if w.get("use_time_window", False) and ingame is not None:
-            start = w.get("window_start", "00:00")
-            end   = w.get("window_end",   "23:59")
-            start_mins = int(start[:2]) * 60 + int(start[3:])
-            end_mins   = int(end[:2])   * 60 + int(end[3:])
-            if start_mins < end_mins:
-                in_window = start_mins < ingame < end_mins
-            else:  # crosses midnight
-                in_window = ingame > start_mins or ingame < end_mins
-            if not in_window:
-                return False
-
         return True
 
+    def _manage_window(self, state: GameState):
+        """Auto-disable 'check during window only' once the covered window passes
+        with no restock renewing it (restock moves window_start/end)."""
+        import config as cfg
+        c = cfg.load()
+        w = c.get("weapon_store", {})
+        if not w.get("use_time_window", False):
+            if self._covered_sig is not None:
+                self._covered_sig = None
+                save_weapon_store_state({"window_sig": None})
+            return
+        if state.ingame_mins is None:
+            return
+        sig = store_windows.window_sig(w)
+        if store_windows.in_window(w, state.ingame_mins):
+            if self._covered_sig != sig:
+                self._covered_sig = sig
+                save_weapon_store_state({"window_sig": sig})
+            return
+        # Outside the window now.
+        if self._covered_sig is None:
+            return  # never observed this window active — stay conservative
+        if sig == self._covered_sig:
+            c["weapon_store"]["use_time_window"] = False
+            cfg.save(c)
+            self._covered_sig = None
+            save_weapon_store_state({"window_sig": None})
+            state.add_log("Weapon Store: buy window passed with no restock — "
+                          "'check during window only' turned off.")
+        else:
+            self._covered_sig = None
+            save_weapon_store_state({"window_sig": None})
+
     def run(self, state: GameState, executor):
+        import config as cfg
+        self._manage_window(state)
+        w = cfg.load().get("weapon_store", {})
+        if w.get("use_time_window", False) and not store_windows.in_window(w, state.ingame_mins):
+            self.last_checked_at = time.time()
+            save_weapon_store_state({"last_checked_at": self.last_checked_at})
+            return
         executor.execute(Action("check_weapon_store", _task=self), state)

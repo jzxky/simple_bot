@@ -179,13 +179,12 @@ def save():
     c["smart_travel"]["store_priority"] = data.get("smart_travel_store_priority", "bionics")
     c["smart_travel"]["window_vs_activity"] = data.get("smart_travel_window_vs_activity", "windows")
     c["smart_travel"]["home"] = data.get("smart_travel_home", "home_city")
-    c["smart_travel"]["window_interval_minutes"] = max(1, int(data.get("smart_travel_window_interval", 5) or 5))
-    c["smart_travel"]["no_window_interval_minutes"] = max(1, int(data.get("smart_travel_no_window_interval", 16) or 16))
 
     c.setdefault("bionics", {})
     c["bionics"]["enabled"] = data.get("bionics_enabled", False)
     c["bionics"]["wanted_items"] = data.get("bionics_wanted_items", [])
-    c["bionics"]["check_interval_minutes"] = max(1, int(data.get("bionics_interval", 5)))
+    c["bionics"]["check_interval_window_minutes"] = max(1, min(30, int(data.get("bionics_interval_window", 5) or 5)))
+    c["bionics"]["check_interval_no_window_minutes"] = max(1, min(30, int(data.get("bionics_interval_no_window", 16) or 16)))
     c["bionics"]["use_time_window"] = data.get("bionics_use_time_window", False)
     c["bionics"]["window_start"] = data.get("bionics_window_start", "00:00")
     c["bionics"]["window_end"] = data.get("bionics_window_end", "23:59")
@@ -196,7 +195,8 @@ def save():
     c["weapon_store"]["enabled"] = data.get("weapon_store_enabled", False)
     c["weapon_store"]["wanted_items"] = data.get("weapon_store_wanted_items", [])
     c["weapon_store"]["priority_order"] = data.get("weapon_store_priority_order", [])
-    c["weapon_store"]["check_interval_minutes"] = max(1, int(data.get("weapon_store_interval", 5)))
+    c["weapon_store"]["check_interval_window_minutes"] = max(1, min(30, int(data.get("weapon_store_interval_window", 5) or 5)))
+    c["weapon_store"]["check_interval_no_window_minutes"] = max(1, min(30, int(data.get("weapon_store_interval_no_window", 16) or 16)))
     c["weapon_store"]["use_time_window"] = data.get("weapon_store_use_time_window", False)
     c["weapon_store"]["window_start"] = data.get("weapon_store_window_start", "00:00")
     c["weapon_store"]["window_end"] = data.get("weapon_store_window_end", "23:59")
@@ -413,8 +413,9 @@ def _get_bionics_next_check_at(state) -> "float | None":
     task = bot.get_bionics_task()
     if not task or task.last_checked_at <= 0:
         return None
+    import store_windows
     b = cfg.load().get("bionics", {})
-    interval_secs = int(b.get("check_interval_minutes", 5)) * 60
+    interval_secs = store_windows.interval_secs(b, state.ingame_mins)
     next_at = task.last_checked_at + interval_secs
 
     if b.get("use_time_window", False) and state.server_time is not None:
@@ -445,8 +446,9 @@ def _get_weapon_store_next_check_at(state) -> "float | None":
     task = bot.get_weapon_store_task()
     if not task or task.last_checked_at <= 0:
         return None
+    import store_windows
     w = cfg.load().get("weapon_store", {})
-    interval_secs = int(w.get("check_interval_minutes", 5)) * 60
+    interval_secs = store_windows.interval_secs(w, state.ingame_mins)
     next_at = task.last_checked_at + interval_secs
 
     if w.get("use_time_window", False) and state.server_time is not None:
