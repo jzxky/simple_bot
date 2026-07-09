@@ -153,10 +153,18 @@
                 </div>
               </div>
               <div class="setting-row">
-                <label for="bionics_interval">Check every</label>
-                <select id="bionics_interval" style="width:100px" onchange="autoSave()">
+                <label for="bionics_interval_window">Check interval — Window</label>
+                <select id="bionics_interval_window" style="width:100px" onchange="autoSave()">
                   {% for m in range(1, 31) %}
-                  <option value="{{ m }}" {% if bionics_cfg.get('check_interval_minutes', 5) == m %}selected{% endif %}>{{ m }} min</option>
+                  <option value="{{ m }}" {% if bionics_cfg.get('check_interval_window_minutes', bionics_cfg.get('check_interval_minutes', 5)) == m %}selected{% endif %}>{{ m }} min</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row">
+                <label for="bionics_interval_no_window">Check interval — No window</label>
+                <select id="bionics_interval_no_window" style="width:100px" onchange="autoSave()">
+                  {% for m in range(1, 31) %}
+                  <option value="{{ m }}" {% if bionics_cfg.get('check_interval_no_window_minutes', 16) == m %}selected{% endif %}>{{ m }} min</option>
                   {% endfor %}
                 </select>
               </div>
@@ -223,10 +231,18 @@
                 </div>
               </div>
               <div class="setting-row">
-                <label for="weapon_store_interval">Check every</label>
-                <select id="weapon_store_interval" style="width:100px" onchange="autoSave()">
+                <label for="weapon_store_interval_window">Check interval — Window</label>
+                <select id="weapon_store_interval_window" style="width:100px" onchange="autoSave()">
                   {% for m in range(1, 31) %}
-                  <option value="{{ m }}" {% if weapon_store_cfg.get('check_interval_minutes', 5) == m %}selected{% endif %}>{{ m }} min</option>
+                  <option value="{{ m }}" {% if weapon_store_cfg.get('check_interval_window_minutes', weapon_store_cfg.get('check_interval_minutes', 5)) == m %}selected{% endif %}>{{ m }} min</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row">
+                <label for="weapon_store_interval_no_window">Check interval — No window</label>
+                <select id="weapon_store_interval_no_window" style="width:100px" onchange="autoSave()">
+                  {% for m in range(1, 31) %}
+                  <option value="{{ m }}" {% if weapon_store_cfg.get('check_interval_no_window_minutes', 16) == m %}selected{% endif %}>{{ m }} min</option>
                   {% endfor %}
                 </select>
               </div>
@@ -349,20 +365,6 @@
                   <option value="{{ v }}" {% if smart.get('home','home_city') == v %}selected{% endif %}>{{ l }}</option>
                   {% endfor %}
                 </select>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
-                <label for="smart_travel_window_interval">Shop check — in window</label>
-                <div>
-                  <input type="number" id="smart_travel_window_interval" min="1" style="width:70px"
-                    value="{{ smart.get('window_interval_minutes', 5) }}" oninput="markNumDirty(this)"> min
-                </div>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
-                <label for="smart_travel_no_window_interval">Shop check — out of window</label>
-                <div>
-                  <input type="number" id="smart_travel_no_window_interval" min="1" style="width:70px"
-                    value="{{ smart.get('no_window_interval_minutes', 16) }}" oninput="markNumDirty(this)"> min
-                </div>
               </div>
             </div>
           </div>

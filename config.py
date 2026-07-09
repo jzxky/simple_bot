@@ -115,8 +115,6 @@ DEFAULT_CONFIG = {
         "store_priority": "bionics",       # "bionics" | "weapon" — overlap tie-break
         "window_vs_activity": "windows",   # "windows" | "activity"
         "home": "home_city",               # "home_city" | "Auckland" | "Beirut" | "Chicago"
-        "window_interval_minutes": 5,      # store check interval while a window is set
-        "no_window_interval_minutes": 16,  # store check interval once a window passes
     },
     "promo": {
         "monitor_top_job": False,
@@ -166,7 +164,8 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "wanted_items": [],
         "priority_order": [],
-        "check_interval_minutes": 5,
+        "check_interval_window_minutes": 5,      # check cadence while inside an active window
+        "check_interval_no_window_minutes": 16,  # check cadence when window off / outside window
         "use_time_window": False,
         "window_start": "00:00",
         "window_end": "23:59",
@@ -176,7 +175,8 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "wanted_items": [],
         "priority_order": [],
-        "check_interval_minutes": 5,
+        "check_interval_window_minutes": 5,
+        "check_interval_no_window_minutes": 16,
         "use_time_window": False,
         "window_start": "00:00",
         "window_end": "23:59",

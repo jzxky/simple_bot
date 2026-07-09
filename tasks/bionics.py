@@ -10,6 +10,7 @@ Withdraws cash before each navigation to the store.
 """
 
 import time
+import store_windows
 from tasks.base import Task, Action
 from state import GameState
 
@@ -49,6 +50,9 @@ class BionicsTask(Task):
         self.last_checked_ingame: "int | None" = s.get("last_checked_ingame")
         self.last_stock: dict       = s.get("last_stock", {})
         self.last_views: "tuple[int,int] | None" = None
+        # Signature of the window we're actively covering; persisted so a restart
+        # doesn't lose it (used to auto-disable the toggle when the window passes).
+        self._covered_sig: "str | None" = s.get("window_sig")
 
     def can_run(self, state: GameState) -> bool:
         import config as cfg
@@ -60,25 +64,56 @@ class BionicsTask(Task):
         if not b.get("enabled", False):
             return False
 
-        interval_secs = int(b.get("check_interval_minutes", 5)) * 60
+        # Wake on the window/no-window interval. When the toggle is on but we're
+        # outside the window, run() still fires (no-window cadence) so it can
+        # detect the window passing — it just won't visit the shop.
+        interval_secs = store_windows.interval_secs(b, state.ingame_mins)
         if self.last_checked_at > 0 and time.time() - self.last_checked_at < interval_secs:
             return False
-
-        # Time window check (handles midnight wrap)
-        ingame = state.ingame_mins
-        if b.get("use_time_window", False) and ingame is not None:
-            start = b.get("window_start", "00:00")
-            end   = b.get("window_end",   "23:59")
-            start_mins = int(start[:2]) * 60 + int(start[3:])
-            end_mins   = int(end[:2])   * 60 + int(end[3:])
-            if start_mins < end_mins:
-                in_window = start_mins < ingame < end_mins
-            else:  # crosses midnight
-                in_window = ingame > start_mins or ingame < end_mins
-            if not in_window:
-                return False
-
         return True
 
+    def _manage_window(self, state: GameState):
+        """Auto-disable 'check during window only' once the covered window passes
+        with no restock renewing it (restock moves window_start/end)."""
+        import config as cfg
+        c = cfg.load()
+        b = c.get("bionics", {})
+        if not b.get("use_time_window", False):
+            if self._covered_sig is not None:
+                self._covered_sig = None
+                save_bionics_state({"window_sig": None})
+            return
+        if state.ingame_mins is None:
+            return
+        sig = store_windows.window_sig(b)
+        if store_windows.in_window(b, state.ingame_mins):
+            if self._covered_sig != sig:
+                self._covered_sig = sig
+                save_bionics_state({"window_sig": sig})
+            return
+        # Outside the window now.
+        if self._covered_sig is None:
+            return  # never observed this window active — stay conservative
+        if sig == self._covered_sig:
+            c["bionics"]["use_time_window"] = False
+            cfg.save(c)
+            self._covered_sig = None
+            save_bionics_state({"window_sig": None})
+            state.add_log("Bionics: buy window passed with no restock — "
+                          "'check during window only' turned off.")
+        else:
+            # Window moved (restock) before we re-covered it — retrack.
+            self._covered_sig = None
+            save_bionics_state({"window_sig": None})
+
     def run(self, state: GameState, executor):
+        import config as cfg
+        self._manage_window(state)
+        b = cfg.load().get("bionics", {})
+        # When window-only is on but we're outside the window, don't visit the
+        # shop — just record the tick (management already ran above).
+        if b.get("use_time_window", False) and not store_windows.in_window(b, state.ingame_mins):
+            self.last_checked_at = time.time()
+            save_bionics_state({"last_checked_at": self.last_checked_at})
+            return
         executor.execute(Action("check_bionics", _task=self), state)
