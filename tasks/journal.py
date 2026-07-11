@@ -57,11 +57,33 @@ def _parse_label(label) -> tuple[str, str, str]:
     return entry_id, title, time_str, text
 
 
+# Journal markup differs in jail: rows/cells/new-marker use jail_-prefixed
+# classes/ids. Match both so journals log while jailed as well as free.
+_ROW_CLASSES     = {"journal_row", "jail_journal_row"}
+_EVENT_CLASSES   = {"journal_event", "jail_journal_event"}
+_NEW_MARKER_IDS  = ("comms_msg_top_super", "jail_comms_msg_top_super")
+
+
+def _journal_rows(soup):
+    """Yield every journal row tag (normal or jail variant)."""
+    for row in soup.find_all("tr"):
+        if set(row.get("class", []) or []) & _ROW_CLASSES:
+            yield row
+
+
+def _event_td(row):
+    """The journal_event / jail_journal_event cell of a row, or None."""
+    for td in row.find_all("td"):
+        if set(td.get("class", []) or []) & _EVENT_CLASSES:
+            return td
+    return None
+
+
 def _parse_journal_rows(soup) -> list[dict]:
-    """Return list of dicts with id/title/time/text for every journal_row on the page."""
+    """Return list of dicts with id/title/time/text for every journal row on the page."""
     entries = []
-    for row in soup.find_all("tr", class_="journal_row"):
-        td = row.find("td", class_="journal_event")
+    for row in _journal_rows(soup):
+        td = _event_td(row)
         if not td:
             continue
         label = td.find("label")
@@ -74,21 +96,21 @@ def _parse_journal_rows(soup) -> list[dict]:
 
 
 def _has_new_marker_before(soup, row_tag) -> bool:
-    """Return True if the journal_row immediately follows a NEW marker tr."""
+    """Return True if the journal row immediately follows a NEW marker tr."""
     prev = row_tag.find_previous_sibling("tr")
     if prev:
-        cell = prev.find("td", id="comms_msg_top_super")
-        if cell:
-            return True
+        for marker_id in _NEW_MARKER_IDS:
+            if prev.find("td", id=marker_id):
+                return True
     return False
 
 
 def _new_entries_on_page(soup) -> list[dict]:
     """Return only the NEW-flagged entries on this page."""
     new = []
-    for row in soup.find_all("tr", class_="journal_row"):
+    for row in _journal_rows(soup):
         if _has_new_marker_before(soup, row):
-            td = row.find("td", class_="journal_event")
+            td = _event_td(row)
             if not td:
                 continue
             label = td.find("label")
