@@ -80,6 +80,7 @@ class AutoJailTimeTask(Task):
     def run(self, state: GameState, executor):
         c = cfg.load()
         jail_cfg = c.get("jail", {})
+        mode = jail_cfg.get("auto_jail_time", "off")
         use_warrants = jail_cfg.get("use_warrants", False)
         partner = jail_cfg.get("auto_jail_partner", "")
 
@@ -111,17 +112,19 @@ class AutoJailTimeTask(Task):
         state.add_log(f"Auto Jail Time: planning jailbreak for {target} (partner: {partner or 'none'}).")
         bot.request_jailbreak_plan(target=target, partner=partner, hold_action_timer=False)
 
-        # Keep the character jailed through the respect change: turn off jail
-        # 'use consumables' (contraband shortens the sentence). Written to config
-        # and reflected in open settings tabs via the settings-revision bump.
-        consumables_were_on = c["jail"].get("use_consumables", False)
-        c["jail"]["use_consumables"] = False
+        # In respect_change mode, keep the character jailed through the change by
+        # turning off jail 'use consumables' (contraband shortens the sentence).
+        # Only do so if it was on, and flag it so it can be auto-restored once the
+        # change has passed. Reflected in open settings tabs via the rev bump.
+        if mode == "respect_change" and c["jail"].get("use_consumables", False):
+            c["jail"]["use_consumables"] = False
+            c["jail"]["consumables_auto_off"] = True
+            state.add_log("Auto Jail Time: jail 'use consumables' disabled while a break is planned.")
+
         c["jail"]["jailbreak_execute_at"] = int(time.time()) + _EXECUTE_DELAY
         cfg.save(c)
         import settings_rev
         settings_rev.bump()
-        if consumables_were_on:
-            state.add_log("Auto Jail Time: jail 'use consumables' disabled while a break is planned.")
 
 
 class AutoJailTimeExecuteTask(Task):
@@ -152,7 +155,40 @@ class AutoJailTimeExecuteTask(Task):
         c = cfg.load()
         c["jail"]["jailbreak_execute_at"] = 0
         cfg.save(c)
-        # After the 30-minute wait the bot only needs to visit the jailbreak page;
+        # After the 31-minute wait the bot only needs to visit the jailbreak page;
         # actually executing the break is not required.
-        state.add_log("Auto Jail Time: 30 min elapsed — visiting jailbreak page.")
+        state.add_log("Auto Jail Time: 31 min elapsed — visiting jailbreak page.")
         executor.execute(Action("navigate", url="/income/jailbreak.asp"), state)
+
+
+class AutoJailConsumablesRestoreTask(Task):
+    """Re-enables jail 'use consumables' after respect_change auto-disabled it.
+
+    Restores only once the self-jail episode is safely over — not in jail, no
+    pending visit, and past the 02:00 execute deadline. Gating on the deadline
+    (rather than the raw jail-release edge) avoids the brief post-visit window
+    where the character isn't jailed yet, which would otherwise re-enable
+    consumables just before the protective sentence begins."""
+    priority = 77
+    label = "Auto Jail Consumables Restore"
+
+    def can_run(self, state: GameState) -> bool:
+        if not state.logged_in or state.in_jail:
+            return False
+        c = cfg.load()
+        jail_cfg = c.get("jail", {})
+        if not jail_cfg.get("consumables_auto_off", False):
+            return False
+        if jail_cfg.get("jailbreak_execute_at", 0) > 0:
+            return False  # still waiting to visit / not yet jailed
+        t = _server_mins(state)
+        return t is not None and _past_execute_deadline(t)
+
+    def run(self, state: GameState, executor):
+        c = cfg.load()
+        c["jail"]["use_consumables"] = True
+        c["jail"]["consumables_auto_off"] = False
+        cfg.save(c)
+        import settings_rev
+        settings_rev.bump()
+        state.add_log("Auto Jail Time: respect change passed — jail 'use consumables' re-enabled.")

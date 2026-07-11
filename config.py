@@ -151,6 +151,7 @@ DEFAULT_CONFIG = {
         "consumable": "cigarettes",
         "auto_jail_time": "off",
         "auto_jail_partner": "",
+        "consumables_auto_off": False,
         "use_warrants": False,
         "auto_warrant_handling": "none",
         "jailbreak_execute_at": 0,

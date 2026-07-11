@@ -40,7 +40,7 @@ from tasks.maintain_cash import MaintainCashTask
 from tasks.character_history import CharacterHistoryTask
 from tasks.obituary_history import ObituaryHistoryTask
 from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJailBreakTask
-from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask
+from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask, AutoJailConsumablesRestoreTask
 from tasks.journal import JournalCheckTask, ArchiveJournalsTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue
 from tasks.drug_trade import DrugTradeTask
 from tasks.illness import IllnessTask
@@ -203,6 +203,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     _auto_jail_task = AutoJailTimeTask()
     sched.add(_auto_jail_task)
     sched.add(AutoJailTimeExecuteTask())
+    sched.add(AutoJailConsumablesRestoreTask())
     sched.add(JournalCheckTask())
     sched.add(ArchiveJournalsTask(_archive_journals_queue))
     sched.add(DrugTradeTask(_drug_trade_queue))
