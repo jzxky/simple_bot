@@ -1,6 +1,11 @@
 """
 Checks main.asp when rank_progress = 100% and submits the configured A/B choice
 if the game redirects to a promotion page.
+
+Runs when auto-promo is enabled (regular ranks; top jobs are left to the
+sniper). Additionally, when top-job monitoring is on but auto-promo is off, it
+still completes a monitored top-job promo page as a fallback for the sniper —
+so the promotion is submitted regardless of the auto-promo toggle.
 """
 
 import time
@@ -10,6 +15,7 @@ import urls
 from state import GameState, parse_state
 from tasks.base import Task
 from promotions import PROMO_BY_RANK, get_choice, match_url
+from tasks.check_top_job import TOP_JOB_MAP as _TOP_JOB_MAP
 
 _CHECK_INTERVAL = 60  # seconds — don't hammer; check once per minute at most
 
@@ -19,6 +25,10 @@ _EXCLUDED_RANKS = {
     "Fire Chief", "Chief Engineer", "Bank Manager", "Funeral Director",
     "Hospital Director", "Boss", "Godfather", "Capo di tutti capi",
 }
+
+# The top jobs the sniper monitors — completed here as a fallback when top-job
+# monitoring is on, even if auto-promo itself is toggled off.
+_MONITORED_TOP_JOBS = set(_TOP_JOB_MAP)
 
 
 class AutoPromoTask(Task):
@@ -33,14 +43,26 @@ class AutoPromoTask(Task):
             return False
         if state.rank_progress < 100:
             return False
-        if not cfg.load().get("promo", {}).get("auto_promo", {}).get("enabled", False):
-            return False
         if state.snipe_top_job_pending:
-            return False
-        if state.next_rank in _EXCLUDED_RANKS:
             return False
         if state.next_rank not in PROMO_BY_RANK:
             return False
+
+        promo_cfg = cfg.load().get("promo", {})
+        auto_on = promo_cfg.get("auto_promo", {}).get("enabled", False)
+        monitor_on = promo_cfg.get("monitor_top_job", False)
+
+        if auto_on:
+            # Normal auto-promo handles regular ranks; top jobs go via the sniper.
+            if state.next_rank in _EXCLUDED_RANKS:
+                return False
+        elif monitor_on and state.next_rank in _MONITORED_TOP_JOBS:
+            # Top-job monitor on but auto-promo off: still complete the top-job
+            # promo if we land on its page (fallback for the sniper).
+            pass
+        else:
+            return False
+
         return time.monotonic() - self._last_run >= _CHECK_INTERVAL
 
     def run(self, state: GameState, executor):
