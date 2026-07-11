@@ -35,6 +35,12 @@ def _past_execute_deadline(t: int) -> bool:
     return _EXECUTE_DEADLINE_MIN <= t < _PLAN_START_MIN
 
 
+def _after_changeover(t: int) -> bool:
+    """01:00 → 22:30 — the respect change has passed and the plan window hasn't
+    reopened yet. Consumables may be restored any time in here."""
+    return _CHANGEOVER_MIN <= t < _PLAN_START_MIN
+
+
 class AutoJailTimeTask(Task):
     priority = 75
     label = "Auto Jail Time"
@@ -164,11 +170,10 @@ class AutoJailTimeExecuteTask(Task):
 class AutoJailConsumablesRestoreTask(Task):
     """Re-enables jail 'use consumables' after respect_change auto-disabled it.
 
-    Restores only once the self-jail episode is safely over — not in jail, no
-    pending visit, and past the 02:00 execute deadline. Gating on the deadline
-    (rather than the raw jail-release edge) avoids the brief post-visit window
-    where the character isn't jailed yet, which would otherwise re-enable
-    consumables just before the protective sentence begins."""
+    Once the respect change (01:00) has passed, the protection is no longer
+    needed — shortening any later sentence is fine — so consumables may be
+    restored any time after 01:00 (while not currently in jail and with no visit
+    still pending)."""
     priority = 77
     label = "Auto Jail Consumables Restore"
 
@@ -182,7 +187,7 @@ class AutoJailConsumablesRestoreTask(Task):
         if jail_cfg.get("jailbreak_execute_at", 0) > 0:
             return False  # still waiting to visit / not yet jailed
         t = _server_mins(state)
-        return t is not None and _past_execute_deadline(t)
+        return t is not None and _after_changeover(t)
 
     def run(self, state: GameState, executor):
         c = cfg.load()
