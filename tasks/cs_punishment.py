@@ -7,7 +7,8 @@ state.cs_sentence is set to N. This task then:
   - Otherwise performs community service
   - Probes agcrime.asp again — if it loads, clears cs_sentence and re-enables aggs
 
-Priority is set above AggCrimeTask (50) so CS punishment is always preferred.
+Priority (61) is set above the action-timer tasks (agg crimes, gym, casino,
+event boss, etc.) so a CS sentence is always served first.
 AggCrimeTask.can_run also returns False when cs_sentence > 0.
 """
 
@@ -16,7 +17,7 @@ from state import GameState
 
 
 class CSPunishmentTask(Task):
-    priority = 55
+    priority = 61
     label = "CS Punishment"
 
     def can_run(self, state: GameState) -> bool:
