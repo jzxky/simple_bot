@@ -48,8 +48,9 @@ def _window_start_offset(prev_ingame, cur_ingame) -> int:
     restock window's *start*.
 
     The restock happened at some point between the previous store check and now.
-    Start = lower of (time-since-last-check + 10.5h) or (0.5h + 10.5h)
-          = 10.5h + min(time-since-last-check, 0.5h).
+    Anchoring to the earliest possible restock (the previous check) opens the
+    window sooner so a restock isn't missed:
+    Start = 10.5h - min(time-since-last-check, 0.5h).
     When the previous in-game time is unknown, assume the full 0.5h cap.
     (The window end stays at current time + 13.5h.)
     """
@@ -58,7 +59,7 @@ def _window_start_offset(prev_ingame, cur_ingame) -> int:
         tslc = cap
     else:
         tslc = (int(cur_ingame) - int(prev_ingame)) % (24 * 60)
-    return 10 * 60 + 30 + min(tslc, cap)
+    return 10 * 60 + 30 - min(tslc, cap)
 
 _DRUG_TRADE_NAME_MAP = {
     "marijuana": "marijuana",
