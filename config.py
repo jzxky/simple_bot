@@ -135,6 +135,10 @@ DEFAULT_CONFIG = {
             "sgarrista": "A", "capodecima": "A", "caporegime": "A", "boss": "B", "don": "A",
         }
     },
+    "crossroads": {
+        "enabled": False,
+        "selection": "current",   # "current" | "new"
+    },
     "consumables": {
         "timer_limit": "00:00",
         "auto_consume": False,
