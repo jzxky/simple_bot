@@ -245,6 +245,8 @@ function _buildPayload() {
     promo_thread_id: (document.getElementById("promo_thread_id") || {value:""}).value.trim(),
     auto_promo_enabled: document.getElementById("auto_promo_enabled")?.checked ?? false,
     promo_choices: _collectPromoChoices(),
+    crossroads_enabled: (document.getElementById("crossroads_enabled")||{checked:false}).checked,
+    crossroads_selection: (document.getElementById("crossroads_selection")||{value:"current"}).value,
     jail_enabled: document.getElementById("jail_enabled").checked,
     jail_duty: document.getElementById("jail_duty").value,
     jail_action: document.getElementById("jail_action").value,

@@ -1259,6 +1259,33 @@ def handle_payback(action: Action, state: GameState):
     state.add_log(f"Payback sent: ${amount:,} to {target}.")
 
 
+def handle_crossroad(action: Action, state: GameState):
+    """Resolve a Career Crossroad page.
+
+    The page offers two radios: the first is the *current* career, the second the
+    *new* career. Picks per the configured selection and submits."""
+    selection = action.params.get("selection", "current")
+    page = browser.page()
+    if "crossroad.asp" not in browser.current_url():
+        return
+
+    radios = page.query_selector_all("input[name='option']")
+    if len(radios) < 2:
+        state.add_log(f"Career crossroad: expected 2 options, found {len(radios)} — skipping.")
+        return
+
+    idx = 0 if selection == "current" else 1
+    soup = BeautifulSoup(page.content(), "html.parser")
+    label_el = soup.find("label", {"for": "one" if idx == 0 else "two"})
+    career = label_el.get_text(strip=True) if label_el else ("current" if idx == 0 else "new")
+
+    radios[idx].click()
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log(f"Career crossroad: chose {'current' if idx == 0 else 'new'} career ({career}).")
+
+
 def handle_probe_agcrime(action: Action, state: GameState):
     """Navigate to agcrime.asp — if it redirects, CS is still required; if it loads, CS is done."""
     _nav(_u("/income/agcrime.asp"), state)
@@ -4173,6 +4200,7 @@ HANDLERS = {
     "check_banking_cases": handle_check_banking_cases,
     "do_crime": handle_do_crime,
     "event_boss": handle_event_boss,
+    "crossroad": handle_crossroad,
     "interact": handle_interact,
     "check_weapon": handle_check_weapon,
     "consume": handle_consume,

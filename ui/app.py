@@ -130,6 +130,10 @@ def _apply_payload(c: dict, data: dict) -> dict:
     if "promo_choices" in data and isinstance(data.get("promo_choices"), dict):
         c["promo"]["choices"] = data["promo_choices"]
 
+    c.setdefault("crossroads", {})
+    c["crossroads"]["enabled"] = data.get("crossroads_enabled", False)
+    c["crossroads"]["selection"] = data.get("crossroads_selection", "current")
+
     c.setdefault("jail", {})
     c["jail"]["enabled"] = data.get("jail_enabled", False)
     c["jail"]["duty"] = data.get("jail_duty", "laundry")
