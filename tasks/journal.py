@@ -130,7 +130,7 @@ def _is_last_page(soup) -> bool:
     return False
 
 
-def _next_page_url(soup) -> str | None:
+def _next_page_url(soup) -> "str | None":
     for a in soup.find_all("a"):
         href = a.get("href", "")
         if re.search(r"journal\.asp\?p=\d+", href) and a.get_text(strip=True) == "Next":
