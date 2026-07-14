@@ -2144,20 +2144,55 @@ def handle_check_fire_cases(action: Action, state: GameState):
                 inspect_link = href
                 break
 
-    if not inspect_link:
+    if inspect_link:
+        state.add_log("Fire case work: performing inspection.")
+        _nav(inspect_link, state)
+        result_soup = BeautifulSoup(page.content(), "html.parser")
+        success = result_soup.find("div", id="success")
+        fail    = result_soup.find("div", id="fail")
+        if success:
+            state.add_log(f"Fire inspection result: {success.get_text(strip=True)}")
+        elif fail:
+            state.add_log(f"Fire inspection failed: {fail.get_text(strip=True)}")
+        else:
+            state.add_log("Fire inspection: submitted (no result div).")
+        _refresh_state(state)
+
+    # Step 3 — investigations requested by police officers (only if case timer free)
+    if not state.timer_ready("case"):
         return
 
-    state.add_log("Fire case work: performing inspection.")
-    _nav(inspect_link, state)
+    _nav(_u("/localcity/firestation.asp?display=investigations"), state)
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    table = soup.find("table", style=lambda s: s and "90%" in s)
+    investigate_links = []
+    if table:
+        for row in table.find_all("tr"):
+            link = row.find("a", href=lambda h: h and "display=investigate&id=" in h)
+            if link:
+                href = link["href"]  # BeautifulSoup already decodes &amp; → &
+                if not href.startswith("http"):
+                    href = _u("/localcity/") + href.lstrip("/")
+                investigate_links.append(href)
+
+    if not investigate_links:
+        return
+
+    target = investigate_links[-1]  # last requested investigation
+    state.add_log("Fire case work: performing investigation.")
+    _nav(target, state)
     result_soup = BeautifulSoup(page.content(), "html.parser")
     success = result_soup.find("div", id="success")
     fail    = result_soup.find("div", id="fail")
     if success:
-        state.add_log(f"Fire inspection result: {success.get_text(strip=True)}")
+        state.add_log(f"Fire investigation result: {success.get_text(strip=True)}")
     elif fail:
-        state.add_log(f"Fire inspection failed: {fail.get_text(strip=True)}")
+        state.add_log(f"Fire investigation failed: {fail.get_text(strip=True)}")
     else:
-        state.add_log("Fire inspection: submitted (no result div).")
+        state.add_log("Fire investigation: submitted (no result div).")
     _refresh_state(state)
 
 
