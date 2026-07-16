@@ -3,6 +3,7 @@ Handles initial login and automatic session re-login.
 """
 
 import time
+import config as cfg
 from tasks.base import Task, Action
 
 RETRY_INTERVAL = 15
@@ -24,3 +25,8 @@ class LoginTask(Task):
     def run(self, state, executor):
         self._last_attempt = time.monotonic()
         executor.execute(Action("login", email=self.email, password=self.password), state)
+
+        # On a successful login, grab the current event-consumable inventory so
+        # it's known before any attack/consume cycle.
+        if state.logged_in and cfg.load().get("event_boss", {}).get("enabled", False):
+            executor.execute(Action("refresh_event_inventory"), state)
