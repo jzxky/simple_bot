@@ -4176,6 +4176,64 @@ def handle_navigate(action: Action, state: GameState):
         _nav(url, state)
 
 
+def _parse_event_consumables(soup, state: GameState):
+    """Parse the #eventboss_collecteditems block into
+    state.event_consumables = {name: {"qty": int, "url": str}}."""
+    container = soup.find("div", id="eventboss_collecteditems")
+    if not container:
+        return
+    items = {}
+    for div in container.find_all("div", onclick=True):
+        oc = div.get("onclick", "")
+        tm = re.search(r"type=([A-Za-z0-9_]+)", oc)
+        if not tm:
+            continue
+        name = tm.group(1)
+        um = re.search(r"href='([^']+)'", oc)
+        url = (um.group(1) if um else "").replace("&amp;", "&")
+        qm = re.search(r"Collected:\s*(\d+)", div.get_text())
+        qty = int(qm.group(1)) if qm else 0
+        items[name] = {"qty": qty, "url": url}
+    state.event_consumables = items
+
+
+def handle_event_consume(action: Action, state: GameState):
+    """Consume one event-boss item by following its consume URL."""
+    name = action.params.get("name", "")
+    url  = action.params.get("url", "")
+    if not url:
+        return
+    if url.startswith("http"):
+        full = url
+    elif url.startswith("/"):
+        full = _u(url)
+    else:
+        full = _u("/" + url)
+
+    _nav(full, state)
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    success = soup.find("div", id="success")
+    fail    = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Event consume {name}: {success.get_text(strip=True)}")
+        ec = (state.event_consumables or {}).get(name)
+        if ec and ec.get("qty", 0) > 0:
+            ec["qty"] -= 1  # keep local count accurate between bossevent visits
+    elif fail:
+        msg = fail.get_text(strip=True)
+        state.add_log(f"Event consume {name} failed: {msg}")
+        # Out of stock — zero it locally so we stop retrying until next visit.
+        if any(p in msg.lower() for p in ("do not have", "don't have", "none left", "0x")):
+            if name in (state.event_consumables or {}):
+                state.event_consumables[name]["qty"] = 0
+    else:
+        state.add_log(f"Event consume {name}: submitted (no result div).")
+    _refresh_state(state)
+
+
 def handle_event_boss(action: Action, state: GameState):
     """Attack the event boss on /conflict/bossevent.asp.
 
@@ -4189,6 +4247,8 @@ def handle_event_boss(action: Action, state: GameState):
         return
 
     soup = BeautifulSoup(page.content(), "html.parser")
+    _parse_event_consumables(soup, state)
+
     attack_href = None
     for a in soup.find_all("a", href=True):
         href = a["href"]
@@ -4232,6 +4292,7 @@ HANDLERS = {
     "check_banking_cases": handle_check_banking_cases,
     "do_crime": handle_do_crime,
     "event_boss": handle_event_boss,
+    "event_consume": handle_event_consume,
     "crossroad": handle_crossroad,
     "interact": handle_interact,
     "check_weapon": handle_check_weapon,

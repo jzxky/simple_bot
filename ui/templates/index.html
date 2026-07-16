@@ -85,6 +85,10 @@
           </div>
           <hr class="stat-divider">
           <div class="consumables-grid" id="stat-consumables"></div>
+          <div id="stat-event-consumables-wrap" style="display:none">
+            <div class="stat-label" style="margin:8px 0 4px">Event Items</div>
+            <div class="consumables-grid" id="stat-event-consumables"></div>
+          </div>
           <hr class="stat-divider">
           <div class="stats-grid" id="stat-timers-grid"></div>
         </div>
@@ -691,6 +695,25 @@
                   oninput="markNumDirty(this)">
               </div>
             </div>
+            {% set ec_cfg = config.get('event_boss', {}).get('consume', {}) %}
+            <div class="settings-group" id="event-consume-settings" style="grid-column: 1 / -1; display:none">
+              <h3>Event Items</h3>
+              <p class="setting-note">Auto-consume collected event-boss items (shown while Event Boss handling is enabled).</p>
+              {% for name, effect, supported in [
+                  ('Burger','Resets Case timer', True),
+                  ('Coffee','Resets Laundering timer', True),
+                  ('Egg','Resets Travel timer', True),
+                  ('Watermelon','Resets Action timer', True),
+                  ('Fries','Restores agg strength (energy < 100%)', True),
+                  ('Milk','+1h Agg pro (whenever in stock)', True),
+                  ('Popcorn','Resets Earn timer (not supported yet)', False),
+                  ('Lightning','Random prize (not supported yet)', False),
+              ] %}
+              <label class="inline-toggle setting-row"{% if not supported %} title="Not supported yet"{% endif %}>{{ name }} <span class="muted" style="font-weight:normal;font-size:0.85em">{{ effect }}</span>
+                <label class="toggle-label"><input type="checkbox" id="event_consume_{{ name }}" {% if ec_cfg.get(name) %}checked{% endif %}{% if not supported %} disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              {% endfor %}
+            </div>
             {% set ab = config.get('autobuy', {}) %}
             {% set ab_drugs = ab.get('drugs', {}) %}
             <div class="settings-group" style="grid-column: 1 / -1">
@@ -767,7 +790,7 @@
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Events</h3>
               <label class="inline-toggle setting-row">Enable Events Boss Task
-                <label class="toggle-label"><input type="checkbox" id="event_boss_enabled" {% if config.get('event_boss', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+                <label class="toggle-label"><input type="checkbox" id="event_boss_enabled" {% if config.get('event_boss', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave(); toggleEventConsumeSettings()"><span class="toggle"></span></label>
               </label>
               <p class="setting-note">Attacks the event boss on the conflict page while a boss event is running.</p>
             </div>

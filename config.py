@@ -64,7 +64,11 @@ DEFAULT_CONFIG = {
         "debug_logging": False
     },
     "event_boss": {
-        "enabled": False
+        "enabled": False,
+        "consume": {
+            "Burger": False, "Coffee": False, "Egg": False, "Fries": False,
+            "Lightning": False, "Milk": False, "Popcorn": False, "Watermelon": False,
+        },
     },
     "case_work": {
         "enabled": False,

@@ -33,6 +33,9 @@ class GameState:
     earns_24h: int = 0
     consumables_24h: int = 0
     consumables: dict = field(default_factory=dict)
+    # Event-boss collected items: {name: {"qty": int, "url": str}}. Updated only
+    # when bossevent.asp is visited.
+    event_consumables: dict = field(default_factory=dict)
     action_timer_ready: bool = False
     action_timer_end: Optional[datetime] = None
     agg_pro_active: bool = False
