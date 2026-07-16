@@ -53,6 +53,7 @@ from tasks.online_age import OnlineAgeTask
 from tasks.bionics import BionicsTask
 from tasks.weapon_store import WeaponStoreTask
 from tasks.event_boss import EventBossTask
+from tasks.event_consume import EventConsumeTask
 from tasks.crossroad import CrossroadTask
 from players import PlayerRefreshTask, SyncTask
 
@@ -220,6 +221,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(_weapon_store_task)
     sched.add(RespectTask())
     sched.add(EventBossTask())
+    sched.add(EventConsumeTask())
     sched.add(CrossroadTask())
     sched.add(PlayerRefreshTask())
     sched.add(SyncTask())

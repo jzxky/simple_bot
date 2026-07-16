@@ -329,8 +329,25 @@ function _buildPayload() {
     sync_online_time:   (document.getElementById("sync_online_time")||{checked:true}).checked,
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
+    ..._collectEventConsume(),
     ..._collectNotifSettings(),
   };
+}
+
+const _EVENT_ITEMS = ["Burger","Coffee","Egg","Fries","Lightning","Milk","Popcorn","Watermelon"];
+function _collectEventConsume() {
+  const o = {};
+  _EVENT_ITEMS.forEach(n => {
+    const el = document.getElementById("event_consume_" + n);
+    o["event_consume_" + n] = el ? el.checked : false;
+  });
+  return o;
+}
+
+function toggleEventConsumeSettings() {
+  const on = (document.getElementById("event_boss_enabled") || {checked:false}).checked;
+  const el = document.getElementById("event-consume-settings");
+  if (el) el.style.display = on ? "" : "none";
 }
 
 // Snapshot of the last config this tab synced with the server. Saves send only
@@ -923,6 +940,22 @@ function pollStatus() {
           Object.entries(CONSUMABLE_LABELS).filter(([k]) => (cons[k] ?? 0) > 0).map(([k, label]) =>
             `<div class="consumable-item"><span class="consumable-name">${label}</span><span class="consumable-qty ${_botRunning ? 'consumable-link' : ''}" onclick="${_botRunning ? `consumeItem('${k}')` : ''}">${cons[k]}</span></div>`
           ).join("") || '<span class="placeholder">No consumables</span>';
+      }
+
+      // Event-boss collected items (display only; click does nothing).
+      const evWrap = document.getElementById("stat-event-consumables-wrap");
+      if (evWrap) {
+        const evc = d.event_consumables || {};
+        const evNames = _EVENT_ITEMS.filter(n => evc[n] && (evc[n].qty ?? 0) > 0);
+        if (d.event_boss_enabled && evNames.length) {
+          evWrap.style.display = "";
+          document.getElementById("stat-event-consumables").innerHTML =
+            evNames.map(n =>
+              `<div class="consumable-item"><span class="consumable-name">${n}</span><span class="consumable-qty">${evc[n].qty}</span></div>`
+            ).join("");
+        } else {
+          evWrap.style.display = "none";
+        }
       }
 
       // Timers
@@ -1717,6 +1750,7 @@ document.addEventListener("DOMContentLoaded", () => {
   _initPriorityDrag("weapon-store-priority-body");
   _renderBuyListSummary("bionics-priority-body", "bionics-buylist-summary");
   _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
+  toggleEventConsumeSettings();
   // Capture the baseline the diff-based save compares against, once dynamic
   // tables/summaries have populated from the server-rendered values.
   setTimeout(() => { _savedConfig = _buildPayload(); }, 1500);

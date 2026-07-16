@@ -153,6 +153,10 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["misc"]["debug_logging"] = data.get("debug_logging", False)
     c.setdefault("event_boss", {})
     c["event_boss"]["enabled"] = data.get("event_boss_enabled", False)
+    import event_consumables as _ec
+    c["event_boss"].setdefault("consume", {})
+    for _name in _ec.EVENT_ORDER:
+        c["event_boss"]["consume"][_name] = data.get(f"event_consume_{_name}", False)
 
     c.setdefault("sync", {})
     c["sync"]["enabled"]          = data.get("sync_enabled", False)
@@ -568,6 +572,8 @@ def status():
         "jail_players": list(s.jail_players),
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
+        "event_boss_enabled": cfg.load().get("event_boss", {}).get("enabled", False),
+        "event_consumables": s.event_consumables,
         "settings_rev": __import__("settings_rev").get(),
         "last_gym_use": _get_last_gym_use(),
         "casino_release_at": _get_casino_release_at(),
