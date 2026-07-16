@@ -4234,6 +4234,18 @@ def handle_event_consume(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def handle_refresh_event_inventory(action: Action, state: GameState):
+    """Visit bossevent.asp once to capture the current event-consumable stock
+    (used on login so the inventory is known before any attack cycle)."""
+    _nav(_u("/conflict/bossevent.asp"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    _parse_event_consumables(soup, state)
+    n = len(state.event_consumables or {})
+    state.add_log(f"Event inventory refreshed: {n} item type(s) collected.")
+
+
 def handle_event_boss(action: Action, state: GameState):
     """Attack the event boss on /conflict/bossevent.asp.
 
@@ -4293,6 +4305,7 @@ HANDLERS = {
     "do_crime": handle_do_crime,
     "event_boss": handle_event_boss,
     "event_consume": handle_event_consume,
+    "refresh_event_inventory": handle_refresh_event_inventory,
     "crossroad": handle_crossroad,
     "interact": handle_interact,
     "check_weapon": handle_check_weapon,
