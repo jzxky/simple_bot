@@ -699,17 +699,17 @@
             <div class="settings-group" id="event-consume-settings" style="grid-column: 1 / -1; display:none">
               <h3>Event Items</h3>
               <p class="setting-note">Auto-consume collected event-boss items (shown while Event Boss handling is enabled).</p>
-              {% for name, effect, supported in [
-                  ('Burger','Resets Case timer', True),
-                  ('Coffee','Resets Laundering timer', True),
-                  ('Egg','Resets Travel timer', True),
-                  ('Watermelon','Resets Action timer', True),
-                  ('Fries','Restores agg strength (energy < 100%)', True),
-                  ('Milk','+1h Agg pro (whenever in stock)', True),
-                  ('Popcorn','Resets Earn timer (not supported yet)', False),
-                  ('Lightning','Random prize (not supported yet)', False),
+              {% for name, plabel, supported in [
+                  ('Burger','Case', True),
+                  ('Coffee','Laundering', True),
+                  ('Egg','Travel', True),
+                  ('Watermelon','Action', True),
+                  ('Fries','Agg strength 100%', True),
+                  ('Milk','+1hr agg pro', True),
+                  ('Popcorn','Earn', False),
+                  ('Lightning','Random prize', False),
               ] %}
-              <label class="inline-toggle setting-row"{% if not supported %} title="Not supported yet"{% endif %}>{{ name }} <span class="muted" style="font-weight:normal;font-size:0.85em">{{ effect }}</span>
+              <label class="inline-toggle setting-row"{% if not supported %} title="Not supported yet"{% endif %}>{{ name }} ({{ plabel }})
                 <label class="toggle-label"><input type="checkbox" id="event_consume_{{ name }}" {% if ec_cfg.get(name) %}checked{% endif %}{% if not supported %} disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
               {% endfor %}
