@@ -19,7 +19,7 @@ import event_consumables as _ec
 from tasks.base import Task, Action
 from state import GameState
 
-_POLL = 15  # seconds between consume evaluations
+_POLL = 2  # seconds between consume evaluations (matches the main loop tick)
 
 
 class EventConsumeTask(Task):
