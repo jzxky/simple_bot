@@ -34,7 +34,8 @@ class EventConsumeTask(Task):
         if kind == "always":
             return True
         if kind == "energy":
-            return (state.energy or 0) < 100
+            # Don't top up agg energy while aggravating is throttled by fails.
+            return (state.energy or 0) < 100 and state.agg_fail_count() < 3
         if kind == "timer":
             return param in state.timers and not state.timer_ready(param)
         return False  # unsupported
