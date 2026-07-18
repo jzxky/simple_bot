@@ -77,6 +77,9 @@ class AggCrimeTask(Task):
             return False
         if state.cs_sentence > 0:
             return False
+        # Back off aggravated crimes once fails hit the 30-min-window threshold.
+        if state.agg_fail_count() >= 3:
+            return False
         if time.monotonic() < self._cooldown_until:
             return False
         crime, _ = self._pick_crime(state)
