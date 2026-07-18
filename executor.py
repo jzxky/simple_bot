@@ -1737,10 +1737,8 @@ def handle_armed_robbery(action: Action, state: GameState):
                 _nav(_u("/loggedin.asp?display=play"), state)
                 return
 
-            state.add_log(f"No valid armed robbery target (pass {pass_num}, attempt {attempt + 1}/{ARMED_MAX_RETRIES}).")
-
         # retries exhausted — check if another task needs to run
-        state.add_log(f"Armed robbery: no targets after pass {pass_num}. Checking task queue...")
+        state.add_log(f"Armed robbery: no valid target after {ARMED_MAX_RETRIES} attempts (pass {pass_num}). Checking task queue...")
         if check_other_tasks and check_other_tasks():
             state.add_log("Another task is ready — yielding armed robbery.")
             _nav(_u("/loggedin.asp?display=play"), state)
@@ -1857,9 +1855,7 @@ def handle_torch_business(action: Action, state: GameState):
                 _nav(_u("/loggedin.asp?display=play"), state)
                 return
 
-            state.add_log(f"No valid torch target (pass {pass_num}, attempt {attempt + 1}/{ARMED_MAX_RETRIES}).")
-
-        state.add_log(f"Torch business: no targets after pass {pass_num}. Checking task queue...")
+        state.add_log(f"Torch business: no valid target after {ARMED_MAX_RETRIES} attempts (pass {pass_num}). Checking task queue...")
         if check_other_tasks and check_other_tasks():
             state.add_log("Another task is ready — yielding torch business.")
             _nav(_u("/loggedin.asp?display=play"), state)
