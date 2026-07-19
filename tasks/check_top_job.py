@@ -11,7 +11,7 @@ import urls
 from state import GameState, parse_state
 from tasks.base import Task
 
-_CHECK_INTERVAL = 5 * 60  # seconds
+_CHECK_INTERVAL = 4 * 60  # seconds
 
 # Maps top job title → promo path
 _TOP_JOB_PATHS = {
