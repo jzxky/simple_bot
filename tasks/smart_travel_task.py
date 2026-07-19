@@ -29,13 +29,18 @@ class SmartTravelTask(Task):
         self._last: float = 0.0
 
     def can_run(self, state: GameState) -> bool:
-        # Runs regardless of the travel timer so it can also manage store windows;
-        # actual travel is only issued when the timer is free (checked in run()).
+        # Only positions the bot; actual travel is issued in run() when the travel
+        # timer is free.
         if not cfg.load().get("smart_travel", {}).get("enabled", False):
             return False
         if not state.logged_in or state.in_jail or state.in_hospital:
             return False
         if state.hold_action_timer:
+            return False
+        # Don't churn while travel is blocked by an outstanding-warrant cooldown —
+        # every attempt would just be rejected and block other tasks.
+        from executor import travel_warrant_cooldown_active
+        if travel_warrant_cooldown_active():
             return False
         return time.monotonic() - self._last >= _POLL_INTERVAL
 
