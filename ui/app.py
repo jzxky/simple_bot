@@ -962,7 +962,10 @@ def api_war_lists():
 def api_war_add():
     import war_mode
     d = request.get_json(force=True) or {}
-    ok, msg = war_mode.add_name(d.get("name", ""), d.get("side", ""))
+    name = d.get("name", "")
+    ok, msg = war_mode.add_name(name, d.get("side", ""))
+    if ok and bot.is_running():
+        bot.request_ws_monitor(name.strip())  # immediate WS check for the new name
     return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
 
 
@@ -1004,7 +1007,8 @@ def api_war_set_interval():
 def api_war_check():
     if not bot.is_running():
         return jsonify({"ok": False, "message": "Bot must be running to check."}), 400
-    bot.request_ws_monitor()
+    d = request.get_json(silent=True) or {}
+    bot.request_ws_monitor((d.get("name") or "").strip() or None)
     return jsonify({"ok": True})
 
 
