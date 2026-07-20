@@ -134,6 +134,9 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["crossroads"]["enabled"] = data.get("crossroads_enabled", False)
     c["crossroads"]["selection"] = data.get("crossroads_selection", "current")
 
+    c.setdefault("war_mode", {})
+    c["war_mode"]["enabled"] = data.get("war_mode_enabled", False)
+
     c.setdefault("jail", {})
     c["jail"]["enabled"] = data.get("jail_enabled", False)
     c["jail"]["duty"] = data.get("jail_duty", "laundry")
@@ -938,6 +941,78 @@ def api_earn_planner():
 @app.route("/players")
 def players_page():
     return render_template("players.html")
+
+
+@app.route("/war")
+def war_page():
+    return render_template("war.html")
+
+
+@app.route("/api/war/lists")
+def api_war_lists():
+    import war_mode
+    st = war_mode.get_state()
+    st["enabled"] = cfg.load().get("war_mode", {}).get("enabled", False)
+    st["interval"] = cfg.load().get("war_mode", {}).get("monitor_interval_minutes", 5)
+    st["running"] = bot.is_running()
+    return jsonify(st)
+
+
+@app.route("/api/war/add", methods=["POST"])
+def api_war_add():
+    import war_mode
+    d = request.get_json(force=True) or {}
+    ok, msg = war_mode.add_name(d.get("name", ""), d.get("side", ""))
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 400)
+
+
+@app.route("/api/war/remove", methods=["POST"])
+def api_war_remove():
+    import war_mode
+    d = request.get_json(force=True) or {}
+    war_mode.remove_name(d.get("name", ""), d.get("side", ""))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/war/set_whack_type", methods=["POST"])
+def api_war_set_whack_type():
+    import war_mode
+    d = request.get_json(force=True) or {}
+    war_mode.set_whack_type(d.get("name", ""), d.get("side", ""), d.get("whack_type", "Normal"))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/war/set_whack_time", methods=["POST"])
+def api_war_set_whack_time():
+    import war_mode
+    d = request.get_json(force=True) or {}
+    war_mode.set_whack_time(d.get("name", ""), d.get("side", ""), d.get("time", ""))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/war/set_interval", methods=["POST"])
+def api_war_set_interval():
+    d = request.get_json(force=True) or {}
+    minutes = max(2, min(10, int(d.get("minutes", 5) or 5)))
+    c = cfg.load()
+    c.setdefault("war_mode", {})["monitor_interval_minutes"] = minutes
+    cfg.save(c)
+    return jsonify({"ok": True, "minutes": minutes})
+
+
+@app.route("/api/war/check", methods=["POST"])
+def api_war_check():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running to check."}), 400
+    bot.request_ws_monitor()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/war/clear_events", methods=["POST"])
+def api_war_clear_events():
+    import war_mode
+    war_mode.clear_events()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/players")

@@ -247,6 +247,7 @@ function _buildPayload() {
     promo_choices: _collectPromoChoices(),
     crossroads_enabled: (document.getElementById("crossroads_enabled")||{checked:false}).checked,
     crossroads_selection: (document.getElementById("crossroads_selection")||{value:"current"}).value,
+    war_mode_enabled: (document.getElementById("war_mode_enabled")||{checked:false}).checked,
     jail_enabled: document.getElementById("jail_enabled").checked,
     jail_duty: document.getElementById("jail_duty").value,
     jail_action: document.getElementById("jail_action").value,
@@ -347,6 +348,12 @@ function _collectEventConsume() {
 function toggleEventConsumeSettings() {
   const on = (document.getElementById("event_boss_enabled") || {checked:false}).checked;
   const el = document.getElementById("event-consume-settings");
+  if (el) el.style.display = on ? "" : "none";
+}
+
+function toggleWarModeLink() {
+  const on = (document.getElementById("war_mode_enabled") || {checked:false}).checked;
+  const el = document.getElementById("war-mode-link-row");
   if (el) el.style.display = on ? "" : "none";
 }
 
@@ -1751,6 +1758,7 @@ document.addEventListener("DOMContentLoaded", () => {
   _renderBuyListSummary("bionics-priority-body", "bionics-buylist-summary");
   _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
   toggleEventConsumeSettings();
+  toggleWarModeLink();
   // Capture the baseline the diff-based save compares against, once dynamic
   // tables/summaries have populated from the server-rendered values.
   setTimeout(() => { _savedConfig = _buildPayload(); }, 1500);

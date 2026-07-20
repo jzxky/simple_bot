@@ -143,6 +143,10 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "selection": "current",   # "current" | "new"
     },
+    "war_mode": {
+        "enabled": False,
+        "monitor_interval_minutes": 5,
+    },
     "consumables": {
         "timer_limit": "00:00",
         "auto_consume": False,
