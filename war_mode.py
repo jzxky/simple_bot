@@ -44,7 +44,46 @@ def _load() -> dict:
     d.setdefault("opps", [])
     d.setdefault("friendlies", [])
     d.setdefault("events", [])
+    d.setdefault("meta", {})
     return d
+
+
+def _ingame_now(d) -> datetime:
+    """Current in-game (server) time = system now + the last-seen server offset."""
+    try:
+        off = float(d.get("meta", {}).get("server_offset_seconds", 0) or 0)
+    except (TypeError, ValueError):
+        off = 0.0
+    return datetime.now() + timedelta(seconds=off)
+
+
+def set_server_now(server_dt):
+    """Record the offset between the game's server clock and system time so
+    whack/window times can be computed and shown in in-game time."""
+    if server_dt is None:
+        return
+    with _lock:
+        d = _load()
+        d.setdefault("meta", {})["server_offset_seconds"] = (server_dt - datetime.now()).total_seconds()
+        _save(d)
+
+
+def _parse_time_of_day(s, ref):
+    """Parse an HH:MM(:SS) in-game time into a full datetime on ref's date,
+    rolling back a day if that would be in the future. Falls back to a full
+    timestamp parse."""
+    if not s:
+        return None
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            t = datetime.strptime(s.strip(), fmt).time()
+            dt = datetime.combine(ref.date(), t)
+            if dt > ref:
+                dt -= timedelta(days=1)
+            return dt
+        except ValueError:
+            continue
+    return _parse_ts(s)
 
 
 def _save(d: dict):
@@ -117,11 +156,11 @@ def set_whack_type(name, side, whack_type):
 
 
 def set_whack_time(name, side, ts_str):
-    dt = _parse_ts(ts_str)
     with _lock:
         d = _load()
         e = _find(d, side, name)
         if e:
+            dt = _parse_time_of_day(ts_str, _ingame_now(d))
             e["last_whack_time"] = dt.strftime(_TS_FMT) if dt else None
             _save(d)
 
@@ -138,7 +177,7 @@ def record_ws(name, side, ws) -> bool:
         whacked = prev is not None and ws > prev
         e["ws"] = ws
         if whacked:
-            e["last_whack_time"] = _now().strftime(_TS_FMT)
+            e["last_whack_time"] = _ingame_now(d).strftime(_TS_FMT)
             _add_event(d, f"{name} has been whacked (whacks survived {prev} → {ws}).")
         _save(d)
     return whacked
@@ -169,7 +208,12 @@ def all_names() -> list:
     return [(s, e["name"]) for s in SIDES for e in d.get(s, [])]
 
 
-def _computed(e) -> dict:
+def _hm(dt):
+    """In-game time-only (HH:MM), no date."""
+    return dt.strftime("%H:%M") if dt else ""
+
+
+def _computed(e, ingame_now) -> dict:
     wt = e.get("whack_type", "Normal")
     lwt = _parse_ts(e.get("last_whack_time"))
     open_dt = close_dt = None
@@ -177,10 +221,9 @@ def _computed(e) -> dict:
     if lwt:
         open_dt = lwt + timedelta(minutes=_OPEN_OFFSET.get(wt, 220))
         close_dt = open_dt + timedelta(minutes=_WINDOW_LEN.get(wt, 40))
-        now = _now()
-        if now < open_dt:
+        if ingame_now < open_dt:
             status = "Protected"
-        elif now <= close_dt:
+        elif ingame_now <= close_dt:
             status = "In-Window"
         else:
             status = "Open"
@@ -188,17 +231,18 @@ def _computed(e) -> dict:
         "name": e["name"],
         "ws": e.get("ws"),
         "whack_type": wt,
-        "last_whack_time": e.get("last_whack_time"),
-        "window_open": open_dt.strftime(_TS_FMT) if open_dt else None,
-        "window_close": close_dt.strftime(_TS_FMT) if close_dt else None,
+        "last_whack": _hm(lwt),
+        "window_open": _hm(open_dt),
+        "window_close": _hm(close_dt),
         "status": status,
     }
 
 
 def get_state() -> dict:
     d = _load()
+    now = _ingame_now(d)
     return {
-        "opps":       [_computed(e) for e in d.get("opps", [])],
-        "friendlies": [_computed(e) for e in d.get("friendlies", [])],
+        "opps":       [_computed(e, now) for e in d.get("opps", [])],
+        "friendlies": [_computed(e, now) for e in d.get("friendlies", [])],
         "events":     d.get("events", []),
     }

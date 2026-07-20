@@ -505,8 +505,9 @@ def _run(c: dict):
             # Manual WS-monitor check requests from the Flask thread
             if not _ws_monitor_queue.empty():
                 try:
-                    _ws_monitor_queue.get_nowait()
-                    executor.execute(Action("ws_monitor"), state)
+                    item = _ws_monitor_queue.get_nowait()
+                    target = item if isinstance(item, str) else None
+                    executor.execute(Action("ws_monitor", target=target), state)
                 except Exception as e:
                     state.add_log(f"WS monitor error: {e}")
 
@@ -752,8 +753,8 @@ def request_respect_refresh():
     _respect_refresh_queue.put(True)
 
 
-def request_ws_monitor():
-    _ws_monitor_queue.put(True)
+def request_ws_monitor(target=None):
+    _ws_monitor_queue.put(target if target else True)
 
 
 def request_clear_earn_queue():

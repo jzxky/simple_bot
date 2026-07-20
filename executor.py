@@ -4243,7 +4243,12 @@ def handle_ws_monitor(action: Action, state: GameState):
     """Sweep the War Mode watch lists, parsing whacks-survived from each
     profile. war_mode.record_ws stamps a whack + logs an event on an increase."""
     import war_mode
+    if state.server_time is not None:
+        war_mode.set_server_now(state.server_time)
+    target = (action.params.get("target") or "").strip()
     pairs = war_mode.all_names()
+    if target:
+        pairs = [(s, n) for (s, n) in pairs if n.lower() == target.lower()]
     if not pairs:
         return
     checked = whacked = 0
