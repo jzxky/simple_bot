@@ -15,6 +15,9 @@
   .war-status.Open { color:#5bbf5b; }
   .war-status.In-Window { color:#e0a53a; }
   .war-status.Protected { color:#cc5555; }
+  .war-whack-cell { white-space:nowrap; }
+  .war-clear { background:transparent; border:none; color:var(--muted); cursor:pointer; font-size:0.85rem; padding:0 4px; }
+  .war-clear:hover { color:var(--red); }
   .war-th { cursor:pointer; user-select:none; white-space:nowrap; }
   .war-th:hover { color:var(--accent); }
   .war-actions { display:flex; gap:6px; }
@@ -106,6 +109,7 @@ const WHACK_TYPES = ["Normal", "Bodyguard"];
 const WAR_COLS = [
   ["name","Name"],["ws","WS"],["status","Status"],["whack_type","Whack Type"],
   ["last_whack","Last Whack"],["window_open","Window Open"],["window_close","Window Close"],
+  ["last_checked","Last Checked"],
 ];
 const warSort = { opps: {col:null, dir:1}, friendlies: {col:null, dir:1} };
 
@@ -147,10 +151,14 @@ function warTable(side, rows) {
           ${WHACK_TYPES.map(t => `<option value="${t}" ${r.whack_type===t?'selected':''}>${t}</option>`).join("")}
         </select>
       </td>
-      <td data-label="Last Whack"><input type="time" class="war-time-input" value="${esc(r.last_whack)}"
-            onchange="warSetTime('${side}','${esc(r.name)}',this.value)"></td>
+      <td data-label="Last Whack" class="war-whack-cell">
+        <input type="time" class="war-time-input" value="${esc(r.last_whack)}"
+               onchange="warSetTime('${side}','${esc(r.name)}',this.value)">
+        <button class="war-clear" title="Clear whack time" onclick="warSetTime('${side}','${esc(r.name)}','')">✕</button>
+      </td>
       <td data-label="Window Open">${fmtTime(r.window_open)}</td>
       <td data-label="Window Close">${fmtTime(r.window_close)}</td>
+      <td data-label="Last Checked">${fmtTime(r.last_checked)}</td>
       <td data-label="" class="war-actions">
         <button class="btn-secondary war-btn" title="Check now" onclick="warCheck('${esc(r.name)}')">Check</button>
         <button class="btn-secondary war-btn war-del" title="Delete" onclick="warRemove('${side}','${esc(r.name)}')">Delete</button>
@@ -174,8 +182,19 @@ function warRender(d) {
     : '<span class="war-empty">No war events yet.</span>';
 }
 
-function warLoad() {
-  fetch("/api/war/lists").then(r => r.json()).then(warRender).catch(()=>{});
+let _warLastJson = "";
+function warApply(d, force) {
+  const json = JSON.stringify(d);
+  if (!force) {
+    if (json === _warLastJson) return;                          // nothing changed
+    const ae = document.activeElement;
+    if (ae && ae.closest && ae.closest(".war-table")) return;   // don't clobber an in-progress edit
+  }
+  _warLastJson = json;
+  warRender(d);
+}
+function warLoad(force = true) {
+  fetch("/api/war/lists").then(r => r.json()).then(d => warApply(d, force)).catch(()=>{});
 }
 
 function warAdd() {
@@ -235,7 +254,7 @@ function warClearEvents() {
 });
 
 warLoad();
-setInterval(warLoad, 5000);
+setInterval(() => warLoad(false), 5000);   // re-render only when the data actually changes
 </script>
 </body>
 </html>

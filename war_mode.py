@@ -112,7 +112,8 @@ def _find(d, side, name):
 
 
 def _new_entry(name):
-    return {"name": name, "ws": None, "whack_type": "Normal", "last_whack_time": None}
+    return {"name": name, "ws": None, "whack_type": "Normal",
+            "last_whack_time": None, "last_checked": None}
 
 
 def name_exists(name) -> bool:
@@ -176,6 +177,7 @@ def record_ws(name, side, ws) -> bool:
         prev = e.get("ws")
         whacked = prev is not None and ws > prev
         e["ws"] = ws
+        e["last_checked"] = _ingame_now(d).strftime(_TS_FMT)
         if whacked:
             e["last_whack_time"] = _ingame_now(d).strftime(_TS_FMT)
             _add_event(d, f"{name} has been whacked (whacks survived {prev} → {ws}).")
@@ -234,6 +236,7 @@ def _computed(e, ingame_now) -> dict:
         "last_whack": _hm(lwt),
         "window_open": _hm(open_dt),
         "window_close": _hm(close_dt),
+        "last_checked": _hm(_parse_ts(e.get("last_checked"))),
         "status": status,
     }
 
