@@ -4230,6 +4230,43 @@ def handle_event_consume(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def _parse_whacks_survived(soup):
+    """Whacks-survived count from a profile page, or None."""
+    a = soup.find("a", id=re.compile(r"^award_survived"))
+    if not a:
+        return None
+    m = re.search(r"(\d+)\s+survived whacks", a.get("title", ""))
+    return int(m.group(1)) if m else None
+
+
+def handle_ws_monitor(action: Action, state: GameState):
+    """Sweep the War Mode watch lists, parsing whacks-survived from each
+    profile. war_mode.record_ws stamps a whack + logs an event on an increase."""
+    import war_mode
+    pairs = war_mode.all_names()
+    if not pairs:
+        return
+    checked = whacked = 0
+    for side, name in pairs:
+        try:
+            _nav(_u(f"/userprofile.asp?username={name}"), state)
+            if not _check_session(state):
+                return
+            soup = BeautifulSoup(browser.page().content(), "html.parser")
+            ws = _parse_whacks_survived(soup)
+            if ws is None:
+                continue
+            if war_mode.record_ws(name, side, ws):
+                whacked += 1
+            checked += 1
+        except Exception as e:
+            state.add_log(f"WS monitor: error checking {name}: {e}")
+    msg = f"WS monitor: checked {checked} name(s)."
+    if whacked:
+        msg += f" {whacked} newly whacked."
+    state.add_log(msg)
+
+
 def handle_refresh_event_inventory(action: Action, state: GameState):
     """Visit bossevent.asp once to capture the current event-consumable stock
     (used on login so the inventory is known before any attack cycle)."""
@@ -4302,6 +4339,7 @@ HANDLERS = {
     "event_boss": handle_event_boss,
     "event_consume": handle_event_consume,
     "refresh_event_inventory": handle_refresh_event_inventory,
+    "ws_monitor": handle_ws_monitor,
     "crossroad": handle_crossroad,
     "interact": handle_interact,
     "check_weapon": handle_check_weapon,

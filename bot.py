@@ -55,6 +55,7 @@ from tasks.weapon_store import WeaponStoreTask
 from tasks.event_boss import EventBossTask
 from tasks.event_consume import EventConsumeTask
 from tasks.crossroad import CrossroadTask
+from tasks.ws_monitor import WSMonitorTask
 from players import PlayerRefreshTask, SyncTask
 
 _thread: threading.Thread = None
@@ -95,6 +96,7 @@ _travel_dests_result: queue.Queue = queue.Queue(maxsize=1)
 _clear_earn_event = threading.Event()
 _clear_jail_duty_queue_event = threading.Event()
 _respect_refresh_queue: queue.Queue = queue.Queue()
+_ws_monitor_queue: queue.Queue = queue.Queue()
 _profile_request: queue.Queue = queue.Queue(maxsize=1)
 _profile_result: queue.Queue = queue.Queue(maxsize=1)
 _navigate_queue: queue.Queue = queue.Queue()
@@ -223,6 +225,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(EventBossTask())
     sched.add(EventConsumeTask())
     sched.add(CrossroadTask())
+    sched.add(WSMonitorTask())
     sched.add(PlayerRefreshTask())
     sched.add(SyncTask())
     sched.add(CheckTopJobTask())
@@ -499,6 +502,14 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Respect refresh error: {e}")
 
+            # Manual WS-monitor check requests from the Flask thread
+            if not _ws_monitor_queue.empty():
+                try:
+                    _ws_monitor_queue.get_nowait()
+                    executor.execute(Action("ws_monitor"), state)
+                except Exception as e:
+                    state.add_log(f"WS monitor error: {e}")
+
             # Profile fetch requests from the Flask thread
             if not _profile_request.empty():
                 try:
@@ -739,6 +750,10 @@ def online_population() -> dict:
 
 def request_respect_refresh():
     _respect_refresh_queue.put(True)
+
+
+def request_ws_monitor():
+    _ws_monitor_queue.put(True)
 
 
 def request_clear_earn_queue():

@@ -133,6 +133,7 @@
           <button class="tab-btn" onclick="showTab('jail', this)">Jail</button>
           <button class="tab-btn" onclick="showTab('misc', this)">Misc</button>
           <button class="tab-btn" onclick="showTab('player-lists', this)">Player Lists</button>
+          <button class="tab-btn" onclick="showTab('war-mode', this)">War Mode</button>
           <button class="tab-btn" onclick="showTab('consumables-settings', this)">Consumables</button>
           <button class="tab-btn" onclick="showTab('credentials', this)">Credentials</button>
         </div>
@@ -755,6 +756,21 @@
                 </tbody>
               </table>
               <div style="margin-top:10px;text-align:center">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="war-mode" class="tab-panel">
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>War Mode</h3>
+              <label class="inline-toggle setting-row">Enable War Mode
+                <label class="toggle-label"><input type="checkbox" id="war_mode_enabled" {% if config.get('war_mode', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave(); toggleWarModeLink()"><span class="toggle"></span></label>
+              </label>
+              <p class="setting-note">Monitors whacks-survived for tracked opps/friendlies. Manage lists on the War Mode page.</p>
+              <div class="setting-row" id="war-mode-link-row" style="display:none">
+                <span>War Mode Page</span>
+                <button type="button" class="action-btn" onclick="window.open('/war','_blank')">Open War Mode ↗</button>
               </div>
             </div>
           </div>
