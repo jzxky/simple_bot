@@ -20,6 +20,26 @@
   .war-log-line { padding:2px 0; border-bottom:1px solid rgba(255,255,255,.05); }
   .war-empty { color:var(--muted); font-style:italic; }
   .war-time-input { width:150px; font-size:0.78rem; }
+  .war-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+  /* Phones: stack each row into a labelled card instead of a wide table. */
+  @media (max-width: 640px) {
+    .container { padding:12px; }
+    .war-add input[type=text] { width:100%; }
+    .war-table-wrap { overflow-x:visible; }
+    .war-table { font-size:0.85rem; }
+    .war-table thead { display:none; }
+    .war-table, .war-table tbody, .war-table tr, .war-table td { display:block; width:100%; }
+    .war-table tr { border:1px solid var(--border); border-radius:8px; margin-bottom:10px; background:var(--surface2); }
+    .war-table td { border:none; border-bottom:1px solid rgba(255,255,255,.06); padding:8px 12px;
+                    display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .war-table td:last-child { border-bottom:none; }
+    .war-table td::before { content:attr(data-label); color:var(--muted); font-size:0.7rem;
+                            text-transform:uppercase; letter-spacing:.04em; flex:0 0 auto; }
+    .war-table td[data-label=""]::before { content:""; }
+    .war-time-input { width:auto; flex:1; min-width:0; }
+    .war-table select { width:auto; max-width:60%; }
+  }
 </style>
 </head>
 <body>
@@ -89,21 +109,21 @@ function warTable(side, rows) {
   const head = `<tr><th>Name</th><th>WS</th><th>Status</th><th>Whack Type</th><th>Last Whack</th><th>Window Open</th><th>Window Close</th><th></th></tr>`;
   const body = rows.map(r => `
     <tr>
-      <td>${esc(r.name)}</td>
-      <td>${r.ws == null ? "—" : r.ws}</td>
-      <td class="war-status ${r.status}">${r.status}</td>
-      <td>
+      <td data-label="Name">${esc(r.name)}</td>
+      <td data-label="WS">${r.ws == null ? "—" : r.ws}</td>
+      <td data-label="Status" class="war-status ${r.status}">${r.status}</td>
+      <td data-label="Whack Type">
         <select onchange="warSetType('${side}','${esc(r.name)}',this.value)">
           ${WHACK_TYPES.map(t => `<option value="${t}" ${r.whack_type===t?'selected':''}>${t}</option>`).join("")}
         </select>
       </td>
-      <td><input type="datetime-local" class="war-time-input" value="${toLocalInput(r.last_whack_time)}"
+      <td data-label="Last Whack"><input type="datetime-local" class="war-time-input" value="${toLocalInput(r.last_whack_time)}"
             onchange="warSetTime('${side}','${esc(r.name)}',this.value)"></td>
-      <td>${fmtTime(r.window_open)}</td>
-      <td>${fmtTime(r.window_close)}</td>
-      <td><button class="war-remove" title="Remove" onclick="warRemove('${side}','${esc(r.name)}')">✕</button></td>
+      <td data-label="Window Open">${fmtTime(r.window_open)}</td>
+      <td data-label="Window Close">${fmtTime(r.window_close)}</td>
+      <td data-label=""><button class="war-remove" title="Remove" onclick="warRemove('${side}','${esc(r.name)}')">✕</button></td>
     </tr>`).join("");
-  return `<table class="war-table">${head}${body}</table>`;
+  return `<div class="war-table-wrap"><table class="war-table">${head}${body}</table></div>`;
 }
 
 function warRender(d) {
