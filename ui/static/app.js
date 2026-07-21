@@ -265,6 +265,9 @@ function _buildPayload() {
     min_cash_on_hand: parseInt(document.getElementById("min_cash_on_hand").value) || 0,
     char_history_enabled: document.getElementById("char_history_enabled").checked,
     char_history_interval: parseInt(document.getElementById("char_history_interval").value) || 30,
+    laundering_enabled: (document.getElementById("laundering_enabled")||{checked:false}).checked,
+    launder_amount: parseInt((document.getElementById("launder_amount")||{value:"0"}).value)||0,
+    laundering_preferred_contacts: _getLaunderContacts(),
     case_work_enabled: document.getElementById("case_work_enabled").checked,
     hospital_poll_interval: parseInt(document.getElementById("hospital_poll_interval").value) || 31,
     fire_poll_interval: parseInt(document.getElementById("fire_poll_interval").value) || 31,
@@ -546,9 +549,10 @@ function _updateIncomePills() {
 
 function _updateIncomeTabColors() {
   const tabs = [
-    ["income-tab-earns",   "earns_enabled"],
-    ["income-tab-crimes",  "crimes_enabled"],
-    ["income-tab-actions", "action_enabled"],
+    ["income-tab-earns",      "earns_enabled"],
+    ["income-tab-crimes",     "crimes_enabled"],
+    ["income-tab-actions",    "action_enabled"],
+    ["income-tab-laundering", "laundering_enabled"],
   ];
   tabs.forEach(([tabId, toggleId]) => {
     const tab = document.getElementById(tabId);
@@ -1583,6 +1587,71 @@ function bulkAddLaunderContacts() {
     })
     .catch(() => { if (status) status.textContent = "Request failed."; })
     .finally(() => { setTimeout(() => { if (btn) btn.disabled = false; }, 2000); });
+}
+
+// ── Laundering preferred contacts ─────────────────────────────────────────────
+
+const _LAUNDER_OCCUPATIONS = ["Bank Teller", "Loan Officer", "Bank Manager"];
+
+function populateLaunderContactSelect() {
+  const sel = document.getElementById("launder_contact_select");
+  if (!sel || !_plData) return;
+  const existing = _getLaunderContacts();
+  const existingLower = new Set(existing.map(n => n.toLowerCase()));
+  const candidates = _plData
+    .filter(p => _LAUNDER_OCCUPATIONS.includes(p.occupation) && p.active && !existingLower.has(p.username.toLowerCase()))
+    .sort((a, b) => a.username.localeCompare(b.username));
+  sel.innerHTML = '<option value="">-- select --</option>';
+  candidates.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.username;
+    opt.textContent = p.username;
+    sel.appendChild(opt);
+  });
+}
+
+function addLaunderContact() {
+  const sel = document.getElementById("launder_contact_select");
+  if (!sel || !sel.value) return;
+  const name = sel.value;
+  _appendLaunderContactItem(name);
+  populateLaunderContactSelect();
+  autoSave();
+}
+
+function fastAddLaunderContacts() {
+  const sel = document.getElementById("launder_contact_select");
+  if (!sel) return;
+  const opts = Array.from(sel.options).filter(o => o.value).map(o => o.value);
+  opts.forEach(name => _appendLaunderContactItem(name));
+  populateLaunderContactSelect();
+  autoSave();
+}
+
+function removeLaunderContact(btn) {
+  const item = btn.closest(".launder-contact-item");
+  if (item) item.remove();
+  populateLaunderContactSelect();
+  autoSave();
+}
+
+function _appendLaunderContactItem(name) {
+  const list = document.getElementById("launder_contacts_list");
+  if (!list) return;
+  const existing = _getLaunderContacts();
+  if (existing.some(n => n.toLowerCase() === name.toLowerCase())) return;
+  const div = document.createElement("div");
+  div.className = "launder-contact-item";
+  div.dataset.name = name;
+  div.style.cssText = "display:flex;align-items:center;gap:6px;padding:3px 0";
+  div.innerHTML = `<span>${name}</span><button type="button" class="btn-danger-sm" onclick="removeLaunderContact(this)" style="font-size:0.75rem;padding:1px 6px">✕</button>`;
+  list.appendChild(div);
+}
+
+function _getLaunderContacts() {
+  const list = document.getElementById("launder_contacts_list");
+  if (!list) return [];
+  return Array.from(list.querySelectorAll(".launder-contact-item")).map(el => el.dataset.name);
 }
 
 function _collectPromoChoices() {
@@ -3024,6 +3093,7 @@ function loadPlayers() {
       _updatePlayerPills();
       // Keep the auto-jail partner list current with the player DB.
       loadAutoJailPartners();
+      populateLaunderContactSelect();
     })
     .catch(() => {});
 }

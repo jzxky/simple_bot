@@ -26,6 +26,7 @@ from tasks.fire_duties import FireDutiesTask
 from tasks.drug_manufacturing import DrugManufacturingTask
 from tasks.case_work import HospitalCaseWorkTask, EngineeringCaseWorkTask, FireCaseWorkTask, BankingCaseWorkTask
 from tasks.away_action import AwayActionTask
+from tasks.laundering import LaunderMoneyTask
 from tasks.refresh import RefreshTask
 from tasks.consume import ConsumeTask
 from tasks.check_top_job import CheckTopJobTask
@@ -192,6 +193,13 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     away_cfg = c.get("away_action", {})
     if away_cfg.get("enabled", False):
         sched.add(AwayActionTask(action_type=away_cfg.get("type", "drug_manufacturing")))
+
+    launder_cfg = c.get("laundering", {})
+    if launder_cfg.get("enabled", False):
+        sched.add(LaunderMoneyTask(
+            launder_amount=launder_cfg.get("launder_amount", 0),
+            preferred_contacts=launder_cfg.get("preferred_contacts", []),
+        ))
 
     sched.add(RefreshTask(interval_seconds=60))
     sched.add(ConsumeTask(_consume_queue))
