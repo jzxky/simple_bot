@@ -28,7 +28,7 @@ class WSMonitorTask(Task):
     def can_run(self, state: GameState) -> bool:
         if not cfg.load().get("war_mode", {}).get("enabled", False):
             return False
-        if not state.logged_in or state.in_jail:
+        if not state.logged_in:
             return False
         if not war_mode.all_names():
             return False
