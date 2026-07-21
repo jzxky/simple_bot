@@ -107,6 +107,11 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["away_action"]["enabled"] = data.get("away_action_enabled", False)
     c["away_action"]["type"] = data.get("away_action_type", "drug_manufacturing")
 
+    c.setdefault("laundering", {})
+    c["laundering"]["enabled"] = data.get("laundering_enabled", False)
+    c["laundering"]["launder_amount"] = int(data.get("launder_amount", 0) or 0)
+    c["laundering"]["preferred_contacts"] = data.get("laundering_preferred_contacts", [])
+
     c["payback_mode"] = data.get("payback_mode", "nobody")
 
     c.setdefault("players", {})

@@ -1014,6 +1014,7 @@
           <button class="tab-btn" id="income-tab-crimes" onclick="showTab('income-crimes', this)"><span class="tab-label-short">Aggs</span><span class="tab-label-long">Aggravated Crimes</span></button>
           <button class="tab-btn" id="income-tab-actions" onclick="showTab('income-actions', this)">Actions</button>
           <button class="tab-btn" onclick="showTab('income-casework', this)">Case Work</button>
+          <button class="tab-btn" id="income-tab-laundering" onclick="showTab('income-laundering', this)">Laundering</button>
           <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)">Jail</button>
         </div>
         <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
@@ -1351,6 +1352,47 @@
             </label>
           </div>
         </div>
+
+        <!-- Laundering tab -->
+        <div id="income-laundering" class="tab-panel">
+          <label class="inline-toggle setting-row" style="margin-bottom:12px">
+            Enable Laundering
+            <label class="toggle-label">
+              <input type="checkbox" id="laundering_enabled"
+                {% if config.get('laundering', {}).get('enabled') %}checked{% endif %}
+                onchange="autoSave(); _updateIncomeTabColors()">
+              <span class="toggle"></span>
+            </label>
+          </label>
+          <hr class="stat-divider">
+          <div class="setting-row" style="margin-bottom:10px">
+            <label for="launder_amount">Launder Amount</label>
+            <input type="number" id="launder_amount" class="input-narrow" min="0"
+              value="{{ config.get('laundering', {}).get('launder_amount', 0) }}"
+              oninput="markNumDirty(this)">
+            <span style="font-size:0.8rem;color:var(--muted);margin-left:6px">Leave as 0 for launder max</span>
+          </div>
+          <hr class="stat-divider">
+          <div style="margin-bottom:8px">
+            <label for="launder_contact_select">Preferred Contacts</label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap">
+              <select id="launder_contact_select" style="width:200px">
+                <option value="">-- select --</option>
+              </select>
+              <button type="button" class="action-btn" onclick="addLaunderContact()">Add</button>
+              <button type="button" class="btn-secondary" onclick="fastAddLaunderContacts()">Fast Add Friendlies</button>
+            </div>
+          </div>
+          <div id="launder_contacts_list" style="margin-top:8px">
+            {% for name in config.get('laundering', {}).get('preferred_contacts', []) %}
+            <div class="launder-contact-item" data-name="{{ name }}" style="display:flex;align-items:center;gap:6px;padding:3px 0">
+              <span>{{ name }}</span>
+              <button type="button" class="btn-danger-sm" onclick="removeLaunderContact(this)" style="font-size:0.75rem;padding:1px 6px">✕</button>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
       </div>
     </section>
 

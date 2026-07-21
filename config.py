@@ -48,6 +48,11 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "type": "drug_manufacturing"
     },
+    "laundering": {
+        "enabled": False,
+        "launder_amount": 0,
+        "preferred_contacts": []
+    },
     "university": {
         "completed": []
     },

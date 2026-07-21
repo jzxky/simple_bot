@@ -4,6 +4,7 @@ ActionExecutor: maps Action.kind to handler functions that drive the browser.
 
 import json
 import queue
+import random
 import re
 import time
 import config as cfg
@@ -32,6 +33,14 @@ _drug_manufacture_cooldown_until: float = 0.0
 def drug_manufacture_cooldown_active() -> bool:
     """True while the drug-manufacturing fail cooldown is in effect."""
     return time.monotonic() < _drug_manufacture_cooldown_until
+
+
+_launder_cooldown_until: float = 0.0
+
+
+def launder_cooldown_active() -> bool:
+    """True while the laundering no-contact cooldown is in effect."""
+    return time.monotonic() < _launder_cooldown_until
 
 
 def _u(path: str) -> str:
@@ -4393,6 +4402,68 @@ def handle_event_boss(action: Action, state: GameState):
         state.add_log("Event Boss attack: no success/fail result parsed.")
 
 
+def handle_launder_money(action: Action, state: GameState):
+    global _launder_cooldown_until
+    page = browser.page()
+    _nav(_u("/income/laundering.asp"), state)
+
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    contacts = []
+    for td in soup.find_all("td", class_="display_border"):
+        link = td.find("a", href=lambda h: h and "laundering.asp?action=launder" in h)
+        if link:
+            href = link["href"]
+            m = re.search(r"id=(\d+)", href)
+            if m:
+                contacts.append({"name": link.get_text(strip=True), "id": m.group(1)})
+
+    if not contacts:
+        _launder_cooldown_until = time.monotonic() + 1800
+        state.add_log("Laundering: no contacts available — cooling down for 30 minutes.")
+        return
+
+    preferred = [n.lower() for n in action.params.get("preferred_contacts", [])]
+    matches = [c for c in contacts if c["name"].lower() in preferred] if preferred else []
+    chosen = random.choice(matches) if matches else random.choice(contacts)
+
+    state.add_log(f"Laundering: selected contact {chosen['name']}.")
+    _nav(_u(f"/income/laundering.asp?action=launder&id={chosen['id']}"), state)
+
+    if not _check_session(state):
+        return
+
+    soup2 = BeautifulSoup(page.content(), "html.parser")
+
+    max_amount = 0
+    font_tag = soup2.find("font", size="1", string=re.compile(r"\$[\d,]+\s*max", re.IGNORECASE))
+    if font_tag:
+        m = re.search(r"\$([\d,]+)", font_tag.get_text())
+        if m:
+            max_amount = int(m.group(1).replace(",", ""))
+
+    if max_amount <= 0:
+        state.add_log("Laundering: could not parse max launder amount from page.")
+        return
+
+    configured = action.params.get("launder_amount", 0)
+    amount = max_amount if configured == 0 else min(max_amount, configured)
+
+    amount_input = page.query_selector("input.input[name='amount']")
+    if not amount_input:
+        state.add_log("Laundering: amount input not found on page.")
+        return
+
+    amount_input.fill(str(amount))
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+    state.add_log(f"Laundering: submitted ${amount:,} through {chosen['name']}.")
+
+
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
@@ -4422,6 +4493,7 @@ HANDLERS = {
     "do_armed_robbery": handle_armed_robbery,
     "do_torch_business": handle_torch_business,
     "do_drug_manufacturing": handle_drug_manufacturing,
+    "launder_money": handle_launder_money,
     "check_hospital_cases": handle_check_hospital_cases,
     "check_fire_cases": handle_check_fire_cases,
     "check_engineering_cases": handle_check_engineering_cases,
