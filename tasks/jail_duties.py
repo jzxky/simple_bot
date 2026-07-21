@@ -16,6 +16,11 @@ class JailDutiesTask(Task):
             return False
         if not cfg.load().get("jail", {}).get("enabled", False):
             return False
+        duty = cfg.load().get("jail", {}).get("duty", "laundry")
+        if duty in ("makeshank", "digtunnel"):
+            # Manual duties are done one Work at a time; gate on the earn timer
+            # (in addition to being in jail).
+            return state.timer_ready("earn")
         return time.monotonic() - self._last_fired >= self._interval
 
     def run(self, state, executor):

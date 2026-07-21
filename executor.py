@@ -2234,8 +2234,68 @@ def _pick_jail_duty(duty: str, available: list) -> "str | None":
     return available[-1] if available else None
 
 
+def _handle_jail_duty_manual(duty: str, state: GameState):
+    """Make Shank / Dig a tunnel are only on the manual jail-duty form
+    (/jail/duty.asp). If the auto queue is active (manual panel hidden), clear
+    the queue and toggle to manual first, then submit one Work."""
+    page = browser.page()
+    _nav(_u("/jail/duty.asp"), state)
+    if not _check_session(state):
+        return
+
+    manual = page.query_selector("div.mm-earn-mode-manual")
+    if manual is None:
+        state.add_log("Jail duties: manual panel not found.")
+        return
+
+    style = manual.get_attribute("style") or ""
+    if "display: none" in style or "display:none" in style:
+        # Auto queue is active — clear it, then switch to manual mode.
+        clear_btn = page.query_selector("button.mm-earn-queue-clear-btn")
+        if clear_btn:
+            clear_btn.click()
+            page.wait_for_load_state("domcontentloaded")
+            state.add_log("Jail duties: cleared queue before manual work.")
+        knob = page.query_selector("span.mm-earn-toggle-knob")
+        if knob:
+            knob.click()
+            try:
+                page.wait_for_function(
+                    "() => { const el = document.querySelector('div.mm-earn-mode-manual'); "
+                    "return el && !el.style.display.includes('none'); }",
+                    timeout=5000,
+                )
+            except Exception:
+                pass
+            state.add_log("Jail duties: switched to MANUAL mode.")
+
+    radio = page.query_selector(f"input[name='job'][value='{duty}']")
+    if not radio:
+        state.add_log(f"Jail duties: '{duty}' option not found.")
+        return
+    radio.check()
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+    label = {"makeshank": "Make Shank", "digtunnel": "Dig a tunnel"}.get(duty, duty)
+    soup = BeautifulSoup(page.content(), "html.parser")
+    success = soup.find("div", id="success")
+    fail    = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Jail duty ({label}): {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Jail duty ({label}) failed: {fail.get_text(strip=True)}")
+    else:
+        state.add_log(f"Jail duty ({label}): submitted.")
+
+
 def handle_jail_duties(action: Action, state: GameState):
     duty = action.params["duty"]
+    if duty in ("makeshank", "digtunnel"):
+        _handle_jail_duty_manual(duty, state)
+        return
+
     page = browser.page()
     _nav(_u("/jail/duties.asp"), state)
 
