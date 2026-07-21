@@ -4449,7 +4449,10 @@ def handle_launder_money(action: Action, state: GameState):
         return
 
     configured = action.params.get("launder_amount", 0)
-    amount = max_amount if configured == 0 else min(max_amount, configured)
+    if configured == 0:
+        amount = min(max_amount, state.dirty_money)
+    else:
+        amount = min(max_amount, configured, state.dirty_money)
 
     amount_input = page.query_selector("input.input[name='amount']")
     if not amount_input:

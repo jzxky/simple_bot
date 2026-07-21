@@ -17,7 +17,7 @@ class LaunderMoneyTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         if not (state.logged_in and not state.in_jail
-                and not state.in_home_city()):
+                and not state.in_home_city() and state.dirty_money >= 5):
             return False
         if "launder" in state.timers and not state.timer_ready("launder"):
             return False
