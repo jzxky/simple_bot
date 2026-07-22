@@ -2062,6 +2062,46 @@ function submitTravel() {
     .finally(() => { btn.disabled = false; });
 }
 
+// ── Quick Travel Overlay ──────────────────────────────────────────────────────
+
+const _TRAVEL_CITIES = ["Auckland", "Beirut", "Chicago"];
+
+function openTravelOverlay() {
+  const current = _botState.city || "";
+  const container = document.getElementById("travel-overlay-buttons");
+  const status = document.getElementById("travel-overlay-status");
+  status.textContent = "";
+  container.innerHTML = _TRAVEL_CITIES
+    .filter(c => c !== current)
+    .map(c => `<button class="btn-primary" onclick="doQuickTravel('${c}')">${c}</button>`)
+    .join("");
+  document.getElementById("travel-overlay").style.display = "flex";
+}
+
+function closeTravelOverlay() {
+  document.getElementById("travel-overlay").style.display = "none";
+}
+
+function doQuickTravel(city) {
+  const status = document.getElementById("travel-overlay-status");
+  status.textContent = "Travelling...";
+  document.querySelectorAll("#travel-overlay-buttons button").forEach(b => b.disabled = true);
+  fetch("/tasks/travel", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({target_city: city, method: "own_vehicle"}),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { status.textContent = d.error; }
+      else { status.textContent = "Travel to " + city + " initiated."; }
+    })
+    .catch(() => { status.textContent = "Request failed."; })
+    .finally(() => {
+      document.querySelectorAll("#travel-overlay-buttons button").forEach(b => b.disabled = false);
+    });
+}
+
 function checkWarrants() {
   const btn = event.target;
   btn.disabled = true;

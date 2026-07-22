@@ -66,7 +66,7 @@
             <div class="stat-item" id="stat-occupation-item"><span class="stat-label">Occupation</span><span class="stat-value" id="stat-occupation">--</span></div>
             <div class="stat-item"><span class="stat-label">Next Rank</span><span class="stat-value" id="stat-next-rank">--</span></div>
             <div class="stat-item"><span class="stat-label">Progress</span><span class="stat-value" id="stat-rank-progress">--</span></div>
-            <div class="stat-item"><span class="stat-label">City</span><span class="stat-value" id="stat-city">--</span></div>
+            <div class="stat-item" style="cursor:pointer;" onclick="openTravelOverlay()" title="Click to travel"><span class="stat-label">City</span><span class="stat-value" id="stat-city">--</span></div>
             <div class="stat-item"><span class="stat-label">Home City</span><span class="stat-value" id="stat-home-city">--</span></div>
             <div class="stat-item" id="stat-respect-item" style="display:none;cursor:pointer;" title="Click to view/refresh" onclick="openRespectOverlay()"><span class="stat-label">Respect</span><span class="stat-value" id="stat-respect">--</span></div>
           </div>
@@ -1807,6 +1807,15 @@
         <button id="respect-refresh-btn" class="btn-primary" style="flex:1;" onclick="refreshRespect()">Refresh Now</button>
         <button class="btn-secondary" style="flex:1;" onclick="closeRespectOverlay()">Close</button>
       </div>
+    </div>
+  </div>
+
+  <div id="travel-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;" onclick="closeTravelOverlay()">
+    <div style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:24px;min-width:260px;max-width:360px;" onclick="event.stopPropagation()">
+      <h4 style="margin:0 0 16px;color:#cdd6f4;">Travel</h4>
+      <div id="travel-overlay-buttons" style="display:flex;flex-direction:column;gap:10px;"></div>
+      <div id="travel-overlay-status" style="margin-top:12px;font-size:.85rem;color:var(--muted,#a6adc8);text-align:center;"></div>
+      <button class="btn-secondary" style="width:100%;margin-top:12px;" onclick="closeTravelOverlay()">Close</button>
     </div>
   </div>
 
