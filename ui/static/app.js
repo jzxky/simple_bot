@@ -1622,7 +1622,12 @@ function addLaunderContact() {
 function fastAddLaunderContacts() {
   const sel = document.getElementById("launder_contact_select");
   if (!sel) return;
-  const opts = Array.from(sel.options).filter(o => o.value).map(o => o.value);
+  const friendlyGroups = new Set(_plGroups.filter(g => g.type === "friendly").map(g => g.name));
+  const opts = Array.from(sel.options).filter(o => {
+    if (!o.value) return false;
+    const p = _plData.find(pl => pl.username === o.value);
+    return p && p.group && friendlyGroups.has(p.group);
+  }).map(o => o.value);
   opts.forEach(name => _appendLaunderContactItem(name));
   populateLaunderContactSelect();
   autoSave();
