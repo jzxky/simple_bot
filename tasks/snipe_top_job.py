@@ -9,7 +9,7 @@ import config as cfg
 import browser
 import urls
 from state import GameState, parse_state, SERVER_TIME_FMT
-from tasks.base import Task
+from tasks.base import Task, Action
 from tasks.check_top_job import TOP_JOB_MAP as _TOP_JOB_MAP
 from promotions import PROMO_BY_RANK, get_choice
 
@@ -33,6 +33,17 @@ class SnipeTopJobTask(Task):
         promo_url = state.snipe_top_job_promo_url
         top_job = state.next_rank or "Unknown"
         state.add_log(f"SnipeTopJob: starting — targeting {top_job}, hammering main.asp for up to 30 minutes.")
+
+        travel_failed = False
+        if not state.in_home_city():
+            state.add_log(f"SnipeTopJob: not in home city ({state.home_city}), travelling from {state.current_city}.")
+            executor.execute(Action("travel", target_city=state.home_city, method="own_vehicle"), state)
+            html = browser.navigate(urls.BASE_URL + "/main.asp")
+            parse_state(html, browser.current_url(), state)
+            if not state.in_home_city():
+                state.add_log("SnipeTopJob: travel to home city failed, continuing with snipe anyway.")
+                travel_failed = True
+
         deadline = time.monotonic() + SNIPE_TIMEOUT
         promoted = False
 
@@ -62,6 +73,11 @@ class SnipeTopJobTask(Task):
         state.snipe_top_job_promo_url = ""
 
         if promoted:
+            if travel_failed and not state.in_home_city():
+                state.add_log(f"SnipeTopJob: retrying travel to home city ({state.home_city}) after promotion.")
+                executor.execute(Action("travel", target_city=state.home_city, method="own_vehicle"), state)
+                html = browser.navigate(urls.BASE_URL + "/main.asp")
+                parse_state(html, browser.current_url(), state)
             self._post_forum(state, top_job)
 
     def _submit_promo(self, state: GameState, top_job: str) -> bool:
