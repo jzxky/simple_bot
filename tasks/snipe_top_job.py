@@ -30,6 +30,7 @@ class SnipeTopJobTask(Task):
         )
 
     def run(self, state: GameState, executor):
+        import bot as _bot
         promo_url = state.snipe_top_job_promo_url
         top_job = state.next_rank or "Unknown"
         state.add_log(f"SnipeTopJob: starting — targeting {top_job}, hammering main.asp for up to 30 minutes.")
@@ -47,7 +48,7 @@ class SnipeTopJobTask(Task):
         deadline = time.monotonic() + SNIPE_TIMEOUT
         promoted = False
 
-        while time.monotonic() < deadline:
+        while time.monotonic() < deadline and not _bot._stop_event.is_set() and not _bot._cancel_snipe_event.is_set():
             try:
                 html = browser.navigate(urls.BASE_URL + "/main.asp")
                 parse_state(html, browser.current_url(), state)
@@ -66,8 +67,16 @@ class SnipeTopJobTask(Task):
                 if promoted:
                     break
 
+        cancelled = _bot._cancel_snipe_event.is_set()
+        _bot._cancel_snipe_event.clear()
+
         if not promoted:
-            state.add_log(f"SnipeTopJob: timed out after 30 minutes without promotion.")
+            if cancelled:
+                state.add_log("SnipeTopJob: cancelled by user.")
+            elif _bot._stop_event.is_set():
+                state.add_log("SnipeTopJob: stopped — bot shutting down.")
+            else:
+                state.add_log(f"SnipeTopJob: timed out after 30 minutes without promotion.")
 
         state.snipe_top_job_pending = False
         state.snipe_top_job_promo_url = ""
