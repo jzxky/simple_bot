@@ -70,6 +70,7 @@ _state: "GameState | None" = None
 _stop_event = threading.Event()
 _pause_event = threading.Event()
 _reload_event = threading.Event()
+_cancel_snipe_event = threading.Event()
 _reload_requested_at: float = 0.0
 _RELOAD_DEBOUNCE = 2.0  # seconds
 _consume_queue: queue.Queue = queue.Queue()
@@ -604,6 +605,7 @@ def start():
         return
     _stop_event.clear()
     _pause_event.clear()
+    _cancel_snipe_event.clear()
     c = cfg.load()
     _thread = threading.Thread(target=_run, args=(c,), daemon=True)
     _thread.start()
@@ -612,6 +614,11 @@ def start():
 def stop():
     _stop_event.set()
     _pause_event.clear()
+    _cancel_snipe_event.set()
+
+
+def cancel_snipe():
+    _cancel_snipe_event.set()
 
 
 def pause():

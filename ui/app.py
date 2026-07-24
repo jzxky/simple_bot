@@ -347,6 +347,12 @@ def stop():
     return jsonify({"running": False, "paused": False})
 
 
+@app.route("/cancel-snipe", methods=["POST"])
+def cancel_snipe():
+    bot.cancel_snipe()
+    return jsonify({"ok": True})
+
+
 @app.route("/banklaunder/bulk_add", methods=["POST"])
 def banklaunder_bulk_add():
     if not bot.is_running():
