@@ -4558,7 +4558,7 @@ def handle_launder_money(action: Action, state: GameState):
 
 
 def handle_scrape_player(action: Action, state: GameState):
-    username = action.kwargs.get("username", "")
+    username = action.params.get("username", "")
     if not username:
         return
     url = f"{_urls.BASE_URL}/userprofile.asp?username={username}"
