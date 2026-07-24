@@ -4562,12 +4562,12 @@ def handle_scrape_player(action: Action, state: GameState):
     if not username:
         return
     url = f"{urls.BASE_URL}/userprofile.asp?username={username}"
-    page = state.page
+    page = browser.page()
     resp = page.goto(url, wait_until="domcontentloaded", timeout=15000)
     if not resp or resp.status != 200:
         state.add_log(f"Scrape: failed to load profile for {username}")
         return
-    soup = _soup(page)
+    soup = BeautifulSoup(page.content(), "html.parser")
     data = {}
     for row in soup.find_all("tr"):
         cells = row.find_all("td")
