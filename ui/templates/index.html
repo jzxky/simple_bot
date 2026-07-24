@@ -121,6 +121,409 @@
       </div>
     </section>
 
+    <!-- Income (Earns, Aggravated Crimes, Actions) -->
+    <section class="card tabs-card" id="s-income">
+      <h2 class="income-h2">
+        <button class="collapse-btn" onclick="toggleSection('s-income')">▾</button>
+        Income
+        <div class="income-pills-block" id="income-pills-block">
+          <div class="income-pills-row" id="pills-income-earns"></div>
+          <div class="income-pills-row" id="pills-income-crimes"></div>
+          <div class="income-pills-row" id="pills-income-actions"></div>
+        </div>
+      </h2>
+      <div class="card-body">
+        <div class="tab-bar">
+          <button class="tab-btn active" id="income-tab-earns" onclick="showTab('income-earns', this)">Earns</button>
+          <button class="tab-btn" id="income-tab-crimes" onclick="showTab('income-crimes', this)"><span class="tab-label-short">Aggs</span><span class="tab-label-long">Aggravated Crimes</span></button>
+          <button class="tab-btn" id="income-tab-actions" onclick="showTab('income-actions', this)">Actions</button>
+          <button class="tab-btn" onclick="showTab('income-casework', this)">Case Work</button>
+          <button class="tab-btn" id="income-tab-laundering" onclick="showTab('income-laundering', this)">Laundering</button>
+          <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)">Jail</button>
+        </div>
+        <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
+        <div id="income-jail" class="tab-panel">
+          <div class="settings-groups" id="income-jail-mount"></div>
+        </div>
+
+        <!-- Earns tab -->
+        <div id="income-earns" class="tab-panel active">
+          <label class="inline-toggle setting-row" style="margin-bottom:12px">
+            Enable Earns
+            <label class="toggle-label"><input type="checkbox" id="earns_enabled" {% if config.earns.enabled %}checked{% endif %} onchange="autoSave(); _updateIncomeTabColors()"><span class="toggle"></span></label>
+          </label>
+          <hr class="stat-divider">
+          <div class="row">
+            <label>Category
+              <select id="earn_category" onchange="_renderEarnSelect(); autoSave()"></select>
+            </label>
+            <label>Earn
+              <select id="earn_type" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
+            </label>
+          </div>
+          <p class="placeholder">Unavailable earns appear in red.</p>
+          <div class="row">
+            <button type="button" id="clear-earn-btn" class="action-btn" onclick="clearEarnQueue()">Clear Queue</button>
+            <button type="button" class="btn-secondary" onclick="openEarnCatalog()">Manage Categories</button>
+          </div>
+
+          <!-- Earn Planner (only shown when character history earn data is available) -->
+          <div id="earn-planner-group" class="settings-group" style="display:none;margin-top:18px">
+            <h3>Earn Planner</h3>
+            <p style="font-size:0.82rem;color:var(--muted);margin:0 0 12px;">
+              Cap how many of each earn the bot will ever complete (lifetime).
+              Earns not listed here have no limit.
+            </p>
+            <div class="row" style="align-items:flex-end;gap:8px">
+              <label style="flex:1">Earn
+                <select id="earn-planner-add-select"></select>
+              </label>
+              <label style="width:110px">Limit
+                <input type="number" id="earn-planner-add-limit" min="1" step="1" placeholder="e.g. 500">
+              </label>
+              <button type="button" class="action-btn" onclick="earnPlannerAdd()">Add</button>
+            </div>
+            <div id="earn-planner-list" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <!-- Aggravated Crimes tab -->
+        <div id="income-crimes" class="tab-panel">
+          <label class="inline-toggle setting-row" style="margin-bottom:12px">
+            Enable Aggravated Crimes
+            <label class="toggle-label"><input type="checkbox" id="crimes_enabled" {% if config.aggravated_crimes.enabled %}checked{% endif %} onchange="autoSave(); _updateIncomeTabColors()"><span class="toggle"></span></label>
+          </label>
+          <hr class="stat-divider">
+          <h3>Crime</h3>
+          <div class="row">
+            <label>Home City
+              <select id="primary_crime" onchange="toggleAwayCrime(); autoSave()">
+                {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('armed','Armed Robbery'),('torch','Torch Business'),('hack','Hack Bank Account')] %}
+                <option value="{{ crime }}" {% if config.aggravated_crimes.primary.crime == crime %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="label-narrow">Energy %
+              <select class="input-narrow-wide" id="primary_threshold" onchange="autoSave()">
+                {% for v, mins in [('7.5',10),('8.3',11),('9.2',12),('13.3',13),('15.6',14),('16.7',15),('17.8',16),('18.9',17),('30.0',18),('31.7',19),('33.3',20),('35.0',21),('36.7',22),('38.3',23),('53.3',24),('55.6',25),('57.8',26),('60.0',27),('62.2',28),('64.4',29),('100',30)] %}
+                <option value="{{ v }}" {% if config.aggravated_crimes.primary.energy_threshold | float == v | float %}selected{% endif %}>{{ v }}% - {{ mins }} mins</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <div class="row" id="away_crime_row" style="display:none">
+            <label>Out of Home City
+              <select id="away_crime" onchange="autoSave()">
+                {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('armed','Armed Robbery'),('torch','Torch Business')] %}
+                <option value="{{ crime }}" {% if config.aggravated_crimes.get('away_crime', {}).get('crime') == crime %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="label-narrow">Energy %
+              <select class="input-narrow-wide" id="away_threshold" onchange="autoSave()">
+                {% for v, mins in [('7.5',10),('8.3',11),('9.2',12),('13.3',13),('15.6',14),('16.7',15),('17.8',16),('18.9',17),('30.0',18),('31.7',19),('33.3',20),('35.0',21),('36.7',22),('38.3',23),('53.3',24),('55.6',25),('57.8',26),('60.0',27),('62.2',28),('64.4',29),('100',30)] %}
+                <option value="{{ v }}" {% if config.aggravated_crimes.get('away_crime', {}).get('energy_threshold', 50) | float == v | float %}selected{% endif %}>{{ v }}% - {{ mins }} mins</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <hr class="stat-divider">
+          <div class="settings-groups">
+            <div class="settings-group">
+              <h3>PvP</h3>
+              <div class="setting-row">
+                <label for="payback_mode">Payback</label>
+                <select id="payback_mode" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
+                  <option value="{{ v }}" {% if config.get('payback_mode','everyone') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <label class="inline-toggle setting-row">Fall back to second option if no hacking targets
+                <label class="toggle-label"><input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+            </div>
+            <div class="settings-group">
+              <h3>PvB</h3>
+              <label class="inline-toggle setting-row">Agg Private
+                <label class="toggle-label"><input type="checkbox" id="armed_agg_private" {% if config.aggravated_crimes.get('armed', {}).get('agg_private') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <label class="inline-toggle setting-row">Agg Drug House
+                <label class="toggle-label"><input type="checkbox" id="armed_agg_drug_house" {% if config.aggravated_crimes.get('armed', {}).get('agg_drug_house') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+            </div>
+            <div class="settings-group">
+              <h3>Torch</h3>
+              <label class="inline-toggle setting-row">Torch Private
+                <label class="toggle-label"><input type="checkbox" id="torch_private" {% if config.aggravated_crimes.get('torch', {}).get('torch_private') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row">
+                <label for="torch_payback_public">Payback Public</label>
+                <select id="torch_payback_public" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
+                  <option value="{{ v }}" {% if config.aggravated_crimes.get('torch', {}).get('torch_payback_public', 'everyone') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row">
+                <label for="torch_payback_private">Payback Private</label>
+                <select id="torch_payback_private" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
+                  <option value="{{ v }}" {% if config.aggravated_crimes.get('torch', {}).get('torch_payback_private', 'everyone') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Case Work tab -->
+        <div id="income-casework" class="tab-panel">
+          <label class="inline-toggle setting-row" style="margin-bottom:12px">
+            Enable Case Work
+            <label class="toggle-label">
+              <input type="checkbox" id="case_work_enabled" {% if config.get('case_work', {}).get('enabled') %}checked{% endif %} onchange="autoSave()">
+              <span class="toggle"></span>
+            </label>
+          </label>
+          <hr class="stat-divider">
+          <p id="cw-none" class="placeholder" style="display:none">No case work available for this occupation.</p>
+
+          <!-- Hospital -->
+          <div id="cw-hospital" style="display:none">
+            <div class="cw-poll-row">
+              Poll every
+              <input type="number" id="hospital_poll_interval" class="input-narrow" min="31"
+                value="{{ config.get('case_work', {}).get('hospital', {}).get('poll_interval', 31) }}"
+                oninput="markNumDirty(this)">
+              seconds
+            </div>
+            <table class="priority-table" id="hospital-priority-table">
+              <thead>
+                <tr><th></th><th>#</th><th>Task</th><th>Target</th></tr>
+              </thead>
+              <tbody id="hospital-priority-body">
+                {% set HOSPITAL_META = {
+                  'bionics':    {'label': 'Fit Bionics', 'pvp': true},
+                  'sex_change': {'label': 'Sex Change',  'pvp': true},
+                  'flu':        {'label': 'Treat Flu',   'pvp': true},
+                  'recover':    {'label': 'Recover',     'pvp': true},
+                  'dna':        {'label': 'DNA Testing', 'pvp': false},
+                } %}
+                {% set hosp_tasks = config.get('case_work', {}).get('hospital', {}).get('tasks', [
+                  {'type':'bionics',    'target':'all'},
+                  {'type':'sex_change', 'target':'all'},
+                  {'type':'flu',        'target':'all'},
+                  {'type':'recover',    'target':'all'},
+                  {'type':'dna',        'enabled':true},
+                ]) %}
+                {% for task in hosp_tasks %}
+                {% set meta = HOSPITAL_META.get(task.type, {'label': task.type, 'pvp': false}) %}
+                <tr data-type="{{ task.type }}">
+                  <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
+                  <td class="priority-num">{{ loop.index }}</td>
+                  <td>{{ meta.label }}</td>
+                  <td>
+                    {% if meta.pvp %}
+                    <select class="cw-select" id="cw_{{ task.type }}_target" onchange="autoSave()">
+                      {% for v, l in [('all','All'),('whitelist','Whitelist'),('not_blacklist','Not Blacklist'),('none','None')] %}
+                      <option value="{{ v }}" {% if task.get('target','all') == v %}selected{% endif %}>{{ l }}</option>
+                      {% endfor %}
+                    </select>
+                    {% else %}
+                    <label class="toggle-label" style="justify-content:flex-start">
+                      <input type="checkbox" id="cw_{{ task.type }}_enabled" {% if task.get('enabled', true) %}checked{% endif %} onchange="autoSave()">
+                      <span class="toggle"></span>
+                    </label>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <div id="cw-hosp-history" style="margin-top:10px"></div>
+          </div>
+
+          <!-- Fire (placeholder) -->
+          <div id="cw-fire" style="display:none">
+            <div class="cw-poll-row">
+              Poll every
+              <input type="number" id="fire_poll_interval" class="input-narrow" min="31"
+                value="{{ config.get('case_work', {}).get('fire', {}).get('poll_interval', 31) }}"
+                oninput="markNumDirty(this)">
+              seconds
+            </div>
+            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 0">Attends active fires and performs building inspections automatically when the case timer is ready.</p>
+          </div>
+
+          <!-- Engineering -->
+          <div id="cw-engineering" style="display:none">
+            <div class="cw-poll-row">
+              Poll every
+              <input type="number" id="engineering_poll_interval" class="input-narrow" min="31"
+                value="{{ config.get('case_work', {}).get('engineering', {}).get('poll_interval', 31) }}"
+                oninput="markNumDirty(this)">
+              seconds
+            </div>
+            <table class="priority-table" id="engineering-priority-table">
+              <thead>
+                <tr><th></th><th>#</th><th>Task</th><th>Target</th></tr>
+              </thead>
+              <tbody id="engineering-priority-body">
+                {% set ENG_META = {
+                  'construct_apartment': {'label': 'Construct Apartment', 'pvp': true},
+                  'repair_business':     {'label': 'Repair Business',     'pvp': false},
+                  'repair_vehicle':      {'label': 'Repair Vehicle',      'pvp': true},
+                  'construct_vault':     {'label': 'Construct Vault',     'pvp': true},
+                } %}
+                {% set eng_tasks = config.get('case_work', {}).get('engineering', {}).get('tasks', [
+                  {'type':'construct_apartment', 'target':'all'},
+                  {'type':'repair_business',     'enabled':true},
+                  {'type':'repair_vehicle',      'target':'all'},
+                  {'type':'construct_vault',     'target':'all'},
+                ]) %}
+                {% for task in eng_tasks %}
+                {% set meta = ENG_META.get(task.type, {'label': task.type, 'pvp': false}) %}
+                <tr data-type="{{ task.type }}">
+                  <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
+                  <td class="priority-num">{{ loop.index }}</td>
+                  <td>{{ meta.label }}</td>
+                  <td>
+                    {% if meta.pvp %}
+                    <select class="cw-select" id="cw_{{ task.type }}_target" onchange="autoSave()">
+                      {% for v, l in [('all','All'),('whitelist','Whitelist Only'),('not_blacklist','Not Blacklist'),('none','No-one')] %}
+                      <option value="{{ v }}" {% if task.get('target','all') == v %}selected{% endif %}>{{ l }}</option>
+                      {% endfor %}
+                    </select>
+                    {% else %}
+                    <label class="toggle-label" style="justify-content:flex-start">
+                      <input type="checkbox" id="cw_{{ task.type }}_enabled" {% if task.get('enabled', true) %}checked{% endif %} onchange="autoSave()">
+                      <span class="toggle"></span>
+                    </label>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <div id="cw-eng-history" style="margin-top:10px"></div>
+          </div>
+
+          <!-- Banking -->
+          <div id="cw-banking" style="display:none">
+            <div class="cw-poll-row">
+              Check for money to launder every
+              <input type="number" id="banking_poll_interval" class="input-narrow" min="31"
+                value="{{ config.get('case_work', {}).get('banking', {}).get('poll_interval', 60) }}"
+                oninput="markNumDirty(this)">
+              seconds
+            </div>
+            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 10px">
+              Polls the launder deals list and launders any gangster's balance over $5, then auto-transfers the cleaned funds back.
+            </p>
+            <hr class="stat-divider">
+            <p style="font-size:0.85rem;color:var(--muted);margin:0 0 10px">
+              Establish money-laundering deals with every eligible player (excludes Heaven/Hell/Manila/Locked,
+              your own home city, and unemployed players). Must be in your home city.
+            </p>
+            <button type="button" class="action-btn" id="bulk-launder-btn" onclick="bulkAddLaunderContacts()">Bulk-Add Contacts</button>
+            <span id="bulk-launder-status" style="font-size:0.8rem;color:var(--muted);margin-left:8px"></span>
+          </div>
+        </div>
+
+        <!-- Actions tab -->
+        <div id="income-actions" class="tab-panel">
+          <label class="inline-toggle setting-row" style="margin-bottom:12px">
+            Enable Actions
+            <label class="toggle-label"><input type="checkbox" id="action_enabled" {% if config.action.enabled or config.get('away_action', {}).get('enabled') %}checked{% endif %} onchange="autoSave(); _updateIncomeTabColors()"><span class="toggle"></span></label>
+          </label>
+          <hr class="stat-divider">
+          <h3>Home City</h3>
+          <div class="row">
+            <label>Action
+              <select id="action_type" onchange="populateActionSub(); autoSave()">
+                <option value="community_service" {% if config.action.type == 'community_service' %}selected{% endif %}>Community Service</option>
+                <option value="fire_duties"       {% if config.action.type == 'fire_duties'       %}selected{% endif %}>Fire Duties</option>
+                <option value="career_training"   {% if config.action.type == 'career_training'   %}selected{% endif %}>Career Training</option>
+                <option value="university"        {% if config.action.type == 'university'        %}selected{% endif %}>University Training</option>
+                <option value="training_centre"   {% if config.action.type == 'training_centre'   %}selected{% endif %}>Training Centre</option>
+                <option value="drug_manufacturing"{% if config.action.type == 'drug_manufacturing'%}selected{% endif %}>Drug Manufacturing</option>
+                <option value="dog_trains"        {% if config.action.type == 'dog_trains'        %}selected{% endif %}>Dog Trains</option>
+              </select>
+            </label>
+            <label id="action_sub_label">Sub-option
+              <select id="action_sub" onchange="autoSave()"></select>
+            </label>
+          </div>
+          <div id="career_training_options" class="setting-row" style="display:none;margin-bottom:8px;">
+            Stop training at 14
+            <label class="toggle-label">
+              <input type="checkbox" id="career_training_stop_at_14"
+                {% if config.get('action', {}).get('career_training_stop_at_14') %}checked{% endif %}
+                onchange="autoSave()">
+              <span class="toggle"></span>
+            </label>
+          </div>
+          <h3>Out of Home City</h3>
+          <div class="row">
+            <label>Action
+              <select id="away_action_type" onchange="autoSave()">
+                <option value=""                  {% if not config.get('away_action', {}).get('type') or config.get('away_action', {}).get('type') == '' %}selected{% endif %}>None</option>
+                <option value="drug_manufacturing" {% if config.get('away_action', {}).get('type') == 'drug_manufacturing' %}selected{% endif %}>Drug Manufacturing</option>
+                <option value="community_service"  {% if config.get('away_action', {}).get('type') == 'community_service'  %}selected{% endif %}>Community Service</option>
+                <option value="dog_trains"         {% if config.get('away_action', {}).get('type') == 'dog_trains'         %}selected{% endif %}>Dog Trains</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <!-- Laundering tab -->
+        <div id="income-laundering" class="tab-panel">
+          <label class="inline-toggle setting-row" style="margin-bottom:12px">
+            Enable Laundering
+            <label class="toggle-label">
+              <input type="checkbox" id="laundering_enabled"
+                {% if config.get('laundering', {}).get('enabled') %}checked{% endif %}
+                onchange="autoSave(); _updateIncomeTabColors()">
+              <span class="toggle"></span>
+            </label>
+          </label>
+          <hr class="stat-divider">
+          <div class="setting-row" style="margin-bottom:10px">
+            <label for="launder_amount">Launder Amount</label>
+            <input type="number" id="launder_amount" class="input-narrow" min="0"
+              value="{{ config.get('laundering', {}).get('launder_amount', 0) }}"
+              oninput="markNumDirty(this)">
+            <span style="font-size:0.8rem;color:var(--muted);margin-left:6px">Leave as 0 for launder max</span>
+          </div>
+          <div id="launder-cooldown-bar" style="display:none;margin-bottom:8px;padding:6px 10px;background:var(--bg-alt);border-radius:6px;align-items:center;gap:8px">
+            <span id="launder-cooldown-text" style="font-size:0.85rem;color:var(--muted)"></span>
+            <button type="button" class="btn-secondary" onclick="clearLaunderCooldown()" style="font-size:0.75rem;padding:2px 8px">Clear</button>
+          </div>
+          <hr class="stat-divider">
+          <div style="margin-bottom:8px">
+            <label for="launder_contact_select">Preferred Contacts</label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap">
+              <select id="launder_contact_select" style="width:200px">
+                <option value="">-- select --</option>
+              </select>
+              <button type="button" class="action-btn" onclick="addLaunderContact()">Add</button>
+              <button type="button" class="btn-secondary" onclick="fastAddLaunderContacts()">Fast Add Friendlies</button>
+            </div>
+          </div>
+          <div id="launder_contacts_list" style="margin-top:8px">
+            {% for name in config.get('laundering', {}).get('preferred_contacts', []) %}
+            <div class="launder-contact-item" data-name="{{ name }}" style="display:flex;align-items:center;gap:6px;padding:3px 0">
+              <span>{{ name }}</span>
+              <button type="button" class="btn-danger-sm" onclick="removeLaunderContact(this)" style="font-size:0.75rem;padding:1px 6px">✕</button>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+      </div>
+    </section>
+
     <!-- Settings Tabs -->
     <section class="card tabs-card" id="s-settings">
       <h2>
@@ -884,6 +1287,40 @@
       </div>
     </section>
 
+    <!-- Communications and Journals -->
+    <section class="card tabs-card" id="s-comms-journals">
+      <h2>
+        <button class="collapse-btn" onclick="toggleSection('s-comms-journals')">▾</button>
+        Communications &amp; Journals
+      </h2>
+      <div class="card-body">
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="showTab('cj-communications', this)">Communications</button>
+          <button class="tab-btn" onclick="showTab('cj-journals', this); cjInit()">Journals</button>
+        </div>
+
+        <!-- Communications tab -->
+        <div id="cj-communications" class="tab-panel active">
+          <p class="placeholder">Coming soon.</p>
+        </div>
+
+        <!-- Journals tab -->
+        <div id="cj-journals" class="tab-panel">
+          <div class="cj-journal-subtabs" style="display:flex;gap:6px;margin-bottom:8px">
+            <button class="tab-btn active" id="cj-sub-events" onclick="cjSwitchSub('events',this)">Events</button>
+            <button class="tab-btn" id="cj-sub-requests" onclick="cjSwitchSub('requests',this)">Requests</button>
+          </div>
+          <div class="cj-search-row">
+            <input type="text" id="cj-search" class="task-select" placeholder="Search title, text or time…"
+              oninput="cjSearch()" style="flex:1;min-width:0;">
+          </div>
+          <div id="cj-pagination-top" class="cj-pager"></div>
+          <div id="cj-list"></div>
+          <div id="cj-pagination" class="cj-pager"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- Character Stats -->
     <!-- Tasks -->
     <section class="card" id="s-tasks">
@@ -994,443 +1431,6 @@
             <p class="task-hint-block">Cancels the currently planned jail break.</p>
             <button class="btn-primary task-submit-btn" onclick="submitJbCalloff()">Call Off Jail Break</button>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Income (Earns, Aggravated Crimes, Actions) -->
-    <section class="card tabs-card" id="s-income">
-      <h2 class="income-h2">
-        <button class="collapse-btn" onclick="toggleSection('s-income')">▾</button>
-        Income
-        <div class="income-pills-block" id="income-pills-block">
-          <div class="income-pills-row" id="pills-income-earns"></div>
-          <div class="income-pills-row" id="pills-income-crimes"></div>
-          <div class="income-pills-row" id="pills-income-actions"></div>
-        </div>
-      </h2>
-      <div class="card-body">
-        <div class="tab-bar">
-          <button class="tab-btn active" id="income-tab-earns" onclick="showTab('income-earns', this)">Earns</button>
-          <button class="tab-btn" id="income-tab-crimes" onclick="showTab('income-crimes', this)"><span class="tab-label-short">Aggs</span><span class="tab-label-long">Aggravated Crimes</span></button>
-          <button class="tab-btn" id="income-tab-actions" onclick="showTab('income-actions', this)">Actions</button>
-          <button class="tab-btn" onclick="showTab('income-casework', this)">Case Work</button>
-          <button class="tab-btn" id="income-tab-laundering" onclick="showTab('income-laundering', this)">Laundering</button>
-          <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)">Jail</button>
-        </div>
-        <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
-        <div id="income-jail" class="tab-panel">
-          <div class="settings-groups" id="income-jail-mount"></div>
-        </div>
-
-        <!-- Earns tab -->
-        <div id="income-earns" class="tab-panel active">
-          <label class="inline-toggle setting-row" style="margin-bottom:12px">
-            Enable Earns
-            <label class="toggle-label"><input type="checkbox" id="earns_enabled" {% if config.earns.enabled %}checked{% endif %} onchange="autoSave(); _updateIncomeTabColors()"><span class="toggle"></span></label>
-          </label>
-          <hr class="stat-divider">
-          <div class="row">
-            <label>Category
-              <select id="earn_category" onchange="_renderEarnSelect(); autoSave()"></select>
-            </label>
-            <label>Earn
-              <select id="earn_type" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
-            </label>
-          </div>
-          <p class="placeholder">Unavailable earns appear in red.</p>
-          <div class="row">
-            <button type="button" id="clear-earn-btn" class="action-btn" onclick="clearEarnQueue()">Clear Queue</button>
-            <button type="button" class="btn-secondary" onclick="openEarnCatalog()">Manage Categories</button>
-          </div>
-
-          <!-- Earn Planner (only shown when character history earn data is available) -->
-          <div id="earn-planner-group" class="settings-group" style="display:none;margin-top:18px">
-            <h3>Earn Planner</h3>
-            <p style="font-size:0.82rem;color:var(--muted);margin:0 0 12px;">
-              Cap how many of each earn the bot will ever complete (lifetime).
-              Earns not listed here have no limit.
-            </p>
-            <div class="row" style="align-items:flex-end;gap:8px">
-              <label style="flex:1">Earn
-                <select id="earn-planner-add-select"></select>
-              </label>
-              <label style="width:110px">Limit
-                <input type="number" id="earn-planner-add-limit" min="1" step="1" placeholder="e.g. 500">
-              </label>
-              <button type="button" class="action-btn" onclick="earnPlannerAdd()">Add</button>
-            </div>
-            <div id="earn-planner-list" style="margin-top:12px"></div>
-          </div>
-        </div>
-
-        <!-- Aggravated Crimes tab -->
-        <div id="income-crimes" class="tab-panel">
-          <label class="inline-toggle setting-row" style="margin-bottom:12px">
-            Enable Aggravated Crimes
-            <label class="toggle-label"><input type="checkbox" id="crimes_enabled" {% if config.aggravated_crimes.enabled %}checked{% endif %} onchange="autoSave(); _updateIncomeTabColors()"><span class="toggle"></span></label>
-          </label>
-          <hr class="stat-divider">
-          <h3>Crime</h3>
-          <div class="row">
-            <label>Home City
-              <select id="primary_crime" onchange="toggleAwayCrime(); autoSave()">
-                {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('armed','Armed Robbery'),('torch','Torch Business'),('hack','Hack Bank Account')] %}
-                <option value="{{ crime }}" {% if config.aggravated_crimes.primary.crime == crime %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label class="label-narrow">Energy %
-              <select class="input-narrow-wide" id="primary_threshold" onchange="autoSave()">
-                {% for v, mins in [('7.5',10),('8.3',11),('9.2',12),('13.3',13),('15.6',14),('16.7',15),('17.8',16),('18.9',17),('30.0',18),('31.7',19),('33.3',20),('35.0',21),('36.7',22),('38.3',23),('53.3',24),('55.6',25),('57.8',26),('60.0',27),('62.2',28),('64.4',29),('100',30)] %}
-                <option value="{{ v }}" {% if config.aggravated_crimes.primary.energy_threshold | float == v | float %}selected{% endif %}>{{ v }}% - {{ mins }} mins</option>
-                {% endfor %}
-              </select>
-            </label>
-          </div>
-          <div class="row" id="away_crime_row" style="display:none">
-            <label>Out of Home City
-              <select id="away_crime" onchange="autoSave()">
-                {% for crime, label in [('pickpocket','Pickpocket'),('mugging','Mugging'),('breaking','Breaking & Entering'),('armed','Armed Robbery'),('torch','Torch Business')] %}
-                <option value="{{ crime }}" {% if config.aggravated_crimes.get('away_crime', {}).get('crime') == crime %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label class="label-narrow">Energy %
-              <select class="input-narrow-wide" id="away_threshold" onchange="autoSave()">
-                {% for v, mins in [('7.5',10),('8.3',11),('9.2',12),('13.3',13),('15.6',14),('16.7',15),('17.8',16),('18.9',17),('30.0',18),('31.7',19),('33.3',20),('35.0',21),('36.7',22),('38.3',23),('53.3',24),('55.6',25),('57.8',26),('60.0',27),('62.2',28),('64.4',29),('100',30)] %}
-                <option value="{{ v }}" {% if config.aggravated_crimes.get('away_crime', {}).get('energy_threshold', 50) | float == v | float %}selected{% endif %}>{{ v }}% - {{ mins }} mins</option>
-                {% endfor %}
-              </select>
-            </label>
-          </div>
-          <hr class="stat-divider">
-          <div class="settings-groups">
-            <div class="settings-group">
-              <h3>PvP</h3>
-              <div class="setting-row">
-                <label for="payback_mode">Payback</label>
-                <select id="payback_mode" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
-                  <option value="{{ v }}" {% if config.get('payback_mode','everyone') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <label class="inline-toggle setting-row">Fall back to second option if no hacking targets
-                <label class="toggle-label"><input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-            </div>
-            <div class="settings-group">
-              <h3>PvB</h3>
-              <label class="inline-toggle setting-row">Agg Private
-                <label class="toggle-label"><input type="checkbox" id="armed_agg_private" {% if config.aggravated_crimes.get('armed', {}).get('agg_private') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <label class="inline-toggle setting-row">Agg Drug House
-                <label class="toggle-label"><input type="checkbox" id="armed_agg_drug_house" {% if config.aggravated_crimes.get('armed', {}).get('agg_drug_house') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-            </div>
-            <div class="settings-group">
-              <h3>Torch</h3>
-              <label class="inline-toggle setting-row">Torch Private
-                <label class="toggle-label"><input type="checkbox" id="torch_private" {% if config.aggravated_crimes.get('torch', {}).get('torch_private') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              <div class="setting-row">
-                <label for="torch_payback_public">Payback Public</label>
-                <select id="torch_payback_public" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
-                  <option value="{{ v }}" {% if config.aggravated_crimes.get('torch', {}).get('torch_payback_public', 'everyone') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="setting-row">
-                <label for="torch_payback_private">Payback Private</label>
-                <select id="torch_payback_private" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('whitelist_only','Whitelist Only'),('not_blacklist','Not Blacklist'),('everyone','Everyone'),('nobody','Nobody')] %}
-                  <option value="{{ v }}" {% if config.aggravated_crimes.get('torch', {}).get('torch_payback_private', 'everyone') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Case Work tab -->
-        <div id="income-casework" class="tab-panel">
-          <label class="inline-toggle setting-row" style="margin-bottom:12px">
-            Enable Case Work
-            <label class="toggle-label">
-              <input type="checkbox" id="case_work_enabled" {% if config.get('case_work', {}).get('enabled') %}checked{% endif %} onchange="autoSave()">
-              <span class="toggle"></span>
-            </label>
-          </label>
-          <hr class="stat-divider">
-          <p id="cw-none" class="placeholder" style="display:none">No case work available for this occupation.</p>
-
-          <!-- Hospital -->
-          <div id="cw-hospital" style="display:none">
-            <div class="cw-poll-row">
-              Poll every
-              <input type="number" id="hospital_poll_interval" class="input-narrow" min="31"
-                value="{{ config.get('case_work', {}).get('hospital', {}).get('poll_interval', 31) }}"
-                oninput="markNumDirty(this)">
-              seconds
-            </div>
-            <table class="priority-table" id="hospital-priority-table">
-              <thead>
-                <tr><th></th><th>#</th><th>Task</th><th>Target</th></tr>
-              </thead>
-              <tbody id="hospital-priority-body">
-                {% set HOSPITAL_META = {
-                  'bionics':    {'label': 'Fit Bionics', 'pvp': true},
-                  'sex_change': {'label': 'Sex Change',  'pvp': true},
-                  'flu':        {'label': 'Treat Flu',   'pvp': true},
-                  'recover':    {'label': 'Recover',     'pvp': true},
-                  'dna':        {'label': 'DNA Testing', 'pvp': false},
-                } %}
-                {% set hosp_tasks = config.get('case_work', {}).get('hospital', {}).get('tasks', [
-                  {'type':'bionics',    'target':'all'},
-                  {'type':'sex_change', 'target':'all'},
-                  {'type':'flu',        'target':'all'},
-                  {'type':'recover',    'target':'all'},
-                  {'type':'dna',        'enabled':true},
-                ]) %}
-                {% for task in hosp_tasks %}
-                {% set meta = HOSPITAL_META.get(task.type, {'label': task.type, 'pvp': false}) %}
-                <tr data-type="{{ task.type }}">
-                  <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
-                  <td class="priority-num">{{ loop.index }}</td>
-                  <td>{{ meta.label }}</td>
-                  <td>
-                    {% if meta.pvp %}
-                    <select class="cw-select" id="cw_{{ task.type }}_target" onchange="autoSave()">
-                      {% for v, l in [('all','All'),('whitelist','Whitelist'),('not_blacklist','Not Blacklist'),('none','None')] %}
-                      <option value="{{ v }}" {% if task.get('target','all') == v %}selected{% endif %}>{{ l }}</option>
-                      {% endfor %}
-                    </select>
-                    {% else %}
-                    <label class="toggle-label" style="justify-content:flex-start">
-                      <input type="checkbox" id="cw_{{ task.type }}_enabled" {% if task.get('enabled', true) %}checked{% endif %} onchange="autoSave()">
-                      <span class="toggle"></span>
-                    </label>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            <div id="cw-hosp-history" style="margin-top:10px"></div>
-          </div>
-
-          <!-- Fire (placeholder) -->
-          <div id="cw-fire" style="display:none">
-            <div class="cw-poll-row">
-              Poll every
-              <input type="number" id="fire_poll_interval" class="input-narrow" min="31"
-                value="{{ config.get('case_work', {}).get('fire', {}).get('poll_interval', 31) }}"
-                oninput="markNumDirty(this)">
-              seconds
-            </div>
-            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 0">Attends active fires and performs building inspections automatically when the case timer is ready.</p>
-          </div>
-
-          <!-- Engineering -->
-          <div id="cw-engineering" style="display:none">
-            <div class="cw-poll-row">
-              Poll every
-              <input type="number" id="engineering_poll_interval" class="input-narrow" min="31"
-                value="{{ config.get('case_work', {}).get('engineering', {}).get('poll_interval', 31) }}"
-                oninput="markNumDirty(this)">
-              seconds
-            </div>
-            <table class="priority-table" id="engineering-priority-table">
-              <thead>
-                <tr><th></th><th>#</th><th>Task</th><th>Target</th></tr>
-              </thead>
-              <tbody id="engineering-priority-body">
-                {% set ENG_META = {
-                  'construct_apartment': {'label': 'Construct Apartment', 'pvp': true},
-                  'repair_business':     {'label': 'Repair Business',     'pvp': false},
-                  'repair_vehicle':      {'label': 'Repair Vehicle',      'pvp': true},
-                  'construct_vault':     {'label': 'Construct Vault',     'pvp': true},
-                } %}
-                {% set eng_tasks = config.get('case_work', {}).get('engineering', {}).get('tasks', [
-                  {'type':'construct_apartment', 'target':'all'},
-                  {'type':'repair_business',     'enabled':true},
-                  {'type':'repair_vehicle',      'target':'all'},
-                  {'type':'construct_vault',     'target':'all'},
-                ]) %}
-                {% for task in eng_tasks %}
-                {% set meta = ENG_META.get(task.type, {'label': task.type, 'pvp': false}) %}
-                <tr data-type="{{ task.type }}">
-                  <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
-                  <td class="priority-num">{{ loop.index }}</td>
-                  <td>{{ meta.label }}</td>
-                  <td>
-                    {% if meta.pvp %}
-                    <select class="cw-select" id="cw_{{ task.type }}_target" onchange="autoSave()">
-                      {% for v, l in [('all','All'),('whitelist','Whitelist Only'),('not_blacklist','Not Blacklist'),('none','No-one')] %}
-                      <option value="{{ v }}" {% if task.get('target','all') == v %}selected{% endif %}>{{ l }}</option>
-                      {% endfor %}
-                    </select>
-                    {% else %}
-                    <label class="toggle-label" style="justify-content:flex-start">
-                      <input type="checkbox" id="cw_{{ task.type }}_enabled" {% if task.get('enabled', true) %}checked{% endif %} onchange="autoSave()">
-                      <span class="toggle"></span>
-                    </label>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            <div id="cw-eng-history" style="margin-top:10px"></div>
-          </div>
-
-          <!-- Banking -->
-          <div id="cw-banking" style="display:none">
-            <div class="cw-poll-row">
-              Check for money to launder every
-              <input type="number" id="banking_poll_interval" class="input-narrow" min="31"
-                value="{{ config.get('case_work', {}).get('banking', {}).get('poll_interval', 60) }}"
-                oninput="markNumDirty(this)">
-              seconds
-            </div>
-            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 10px">
-              Polls the launder deals list and launders any gangster's balance over $5, then auto-transfers the cleaned funds back.
-            </p>
-            <hr class="stat-divider">
-            <p style="font-size:0.85rem;color:var(--muted);margin:0 0 10px">
-              Establish money-laundering deals with every eligible player (excludes Heaven/Hell/Manila/Locked,
-              your own home city, and unemployed players). Must be in your home city.
-            </p>
-            <button type="button" class="action-btn" id="bulk-launder-btn" onclick="bulkAddLaunderContacts()">Bulk-Add Contacts</button>
-            <span id="bulk-launder-status" style="font-size:0.8rem;color:var(--muted);margin-left:8px"></span>
-          </div>
-        </div>
-
-        <!-- Actions tab -->
-        <div id="income-actions" class="tab-panel">
-          <label class="inline-toggle setting-row" style="margin-bottom:12px">
-            Enable Actions
-            <label class="toggle-label"><input type="checkbox" id="action_enabled" {% if config.action.enabled or config.get('away_action', {}).get('enabled') %}checked{% endif %} onchange="autoSave(); _updateIncomeTabColors()"><span class="toggle"></span></label>
-          </label>
-          <hr class="stat-divider">
-          <h3>Home City</h3>
-          <div class="row">
-            <label>Action
-              <select id="action_type" onchange="populateActionSub(); autoSave()">
-                <option value="community_service" {% if config.action.type == 'community_service' %}selected{% endif %}>Community Service</option>
-                <option value="fire_duties"       {% if config.action.type == 'fire_duties'       %}selected{% endif %}>Fire Duties</option>
-                <option value="career_training"   {% if config.action.type == 'career_training'   %}selected{% endif %}>Career Training</option>
-                <option value="university"        {% if config.action.type == 'university'        %}selected{% endif %}>University Training</option>
-                <option value="training_centre"   {% if config.action.type == 'training_centre'   %}selected{% endif %}>Training Centre</option>
-                <option value="drug_manufacturing"{% if config.action.type == 'drug_manufacturing'%}selected{% endif %}>Drug Manufacturing</option>
-                <option value="dog_trains"        {% if config.action.type == 'dog_trains'        %}selected{% endif %}>Dog Trains</option>
-              </select>
-            </label>
-            <label id="action_sub_label">Sub-option
-              <select id="action_sub" onchange="autoSave()"></select>
-            </label>
-          </div>
-          <div id="career_training_options" class="setting-row" style="display:none;margin-bottom:8px;">
-            Stop training at 14
-            <label class="toggle-label">
-              <input type="checkbox" id="career_training_stop_at_14"
-                {% if config.get('action', {}).get('career_training_stop_at_14') %}checked{% endif %}
-                onchange="autoSave()">
-              <span class="toggle"></span>
-            </label>
-          </div>
-          <h3>Out of Home City</h3>
-          <div class="row">
-            <label>Action
-              <select id="away_action_type" onchange="autoSave()">
-                <option value=""                  {% if not config.get('away_action', {}).get('type') or config.get('away_action', {}).get('type') == '' %}selected{% endif %}>None</option>
-                <option value="drug_manufacturing" {% if config.get('away_action', {}).get('type') == 'drug_manufacturing' %}selected{% endif %}>Drug Manufacturing</option>
-                <option value="community_service"  {% if config.get('away_action', {}).get('type') == 'community_service'  %}selected{% endif %}>Community Service</option>
-                <option value="dog_trains"         {% if config.get('away_action', {}).get('type') == 'dog_trains'         %}selected{% endif %}>Dog Trains</option>
-              </select>
-            </label>
-          </div>
-        </div>
-
-        <!-- Laundering tab -->
-        <div id="income-laundering" class="tab-panel">
-          <label class="inline-toggle setting-row" style="margin-bottom:12px">
-            Enable Laundering
-            <label class="toggle-label">
-              <input type="checkbox" id="laundering_enabled"
-                {% if config.get('laundering', {}).get('enabled') %}checked{% endif %}
-                onchange="autoSave(); _updateIncomeTabColors()">
-              <span class="toggle"></span>
-            </label>
-          </label>
-          <hr class="stat-divider">
-          <div class="setting-row" style="margin-bottom:10px">
-            <label for="launder_amount">Launder Amount</label>
-            <input type="number" id="launder_amount" class="input-narrow" min="0"
-              value="{{ config.get('laundering', {}).get('launder_amount', 0) }}"
-              oninput="markNumDirty(this)">
-            <span style="font-size:0.8rem;color:var(--muted);margin-left:6px">Leave as 0 for launder max</span>
-          </div>
-          <div id="launder-cooldown-bar" style="display:none;margin-bottom:8px;padding:6px 10px;background:var(--bg-alt);border-radius:6px;align-items:center;gap:8px">
-            <span id="launder-cooldown-text" style="font-size:0.85rem;color:var(--muted)"></span>
-            <button type="button" class="btn-secondary" onclick="clearLaunderCooldown()" style="font-size:0.75rem;padding:2px 8px">Clear</button>
-          </div>
-          <hr class="stat-divider">
-          <div style="margin-bottom:8px">
-            <label for="launder_contact_select">Preferred Contacts</label>
-            <div style="display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap">
-              <select id="launder_contact_select" style="width:200px">
-                <option value="">-- select --</option>
-              </select>
-              <button type="button" class="action-btn" onclick="addLaunderContact()">Add</button>
-              <button type="button" class="btn-secondary" onclick="fastAddLaunderContacts()">Fast Add Friendlies</button>
-            </div>
-          </div>
-          <div id="launder_contacts_list" style="margin-top:8px">
-            {% for name in config.get('laundering', {}).get('preferred_contacts', []) %}
-            <div class="launder-contact-item" data-name="{{ name }}" style="display:flex;align-items:center;gap:6px;padding:3px 0">
-              <span>{{ name }}</span>
-              <button type="button" class="btn-danger-sm" onclick="removeLaunderContact(this)" style="font-size:0.75rem;padding:1px 6px">✕</button>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- Communications and Journals -->
-    <section class="card tabs-card" id="s-comms-journals">
-      <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-comms-journals')">▾</button>
-        Communications &amp; Journals
-      </h2>
-      <div class="card-body">
-        <div class="tab-bar">
-          <button class="tab-btn active" onclick="showTab('cj-communications', this)">Communications</button>
-          <button class="tab-btn" onclick="showTab('cj-journals', this); cjInit()">Journals</button>
-        </div>
-
-        <!-- Communications tab -->
-        <div id="cj-communications" class="tab-panel active">
-          <p class="placeholder">Coming soon.</p>
-        </div>
-
-        <!-- Journals tab -->
-        <div id="cj-journals" class="tab-panel">
-          <div class="cj-journal-subtabs" style="display:flex;gap:6px;margin-bottom:8px">
-            <button class="tab-btn active" id="cj-sub-events" onclick="cjSwitchSub('events',this)">Events</button>
-            <button class="tab-btn" id="cj-sub-requests" onclick="cjSwitchSub('requests',this)">Requests</button>
-          </div>
-          <div class="cj-search-row">
-            <input type="text" id="cj-search" class="task-select" placeholder="Search title, text or time…"
-              oninput="cjSearch()" style="flex:1;min-width:0;">
-          </div>
-          <div id="cj-pagination-top" class="cj-pager"></div>
-          <div id="cj-list"></div>
-          <div id="cj-pagination" class="cj-pager"></div>
         </div>
       </div>
     </section>
