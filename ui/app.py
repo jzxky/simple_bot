@@ -606,6 +606,7 @@ def status():
         "respect_pct": _get_respect_data().get("respect_pct"),
         "respect_last_check": _get_respect_data().get("last_check", 0.0),
         "notifications": bot.state.notifications,
+        "launder_cooldown": __import__("executor").launder_cooldown_remaining(),
     })
 
 
@@ -645,6 +646,52 @@ def consume():
     consume_type = request.get_json().get("type", "")
     if consume_type:
         bot.request_consume(consume_type)
+    return jsonify({"ok": True})
+
+
+@app.route("/consume-event", methods=["POST"])
+def consume_event():
+    name = request.get_json().get("name", "")
+    if name:
+        bot.request_event_consume(name)
+    return jsonify({"ok": True})
+
+
+@app.route("/journal-action", methods=["POST"])
+def journal_action():
+    data = request.get_json()
+    entry_id = data.get("entry_id", "")
+    action_url = data.get("action_url", "")
+    action_type = data.get("action_type", "")
+    if action_url:
+        bot.request_journal_action(entry_id, action_url, action_type)
+    return jsonify({"ok": True})
+
+
+@app.route("/clear-launder-cooldown", methods=["POST"])
+def clear_launder_cooldown():
+    import executor
+    executor.clear_launder_cooldown()
+    return jsonify({"ok": True})
+
+
+@app.route("/toggle-monitoring", methods=["POST"])
+def toggle_monitoring():
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "")
+    on = data.get("on", False)
+    if not username:
+        return jsonify({"error": "missing username"}), 400
+    import player_db
+    player_db.toggle_monitoring(username, on)
+    return jsonify({"ok": True})
+
+
+@app.route("/scrape-players", methods=["POST"])
+def scrape_players():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    bot.request_scrape_players()
     return jsonify({"ok": True})
 
 

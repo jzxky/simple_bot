@@ -21,9 +21,27 @@ import urls as _urls
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _journals_path(char_name: str) -> Path:
+def _journals_dir() -> Path:
     from paths import data_dir
-    return Path(data_dir()) / f"journals_{char_name}.json"
+    return Path(data_dir()) / "journals"
+
+
+def _journals_path(char_name: str) -> Path:
+    return _journals_dir() / f"journals_{char_name}.json"
+
+
+def _migrate_journal_files():
+    import shutil as _shutil
+    from paths import data_dir
+    d = Path(data_dir())
+    jdir = _journals_dir()
+    jdir.mkdir(exist_ok=True)
+    for f in d.glob("journals_*.json"):
+        dest = jdir / f.name
+        if not dest.exists():
+            _shutil.move(str(f), str(dest))
+
+_migrate_journal_files()
 
 
 def _load_journals(char_name: str) -> dict:
@@ -38,10 +56,11 @@ def _load_journals(char_name: str) -> dict:
 
 def _save_journals(char_name: str, data: dict):
     p = _journals_path(char_name)
+    p.parent.mkdir(exist_ok=True)
     p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def _parse_label(label) -> tuple[str, str, str]:
+def _parse_label(label) -> tuple[str, str, str, str]:
     """Return (entry_id, title, time_str, text) from a journal label element."""
     entry_id = label.get("for", "").strip()
     title_el = label.find("strong", class_="title")
@@ -55,6 +74,24 @@ def _parse_label(label) -> tuple[str, str, str]:
             el.decompose()
     text = re.sub(r"\s+", " ", label.get_text(" ", strip=True))
     return entry_id, title, time_str, text
+
+
+def _extract_action_urls(journal_row):
+    """Extract accept/decline URLs from sibling rows after a journal_row."""
+    accept_url = ""
+    decline_url = ""
+    sibling = journal_row.find_next_sibling("tr")
+    if not sibling:
+        return accept_url, decline_url
+    for a in sibling.find_all("a", href=True):
+        href = a["href"]
+        if "actionevent.asp" not in href:
+            continue
+        if "action=accept" in href:
+            accept_url = href if href.startswith("http") else href
+        elif "action=decline" in href:
+            decline_url = href if href.startswith("http") else href
+    return accept_url, decline_url
 
 
 # Journal markup differs in jail: rows/cells/new-marker use jail_-prefixed
@@ -217,3 +254,21 @@ class ArchiveJournalsTask(Task):
         except Exception:
             return
         executor.execute(Action("archive_journals", **params), state)
+
+
+class JournalActionTask(Task):
+    priority = 36
+    label = "Journal Action"
+
+    def __init__(self, action_queue: queue.Queue):
+        self._queue = action_queue
+
+    def can_run(self, state: GameState) -> bool:
+        return state.logged_in and not self._queue.empty()
+
+    def run(self, state: GameState, executor):
+        try:
+            params = self._queue.get_nowait()
+        except Exception:
+            return
+        executor.execute(Action("journal_action", **params), state)

@@ -35,12 +35,33 @@ def drug_manufacture_cooldown_active() -> bool:
     return time.monotonic() < _drug_manufacture_cooldown_until
 
 
+_gym_travel_cooldown_until: float = 0.0
+
+
+def gym_travel_cooldown_active() -> bool:
+    return time.monotonic() < _gym_travel_cooldown_until
+
+
 _launder_cooldown_until: float = 0.0
+_launder_cooldown_city: str = ""
 
 
-def launder_cooldown_active() -> bool:
-    """True while the laundering no-contact cooldown is in effect."""
-    return time.monotonic() < _launder_cooldown_until
+def launder_cooldown_active(current_city: str = "") -> bool:
+    if time.monotonic() >= _launder_cooldown_until:
+        return False
+    if current_city and _launder_cooldown_city and current_city != _launder_cooldown_city:
+        return False
+    return True
+
+
+def clear_launder_cooldown():
+    global _launder_cooldown_until, _launder_cooldown_city
+    _launder_cooldown_until = 0.0
+    _launder_cooldown_city = ""
+
+
+def launder_cooldown_remaining() -> int:
+    return max(0, int(_launder_cooldown_until - time.monotonic()))
 
 
 def _u(path: str) -> str:
@@ -3130,6 +3151,29 @@ def handle_check_drug_trade(action: Action, state: GameState):
 # Journal handlers
 # ---------------------------------------------------------------------------
 
+def _extract_action_urls_from_soup(soup, entry_id):
+    """Find accept/decline URLs for a journal entry by its ID."""
+    accept_url = decline_url = ""
+    label = soup.find("label", attrs={"for": entry_id})
+    if not label:
+        return accept_url, decline_url
+    row = label.find_parent("tr")
+    if not row:
+        return accept_url, decline_url
+    sibling = row.find_next_sibling("tr")
+    if not sibling:
+        return accept_url, decline_url
+    for a in sibling.find_all("a", href=True):
+        href = a["href"]
+        if "actionevent.asp" not in href:
+            continue
+        if "action=accept" in href:
+            accept_url = href
+        elif "action=decline" in href:
+            decline_url = href
+    return accept_url, decline_url
+
+
 def handle_check_journals(action: Action, state: GameState):
     from tasks.journal import (
         _load_journals, _save_journals, _parse_journal_rows,
@@ -3153,6 +3197,7 @@ def handle_check_journals(action: Action, state: GameState):
 
         for e in new_entries:
             if e["id"] not in data:
+                e["type"] = "events"
                 data[e["id"]] = e
                 changed = True
                 dispatch_journal_action(e, state)
@@ -3169,6 +3214,7 @@ def handle_check_journals(action: Action, state: GameState):
         # Backfill non-new entries on this final page
         for e in all_entries:
             if e["id"] not in data:
+                e["type"] = "events"
                 data[e["id"]] = e
                 changed = True
         break
@@ -3188,6 +3234,21 @@ def handle_check_journals(action: Action, state: GameState):
             pending_requests = int(m.group(1))
     if pending_requests > 0:
         _nav(_u("/journal/journal.asp?display=requests"), state)
+        req_soup = BeautifulSoup(state.page_html, "html.parser")
+        req_entries = _parse_journal_rows(req_soup)
+        for e in req_entries:
+            if e["id"] not in data:
+                e["type"] = "requests"
+                accept_url, decline_url = _extract_action_urls_from_soup(req_soup, e["id"])
+                if accept_url:
+                    e["accept_url"] = accept_url
+                if decline_url:
+                    e["decline_url"] = decline_url
+                data[e["id"]] = e
+                changed = True
+        if changed:
+            _save_journals(char, data)
+            state.journals_updated_at = time.time()
         state.add_log(f"Journals: {pending_requests} pending request(s) — checked requests page.")
 
     state.has_new_journals = False
@@ -3231,6 +3292,31 @@ def handle_archive_journals(action: Action, state: GameState):
     if changed:
         _save_journals(char, data)
         state.journals_updated_at = time.time()
+
+
+def handle_journal_action(action: Action, state: GameState):
+    action_url = action.params.get("url", "")
+    entry_id = action.params.get("entry_id", "")
+    action_type = action.params.get("action_type", "")
+    if not action_url:
+        state.add_log("Journal action: no URL provided.")
+        return
+    full = _u(action_url) if action_url.startswith("/") else (
+        action_url if action_url.startswith("http") else _u("/" + action_url)
+    )
+    _nav(full, state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    success = soup.find("div", id="success")
+    fail = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Journal {action_type} (#{entry_id}): {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Journal {action_type} (#{entry_id}): {fail.get_text(strip=True)}")
+    else:
+        text = soup.get_text(" ", strip=True)[:200]
+        state.add_log(f"Journal {action_type} (#{entry_id}): {text}")
 
 
 # ---------------------------------------------------------------------------
@@ -3648,14 +3734,17 @@ def handle_gym(action: Action, state: GameState):
         if not auto_travel:
             state.add_log("Gym: not in Chicago and auto-travel is off — skipping.")
             return
+        global _gym_travel_cooldown_until
         state.add_log("Gym: travelling to Chicago...")
         method = "own_vehicle"
         result = handle_travel(Action("travel", target_city=_CHICAGO, method=method), state)
         if result == 0:
-            state.add_log("Gym: travel to Chicago failed — skipping.")
+            _gym_travel_cooldown_until = time.monotonic() + 3600
+            state.add_log("Gym: travel to Chicago failed — skipping gym for 1 hour.")
             return
         if state.current_city != _CHICAGO:
-            state.add_log(f"Gym: still not in Chicago after travel ({state.current_city}) — skipping.")
+            _gym_travel_cooldown_until = time.monotonic() + 3600
+            state.add_log(f"Gym: still not in Chicago after travel ({state.current_city}) — skipping gym for 1 hour.")
             return
 
     # Navigate to gym page
@@ -4403,7 +4492,7 @@ def handle_event_boss(action: Action, state: GameState):
 
 
 def handle_launder_money(action: Action, state: GameState):
-    global _launder_cooldown_until
+    global _launder_cooldown_until, _launder_cooldown_city
     page = browser.page()
     _nav(_u("/income/laundering.asp"), state)
 
@@ -4422,6 +4511,7 @@ def handle_launder_money(action: Action, state: GameState):
 
     if not contacts:
         _launder_cooldown_until = time.monotonic() + 1800
+        _launder_cooldown_city = state.current_city
         state.add_log("Laundering: no contacts available — cooling down for 30 minutes.")
         return
 
@@ -4465,6 +4555,49 @@ def handle_launder_money(action: Action, state: GameState):
     _refresh_state(state)
 
     state.add_log(f"Laundering: submitted ${amount:,} through {chosen['name']}.")
+
+
+def handle_scrape_player(action: Action, state: GameState):
+    username = action.kwargs.get("username", "")
+    if not username:
+        return
+    url = f"{_urls.BASE_URL}/userprofile.asp?username={username}"
+    page = state.page
+    resp = page.goto(url, wait_until="domcontentloaded", timeout=15000)
+    if not resp or resp.status != 200:
+        state.add_log(f"Scrape: failed to load profile for {username}")
+        return
+    soup = _soup(page)
+    data = {}
+    for row in soup.find_all("tr"):
+        cells = row.find_all("td")
+        if len(cells) >= 2:
+            key = cells[0].get_text(strip=True).rstrip(":").lower()
+            val = cells[1].get_text(strip=True)
+            if key == "sex":
+                data["sex"] = val
+            elif key == "wealth":
+                data["wealth"] = val
+            elif key == "scripting":
+                data["scripting"] = val
+    gf_holder = soup.find(id="profile_gf_holder")
+    if gf_holder:
+        gf_text = gf_holder.get_text(strip=True)
+        if gf_text:
+            data["godfather"] = gf_text
+    crew_holder = soup.find(id="profile_crew_holder")
+    if crew_holder:
+        crew_text = crew_holder.get_text(strip=True)
+        if crew_text:
+            data["crew_name"] = crew_text
+    regime_holder = soup.find(id="regime_holder")
+    if regime_holder:
+        capo_names = [a.get_text(strip=True) for a in regime_holder.find_all("a") if a.get_text(strip=True)]
+        if capo_names:
+            data["capos"] = ", ".join(capo_names)
+    import player_db
+    player_db.update_scraped_data(username, data)
+    state.add_log(f"Scrape: updated profile for {username}")
 
 
 HANDLERS = {
@@ -4511,6 +4644,7 @@ HANDLERS = {
     "jailbreak_calloff": handle_jailbreak_calloff,
     "check_journals": handle_check_journals,
     "archive_journals": handle_archive_journals,
+    "journal_action": handle_journal_action,
     "check_drug_trade": handle_check_drug_trade,
     "check_warrants": handle_check_warrants,
     "turn_in_warrant": handle_turn_in_warrant,
@@ -4523,6 +4657,7 @@ HANDLERS = {
     "fetch_respect": handle_fetch_respect,
     "fetch_profile": handle_fetch_profile,
     "navigate": handle_navigate,
+    "scrape_player": handle_scrape_player,
 }
 
 

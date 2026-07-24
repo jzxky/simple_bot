@@ -9,3 +9,5 @@ data/
 *.db
 last_screenshot.png
 player_images/
+character_history/
+journals/

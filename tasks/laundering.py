@@ -22,7 +22,7 @@ class LaunderMoneyTask(Task):
         if "launder" in state.timers and not state.timer_ready("launder"):
             return False
         import executor
-        if executor.launder_cooldown_active():
+        if executor.launder_cooldown_active(state.current_city):
             return False
         return True
 

@@ -42,7 +42,7 @@ from tasks.character_history import CharacterHistoryTask
 from tasks.obituary_history import ObituaryHistoryTask
 from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJailBreakTask
 from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask, AutoJailConsumablesRestoreTask
-from tasks.journal import JournalCheckTask, ArchiveJournalsTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue
+from tasks.journal import JournalCheckTask, ArchiveJournalsTask, JournalActionTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue
 from tasks.drug_trade import DrugTradeTask
 from tasks.illness import IllnessTask
 from tasks.gym import GymTask
@@ -54,7 +54,8 @@ from tasks.online_age import OnlineAgeTask
 from tasks.bionics import BionicsTask
 from tasks.weapon_store import WeaponStoreTask
 from tasks.event_boss import EventBossTask
-from tasks.event_consume import EventConsumeTask
+from tasks.event_consume import EventConsumeTask, ManualEventConsumeTask
+from tasks.scrape_players import ScrapePlayersTask
 from tasks.crossroad import CrossroadTask
 from tasks.ws_monitor import WSMonitorTask
 from players import PlayerRefreshTask, SyncTask
@@ -78,6 +79,9 @@ _deposit_queue: queue.Queue = queue.Queue()
 _withdraw_queue: queue.Queue = queue.Queue()
 _char_history_queue: queue.Queue = queue.Queue()
 _jailbreak_plan_queue: queue.Queue = queue.Queue()
+_journal_action_queue: queue.Queue = queue.Queue()
+_event_consume_queue: queue.Queue = queue.Queue()
+_scrape_queue: queue.Queue = queue.Queue()
 _jailbreak_execute_queue: queue.Queue = queue.Queue()
 _jailbreak_calloff_queue: queue.Queue = queue.Queue()
 _archive_journals_queue: queue.Queue = queue.Queue()
@@ -219,6 +223,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(AutoJailConsumablesRestoreTask())
     sched.add(JournalCheckTask())
     sched.add(ArchiveJournalsTask(_archive_journals_queue))
+    sched.add(JournalActionTask(_journal_action_queue))
     sched.add(DrugTradeTask(_drug_trade_queue))
     sched.add(IllnessTask(_illness_queue))
     sched.add(GymTask())
@@ -233,6 +238,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(RespectTask())
     sched.add(EventBossTask())
     sched.add(EventConsumeTask())
+    sched.add(ManualEventConsumeTask(_event_consume_queue))
+    sched.add(ScrapePlayersTask(_scrape_queue))
     sched.add(CrossroadTask())
     sched.add(WSMonitorTask())
     sched.add(PlayerRefreshTask())
@@ -677,6 +684,18 @@ def request_auto_jail_check():
 
 def request_consume(consume_type: str):
     _consume_queue.put(consume_type)
+
+
+def request_event_consume(name: str):
+    _event_consume_queue.put(name)
+
+
+def request_scrape_players():
+    _scrape_queue.put(True)
+
+
+def request_journal_action(entry_id: str, action_url: str, action_type: str = ""):
+    _journal_action_queue.put({"entry_id": entry_id, "url": action_url, "action_type": action_type})
 
 
 def request_deposit():
