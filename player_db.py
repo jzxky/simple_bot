@@ -76,6 +76,13 @@ _MIGRATIONS = [
     ("players",  "died_at",               "TEXT DEFAULT ''"),
     ("players",  "born_at",               "TEXT DEFAULT ''"),
     ("players",  "pic_url",               "TEXT DEFAULT ''"),
+    ("players",  "monitoring",            "INTEGER DEFAULT 0"),
+    ("players",  "sex",                   "TEXT DEFAULT ''"),
+    ("players",  "wealth",                "TEXT DEFAULT ''"),
+    ("players",  "scripting",             "TEXT DEFAULT ''"),
+    ("players",  "godfather",             "TEXT DEFAULT ''"),
+    ("players",  "crew_name",             "TEXT DEFAULT ''"),
+    ("players",  "capos",                 "TEXT DEFAULT ''"),
 ]
 
 
@@ -215,7 +222,9 @@ def get_all_players() -> list:
             rows = con.execute(
                 """SELECT username, homecity, occupation, rank, active,
                           group_name, agg_crimes, case_work,
-                          character_age, jail_age, died_at, born_at, pic_url
+                          character_age, jail_age, died_at, born_at, pic_url,
+                          monitoring, sex, wealth, scripting, godfather,
+                          crew_name, capos, scraped_at
                    FROM players ORDER BY username COLLATE NOCASE"""
             ).fetchall()
             result = []
@@ -429,7 +438,7 @@ def mark_absent_dead(seen_names: set) -> int:
             for r in rows:
                 if r["username"] not in seen_names:
                     con.execute(
-                        "UPDATE players SET active=0, group_name='', died_at=?, assignments_updated_at=? WHERE username=?",
+                        "UPDATE players SET active=0, group_name='', monitoring=0, died_at=?, assignments_updated_at=? WHERE username=?",
                         (ts, ts, r["username"]),
                     )
                     marked += 1
@@ -812,3 +821,36 @@ def is_allowed(username: str, context: str, target_mode: str) -> bool:
     if target_mode == "not_blacklist":
         return assignment != "blacklist"
     return True
+
+
+def toggle_monitoring(username: str, on: bool):
+    with _lock:
+        con = _conn()
+        try:
+            con.execute("UPDATE players SET monitoring=? WHERE username=?", (1 if on else 0, username))
+            con.commit()
+        finally:
+            con.close()
+
+
+def get_monitored_players() -> list[str]:
+    with _lock:
+        con = _conn()
+        try:
+            rows = con.execute("SELECT username FROM players WHERE monitoring=1 AND active=1").fetchall()
+            return [r["username"] for r in rows]
+        finally:
+            con.close()
+
+
+def update_scraped_data(username: str, data: dict):
+    cols = ["sex", "wealth", "scripting", "godfather", "crew_name", "capos", "scraped_at"]
+    sets = ", ".join(f"{c}=?" for c in cols)
+    vals = [data.get(c, "") for c in cols[:-1]] + [_utcnow()]
+    with _lock:
+        con = _conn()
+        try:
+            con.execute(f"UPDATE players SET {sets} WHERE username=?", vals + [username])
+            con.commit()
+        finally:
+            con.close()

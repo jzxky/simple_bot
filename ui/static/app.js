@@ -971,7 +971,7 @@ function pollStatus() {
           evWrap.style.display = "";
           document.getElementById("stat-event-consumables").innerHTML =
             evNames.map(n =>
-              `<div class="consumable-item"><span class="consumable-name">${n}</span><span class="consumable-qty">${evc[n].qty}</span></div>`
+              `<div class="consumable-item"><span class="consumable-name">${n}</span><span class="consumable-qty ${_botRunning ? 'consumable-link' : ''}" onclick="${_botRunning ? `consumeEventItem('${n}')` : ''}">${evc[n].qty}</span></div>`
             ).join("");
         } else {
           evWrap.style.display = "none";
@@ -1081,6 +1081,19 @@ function pollStatus() {
       if ((d.journals_updated_at || 0) > _cjLastUpdated) {
         _cjLastUpdated = d.journals_updated_at;
         cjRefreshData();
+      }
+
+      // Launder cooldown
+      const lcdBar = document.getElementById("launder-cooldown-bar");
+      if (lcdBar) {
+        const lcd = d.launder_cooldown || 0;
+        if (lcd > 0) {
+          lcdBar.style.display = "flex";
+          const m = Math.ceil(lcd / 60);
+          document.getElementById("launder-cooldown-text").textContent = `Cooldown: ${m} min remaining`;
+        } else {
+          lcdBar.style.display = "none";
+        }
       }
 
       // Notifications
@@ -1495,6 +1508,18 @@ function consumeItem(type) {
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({type}),
   });
+}
+
+function consumeEventItem(name) {
+  fetch("/consume-event", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name}),
+  });
+}
+
+function clearLaunderCooldown() {
+  fetch("/clear-launder-cooldown", {method: "POST"});
 }
 
 function escHtml(s) {
@@ -2779,16 +2804,28 @@ function toggleLockedTraits() {
 let _cjData = [];         // full sorted journal list
 let _cjFiltered = [];     // after search filter
 let _cjPage = 1;
+let _cjSubTab = "events"; // "events" or "requests"
 let _cjLastUpdated = 0;   // last journals_updated_at seen from /status
 let _chLastUpdated = 0;   // last char_history_updated_at seen from /status
 const CJ_PAGE_SIZE = 10;
+
+function cjSwitchSub(tab, btn) {
+  _cjSubTab = tab;
+  document.querySelectorAll(".cj-journal-subtabs .tab-btn").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  cjSearch();
+}
+
+function _cjFilterByTab(entries) {
+  return entries.filter(e => (e.type || "events") === _cjSubTab);
+}
 
 function cjInit() {
   fetch("/journals")
     .then(r => r.json())
     .then(data => {
       _cjData = Object.values(data).sort((a, b) => new Date(b.time) - new Date(a.time));
-      _cjFiltered = _cjData;
+      _cjFiltered = _cjFilterByTab(_cjData);
       _cjPage = 1;
       cjRender();
     })
@@ -2804,8 +2841,7 @@ function cjRefreshData() {
       _cjData = Object.values(data).sort((a, b) => new Date(b.time) - new Date(a.time));
       const q = (document.getElementById("cj-search")?.value || "").toLowerCase().trim();
       if (!q) {
-        // No filter — update the visible list too
-        _cjFiltered = _cjData;
+        _cjFiltered = _cjFilterByTab(_cjData);
         cjRender();
       }
       // Filter active — _cjData is updated silently.
@@ -2816,11 +2852,12 @@ function cjRefreshData() {
 
 function cjSearch() {
   const q = (document.getElementById("cj-search").value || "").toLowerCase().trim();
+  let base = _cjFilterByTab(_cjData);
   if (!q) {
-    _cjFiltered = _cjData;
+    _cjFiltered = base;
   } else {
     const words = q.split(/\s+/).filter(Boolean);
-    _cjFiltered = _cjData.filter(e => {
+    _cjFiltered = base.filter(e => {
       const haystack = [(e.title || ""), (e.text || ""), (e.time || "")].join(" ").toLowerCase();
       return words.every(w => haystack.includes(w));
     });
@@ -2847,13 +2884,19 @@ function cjRender() {
   const start = (_cjPage - 1) * CJ_PAGE_SIZE;
   const slice = _cjFiltered.slice(start, start + CJ_PAGE_SIZE);
 
-  list.innerHTML = slice.map(e => `
-    <div class="cj-entry">
+  list.innerHTML = slice.map(e => {
+    let actions = "";
+    if (_cjSubTab === "requests") {
+      if (e.accept_url) actions += `<button class="action-btn" onclick="cjDoAction('${escHtml(e.id)}','${escHtml(e.accept_url)}','accept')">Accept</button>`;
+      if (e.decline_url) actions += `<button class="btn-secondary" onclick="cjDoAction('${escHtml(e.id)}','${escHtml(e.decline_url)}','decline')">Decline</button>`;
+    }
+    return `<div class="cj-entry" id="cje-${escHtml(e.id || '')}">
       <span class="cj-entry-title">${escHtml(e.title || "")}</span>
       <span class="cj-entry-time">${escHtml(e.time || "")}</span>
       <div class="cj-entry-text">${escHtml(e.text || "")}</div>
-    </div>
-  `).join("");
+      ${actions ? `<div class="cj-entry-actions" style="margin-top:4px;display:flex;gap:6px">${actions}</div>` : ""}
+    </div>`;
+  }).join("");
 
   // Pagination buttons
   let btns = "";
@@ -2877,6 +2920,25 @@ function cjRender() {
 function cjGoPage(n) {
   _cjPage = n;
   cjRender();
+}
+
+function cjDoAction(entryId, url, actionType) {
+  const row = document.getElementById("cje-" + entryId);
+  const btns = row ? row.querySelectorAll(".cj-entry-actions button") : [];
+  btns.forEach(b => b.disabled = true);
+  fetch("/journal-action", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({entry_id: entryId, action_url: url, action_type: actionType}),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (row) {
+        const act = row.querySelector(".cj-entry-actions");
+        if (act) act.innerHTML = `<span style="color:var(--muted);font-size:0.8rem">${escHtml(actionType)} sent</span>`;
+      }
+    })
+    .catch(() => { btns.forEach(b => b.disabled = false); });
 }
 
 // =============================================================================
@@ -2984,6 +3046,16 @@ function _plOccByName() {
   return m;
 }
 
+let _activeCareerFilter = "All";
+
+function plFilterCareer(career) {
+  _activeCareerFilter = career;
+  document.querySelectorAll(".pl-career-tab").forEach(b => {
+    b.classList.toggle("active", b.textContent.trim() === career);
+  });
+  plRenderActive();
+}
+
 function plRenderActive() {
   const content  = document.getElementById("pl-active-content");
   const legendEl = document.getElementById("pl-active-legend");
@@ -3009,13 +3081,20 @@ function plRenderActive() {
   ];
 
   content.innerHTML = groups.map(g => {
-    const names = g.names.slice().sort((a, b) => a.localeCompare(b));
+    let names = g.names.slice().sort((a, b) => a.localeCompare(b));
+    if (_activeCareerFilter !== "All") {
+      names = names.filter(n => {
+        const p = occ[n.toLowerCase()];
+        return p && _careerGroup(p.occupation) === _activeCareerFilter;
+      });
+    }
     const chips = names.length
       ? names.map(n => {
           const p     = occ[n.toLowerCase()];
           const color = p ? _careerColor(p.occupation) : _CAREER_COLORS["Other"];
           const title = p ? `${p.occupation || "?"} · ${p.homecity || "?"}` : "not in player DB";
-          return `<button class="pl-active-name" style="color:${color}" title="${escHtml(title)}"
+          const mayorCls = p && _careerGroup(p.occupation) === "Mayor" ? " pl-active-mayor" : "";
+          return `<button class="pl-active-name${mayorCls}" style="color:${color}" title="${escHtml(title)}"
                     onclick="plOpenActMenu(event, ${escJsStr(n)}, '${g.key}')">${escHtml(n)}</button>`;
         }).join("")
       : `<span class="pl-active-empty">None</span>`;
@@ -3064,8 +3143,8 @@ function plOpenActMenu(ev, username, groupKey) {
   const el = document.createElement("div");
   el.className = "pl-act-menu";
   el.innerHTML =
-    `<div class="pl-act-menu-head" style="color:${nameCol}">${escHtml(username)}</div>` +
-    `<div class="pl-act-info">${avatarHtml}<div class="pl-act-details">${rowsHtml}</div></div>` +
+    `<div class="pl-act-menu-top">${avatarHtml}<div class="pl-act-menu-head" style="color:${nameCol}">${escHtml(username)}</div></div>` +
+    `<div class="pl-act-details">${rowsHtml}</div>` +
     actions.map(([kind, label]) =>
       `<button class="pl-act-btn" onclick="plDoInteract('${kind}', ${escJsStr(username)})">${escHtml(label)}</button>`
     ).join("") +
@@ -3283,7 +3362,7 @@ function _plRenderTable() {
   const colorMap = _plGroupColorMap();
 
   if (_plFiltered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="12" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
     return;
   }
 
@@ -3319,10 +3398,11 @@ function _plRenderTable() {
       <td style="white-space:nowrap">${jailAgeCell}</td>
       <td>${aggCell}</td>
       <td>${cwCell}</td>
+      <td style="text-align:center"><input type="checkbox" ${p.monitoring ? 'checked' : ''} onclick="event.stopPropagation();plToggleMonitoring(${escJsStr(p.username)}, this.checked)"></td>
     </tr>`);
 
     if (expanded) {
-      rows.push(`<tr class="pl-detail-row"><td colspan="12"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
+      rows.push(`<tr class="pl-detail-row"><td colspan="13"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
     }
   });
   tbody.innerHTML = rows.join("");
@@ -3366,6 +3446,14 @@ function _plDetailHtml(p) {
     </select>
   </div>
 </div>
+${p.scraped_at ? `<div class="pl-detail-grid" style="margin-top:6px">
+  <div class="pl-detail-item"><span class="pl-detail-label">Sex</span>${escHtml(p.sex||"—")}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Wealth</span>${escHtml(p.wealth||"—")}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Scripting</span>${escHtml(p.scripting||"—")}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Godfather</span>${escHtml(p.godfather||"—")}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Crew</span>${escHtml(p.crew_name||"—")}</div>
+  <div class="pl-detail-item"><span class="pl-detail-label">Capos</span>${escHtml(p.capos||"—")}</div>
+</div>` : ''}
 <div class="pl-history-toggle" onclick="plLoadHistory(${escJsStr(p.username)}, '${histId}', this); event.stopPropagation()">
   ▸ Show Career History
 </div>
@@ -3625,6 +3713,33 @@ function _plRunWhitelistBolds() {
     .then(r => r.json())
     .then(d => { if (d.newly > 0) loadPlayers(); })
     .catch(() => {});
+}
+
+function plToggleMonitoring(username, on) {
+  fetch("/toggle-monitoring", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username, on}),
+  }).then(() => {
+    const p = _plData.find(x => x.username === username);
+    if (p) p.monitoring = on ? 1 : 0;
+  }).catch(() => {});
+}
+
+function plScrapePlayers() {
+  if (!_botRunning) { alert("Bot is not running."); return; }
+  const overlay = document.getElementById("pl-scrape-overlay");
+  if (overlay) overlay.style.display = "flex";
+}
+
+function plScrapeConfirm() {
+  const overlay = document.getElementById("pl-scrape-overlay");
+  if (overlay) overlay.style.display = "none";
+  fetch("/scrape-players", {method: "POST"}).catch(() => {});
+}
+
+function plScrapeCancel() {
+  const overlay = document.getElementById("pl-scrape-overlay");
+  if (overlay) overlay.style.display = "none";
 }
 
 // ── Refresh & import ──────────────────────────────────────────────────────────

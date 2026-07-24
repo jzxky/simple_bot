@@ -1373,6 +1373,10 @@
               oninput="markNumDirty(this)">
             <span style="font-size:0.8rem;color:var(--muted);margin-left:6px">Leave as 0 for launder max</span>
           </div>
+          <div id="launder-cooldown-bar" style="display:none;margin-bottom:8px;padding:6px 10px;background:var(--bg-alt);border-radius:6px;align-items:center;gap:8px">
+            <span id="launder-cooldown-text" style="font-size:0.85rem;color:var(--muted)"></span>
+            <button type="button" class="btn-secondary" onclick="clearLaunderCooldown()" style="font-size:0.75rem;padding:2px 8px">Clear</button>
+          </div>
           <hr class="stat-divider">
           <div style="margin-bottom:8px">
             <label for="launder_contact_select">Preferred Contacts</label>
@@ -1416,6 +1420,10 @@
 
         <!-- Journals tab -->
         <div id="cj-journals" class="tab-panel">
+          <div class="cj-journal-subtabs" style="display:flex;gap:6px;margin-bottom:8px">
+            <button class="tab-btn active" id="cj-sub-events" onclick="cjSwitchSub('events',this)">Events</button>
+            <button class="tab-btn" id="cj-sub-requests" onclick="cjSwitchSub('requests',this)">Requests</button>
+          </div>
           <div class="cj-search-row">
             <input type="text" id="cj-search" class="task-select" placeholder="Search title, text or time…"
               oninput="cjSearch()" style="flex:1;min-width:0;">
@@ -1471,6 +1479,7 @@
             <button class="btn-secondary" onclick="plRefresh()" id="pl-refresh-btn">Refresh</button>
             <span id="pl-refresh-status" style="font-size:0.8rem;color:var(--error,#f87171)"></span>
             <button class="btn-secondary" onclick="window.open('/players','_blank')" title="Open player list in new tab">↗</button>
+            <button class="btn-secondary" onclick="plScrapePlayers()" title="Scrape monitored player profiles">Scrape Monitored</button>
             </div>
             <label class="inline-toggle" style="white-space:nowrap">Active only
               <label class="toggle-label">
@@ -1495,6 +1504,7 @@
                   <th class="pl-th pl-th-filter" onclick="plSort('jail_age')" data-col="jail_age">Jail Age <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('agg_crimes')" data-col="agg_crimes">Agg <span class="pl-sort-icon">↕</span></th>
                   <th class="pl-th pl-th-filter" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
+                  <th class="pl-th" style="width:24px" title="Monitor">Mon</th>
                 </tr>
                 <tr id="pl-filter-row">
                   <th class="pl-filter-cell"><select id="pl-filter-online" class="pl-filter-input" onchange="plFilter()">
@@ -1524,6 +1534,7 @@
                     <option value="whitelist">Whitelist</option>
                     <option value="blacklist">Blacklist</option>
                   </select></th>
+                  <th class="pl-filter-cell"></th>
                 </tr>
               </thead>
               <tbody id="pl-tbody"></tbody>
@@ -1536,6 +1547,20 @@
           <div class="pl-active-toolbar">
             <span class="pl-active-hint">Click a name for interaction options. Lists update automatically.</span>
             <div id="pl-active-legend" class="pl-active-legend"></div>
+          </div>
+          <div class="pl-career-tabs" id="pl-career-tabs">
+            <button class="pl-career-tab active" onclick="plFilterCareer('All')">All</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Gangster')">Gangster</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Police')">Police</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Law')">Law</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Customs')">Customs</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Hospital')">Hospital</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Engineering')">Engineering</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Fire')">Fire</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Bank')">Bank</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Funeral')">Funeral</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Mayor')">Mayor</button>
+            <button class="pl-career-tab" onclick="plFilterCareer('Unemployed')">Unemployed</button>
           </div>
           <div id="pl-active-content"></div>
         </div>
@@ -1640,6 +1665,13 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+      <div id="pl-scrape-overlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;border-radius:8px">
+        <div style="background:var(--surface);padding:20px;border-radius:8px;max-width:340px;text-align:center">
+          <p style="margin-bottom:12px">This will visit each monitored player's profile and could tie up the bot for a few minutes. Proceed?</p>
+          <button class="action-btn" onclick="plScrapeConfirm()">Confirm</button>
+          <button class="btn-secondary" onclick="plScrapeCancel()" style="margin-left:8px">Cancel</button>
         </div>
       </div>
     </section>

@@ -12,6 +12,7 @@ Stock counts come from the last bossevent.asp visit (EventBossTask); consuming
 decrements the local count so we don't over-retry between visits.
 """
 
+import queue
 import time
 
 import config as cfg
@@ -72,3 +73,25 @@ class EventConsumeTask(Task):
             return
         name, url = picked
         executor.execute(Action("event_consume", name=name, url=url), state)
+
+
+class ManualEventConsumeTask(Task):
+    priority = 59
+    label = "Manual Event Consume"
+
+    def __init__(self, eq: queue.Queue):
+        self._queue = eq
+
+    def can_run(self, state: GameState) -> bool:
+        return state.logged_in and not state.in_jail and not self._queue.empty()
+
+    def run(self, state: GameState, executor):
+        try:
+            name = self._queue.get_nowait()
+        except Exception:
+            return
+        ec = (state.event_consumables or {}).get(name)
+        if not ec or not ec.get("url"):
+            state.add_log(f"Event consume: no URL for {name}")
+            return
+        executor.execute(Action("event_consume", name=name, url=ec["url"]), state)

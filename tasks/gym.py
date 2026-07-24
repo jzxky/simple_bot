@@ -52,9 +52,10 @@ class GymTask(Task):
                 return False
             if not gym_cfg.get("auto_travel", False):
                 return False
-            # Don't keep retrying auto-travel while warrants block it
             import executor
             if executor.travel_warrant_cooldown_active():
+                return False
+            if executor.gym_travel_cooldown_active():
                 return False
         elapsed_hours = (time.time() - load_last_gym_use()) / 3600
         return elapsed_hours >= _GYM_COOLDOWN_HOURS

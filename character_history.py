@@ -3,16 +3,19 @@ Fetch, parse, and cache character history from playerstats.asp.
 Stored as JSON in the data directory.
 """
 
+import glob
 import json
 import os
 import re
+import shutil
 from datetime import datetime
 from bs4 import BeautifulSoup
 import browser
 import urls
 import paths
 
-CACHE_PATH = os.path.join(paths.data_dir(), "character_history.json")  # legacy / current character
+_CH_DIR = os.path.join(paths.data_dir(), "character_history")
+CACHE_PATH = os.path.join(_CH_DIR, "character_history.json")
 
 
 def _safe(name: str) -> str:
@@ -20,7 +23,21 @@ def _safe(name: str) -> str:
 
 
 def _per_char_path(name: str) -> str:
-    return os.path.join(paths.data_dir(), f"chistory_{_safe(name)}.json")
+    return os.path.join(_CH_DIR, f"chistory_{_safe(name)}.json")
+
+
+def _migrate_ch_files():
+    os.makedirs(_CH_DIR, exist_ok=True)
+    d = paths.data_dir()
+    old_legacy = os.path.join(d, "character_history.json")
+    if os.path.exists(old_legacy) and not os.path.exists(CACHE_PATH):
+        shutil.move(old_legacy, CACHE_PATH)
+    for f in glob.glob(os.path.join(d, "chistory_*.json")):
+        dest = os.path.join(_CH_DIR, os.path.basename(f))
+        if not os.path.exists(dest):
+            shutil.move(f, dest)
+
+_migrate_ch_files()
 
 
 def has_saved(name: str) -> bool:
@@ -215,7 +232,7 @@ def load(name: str = "") -> dict:
 def list_saved() -> list:
     """Return the names of all saved character histories (sorted)."""
     names = set()
-    d = paths.data_dir()
+    d = _CH_DIR
     try:
         entries = os.listdir(d)
     except FileNotFoundError:
