@@ -4561,7 +4561,7 @@ def handle_scrape_player(action: Action, state: GameState):
     username = action.params.get("username", "")
     if not username:
         return
-    url = f"{_urls.BASE_URL}/userprofile.asp?username={username}"
+    url = f"{urls.BASE_URL}/userprofile.asp?username={username}"
     page = state.page
     resp = page.goto(url, wait_until="domcontentloaded", timeout=15000)
     if not resp or resp.status != 200:
