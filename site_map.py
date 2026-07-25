@@ -175,7 +175,7 @@ def crawl(page, index: dict, dry_run: bool):
 
 def run(email: str, password: str, dry_run: bool = False):
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         ctx = browser.new_context(user_agent=MOBILE_UA)
         page = ctx.new_page()
 
