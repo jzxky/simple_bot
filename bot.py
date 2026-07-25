@@ -694,6 +694,10 @@ def request_scrape_players():
     _scrape_queue.put(True)
 
 
+def request_scrape_player(username: str):
+    _scrape_queue.put(username)
+
+
 def request_journal_action(entry_id: str, action_url: str, action_type: str = ""):
     _journal_action_queue.put({"entry_id": entry_id, "url": action_url, "action_type": action_type})
 

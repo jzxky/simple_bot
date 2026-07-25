@@ -17,8 +17,13 @@ class ScrapePlayersTask(Task):
 
     def run(self, state: GameState, executor):
         try:
-            self._queue.get_nowait()
+            item = self._queue.get_nowait()
         except Exception:
+            return
+        if isinstance(item, str):
+            state.add_log(f"Scrape: starting for {item}")
+            executor.execute(Action("scrape_player", username=item), state)
+            state.add_log(f"Scrape: finished for {item}")
             return
         names = player_db.get_monitored_players()
         if not names:

@@ -3457,7 +3457,41 @@ ${p.scraped_at ? `<div class="pl-detail-grid" style="margin-top:6px">
 <div class="pl-history-toggle" onclick="plLoadHistory(${escJsStr(p.username)}, '${histId}', this); event.stopPropagation()">
   ▸ Show Career History
 </div>
-<div id="${histId}" style="display:none"></div>`;
+<div id="${histId}" style="display:none"></div>
+<button class="btn-secondary" id="plupdate-${escHtml(p.username)}" style="margin-top:6px"
+        onclick="plUpdatePlayer(${escJsStr(p.username)}, this); event.stopPropagation()">Update</button>`;
+}
+
+function plUpdatePlayer(username, btn) {
+  if (!_botRunning) { alert("Bot is not running."); return; }
+  const prevScrapedAt = (_plData.find(p => p.username === username) || {}).scraped_at;
+  if (btn) { btn.disabled = true; btn.textContent = "Updating…"; }
+  fetch(`/players/${encodeURIComponent(username)}/scrape`, {method: "POST"})
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) {
+        alert(d.error);
+        if (btn) { btn.disabled = false; btn.textContent = "Update"; }
+        return;
+      }
+      _plPollForScrapeUpdate(username, prevScrapedAt, btn, 0);
+    })
+    .catch(() => { if (btn) { btn.disabled = false; btn.textContent = "Update"; } });
+}
+
+function _plPollForScrapeUpdate(username, prevScrapedAt, btn, attempt) {
+  fetch("/api/players").then(r => r.json()).then(d => {
+    const players = d.players || [];
+    const p = players.find(pl => pl.username === username);
+    const updated = p && p.scraped_at && p.scraped_at !== prevScrapedAt;
+    if (updated || attempt >= 15) {
+      loadPlayers();
+      return;
+    }
+    setTimeout(() => _plPollForScrapeUpdate(username, prevScrapedAt, btn, attempt + 1), 2000);
+  }).catch(() => {
+    if (btn) { btn.disabled = false; btn.textContent = "Update"; }
+  });
 }
 
 function plLoadHistory(username, containerId, toggleEl) {

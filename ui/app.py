@@ -695,6 +695,14 @@ def scrape_players():
     return jsonify({"ok": True})
 
 
+@app.route("/players/<username>/scrape", methods=["POST"])
+def scrape_player(username):
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    bot.request_scrape_player(username)
+    return jsonify({"ok": True})
+
+
 @app.route("/deposit", methods=["POST"])
 def deposit():
     if not bot.is_running():
