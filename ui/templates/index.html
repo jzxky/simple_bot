@@ -1267,6 +1267,21 @@
                 </label>
               </div>
             </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>UI Access PIN</h3>
+              <label class="setting-row">
+                <span>Require PIN for UI access</span>
+                <label class="toggle-label"><input type="checkbox" id="pin_required" {% if pin_required %}checked{% endif %} onchange="autoSave(); togglePinInput()"><span class="toggle"></span></label>
+              </label>
+              <div class="row" id="pin_input_row" style="{% if not pin_required %}display:none{% endif %}">
+                <label>PIN
+                  <div class="input-with-btn">
+                    <input type="password" id="ui_pin" value="{{ ui_pin }}" oninput="markCredsDirty()">
+                    <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('ui_pin', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
