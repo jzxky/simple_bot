@@ -500,12 +500,15 @@
                   <option value="10,5" {% if cur_term == '10,5' %}selected{% endif %}>10 Hours @ 5%</option>
                 </select>
               </div>
-              <div class="setting-row" style="margin-bottom:10px">
+              <div class="setting-row" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
                 <label for="banking_invest_amount">Amount to Invest</label>
                 <input type="text" inputmode="numeric" id="banking_invest_amount" class="input-narrow" style="width:150%"
                   value="{{ config.get('banking', {}).get('invest_amount', 0) }}"
                   oninput="markNumDirty(this)">
-                <span style="font-size:0.8rem;color:var(--muted);margin-left:6px">Max: 1,500,000</span>
+                <span style="font-size:0.8rem;color:var(--muted);white-space:nowrap">Max: 1,500,000</span>
+              </div>
+              <div id="banking-mature-date-row" style="margin-bottom:10px;font-size:0.85rem;color:var(--muted)">
+                Mature Date: <span id="banking-mature-date">N/A</span>
               </div>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">

@@ -1056,6 +1056,18 @@ function pollStatus() {
         }
       }
 
+      // Banking mature date
+      const matureEl = document.getElementById("banking-mature-date");
+      if (matureEl) {
+        const matureAt = d.banking_mature_at || 0;
+        if (matureAt <= 0) {
+          matureEl.textContent = "N/A";
+        } else {
+          const dt = new Date(matureAt * 1000);
+          matureEl.textContent = dt.toLocaleString();
+        }
+      }
+
       // Bionics store visits + next check
       const bionicsViewsEl = document.getElementById("bionics-views");
       const bionicsNextEl  = document.getElementById("bionics-next-check");
