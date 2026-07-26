@@ -557,7 +557,6 @@ function _updateIncomeTabColors() {
     ["income-tab-earns",      "earns_enabled"],
     ["income-tab-crimes",     "crimes_enabled"],
     ["income-tab-actions",    "action_enabled"],
-    ["income-tab-laundering", "laundering_enabled"],
     ["income-tab-banking",    "banking_auto_invest_enabled"],
   ];
   tabs.forEach(([tabId, toggleId]) => {
