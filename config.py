@@ -119,6 +119,11 @@ DEFAULT_CONFIG = {
         "bet_amount": 100,
         "auto_travel": False,
     },
+    "banking": {
+        "auto_invest_enabled": False,
+        "investment_term": "3,2.25",
+        "invest_amount": 0,
+    },
     "smart_travel": {
         "enabled": False,
         "store_priority": "bionics",       # "bionics" | "weapon" — overlap tie-break

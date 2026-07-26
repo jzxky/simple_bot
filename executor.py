@@ -2472,6 +2472,69 @@ def handle_deposit(action: Action, state: GameState):
     state.add_log(f"Deposit: deposited ${amount:,}.")
 
 
+def handle_bank_invest(action: Action, state: GameState):
+    import re
+    from datetime import datetime
+    from tasks.banking import save_mature_date, load_mature_date
+    import config as cfg
+
+    bank_cfg = cfg.load().get("banking", {})
+    term = bank_cfg.get("investment_term", "3,2.25")
+    raw_amount = str(bank_cfg.get("invest_amount", 0))
+    amount = int(re.sub(r"[^0-9]", "", raw_amount) or "0")
+    if amount < 1:
+        state.add_log("Banking: invest amount must be at least $1.")
+        return
+    amount = min(amount, 1500000)
+
+    INVEST_URL = _u("/income/bank.asp?option=invest")
+    page = browser.page()
+    page.goto(INVEST_URL, wait_until="domcontentloaded", timeout=15000)
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    mature_td = None
+    for td in soup.find_all("td"):
+        strong = td.find("strong")
+        if strong and "Mature Date" in strong.get_text():
+            mature_td = td
+            break
+    if mature_td:
+        raw_text = mature_td.get_text(separator=" ", strip=True)
+        date_text = raw_text.replace("Mature Date:", "").strip()
+        if date_text and date_text != "N/A":
+            try:
+                mature_dt = datetime.strptime(date_text, "%m/%d/%Y %I:%M:%S %p")
+                mature_ts = mature_dt.timestamp()
+                if mature_ts > time.time():
+                    save_mature_date(mature_ts)
+                    state.add_log(f"Banking: investment still active, matures at {date_text}.")
+                    return
+            except ValueError:
+                pass
+
+    page.select_option("select[name='terms']", term)
+    page.fill("input[name='amount']", str(amount))
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded", timeout=10000)
+
+    page.goto(INVEST_URL, wait_until="domcontentloaded", timeout=15000)
+    soup = BeautifulSoup(page.content(), "html.parser")
+    for td in soup.find_all("td"):
+        strong = td.find("strong")
+        if strong and "Mature Date" in strong.get_text():
+            raw_text = td.get_text(separator=" ", strip=True)
+            date_text = raw_text.replace("Mature Date:", "").strip()
+            if date_text and date_text != "N/A":
+                try:
+                    mature_dt = datetime.strptime(date_text, "%m/%d/%Y %I:%M:%S %p")
+                    save_mature_date(mature_dt.timestamp())
+                    state.add_log(f"Banking: invested ${amount:,} at term {term}, matures at {date_text}.")
+                except ValueError:
+                    state.add_log(f"Banking: invested ${amount:,} at term {term}.")
+                return
+    state.add_log(f"Banking: invested ${amount:,} at term {term}.")
+
+
 def _stash_held_weapon(state: GameState, label: str) -> bool:
     """Navigate to profile, check home city + apartment, then stash weapon in slot #1."""
     page = browser.page()
@@ -4651,6 +4714,7 @@ HANDLERS = {
     "apply_illness_treatment": handle_apply_illness_treatment,
     "do_gym": handle_gym,
     "play_casino": handle_casino,
+    "do_bank_invest": handle_bank_invest,
     "check_vehicle": handle_check_vehicle,
     "repair_vehicle": handle_repair_vehicle,
     "travel": handle_travel,
