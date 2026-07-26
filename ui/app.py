@@ -518,6 +518,14 @@ def _get_casino_release_at() -> float:
         return 0.0
 
 
+def _get_banking_mature_at() -> float:
+    try:
+        from tasks.banking import load_mature_date
+        return load_mature_date()
+    except Exception:
+        return 0.0
+
+
 def _get_bionics_next_check_at(state) -> "float | None":
     import time as _time
     task = bot.get_bionics_task()
@@ -650,6 +658,7 @@ def status():
         "respect_last_check": _get_respect_data().get("last_check", 0.0),
         "notifications": bot.state.notifications,
         "launder_cooldown": __import__("executor").launder_cooldown_remaining(),
+        "banking_mature_at": _get_banking_mature_at(),
     })
 
 

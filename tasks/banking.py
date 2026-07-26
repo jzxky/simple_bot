@@ -42,7 +42,13 @@ class BankingInvestTask(Task):
         bank_cfg = cfg.load().get("banking", {})
         if not bank_cfg.get("auto_invest_enabled", False):
             return False
-        return time.time() >= load_mature_date()
+        mature_at = load_mature_date()
+        if mature_at <= 0:
+            return True
+        server_now = state._estimated_server_time()
+        if server_now is None:
+            return False
+        return server_now.timestamp() >= mature_at
 
     def run(self, state: GameState, executor):
         executor.execute(Action("do_bank_invest"), state)

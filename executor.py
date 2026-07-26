@@ -2505,7 +2505,8 @@ def handle_bank_invest(action: Action, state: GameState):
             try:
                 mature_dt = datetime.strptime(date_text, "%m/%d/%Y %I:%M:%S %p")
                 mature_ts = mature_dt.timestamp()
-                if mature_ts > time.time():
+                server_now = state._estimated_server_time()
+                if server_now and mature_dt > server_now:
                     save_mature_date(mature_ts)
                     state.add_log(f"Banking: investment still active, matures at {date_text}.")
                     return
