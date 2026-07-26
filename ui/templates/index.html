@@ -139,6 +139,7 @@
           <button class="tab-btn" id="income-tab-actions" onclick="showTab('income-actions', this)">Actions</button>
           <button class="tab-btn" onclick="showTab('income-casework', this)">Case Work</button>
           <button class="tab-btn" id="income-tab-laundering" onclick="showTab('income-laundering', this)">Laundering</button>
+          <button class="tab-btn" id="income-tab-banking" onclick="showTab('income-banking', this)">Banking</button>
           <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)">Jail</button>
         </div>
         <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
@@ -518,6 +519,40 @@
               <button type="button" class="btn-danger-sm" onclick="removeLaunderContact(this)" style="font-size:0.75rem;padding:1px 6px">✕</button>
             </div>
             {% endfor %}
+          </div>
+        </div>
+
+        <div id="income-banking" class="tab-panel">
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Auto Invest</h3>
+              <label class="inline-toggle setting-row" style="margin-bottom:12px">
+                Auto-Invest
+                <label class="toggle-label">
+                  <input type="checkbox" id="banking_auto_invest_enabled"
+                    {% if config.get('banking', {}).get('auto_invest_enabled') %}checked{% endif %}
+                    onchange="autoSave(); _updateIncomeTabColors()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row" style="margin-bottom:10px">
+                <label for="banking_investment_term">Investment Term</label>
+                <select id="banking_investment_term" onchange="autoSave()">
+                  {% set cur_term = config.get('banking', {}).get('investment_term', '3,2.25') %}
+                  <option value="3,2.25" {% if cur_term == '3,2.25' %}selected{% endif %}>3 Hours @ 2.25%</option>
+                  <option value="5,3" {% if cur_term == '5,3' %}selected{% endif %}>5 Hours @ 3.0%</option>
+                  <option value="7,3.75" {% if cur_term == '7,3.75' %}selected{% endif %}>7 Hours @ 3.75%</option>
+                  <option value="10,5" {% if cur_term == '10,5' %}selected{% endif %}>10 Hours @ 5%</option>
+                </select>
+              </div>
+              <div class="setting-row" style="margin-bottom:10px">
+                <label for="banking_invest_amount">Amount to Invest</label>
+                <input type="number" id="banking_invest_amount" class="input-narrow" min="0" max="1500000"
+                  value="{{ config.get('banking', {}).get('invest_amount', 0) }}"
+                  oninput="markNumDirty(this)">
+                <span style="font-size:0.8rem;color:var(--muted);margin-left:6px">Max: 1,500,000</span>
+              </div>
+            </div>
           </div>
         </div>
 

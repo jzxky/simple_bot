@@ -274,6 +274,13 @@ def _apply_payload(c: dict, data: dict) -> dict:
     if data.get("engineering_tasks"):
         c["case_work"]["engineering"]["tasks"] = data["engineering_tasks"]
 
+    import re as _re
+    c.setdefault("banking", {})
+    c["banking"]["auto_invest_enabled"] = data.get("banking_auto_invest_enabled", False)
+    c["banking"]["investment_term"] = data.get("banking_investment_term", "3,2.25")
+    raw_amt = _re.sub(r"[^0-9]", "", str(data.get("banking_invest_amount", 0) or "0"))
+    c["banking"]["invest_amount"] = min(int(raw_amt or 0), 1500000)
+
     c.setdefault("notifications", {})
     for slug, _ in NOTIFICATION_EVENTS:
         c["notifications"][slug] = data.get(f"notif_{slug}", False)
