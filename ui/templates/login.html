@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MafiaMatrix Bot – Login</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .login-wrapper { display:flex; justify-content:center; align-items:center; min-height:80vh; }
+  .login-card { background:var(--card-bg, #23232a); border-radius:10px; padding:2rem 2.5rem; min-width:300px; max-width:380px; width:100%; box-shadow:0 2px 16px rgba(0,0,0,.3); }
+  .login-card h2 { margin:0 0 1.2rem; text-align:center; }
+  .login-card input[type="password"] { width:100%; padding:.55rem .7rem; border-radius:6px; border:1px solid var(--border, #3a3a44); background:var(--input-bg, #18181d); color:var(--fg, #eee); font-size:1rem; box-sizing:border-box; }
+  .login-card button { width:100%; margin-top:1rem; padding:.6rem; border:none; border-radius:6px; background:var(--accent, #5b8af5); color:#fff; font-size:1rem; cursor:pointer; }
+  .login-card button:hover { opacity:.9; }
+  .login-error { color:#e55; text-align:center; margin-top:.8rem; font-size:.9rem; }
+</style>
+</head>
+<body>
+<div class="login-wrapper">
+  <form class="login-card" method="POST" action="/login">
+    <h2>Enter PIN</h2>
+    <input type="password" name="pin" autofocus placeholder="PIN" required>
+    <button type="submit">Unlock</button>
+    {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
+  </form>
+</div>
+</body>
+</html>

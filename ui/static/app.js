@@ -220,6 +220,8 @@ function _buildPayload() {
   return {
     email: document.getElementById("email").value,
     password: document.getElementById("password").value,
+    pin_required: document.getElementById("pin_required").checked,
+    ui_pin: document.getElementById("ui_pin").value,
     earns_enabled: document.getElementById("earns_enabled").checked,
     earn_type: document.getElementById("earn_type").value,
     earn_planner_limits: _earnPlannerLimits,
@@ -1427,6 +1429,11 @@ function clearEarnQueue() {
   fetch("/clear_earn_queue", { method: "POST" })
     .then(r => r.json())
     .finally(() => { btn.disabled = false; });
+}
+
+function togglePinInput() {
+  const row = document.getElementById("pin_input_row");
+  if (row) row.style.display = document.getElementById("pin_required").checked ? "" : "none";
 }
 
 function toggleFieldVisibility(id, btn) {

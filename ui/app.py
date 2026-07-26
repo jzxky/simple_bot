@@ -8,7 +8,7 @@ import subprocess
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, render_template, request, jsonify, abort, send_file
+from flask import Flask, render_template, request, jsonify, abort, send_file, session, redirect, url_for
 import config as cfg
 import bot
 import paths
@@ -38,12 +38,43 @@ _ui_root = os.path.join(paths.resource_dir(), "ui")
 app = Flask(__name__,
             template_folder=os.path.join(_ui_root, "templates"),
             static_folder=os.path.join(_ui_root, "static"))
+app.secret_key = cfg.get_or_create_secret_key()
+
+
+@app.before_request
+def require_pin():
+    if not cfg.get_pin_required():
+        return
+    if request.endpoint in ("login", "static"):
+        return
+    if not session.get("authenticated"):
+        return redirect(url_for("login"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if not cfg.get_pin_required():
+        return redirect(url_for("index"))
+    error = None
+    if request.method == "POST":
+        if request.form.get("pin") == cfg.get_pin():
+            session["authenticated"] = True
+            return redirect(url_for("index"))
+        error = "Incorrect PIN"
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.route("/")
 def index():
     c = cfg.load()
-    return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS)
+    return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS,
+                           pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin())
 
 
 def _merge_changed(target: dict, before: dict, after: dict):
@@ -270,13 +301,18 @@ def save():
         c = c_live
         creds_changed = (data.get("email") != base.get("email")
                          or data.get("password") != base.get("password"))
+        pin_changed = (data.get("pin_required") != base.get("pin_required")
+                       or data.get("ui_pin") != base.get("ui_pin"))
     else:
         # Legacy full apply (no base sent — e.g. very first save).
         c = _apply_payload(c_live, data)
         creds_changed = True
+        pin_changed = True
 
-    if creds_changed:
-        cfg.save_env(data.get("email", ""), data.get("password", ""))
+    if creds_changed or pin_changed:
+        cfg.save_env(data.get("email", ""), data.get("password", ""),
+                     pin_required=data.get("pin_required"),
+                     pin=data.get("ui_pin"))
 
     if c.get("jail", {}).get("duty", "laundry") != prev_duty and bot.is_running():
         bot.request_clear_jail_duty_queue()

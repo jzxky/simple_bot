@@ -275,13 +275,16 @@ def get_env_var(key: str, default: str = "") -> str:
     return os.environ.get(key, default)
 
 
-def save_env(email: str, password: str):
-    # Read existing .env, update only MM_EMAIL/MM_PASSWORD, preserve all other lines
+def save_env(email: str, password: str, pin_required: bool = None, pin: str = None):
     lines = []
     if os.path.exists(ENV_PATH):
         with open(ENV_PATH) as f:
             lines = f.readlines()
     managed = {"MM_EMAIL": email, "MM_PASSWORD": password}
+    if pin_required is not None:
+        managed["UI_PIN_REQUIRED"] = "true" if pin_required else "false"
+    if pin is not None:
+        managed["UI_PIN"] = pin
     seen = set()
     new_lines = []
     for line in lines:
@@ -298,6 +301,49 @@ def save_env(email: str, password: str):
     for key, val in managed.items():
         if key not in seen:
             new_lines.append(f"{key}={val}\n")
+    with _lock:
+        with open(ENV_PATH, "w") as f:
+            f.writelines(new_lines)
+
+
+def get_pin_required() -> bool:
+    return get_env_var("UI_PIN_REQUIRED", "false").lower() == "true"
+
+
+def get_pin() -> str:
+    return get_env_var("UI_PIN", "")
+
+
+def get_or_create_secret_key() -> str:
+    key = get_env_var("UI_SECRET_KEY", "")
+    if key:
+        return key
+    import secrets
+    key = secrets.token_hex(32)
+    save_env_single("UI_SECRET_KEY", key)
+    return key
+
+
+def save_env_single(key: str, value: str):
+    lines = []
+    if os.path.exists(ENV_PATH):
+        with open(ENV_PATH) as f:
+            lines = f.readlines()
+    found = False
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            new_lines.append(line)
+            continue
+        k = stripped.split("=", 1)[0].strip()
+        if k == key:
+            new_lines.append(f"{key}={value}\n")
+            found = True
+        else:
+            new_lines.append(line)
+    if not found:
+        new_lines.append(f"{key}={value}\n")
     with _lock:
         with open(ENV_PATH, "w") as f:
             f.writelines(new_lines)
