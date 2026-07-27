@@ -1701,12 +1701,11 @@ function _appendLaunderContactItem(name) {
   if (!list) return;
   const existing = _getLaunderContacts();
   if (existing.some(n => n.toLowerCase() === name.toLowerCase())) return;
-  const div = document.createElement("div");
-  div.className = "launder-contact-item";
-  div.dataset.name = name;
-  div.style.cssText = "display:flex;align-items:center;gap:6px;padding:3px 0";
-  div.innerHTML = `<span>${name}</span><button type="button" class="btn-danger-sm" onclick="removeLaunderContact(this)" style="font-size:0.75rem;padding:1px 6px">✕</button>`;
-  list.appendChild(div);
+  const tr = document.createElement("tr");
+  tr.className = "launder-contact-item";
+  tr.dataset.name = name;
+  tr.innerHTML = `<td style="padding:3px 12px 3px 0">${name}</td><td style="padding:3px 0"><button type="button" class="btn-danger-sm" onclick="removeLaunderContact(this)" style="font-size:0.75rem;padding:1px 6px">✕</button></td>`;
+  list.appendChild(tr);
 }
 
 function _getLaunderContacts() {
