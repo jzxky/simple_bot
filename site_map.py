@@ -40,7 +40,7 @@ URLS = {
     "police_training":     BASE + "/localcity/policerecruit.asp",
     "drug_house":          BASE + "/income/drughouse.asp",
     "university":          BASE + "/localcity/university.asp",
-    "training_centre":     BASE + "/localcity/trainingcentre.asp",
+    "training_centre":     BASE + "/localcity/training.asp",
     "hospital":            BASE + "/localcity/hospital.asp",
     "black_market":        BASE + "/localcity/blackmarket.asp",
     "weapons":             BASE + "/weapons.asp",

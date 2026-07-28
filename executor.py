@@ -1591,6 +1591,92 @@ def handle_university(action: Action, state: GameState):
         continue  # re-parse — should now be the enrollment confirmation page
 
 
+def handle_training_centre(action: Action, state: GameState):
+    from tasks.training_centre import TRAINING_COSTS
+    import re as _re
+    discipline = action.params["discipline"]
+    url = action.params["url"]
+    cost = TRAINING_COSTS.get(discipline, 0)
+    page = browser.page()
+    _nav(url, state)
+
+    if not _check_session(state):
+        return
+
+    if "/localcity/local.asp" in browser.current_url():
+        soup = BeautifulSoup(page.content(), "html.parser")
+        fail = soup.find("div", id="fail") or soup.find("div", class_="info red")
+        msg = fail.get_text(strip=True) if fail else "Training centre unavailable."
+        state.add_log(f"Training centre: {msg} — disabling actions.")
+        c = cfg.load()
+        c["action"]["enabled"] = False
+        cfg.save(c)
+        return
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    select = soup.find("select", attrs={"name": "action"})
+    if not select:
+        state.add_log("Training centre: form not found.")
+        return
+
+    options = {opt.get("value", ""): opt.get_text(strip=True) for opt in select.find_all("option")}
+
+    # Page 1: discipline selection — pick the configured discipline
+    if discipline in options:
+        if (state.clean_money or 0) < cost:
+            min_cash = int(cfg.load().get("misc", {}).get("min_cash_on_hand", 0))
+            needed = cost - (state.clean_money or 0) + min_cash
+            state.add_log(f"Training centre: need ${cost:,}, withdrawing ${needed:,}.")
+            handle_withdraw(Action("withdraw", amount=needed), state)
+            if (state.clean_money or 0) < cost:
+                state.add_log("Training centre: insufficient funds after withdrawal — skipping.")
+                return
+        page.select_option("select[name='action']", discipline)
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+
+        # Page 2: confirmation — select the accept option
+        soup2 = BeautifulSoup(page.content(), "html.parser")
+        select2 = soup2.find("select", attrs={"name": "action"})
+        if select2:
+            accept_val = next(
+                (opt.get("value", "") for opt in select2.find_all("option")
+                 if opt.get("value", "").startswith("accept")),
+                None,
+            )
+            if accept_val:
+                page.select_option("select[name='action']", accept_val)
+                page.click("input[type='submit'][name='B1']")
+                page.wait_for_load_state("domcontentloaded")
+                _refresh_state(state)
+                state.add_log(f"Training centre: enrolled in {discipline}.")
+                c = cfg.load()
+                c["action"]["enabled"] = False
+                cfg.save(c)
+                return
+            else:
+                state.add_log("Training centre: no accept option found on confirmation page.")
+                return
+        state.add_log(f"Training centre: submitted {discipline}.")
+        return
+
+    # Already on a confirmation page (accept option present)
+    accept_val = next((v for v in options if v.startswith("accept")), None)
+    if accept_val:
+        page.select_option("select[name='action']", accept_val)
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+        state.add_log(f"Training centre: enrolled in {discipline}.")
+        c = cfg.load()
+        c["action"]["enabled"] = False
+        cfg.save(c)
+        return
+
+    state.add_log(f"Training centre: discipline '{discipline}' not available in selector.")
+
+
 def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
     """Returns True if transfer succeeded, False otherwise."""
     page = browser.page()
@@ -4690,6 +4776,7 @@ HANDLERS = {
     "do_fire_duties": handle_fire_duties,
     "do_career_training": handle_career_training,
     "do_university":      handle_university,
+    "do_training_centre": handle_training_centre,
     "do_armed_robbery": handle_armed_robbery,
     "do_torch_business": handle_torch_business,
     "do_drug_manufacturing": handle_drug_manufacturing,
