@@ -1621,6 +1621,15 @@ def handle_training_centre(action: Action, state: GameState):
 
     options = {opt.get("value", ""): opt.get_text(strip=True) for opt in select.find_all("option")}
 
+    # Already training page: "Yes, I would like to train"
+    if "Yes" in options and discipline not in options:
+        page.select_option("select[name='action']", "Yes")
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+        state.add_log(f"Training centre: continued training in {discipline}.")
+        return
+
     # Page 1: discipline selection — pick the configured discipline
     if discipline in options:
         if (state.clean_money or 0) < cost:
