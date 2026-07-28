@@ -20,6 +20,7 @@ from tasks.earns import EarnsTask
 from tasks.agg_crimes import AggCrimeTask
 from tasks.community_service import CommunityServiceTask
 from tasks.dog_trains import DogTrainsTask
+from tasks.training_centre import TrainingCentreTask
 from tasks.career_training import CareerTrainingTask
 from tasks.university import UniversityTask
 from tasks.fire_duties import FireDutiesTask
@@ -181,6 +182,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             sched.add(UniversityTask(degree=sub))
         elif action_type == "dog_trains":
             sched.add(DogTrainsTask())
+        elif action_type == "training_centre":
+            sched.add(TrainingCentreTask(discipline=sub))
 
     cw_cfg = c.get("case_work", {})
     if cw_cfg.get("enabled", False):

@@ -14,7 +14,12 @@ const ACTION_SUB_MAP = {
     ["Engineering","Engineering"],
     ["Law","Law"],
   ],
-  training_centre: [],
+  training_centre: [
+    ["Jui Jitsu","Jui Jitsu"],
+    ["Muay Thai","Muay Thai"],
+    ["Karate","Karate"],
+    ["MMA","MMA"],
+  ],
   drug_manufacturing: [],
 };
 

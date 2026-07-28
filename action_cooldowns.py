@@ -11,6 +11,7 @@ ACTION_COOLDOWNS: dict[str, int] = {
     "career_training":        10,
     "university":             10,
     "drug_manufacturing":     10,
+    "training_centre":        10,
 }
 
 # Energy % breakpoints → crime cycle minutes (mirrors the UI dropdown)
