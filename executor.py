@@ -514,13 +514,20 @@ def _try_quick_earn(page, display_name: str, state: GameState) -> bool:
         if match and match.group(1).lower() == display_name.lower():
             link.click()
             try:
+                page.wait_for_load_state("domcontentloaded", timeout=10000)
+            except Exception:
+                pass
+            try:
                 page.wait_for_selector("input[name='lastearn']", timeout=5000)
             except Exception:
                 pass
             lastearn = page.query_selector("input[name='lastearn']")
             if lastearn:
                 lastearn.click()
-                page.wait_for_load_state("domcontentloaded")
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=10000)
+                except Exception:
+                    pass
                 state.add_log(f"Manual earn: quick-earn '{display_name}' — submitted via lastearn.")
             else:
                 state.add_log(f"Manual earn: quick-earn '{display_name}' — lastearn input not found.")
