@@ -99,6 +99,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     writes, no bot signals, no persistence (those are handled by save())."""
     c["earns"]["enabled"] = data.get("earns_enabled", False)
     c["earns"]["earn_type"] = data.get("earn_type", "surgeon")
+    c["earns"]["earn_mode"] = data.get("earn_mode", "auto")
 
     if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
         import earn_planner as _ep
@@ -623,6 +624,7 @@ def status():
         "own_name": s.own_name,
         "earns_enabled": cfg.load().get("earns", {}).get("enabled", True),
         "earn_type": cfg.load().get("earns", {}).get("earn_type", ""),
+        "earn_mode": cfg.load().get("earns", {}).get("earn_mode", "auto"),
         "current_task": s.current_task,
         "in_jail": s.in_jail,
         "jail_rank": s.jail_rank,

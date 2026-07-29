@@ -154,6 +154,14 @@
           </label>
           <hr class="stat-divider">
           <div class="row">
+            <label>Earn Mode
+              <select id="earn_mode" onchange="autoSave()">
+                <option value="auto" {% if config.earns.earn_mode == 'auto' or not config.earns.earn_mode %}selected{% endif %}>Auto</option>
+                <option value="manual" {% if config.earns.earn_mode == 'manual' %}selected{% endif %}>Manual</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
             <label>Category
               <select id="earn_category" onchange="_renderEarnSelect(); autoSave()"></select>
             </label>

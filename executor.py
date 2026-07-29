@@ -479,6 +479,117 @@ def handle_clear_earn_queue(action: Action, state: GameState):
         handle_check_earns(Action("check_earns", earn_type=earn_type), state)
 
 
+def _load_earn_catalog():
+    import paths, os, json as _json
+    path = os.path.join(paths.data_dir(), "available_earns.json")
+    if not os.path.exists(path):
+        return list(_EARN_SEED)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return _json.load(f)
+    except Exception:
+        return list(_EARN_SEED)
+
+
+def _earn_display_name(schedule_value: str) -> str:
+    for entry in _load_earn_catalog():
+        if entry.get("schedule_value") == schedule_value:
+            return entry["label"]
+    import earn_planner as _ep
+    return _ep.HISTORY_NAME.get(schedule_value, schedule_value)
+
+
+def _earn_data_earn(schedule_value: str):
+    for entry in _load_earn_catalog():
+        if entry.get("schedule_value") == schedule_value:
+            return entry.get("data_earn")
+    return None
+
+
+def _try_quick_earn(page, display_name: str, state: GameState) -> bool:
+    links = page.query_selector_all("a[href*='doLoadfastincome']")
+    for link in links:
+        href = link.get_attribute("href") or ""
+        match = re.search(r"doLoadfastincome\('([^']+)'", href)
+        if match and match.group(1).lower() == display_name.lower():
+            link.click()
+            page.wait_for_load_state("domcontentloaded")
+            state.add_log(f"Manual earn: used quick-earn link for '{display_name}'.")
+            _refresh_state(state)
+            return True
+    return False
+
+
+def _ensure_manual_earn_mode(page, state: GameState):
+    manual_div = page.query_selector("div.mm-earn-mode-manual")
+    if not manual_div:
+        return
+    style = manual_div.get_attribute("style") or ""
+    if "display: none" not in style and "display:none" not in style:
+        return
+    handle_clear_earn_queue(Action("clear_earn_queue"), state)
+    _nav(_u("/income/earn.asp"), state)
+    if not _check_session(state):
+        return
+    page.click("span.mm-earn-toggle-knob")
+    page.wait_for_function(
+        "() => { const el = document.querySelector('div.mm-earn-mode-manual'); "
+        "return el && !el.style.display.includes('none'); }",
+        timeout=5000
+    )
+    state.add_log("Switched to MANUAL earn mode.")
+
+
+def handle_manual_earn(action: Action, state: GameState):
+    earn_type = action.params["earn_type"]
+    page = browser.page()
+    display_name = _earn_display_name(earn_type)
+
+    if _try_quick_earn(page, display_name, state):
+        return
+
+    _nav(_u("/income/earn.asp"), state)
+    if not _check_session(state):
+        return
+
+    _ensure_manual_earn_mode(page, state)
+
+    data_earn = _earn_data_earn(earn_type)
+    option = None
+    if data_earn is not None:
+        option = page.query_selector(f"div.earn-option[data-earn='{data_earn}']")
+
+    if not option:
+        options = page.query_selector_all("div.earn-option")
+        for opt in options:
+            span = opt.query_selector("span")
+            if span and span.inner_text().strip().lower() == display_name.lower():
+                option = opt
+                break
+
+    if not option:
+        state.add_log(f"Manual earn: could not find '{display_name}' in earn list.")
+        return
+
+    trapped = option.query_selector("s")
+    if trapped:
+        state.add_log(f"Manual earn: '{display_name}' is trapped (red) — skipping.")
+        return
+
+    option.click()
+    time.sleep(0.3)
+
+    work_btn = page.query_selector("button.btn-new.bg-mm")
+    if not work_btn:
+        state.add_log("Manual earn: Work button not found.")
+        return
+
+    work_btn.click()
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    state.add_log(f"Manual earn: worked '{display_name}'.")
+
+
 def _get_online_local_players(state: GameState) -> list:
     """Parse the who's online sidebar from the current page HTML."""
     soup = BeautifulSoup(state.page_html, "html.parser")
@@ -4768,6 +4879,7 @@ HANDLERS = {
     "check_earns": handle_check_earns,
     "refresh_earn_catalog": handle_refresh_earn_catalog,
     "clear_earn_queue": handle_clear_earn_queue,
+    "manual_earn": handle_manual_earn,
     "bulk_add_launder_contacts": handle_bulk_add_launder_contacts,
     "check_banking_cases": handle_check_banking_cases,
     "do_crime": handle_do_crime,
