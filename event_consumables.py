@@ -19,7 +19,7 @@ INFO = {
     "Fries":      ("Restores agg strength",    "energy",      None),
     "Lightning":  ("Random prize",             "unsupported", None),
     "Milk":       ("+1h Agg pro",              "always",      None),
-    "Popcorn":    ("Resets Earn timer",        "unsupported", None),
+    "Popcorn":    ("Resets Earn timer",        "earn_timer",  "earn"),
     "Watermelon": ("Resets Action timer",      "timer",       "action"),
 }
 
