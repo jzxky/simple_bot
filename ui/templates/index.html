@@ -462,6 +462,14 @@
             <label id="action_sub_label">Sub-option
               <select id="action_sub" onchange="autoSave()"></select>
             </label>
+            <label id="action_fallback_label" style="display:none">Fallback
+              <select id="action_fallback" onchange="autoSave()">
+                <option value=""                  {% if not config.action.get('fallback_action') %}selected{% endif %}>None</option>
+                <option value="drug_manufacturing"{% if config.action.get('fallback_action') == 'drug_manufacturing' %} selected{% endif %}>Drug Manufacturing</option>
+                <option value="community_service" {% if config.action.get('fallback_action') == 'community_service' %} selected{% endif %}>Community Service</option>
+                <option value="dog_trains"        {% if config.action.get('fallback_action') == 'dog_trains' %} selected{% endif %}>Dog Trains</option>
+              </select>
+            </label>
           </div>
           <div id="career_training_options" class="setting-row" style="display:none;margin-bottom:8px;">
             Stop training at 14

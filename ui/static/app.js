@@ -8,6 +8,7 @@ const ACTION_SUB_MAP = {
     ["police","Police"],
   ],
   university: [
+    ["","All"],
     ["Business","Business"],
     ["Science","Science"],
     ["Medicine","Medicine"],
@@ -202,6 +203,12 @@ function populateActionSub(selectedValue) {
 
   const ctOpts = document.getElementById("career_training_options");
   if (ctOpts) ctOpts.style.display = type === "career_training" ? "" : "none";
+
+  const fbLabel = document.getElementById("action_fallback_label");
+  if (fbLabel) {
+    const show = type === "career_training" || type === "university" || type === "training_centre";
+    fbLabel.style.display = show ? "" : "none";
+  }
 }
 
 function toggleAwayCrime() {
@@ -244,6 +251,7 @@ function _buildPayload() {
     action_enabled: document.getElementById("action_enabled").checked,
     action_type: document.getElementById("action_type").value,
     action_sub: document.getElementById("action_sub").value,
+    action_fallback: (document.getElementById("action_fallback")||{value:""}).value,
     career_training_stop_at_14: document.getElementById("career_training_stop_at_14")?.checked ?? false,
     away_action_enabled: document.getElementById("action_enabled").checked,
     away_action_type: document.getElementById("away_action_type").value,
@@ -1140,6 +1148,15 @@ function pollStatus() {
         const em = document.getElementById("earn_mode");
         if (em && em.value !== d.earn_mode && em !== document.activeElement) {
           em.value = d.earn_mode;
+        }
+      }
+
+      // Action type sync — reflect fallback-driven action switches
+      if (d.action_type) {
+        const at = document.getElementById("action_type");
+        if (at && at.value !== d.action_type && at !== document.activeElement) {
+          at.value = d.action_type;
+          populateActionSub(d.action_sub || "");
         }
       }
 

@@ -136,6 +136,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["action"]["enabled"] = data.get("action_enabled", False)
     c["action"]["type"] = data.get("action_type", "community_service")
     c["action"]["sub_option"] = data.get("action_sub", "")
+    c["action"]["fallback_action"] = data.get("action_fallback", "")
     c["action"]["career_training_stop_at_14"] = data.get("career_training_stop_at_14", False)
 
     c.setdefault("away_action", {})
@@ -626,6 +627,8 @@ def status():
         },
         "consumables": s.consumables,
         "own_name": s.own_name,
+        "action_type": cfg.load().get("action", {}).get("type", ""),
+        "action_sub": cfg.load().get("action", {}).get("sub_option", ""),
         "earns_enabled": cfg.load().get("earns", {}).get("enabled", True),
         "earn_type": cfg.load().get("earns", {}).get("earn_type", ""),
         "earn_mode": cfg.load().get("earns", {}).get("earn_mode", "auto"),

@@ -43,6 +43,7 @@ DEFAULT_CONFIG = {
         "enabled": True,
         "type": "community_service",
         "sub_option": "",
+        "fallback_action": "",
         "career_training_stop_at_14": False
     },
     "away_action": {
