@@ -10,6 +10,7 @@ DEFAULT_CONFIG = {
     "earns": {
         "enabled": True,
         "earn_type": "surgeon",
+        "earn_mode": "auto",
         "check_interval_minutes": 30
     },
     "earn_planner": {

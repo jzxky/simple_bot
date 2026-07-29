@@ -228,6 +228,7 @@ function _buildPayload() {
     pin_required: document.getElementById("pin_required").checked,
     ui_pin: document.getElementById("ui_pin").value,
     earns_enabled: document.getElementById("earns_enabled").checked,
+    earn_mode: document.getElementById("earn_mode").value,
     earn_type: document.getElementById("earn_type").value,
     earn_planner_limits: _earnPlannerLimits,
     crimes_enabled: document.getElementById("crimes_enabled").checked,
@@ -539,8 +540,10 @@ function _updateEarnsPills() {
   if (!el) return;
   const enabled = document.getElementById("earns_enabled")?.checked;
   if (!enabled) { el.innerHTML = _pill("Earns: Disabled"); return; }
+  const mode = document.getElementById("earn_mode")?.value || "auto";
   const label = _selText("earn_type");
-  el.innerHTML = label ? _pill(label) : "";
+  const suffix = mode === "manual" ? " (Manual)" : "";
+  el.innerHTML = label ? _pill(label + suffix) : "";
 }
 
 function _updateActionsPills() {
@@ -1130,6 +1133,13 @@ function pollStatus() {
           loadCharHistory();
         }
         loadEarnPlanner();
+      }
+
+      if (d.earn_mode) {
+        const em = document.getElementById("earn_mode");
+        if (em && em.value !== d.earn_mode && em !== document.activeElement) {
+          em.value = d.earn_mode;
+        }
       }
 
       // Active earn sync — reflect planner-driven earn switches in the Earns tab

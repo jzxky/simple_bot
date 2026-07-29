@@ -17,6 +17,7 @@ from executor import ActionExecutor
 from tasks.base import Action
 from tasks.login import LoginTask
 from tasks.earns import EarnsTask
+from tasks.manual_earns import ManualEarnsTask
 from tasks.agg_crimes import AggCrimeTask
 from tasks.community_service import CommunityServiceTask
 from tasks.dog_trains import DogTrainsTask
@@ -139,10 +140,15 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
 
     if c.get("earns", {}).get("enabled", False):
         earn_cfg = c["earns"]
-        sched.add(EarnsTask(
-            earn_type=earn_cfg.get("earn_type", "surgeon"),
-            interval_minutes=earn_cfg.get("check_interval_minutes", 30),
-        ))
+        if earn_cfg.get("earn_mode", "auto") == "manual":
+            sched.add(ManualEarnsTask(
+                earn_type=earn_cfg.get("earn_type", "surgeon"),
+            ))
+        else:
+            sched.add(EarnsTask(
+                earn_type=earn_cfg.get("earn_type", "surgeon"),
+                interval_minutes=earn_cfg.get("check_interval_minutes", 30),
+            ))
 
     if c.get("aggravated_crimes", {}).get("enabled", False):
         ac = c["aggravated_crimes"]
