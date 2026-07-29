@@ -47,6 +47,9 @@ def require_pin():
         return
     if request.endpoint in ("login", "static"):
         return
+    if request.path == "/war" or request.path.startswith("/api/war/"):
+        if cfg.load().get("war_mode", {}).get("skip_pin", False):
+            return
     if not session.get("authenticated"):
         return redirect(url_for("login"))
 
@@ -173,6 +176,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
 
     c.setdefault("war_mode", {})
     c["war_mode"]["enabled"] = data.get("war_mode_enabled", False)
+    c["war_mode"]["skip_pin"] = data.get("war_mode_skip_pin", False)
 
     c.setdefault("jail", {})
     c["jail"]["enabled"] = data.get("jail_enabled", False)
