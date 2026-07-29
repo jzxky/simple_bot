@@ -82,8 +82,26 @@ def init_db():
         try:
             con.executescript(_SCHEMA)
             con.commit()
+            _migrate_career_ts_format(con)
         finally:
             con.close()
+
+
+def _migrate_career_ts_format(con):
+    """Convert old local-time career timestamps to UTC ISO format."""
+    rows = con.execute(
+        "SELECT username, ts, rank, occupation, homecity FROM career WHERE ts LIKE '____-__-__ __:__:__'"
+    ).fetchall()
+    if not rows:
+        return
+    for row in rows:
+        old_ts = row[1]
+        new_ts = old_ts[:10] + "T" + old_ts[11:] + "Z"
+        con.execute(
+            "UPDATE career SET ts = ? WHERE username = ? AND ts = ?",
+            (new_ts, row[0], old_ts),
+        )
+    con.commit()
 
 
 def _upsert_players(con, rows: list):
