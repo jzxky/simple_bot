@@ -157,6 +157,7 @@ DEFAULT_CONFIG = {
     "war_mode": {
         "enabled": False,
         "monitor_interval_minutes": 5,
+        "skip_pin": False,
     },
     "consumables": {
         "timer_limit": "00:00",

@@ -256,6 +256,7 @@ function _buildPayload() {
     crossroads_enabled: (document.getElementById("crossroads_enabled")||{checked:false}).checked,
     crossroads_selection: (document.getElementById("crossroads_selection")||{value:"current"}).value,
     war_mode_enabled: (document.getElementById("war_mode_enabled")||{checked:false}).checked,
+    war_mode_skip_pin: (document.getElementById("war_mode_skip_pin")||{checked:false}).checked,
     jail_enabled: document.getElementById("jail_enabled").checked,
     jail_duty: document.getElementById("jail_duty").value,
     jail_action: document.getElementById("jail_action").value,

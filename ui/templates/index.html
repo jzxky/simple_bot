@@ -1218,6 +1218,9 @@
               <label class="inline-toggle setting-row">Enable War Mode
                 <label class="toggle-label"><input type="checkbox" id="war_mode_enabled" {% if config.get('war_mode', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave(); toggleWarModeLink()"><span class="toggle"></span></label>
               </label>
+              <label class="inline-toggle setting-row">Skip PIN for War Mode page
+                <label class="toggle-label"><input type="checkbox" id="war_mode_skip_pin" {% if config.get('war_mode', {}).get('skip_pin', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
               <p class="setting-note">Monitors whacks-survived for tracked opps/friendlies. Manage lists on the War Mode page.</p>
               <div class="setting-row" id="war-mode-link-row" style="display:none">
                 <span>War Mode Page</span>
