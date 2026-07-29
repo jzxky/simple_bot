@@ -98,7 +98,24 @@ def _apply_migrations(con: sqlite3.Connection):
         if col not in existing:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
     con.commit()
+    _migrate_career_ts_format(con)
     _dedupe_career_history(con)
+
+
+def _migrate_career_ts_format(con: sqlite3.Connection):
+    """Convert old local-time career_history timestamps ('YYYY-MM-DD HH:MM:SS')
+    to UTC ISO format ('YYYY-MM-DDTHH:MM:SSZ') so they compare correctly against
+    sync watermarks."""
+    rows = con.execute(
+        "SELECT id, ts FROM career_history WHERE ts LIKE '____-__-__ __:__:__'"
+    ).fetchall()
+    if not rows:
+        return
+    for row in rows:
+        old_ts = row[1]
+        new_ts = old_ts[:10] + "T" + old_ts[11:] + "Z"
+        con.execute("UPDATE career_history SET ts = ? WHERE id = ?", (new_ts, row[0]))
+    con.commit()
 
 
 def _dedupe_career_history(con: sqlite3.Connection):
@@ -376,8 +393,8 @@ def _utcnow() -> str:
 def upsert_players(player_list: list):
     """Update player records. Skips Heaven/Hell players entirely.
     Appends career_history when rank/occupation/homecity changes."""
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     scraped_at = _utcnow()
+    ts = scraped_at
     with _lock:
         con = _conn()
         try:
