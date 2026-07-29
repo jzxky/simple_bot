@@ -1549,6 +1549,22 @@ def handle_fire_duties(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def _action_fallback(state: GameState, reason: str):
+    c = cfg.load()
+    fallback = c.get("action", {}).get("fallback_action", "")
+    if fallback:
+        c["action"]["type"] = fallback
+        c["action"]["sub_option"] = ""
+        c["action"]["fallback_action"] = ""
+        cfg.save(c)
+        import settings_rev; settings_rev.bump()
+        state.add_log(f"{reason} — switched action to '{fallback}'.")
+    else:
+        c["action"]["enabled"] = False
+        cfg.save(c)
+        state.add_log(f"{reason} — disabling actions.")
+
+
 def handle_career_training(action: Action, state: GameState):
     url = action.params["url"]
     career = action.params["career"]
@@ -1563,10 +1579,7 @@ def handle_career_training(action: Action, state: GameState):
         soup = BeautifulSoup(page.content(), "html.parser")
         fail = soup.find("div", id="fail") or soup.find("div", class_="info red")
         msg = fail.get_text(strip=True) if fail else "Training centre unavailable."
-        state.add_log(f"Career training: {msg} — disabling actions.")
-        c = cfg.load()
-        c["action"]["enabled"] = False
-        cfg.save(c)
+        _action_fallback(state, f"Career training: {msg}")
         return
 
     soup = BeautifulSoup(page.content(), "html.parser")
@@ -1582,10 +1595,7 @@ def handle_career_training(action: Action, state: GameState):
     # Stop-at-14 check
     stop_at_14 = cfg.load().get("action", {}).get("career_training_stop_at_14", False)
     if stop_at_14 and current_trains is not None and current_trains >= 14:
-        state.add_log(f"Career training: reached {current_trains} trains — stop-at-14 reached, disabling actions.")
-        c = cfg.load()
-        c["action"]["enabled"] = False
-        cfg.save(c)
+        _action_fallback(state, f"Career training: reached {current_trains} trains (stop-at-14)")
         return
 
     select = soup.find("select", attrs={"name": "action"})
@@ -1691,16 +1701,12 @@ def handle_university(action: Action, state: GameState):
                 degree_cfg,
             )
             if canonical in completed:
-                state.add_log(f"University: '{canonical}' already completed — disabling actions.")
-                c["action"]["enabled"] = False
-                cfg.save(c)
+                _action_fallback(state, f"University: '{canonical}' already completed")
                 return
         else:
             canonical = next((d for d in _DEGREES if d not in completed), None)
             if canonical is None:
-                state.add_log("University: all degrees completed — disabling actions.")
-                c["action"]["enabled"] = False
-                cfg.save(c)
+                _action_fallback(state, "University: all degrees completed")
                 return
 
         match = next(
@@ -1709,9 +1715,7 @@ def handle_university(action: Action, state: GameState):
             None,
         )
         if not match:
-            state.add_log(f"University: degree '{canonical}' not available on selector — disabling actions.")
-            c["action"]["enabled"] = False
-            cfg.save(c)
+            _action_fallback(state, f"University: degree '{canonical}' not available on selector")
             return
         _submit(match)
         state.add_log(f"University: selected {canonical} course.")
@@ -1734,13 +1738,16 @@ def handle_training_centre(action: Action, state: GameState):
         soup = BeautifulSoup(page.content(), "html.parser")
         fail = soup.find("div", id="fail") or soup.find("div", class_="info red")
         msg = fail.get_text(strip=True) if fail else "Training centre unavailable."
-        state.add_log(f"Training centre: {msg} — disabling actions.")
-        c = cfg.load()
-        c["action"]["enabled"] = False
-        cfg.save(c)
+        _action_fallback(state, f"Training centre: {msg}")
         return
 
     soup = BeautifulSoup(page.content(), "html.parser")
+
+    holder = soup.find("div", id="holder_content")
+    if holder and "no more training to complete" in holder.get_text(" ").lower():
+        _action_fallback(state, "Training centre: no more training to complete")
+        return
+
     select = soup.find("select", attrs={"name": "action"})
     if not select:
         state.add_log("Training centre: form not found.")
@@ -1814,7 +1821,7 @@ def handle_training_centre(action: Action, state: GameState):
         state.add_log(f"Training centre: submitted {discipline}.")
         return
 
-    state.add_log(f"Training centre: discipline '{discipline}' not available in selector.")
+    _action_fallback(state, f"Training centre: discipline '{discipline}' not available in selector")
 
 
 def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
