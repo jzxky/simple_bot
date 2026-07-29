@@ -514,7 +514,13 @@ def _try_quick_earn(page, display_name: str, state: GameState) -> bool:
         if match and match.group(1).lower() == display_name.lower():
             link.click()
             page.wait_for_load_state("domcontentloaded")
-            state.add_log(f"Manual earn: used quick-earn link for '{display_name}'.")
+            lastearn = page.query_selector("input[name='lastearn']")
+            if lastearn:
+                lastearn.click()
+                page.wait_for_load_state("domcontentloaded")
+                state.add_log(f"Manual earn: quick-earn '{display_name}' — submitted via lastearn.")
+            else:
+                state.add_log(f"Manual earn: quick-earn '{display_name}' — lastearn input not found.")
             _refresh_state(state)
             return True
     return False
