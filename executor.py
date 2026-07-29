@@ -513,7 +513,10 @@ def _try_quick_earn(page, display_name: str, state: GameState) -> bool:
         match = re.search(r"doLoadfastincome\('([^']+)'", href)
         if match and match.group(1).lower() == display_name.lower():
             link.click()
-            page.wait_for_load_state("domcontentloaded")
+            try:
+                page.wait_for_selector("input[name='lastearn']", timeout=5000)
+            except Exception:
+                pass
             lastearn = page.query_selector("input[name='lastearn']")
             if lastearn:
                 lastearn.click()
