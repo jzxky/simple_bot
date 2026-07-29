@@ -1630,8 +1630,9 @@ def handle_training_centre(action: Action, state: GameState):
         state.add_log(f"Training centre: continued training in {discipline}.")
         return
 
-    # Page 1: discipline selection — pick the configured discipline
-    if discipline in options:
+    # Enrollment confirmation page (accept option present) — ensure funds, enrol, then re-nav
+    accept_val = next((v for v in options if v.startswith("accept")), None)
+    if accept_val:
         if (state.clean_money or 0) < cost:
             min_cash = int(cfg.load().get("misc", {}).get("min_cash_on_hand", 0))
             needed = cost - (state.clean_money or 0) + min_cash
@@ -1640,47 +1641,50 @@ def handle_training_centre(action: Action, state: GameState):
             if (state.clean_money or 0) < cost:
                 state.add_log("Training centre: insufficient funds after withdrawal — skipping.")
                 return
-        page.select_option("select[name='action']", discipline)
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
-        _refresh_state(state)
-
-        # Page 2: confirmation — select the accept option
-        soup2 = BeautifulSoup(page.content(), "html.parser")
-        select2 = soup2.find("select", attrs={"name": "action"})
-        if select2:
-            accept_val = next(
-                (opt.get("value", "") for opt in select2.find_all("option")
-                 if opt.get("value", "").startswith("accept")),
-                None,
-            )
-            if accept_val:
-                page.select_option("select[name='action']", accept_val)
-                page.click("input[type='submit'][name='B1']")
-                page.wait_for_load_state("domcontentloaded")
-                _refresh_state(state)
-                state.add_log(f"Training centre: enrolled in {discipline}.")
-                c = cfg.load()
-                c["action"]["enabled"] = False
-                cfg.save(c)
-                return
-            else:
-                state.add_log("Training centre: no accept option found on confirmation page.")
-                return
-        state.add_log(f"Training centre: submitted {discipline}.")
-        return
-
-    # Already on a confirmation page (accept option present)
-    accept_val = next((v for v in options if v.startswith("accept")), None)
-    if accept_val:
+            _nav(url, state)
         page.select_option("select[name='action']", accept_val)
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
         state.add_log(f"Training centre: enrolled in {discipline}.")
-        c = cfg.load()
-        c["action"]["enabled"] = False
-        cfg.save(c)
+        return
+
+    # Page 1: discipline selection — pick the configured discipline
+    if discipline in options:
+        page.select_option("select[name='action']", discipline)
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+
+        # Now on the confirmation page — ensure funds, enrol
+        soup2 = BeautifulSoup(page.content(), "html.parser")
+        select2 = soup2.find("select", attrs={"name": "action"})
+        if select2:
+            accept_val2 = next(
+                (opt.get("value", "") for opt in select2.find_all("option")
+                 if opt.get("value", "").startswith("accept")),
+                None,
+            )
+            if accept_val2:
+                if (state.clean_money or 0) < cost:
+                    min_cash = int(cfg.load().get("misc", {}).get("min_cash_on_hand", 0))
+                    needed = cost - (state.clean_money or 0) + min_cash
+                    state.add_log(f"Training centre: need ${cost:,}, withdrawing ${needed:,}.")
+                    handle_withdraw(Action("withdraw", amount=needed), state)
+                    if (state.clean_money or 0) < cost:
+                        state.add_log("Training centre: insufficient funds after withdrawal — skipping.")
+                        return
+                    _nav(url, state)
+                page.select_option("select[name='action']", accept_val2)
+                page.click("input[type='submit'][name='B1']")
+                page.wait_for_load_state("domcontentloaded")
+                _refresh_state(state)
+                state.add_log(f"Training centre: enrolled in {discipline}.")
+                return
+            else:
+                state.add_log("Training centre: no accept option found on confirmation page.")
+                return
+        state.add_log(f"Training centre: submitted {discipline}.")
         return
 
     state.add_log(f"Training centre: discipline '{discipline}' not available in selector.")
