@@ -6,7 +6,8 @@ per-item toggle is on and whose condition is met:
   - timer items  → the reset target timer is on cooldown
   - Fries        → energy < 100%
   - Milk         → whenever stock remains
-  - Popcorn/Lightning → unsupported (never consumed)
+  - Popcorn        → resets earn timer (only in manual earn mode)
+  - Lightning      → unsupported (never consumed)
 
 Stock counts come from the last bossevent.asp visit (EventBossTask); consuming
 decrements the local count so we don't over-retry between visits.
@@ -38,6 +39,11 @@ class EventConsumeTask(Task):
             # Don't top up agg energy while aggravating is throttled by fails.
             return (state.energy or 0) < 100 and state.agg_fail_count() < 3
         if kind == "timer":
+            return param in state.timers and not state.timer_ready(param)
+        if kind == "earn_timer":
+            earn_mode = cfg.load().get("earns", {}).get("earn_mode", "auto")
+            if earn_mode != "manual":
+                return False
             return param in state.timers and not state.timer_ready(param)
         return False  # unsupported
 
