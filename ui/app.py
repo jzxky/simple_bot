@@ -1173,26 +1173,34 @@ def api_player_image(username):
 @app.route("/api/players/top_jobs")
 def api_top_jobs():
     import player_db as _db
+    from datetime import datetime, timezone
     TOP_JOBS = [
         "Hospital Director", "Fire Chief", "Bank Manager",
         "Funeral Director", "Chief Engineer", "Commissioner-General",
     ]
+    now_utc = datetime.now(timezone.utc)
     all_p = _db.get_all_players()
     holders = [p for p in all_p if p.get("occupation") in TOP_JOBS and p.get("active", 1)]
     result = []
     for p in holders:
         history = _db.get_career_history(p["username"])
-        started_at = ""
+        duration_secs = None
         for entry in history:
             if entry.get("occupation") == p["occupation"] and entry.get("homecity") == p.get("homecity"):
-                started_at = entry.get("ts", "")
+                ts = entry.get("ts", "")
+                if ts:
+                    try:
+                        dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                        duration_secs = max(0, int((now_utc - dt).total_seconds()))
+                    except Exception:
+                        pass
                 break
         result.append({
             "username": p["username"],
             "occupation": p["occupation"],
             "homecity": p.get("homecity", ""),
             "rank": p.get("rank", ""),
-            "started_at": started_at,
+            "duration_secs": duration_secs,
         })
     return jsonify({"holders": result, "jobs": TOP_JOBS})
 

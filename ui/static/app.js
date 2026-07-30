@@ -3804,7 +3804,7 @@ function plLoadTopJobs() {
         jobs.forEach(job => {
           const h = cities[city][job];
           if (h) {
-            const since = h.started_at ? _topJobSince(h.started_at) : "—";
+            const since = h.duration_secs != null ? _topJobDuration(h.duration_secs) : "—";
             html += `<tr style="border-bottom:1px solid var(--border)">
               <td style="padding:4px 6px">${escHtml(job)}</td>
               <td style="padding:4px 6px;font-weight:500">${escHtml(h.username)}</td>
@@ -3828,13 +3828,10 @@ function plLoadTopJobs() {
     });
 }
 
-function _topJobSince(ts) {
-  if (!ts) return "—";
-  const d = new Date(ts);
-  if (isNaN(d.getTime())) return "—";
-  const diff = Date.now() - d.getTime();
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor((diff % 86400000) / 3600000);
+function _topJobDuration(secs) {
+  if (secs == null || secs < 0) return "—";
+  const days = Math.floor(secs / 86400);
+  const hours = Math.floor((secs % 86400) / 3600);
   if (days < 1) return hours + "h";
   return days + "d " + hours + "h";
 }
