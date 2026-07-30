@@ -3799,7 +3799,7 @@ function plLoadTopJobs() {
             <thead><tr style="border-bottom:1px solid var(--border)">
               <th style="text-align:left;padding:4px 6px;color:var(--text-muted);font-weight:500">Job</th>
               <th style="text-align:left;padding:4px 6px;color:var(--text-muted);font-weight:500">Holder</th>
-              <th style="text-align:left;padding:4px 6px;color:var(--text-muted);font-weight:500">Since</th>
+              <th style="text-align:left;padding:4px 6px;color:var(--text-muted);font-weight:500">Duration</th>
             </tr></thead><tbody>`;
         jobs.forEach(job => {
           const h = cities[city][job];
@@ -3834,9 +3834,9 @@ function _topJobSince(ts) {
   if (isNaN(d.getTime())) return "—";
   const diff = Date.now() - d.getTime();
   const days = Math.floor(diff / 86400000);
-  if (days < 1) return "Today";
-  if (days === 1) return "1 day";
-  return days + " days";
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  if (days < 1) return hours + "h";
+  return days + "d " + hours + "h";
 }
 
 // ── Assignments & groups ──────────────────────────────────────────────────────
