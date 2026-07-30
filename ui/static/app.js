@@ -1152,12 +1152,25 @@ function pollStatus() {
         }
       }
 
-      // Action type sync — reflect fallback-driven action switches
+      // Action enabled/type/fallback sync — reflect fallback-driven changes
+      if (typeof d.action_enabled === "boolean") {
+        const ae = document.getElementById("action_enabled");
+        if (ae && ae.checked !== d.action_enabled) {
+          ae.checked = d.action_enabled;
+          _updateIncomeTabColors();
+        }
+      }
       if (d.action_type) {
         const at = document.getElementById("action_type");
         if (at && at.value !== d.action_type && at !== document.activeElement) {
           at.value = d.action_type;
           populateActionSub(d.action_sub || "");
+        }
+      }
+      if (typeof d.action_fallback === "string") {
+        const af = document.getElementById("action_fallback");
+        if (af && af.value !== d.action_fallback && af !== document.activeElement) {
+          af.value = d.action_fallback;
         }
       }
 
