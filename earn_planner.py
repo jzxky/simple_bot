@@ -121,24 +121,40 @@ def completed_count(schedule_value: str, history: dict | None = None) -> int:
     return _completed_counts(history).get(name, 0)
 
 
+def _catalog_labels() -> dict:
+    """Return {schedule_value: label} from the earn catalog JSON."""
+    import os, json, paths
+    path = os.path.join(paths.data_dir(), "available_earns.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            entries = json.load(f)
+    except Exception:
+        return {}
+    return {e["schedule_value"]: e["label"] for e in entries if e.get("schedule_value")}
+
+
 def planner_view(limits: dict, active_earn: str = "", history: dict | None = None) -> dict:
     """Build the data the UI needs: availability + per-listed-earn completed counts."""
     data = history if history is not None else ch.load()
     counts = _completed_counts(data)
+    catalog = _catalog_labels()
+    mappable = {v: catalog.get(v, name) for v, name in HISTORY_NAME.items()}
     earns = []
     for value, limit in (limits or {}).items():
-        name = HISTORY_NAME.get(value)
-        if not name:
+        history_name = HISTORY_NAME.get(value)
+        if not history_name:
             continue
         earns.append({
             "value": value,
-            "history_name": name,
-            "completed": counts.get(name, 0),
+            "history_name": history_name,
+            "completed": counts.get(history_name, 0),
             "limit": limit,
         })
     return {
         "available": is_available(data),
         "earns": earns,
         "active": active_earn,
-        "mappable": HISTORY_NAME,
+        "mappable": mappable,
     }
