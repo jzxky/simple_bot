@@ -1170,6 +1170,33 @@ def api_player_image(username):
     return send_file(path)
 
 
+@app.route("/api/players/top_jobs")
+def api_top_jobs():
+    import player_db as _db
+    TOP_JOBS = [
+        "Hospital Director", "Fire Chief", "Bank Manager",
+        "Funeral Director", "Chief Engineer", "Commissioner-General",
+    ]
+    all_p = _db.get_all_players()
+    holders = [p for p in all_p if p.get("occupation") in TOP_JOBS and p.get("active", 1)]
+    result = []
+    for p in holders:
+        history = _db.get_career_history(p["username"])
+        started_at = ""
+        for entry in history:
+            if entry.get("occupation") == p["occupation"] and entry.get("homecity") == p.get("homecity"):
+                started_at = entry.get("ts", "")
+                break
+        result.append({
+            "username": p["username"],
+            "occupation": p["occupation"],
+            "homecity": p.get("homecity", ""),
+            "rank": p.get("rank", ""),
+            "started_at": started_at,
+        })
+    return jsonify({"holders": result, "jobs": TOP_JOBS})
+
+
 @app.route("/api/players/<username>/history")
 def api_player_history(username):
     import player_db as _db
