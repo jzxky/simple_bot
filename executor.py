@@ -1028,6 +1028,7 @@ def handle_do_crime(action: Action, state: GameState):
 
     if not targets:
         state.add_log(f"No targets found for {crime}, skipping.")
+        state._agg_targets_exhausted = True
         return
 
     if not _nav_to_target_input(crime, state):
