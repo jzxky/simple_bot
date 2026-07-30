@@ -40,10 +40,11 @@ function _populateEarnCategories(selectedEarnType) {
   const catSel = document.getElementById("earn_category");
   if (!catSel) return;
 
-  // Build ordered unique category list
+  // Build ordered unique category list — only include categories with enabled earns
   const seen = new Set();
   const cats = [];
   _earnCatalog.forEach(e => {
+    if (e.enabled === false) return;
     const cat = e.category || "Uncategorized";
     if (!seen.has(cat)) { seen.add(cat); cats.push(cat); }
   });
@@ -64,7 +65,7 @@ function _renderEarnSelect(selectedValue) {
   const sel = document.getElementById("earn_type");
   if (!sel) return;
   const cat = catSel ? catSel.value : "";
-  const items = _earnCatalog.filter(e => e.schedule_value && (e.category || "Uncategorized") === cat);
+  const items = _earnCatalog.filter(e => e.schedule_value && e.enabled !== false && (e.category || "Uncategorized") === cat);
   if (!items.length) {
     // Preserve current value so a failed/empty catalog load doesn't overwrite config
     const preserved = sel.dataset.current || sel.value || "";
