@@ -3768,6 +3768,77 @@ function _plPopulateBornFilters(source) {
   });
 }
 
+// ── Top Jobs tab ─────────────────────────────────────────────────────────────
+
+function plLoadTopJobs() {
+  const container = document.getElementById("pl-topjobs-content");
+  if (!container) return;
+  container.innerHTML = '<p style="padding:12px;color:var(--text-muted);text-align:center">Loading…</p>';
+  fetch("/api/players/top_jobs")
+    .then(r => r.json())
+    .then(data => {
+      const holders = data.holders || [];
+      const jobs = data.jobs || [];
+      // Group by city
+      const cities = {};
+      holders.forEach(h => {
+        const city = h.homecity || "Unknown";
+        if (!cities[city]) cities[city] = {};
+        cities[city][h.occupation] = h;
+      });
+      const cityNames = Object.keys(cities).sort();
+      if (!cityNames.length) {
+        container.innerHTML = '<p style="padding:12px;color:var(--text-muted);text-align:center">No top job holders found in player database.</p>';
+        return;
+      }
+      let html = '<div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))">';
+      cityNames.forEach(city => {
+        html += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px">
+          <h3 style="margin:0 0 10px;font-size:1rem;color:var(--accent)">${escHtml(city)}</h3>
+          <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+            <thead><tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:4px 6px;color:var(--text-muted);font-weight:500">Job</th>
+              <th style="text-align:left;padding:4px 6px;color:var(--text-muted);font-weight:500">Holder</th>
+              <th style="text-align:left;padding:4px 6px;color:var(--text-muted);font-weight:500">Since</th>
+            </tr></thead><tbody>`;
+        jobs.forEach(job => {
+          const h = cities[city][job];
+          if (h) {
+            const since = h.started_at ? _topJobSince(h.started_at) : "—";
+            html += `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:4px 6px">${escHtml(job)}</td>
+              <td style="padding:4px 6px;font-weight:500">${escHtml(h.username)}</td>
+              <td style="padding:4px 6px;color:var(--text-muted);white-space:nowrap">${since}</td>
+            </tr>`;
+          } else {
+            html += `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:4px 6px">${escHtml(job)}</td>
+              <td style="padding:4px 6px;color:var(--text-muted)">Vacant</td>
+              <td style="padding:4px 6px"></td>
+            </tr>`;
+          }
+        });
+        html += '</tbody></table></div>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    })
+    .catch(() => {
+      container.innerHTML = '<p style="padding:12px;color:var(--error);text-align:center">Failed to load top jobs.</p>';
+    });
+}
+
+function _topJobSince(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return "—";
+  const diff = Date.now() - d.getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days < 1) return "Today";
+  if (days === 1) return "1 day";
+  return days + " days";
+}
+
 // ── Assignments & groups ──────────────────────────────────────────────────────
 
 function plSetAssignment(username, context, value) {
