@@ -261,6 +261,10 @@ def _scrape_earn_catalog(page, state: GameState):
                 "return el && !el.style.display.includes('none'); }",
                 timeout=5000
             )
+            page.wait_for_selector(
+                "select[name='schedule_earn_identifier']",
+                state="visible", timeout=5000,
+            )
             state.add_log("Switched to AUTO earn mode.")
 
     soup = BeautifulSoup(page.content(), "html.parser")
@@ -461,16 +465,7 @@ def handle_clear_earn_queue(action: Action, state: GameState):
         return
 
     # Ensure AUTO panel is visible
-    auto_div = page.query_selector("div.mm-earn-mode-auto")
-    if auto_div:
-        style = auto_div.get_attribute("style") or ""
-        if "display: none" in style or "display:none" in style:
-            page.click("span.mm-earn-toggle-knob")
-            page.wait_for_function(
-                "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
-                "return el && !el.style.display.includes('none'); }",
-                timeout=5000
-            )
+    _ensure_auto_earn_mode(page)
 
     btn = page.query_selector("button.mm-earn-queue-clear-btn")
     if not btn:
@@ -2516,16 +2511,7 @@ def handle_clear_jail_duty_queue(action: Action, state: GameState):
     if not _check_session(state):
         return
 
-    auto_div = page.query_selector("div.mm-earn-mode-auto")
-    if auto_div:
-        style = auto_div.get_attribute("style") or ""
-        if "display: none" in style or "display:none" in style:
-            page.click("span.mm-earn-toggle-knob")
-            page.wait_for_function(
-                "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
-                "return el && !el.style.display.includes('none'); }",
-                timeout=5000
-            )
+    _ensure_auto_earn_mode(page)
 
     btn = page.query_selector("button.mm-earn-queue-clear-btn")
     if not btn:
@@ -2622,17 +2608,7 @@ def handle_jail_duties(action: Action, state: GameState):
     if not _check_session(state):
         return
 
-    auto_div = page.query_selector("div.mm-earn-mode-auto")
-    if auto_div:
-        style = auto_div.get_attribute("style") or ""
-        if "display: none" in style or "display:none" in style:
-            page.click("span.mm-earn-toggle-knob")
-            page.wait_for_function(
-                "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
-                "return el && !el.style.display.includes('none'); }",
-                timeout=5000
-            )
-            state.add_log("Jail duties: switched to AUTO mode.")
+    _ensure_auto_earn_mode(page)
 
     soup = BeautifulSoup(page.content(), "html.parser")
     auto_panel = soup.find("div", class_="mm-earn-mode-auto")
