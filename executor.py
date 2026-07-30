@@ -338,6 +338,10 @@ def _ensure_auto_earn_mode(page):
             "return el && !el.style.display.includes('none'); }",
             timeout=5000,
         )
+    page.wait_for_selector(
+        "select[name='schedule_earn_identifier']",
+        state="visible", timeout=5000,
+    )
 
 
 def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
