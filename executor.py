@@ -372,6 +372,14 @@ def handle_check_earns(action: Action, state: GameState):
     earn_type = action.params["earn_type"]
     page = browser.page()
 
+    # Fetch character history first — it navigates away from earn.asp.
+    import earn_planner as _ep
+    import character_history as _ch
+    try:
+        _ch.fetch_and_save(state.own_name or "")
+    except Exception:
+        pass
+
     auto_opts, available_values = _scrape_earn_catalog(page, state)
     if not available_values:
         return
@@ -399,12 +407,6 @@ def handle_check_earns(action: Action, state: GameState):
 
     available_capacity = QUEUE_MAX - current_count
 
-    import earn_planner as _ep
-    import character_history as _ch
-    try:
-        _ch.fetch_and_save(state.own_name or "")
-    except Exception:
-        pass
     queue_rows = _parse_earn_queue_rows(earn_soup)
     limits = cfg.load().get("earn_planner", {}).get("limits", {})
 
