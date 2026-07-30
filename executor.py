@@ -392,6 +392,11 @@ def handle_check_earns(action: Action, state: GameState):
     available_capacity = QUEUE_MAX - current_count
 
     import earn_planner as _ep
+    import character_history as _ch
+    try:
+        _ch.fetch_and_save(state.own_name or "")
+    except Exception:
+        pass
     queue_rows = _parse_earn_queue_rows(earn_soup)
     limits = cfg.load().get("earn_planner", {}).get("limits", {})
 
@@ -506,33 +511,48 @@ def _earn_data_earn(schedule_value: str):
     return None
 
 
-def _try_quick_earn(page, display_name: str, state: GameState) -> bool:
+def _try_quick_earn(page, display_name: str, schedule_value: str, state: GameState) -> bool:
     links = page.query_selector_all("a[href*='doLoadfastincome']")
     for link in links:
         href = link.get_attribute("href") or ""
         match = re.search(r"doLoadfastincome\('([^']+)'", href)
-        if match and match.group(1).lower() == display_name.lower():
-            link.click()
+        if not match:
+            continue
+        lastearn_text = match.group(1)
+        catalog = _load_earn_catalog()
+        matched = False
+        if lastearn_text.lower() == display_name.lower():
+            matched = True
+        else:
+            for entry in catalog:
+                if entry.get("schedule_value") == schedule_value:
+                    if entry.get("lastearn_name", "").lower() == lastearn_text.lower():
+                        matched = True
+                    break
+        if not matched:
+            continue
+        link.click()
+        try:
+            page.wait_for_load_state("domcontentloaded", timeout=10000)
+        except Exception:
+            pass
+        try:
+            page.wait_for_selector("input[name='lastearn']", timeout=5000)
+        except Exception:
+            pass
+        lastearn = page.query_selector("input[name='lastearn']")
+        if lastearn:
+            lastearn.click()
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=10000)
             except Exception:
                 pass
-            try:
-                page.wait_for_selector("input[name='lastearn']", timeout=5000)
-            except Exception:
-                pass
-            lastearn = page.query_selector("input[name='lastearn']")
-            if lastearn:
-                lastearn.click()
-                try:
-                    page.wait_for_load_state("domcontentloaded", timeout=10000)
-                except Exception:
-                    pass
-                state.add_log(f"Manual earn: quick-earn '{display_name}' — submitted via lastearn.")
-            else:
-                state.add_log(f"Manual earn: quick-earn '{display_name}' — lastearn input not found.")
-            _refresh_state(state)
-            return True
+            state.add_log(f"Manual earn: quick-earn '{display_name}' — submitted via lastearn.")
+            _map_lastearn_to_catalog(lastearn_text, schedule_value)
+        else:
+            state.add_log(f"Manual earn: quick-earn '{display_name}' — lastearn input not found.")
+        _refresh_state(state)
+        return True
     return False
 
 
@@ -556,18 +576,39 @@ def _ensure_manual_earn_mode(page, state: GameState):
     state.add_log("Switched to MANUAL earn mode.")
 
 
+def _map_lastearn_to_catalog(lastearn_text: str, schedule_value: str):
+    """Update the earn catalog so the lastearn display name maps to the schedule_value."""
+    import paths, os, json as _json
+    path = os.path.join(paths.data_dir(), "available_earns.json")
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            entries = _json.load(f)
+    except Exception:
+        return
+    for entry in entries:
+        if entry.get("schedule_value") == schedule_value:
+            if entry.get("lastearn_name") != lastearn_text:
+                entry["lastearn_name"] = lastearn_text
+                with open(path, "w", encoding="utf-8") as f:
+                    _json.dump(entries, f, indent=2)
+            return
+
+
 def handle_manual_earn(action: Action, state: GameState):
     earn_type = action.params["earn_type"]
     page = browser.page()
     display_name = _earn_display_name(earn_type)
 
-    if _try_quick_earn(page, display_name, state):
+    if _try_quick_earn(page, display_name, earn_type, state):
         return
 
     _nav(_u("/income/earn.asp"), state)
     if not _check_session(state):
         return
 
+    _scrape_earn_catalog(page, state)
     _ensure_manual_earn_mode(page, state)
 
     data_earn = _earn_data_earn(earn_type)
@@ -604,6 +645,13 @@ def handle_manual_earn(action: Action, state: GameState):
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
     state.add_log(f"Manual earn: worked '{display_name}'.")
+
+    for lnk in page.query_selector_all("a[href*='doLoadfastincome']"):
+        href = lnk.get_attribute("href") or ""
+        m = re.search(r"doLoadfastincome\('([^']+)'", href)
+        if m:
+            _map_lastearn_to_catalog(m.group(1), earn_type)
+            break
 
 
 def _get_online_local_players(state: GameState) -> list:
