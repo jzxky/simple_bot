@@ -3922,7 +3922,7 @@ def handle_travel(action: Action, state: GameState) -> int:
             should_turn_in = (
                 warrant_mode == "all"
                 or (warrant_mode == "failed_no_jail"   and is_failed and not jail_nz)
-                or (warrant_mode == "failed_incl_jail" and is_failed and jail_nz)
+                or (warrant_mode == "failed_incl_jail" and is_failed)
             )
 
             if should_turn_in:
