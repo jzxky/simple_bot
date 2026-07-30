@@ -1522,6 +1522,7 @@
           <button class="tab-btn" onclick="showTab('pl-tab-groups', this)">Groups</button>
           <button class="tab-btn" onclick="showTab('pl-tab-dead', this); plRenderRecentDead()">Obituaries</button>
           <button class="tab-btn" onclick="showTab('pl-tab-born', this); plRenderRecentBorn()">Births</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-topjobs', this); plLoadTopJobs()">Top Jobs</button>
         </div>
 
         <!-- Player List tab -->
@@ -1737,6 +1738,13 @@
                 <tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- Top Jobs tab -->
+        <div id="pl-tab-topjobs" class="tab-panel">
+          <div id="pl-topjobs-content" style="margin-top:8px">
+            <p style="padding:12px;color:var(--text-muted);text-align:center">Click to load top jobs…</p>
           </div>
         </div>
       </div>

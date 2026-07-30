@@ -15,6 +15,7 @@ import player_db as _db
 _db.init_db()
 
 DEAD_CITIES = {"heaven", "hell", "locked"}
+EXCLUDED_CITIES = {"manila"}
 _DEFAULT_REFRESH_INTERVAL = 30 * 60
 
 
@@ -76,6 +77,8 @@ def _refresh_impl() -> "tuple[int, int]":
         if not name:
             continue
         homecity   = p.get("userHomeCity", "")
+        if homecity.lower() in EXCLUDED_CITIES:
+            continue
         occupation = p.get("userOccupation", p.get("userJob", ""))
         rank       = p.get("userRank", "")
         pic_url    = p.get("userPicLink", "")
