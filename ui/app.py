@@ -95,6 +95,10 @@ def _merge_changed(target: dict, before: dict, after: dict):
             _merge_changed(tv, bv, av)
         elif av != bv:
             target[k] = av
+    if isinstance(before, dict):
+        for k in before:
+            if k not in after:
+                target.pop(k, None)
 
 
 def _apply_payload(c: dict, data: dict) -> dict:
