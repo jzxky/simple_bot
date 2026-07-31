@@ -5020,7 +5020,7 @@ class ActionExecutor:
                     state.add_log(f"Error executing {action.kind}: {e}")
 
                 # Recovery — get the browser back to a known safe page
-                if "Page crashed" in err or "has been closed" in err:
+                if "Page crashed" in err or "has been closed" in err or "ERR_INSUFFICIENT_RESOURCES" in err:
                     state.add_log("Browser/page lost — restarting browser.")
                     try:
                         headless = cfg.load().get("misc", {}).get("headless", False)
