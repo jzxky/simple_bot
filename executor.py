@@ -3556,33 +3556,25 @@ def handle_check_journals(action: Action, state: GameState):
         _save_journals(char, data)
         state.journals_updated_at = time.time()
 
-    # The new-journals indicator stays lit on the first journal view, so it's
-    # unreliable. Instead, only visit the requests page when the journal page shows
-    # a pending-requests count — a "requests" link with "(n)" where n > 0.
-    pending_requests = 0
-    req_link = soup.find("a", href=lambda h: h and "display=requests" in h)
-    if req_link:
-        m = re.search(r"\((\d+)\)", req_link.get_text())
-        if m:
-            pending_requests = int(m.group(1))
-    if pending_requests > 0:
-        _nav(_u("/journal/journal.asp?display=requests"), state)
-        req_soup = BeautifulSoup(state.page_html, "html.parser")
-        req_entries = _parse_journal_rows(req_soup)
-        for e in req_entries:
-            if e["id"] not in data:
-                e["type"] = "requests"
-                accept_url, decline_url = _extract_action_urls_from_soup(req_soup, e["id"])
-                if accept_url:
-                    e["accept_url"] = accept_url
-                if decline_url:
-                    e["decline_url"] = decline_url
-                data[e["id"]] = e
-                changed = True
-        if changed:
-            _save_journals(char, data)
-            state.journals_updated_at = time.time()
-        state.add_log(f"Journals: {pending_requests} pending request(s) — checked requests page.")
+    # Always check the requests page — the journal indicator doesn't reliably
+    # distinguish events from requests, and the count badge may not appear.
+    _nav(_u("/journal/journal.asp?display=requests"), state)
+    req_soup = BeautifulSoup(state.page_html, "html.parser")
+    req_entries = _parse_journal_rows(req_soup)
+    for e in req_entries:
+        if e["id"] not in data:
+            e["type"] = "requests"
+            accept_url, decline_url = _extract_action_urls_from_soup(req_soup, e["id"])
+            if accept_url:
+                e["accept_url"] = accept_url
+            if decline_url:
+                e["decline_url"] = decline_url
+            data[e["id"]] = e
+            changed = True
+    if changed:
+        _save_journals(char, data)
+        state.journals_updated_at = time.time()
+        state.add_log(f"Journals: {len(req_entries)} request(s) found — checked requests page.")
 
     state.has_new_journals = False
 
