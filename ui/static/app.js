@@ -1939,9 +1939,11 @@ document.addEventListener("DOMContentLoaded", () => {
   _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
   toggleEventConsumeSettings();
   toggleWarModeLink();
+  loadEarnPlanner();
   // Capture the baseline the diff-based save compares against, once dynamic
   // tables/summaries have populated from the server-rendered values.
-  setTimeout(() => { _savedConfig = _buildPayload(); }, 1500);
+  // Delay must be long enough for loadEarnPlanner fetch to complete.
+  setTimeout(() => { _savedConfig = _buildPayload(); }, 2500);
 });
 
 // Up/down reorder for priority tables
