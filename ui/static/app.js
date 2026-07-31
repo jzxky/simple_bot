@@ -739,12 +739,14 @@ function applyEarnCategoryRename(btn) {
   input.dataset.orig = next;
   input.dataset.dirty = "";
   _renderEarnCategoryEditor();
+  _renderEarnCatalogRows();
 }
 
 function deleteEarnCategory(cat) {
   if (!confirm(`Delete category "${cat}"? Its earns will move to Uncategorized.`)) return;
   _earnCatalog = _earnCatalog.map(e => e.category === cat ? {...e, category: "Uncategorized"} : e);
   _renderEarnCategoryEditor();
+  _renderEarnCatalogRows();
 }
 
 function addEarnCategory() {
@@ -756,6 +758,7 @@ function addEarnCategory() {
   _earnCatalog.push({ label: "__placeholder__", schedule_value: "", category: name, available: false });
   input.value = "";
   _renderEarnCategoryEditor();
+  _renderEarnCatalogRows();
 }
 
 function _renderEarnCatalogRows() {
@@ -766,7 +769,8 @@ function _renderEarnCatalogRows() {
   for (const entry of sorted) {
     const avail = entry.available === true ? "✓" : entry.available === false ? "✗" : "—";
     const availColor = entry.available === true ? "#a6e3a1" : entry.available === false ? "#f38ba8" : "var(--muted)";
-    const catOptions = _EARN_CATEGORIES.map(c =>
+    const allCats = [...new Set([..._EARN_CATEGORIES, ..._earnCategoryList()])];
+    const catOptions = allCats.map(c =>
       `<option value="${c}" ${entry.category === c ? "selected" : ""}>${c}</option>`
     ).join("");
     const tr = document.createElement("tr");
