@@ -238,7 +238,7 @@ function _buildPayload() {
     earns_enabled: document.getElementById("earns_enabled").checked,
     earn_mode: document.getElementById("earn_mode").value,
     earn_type: document.getElementById("earn_type").value,
-    earn_planner_limits: _earnPlannerLimits,
+    earn_planner_limits: {..._earnPlannerLimits},
     crimes_enabled: document.getElementById("crimes_enabled").checked,
     primary_crime: document.getElementById("primary_crime").value,
     primary_threshold: document.getElementById("primary_threshold").value,
