@@ -5028,13 +5028,13 @@ class ActionExecutor:
                     state.add_log(f"Error executing {action.kind}: {e}")
 
                 # Recovery — get the browser back to a known safe page
-                if "Page crashed" in err:
-                    state.add_log("Page crashed — restarting browser.")
+                if "Page crashed" in err or "has been closed" in err:
+                    state.add_log("Browser/page lost — restarting browser.")
                     try:
                         headless = cfg.load().get("misc", {}).get("headless", False)
                         browser.stop()
                         browser.start(headless=headless)
-                        state.add_log("Browser restarted after crash.")
+                        state.add_log("Browser restarted — will re-login on next tick.")
                         state.logged_in = False
                     except Exception as restart_err:
                         state.add_log(f"Browser restart failed: {restart_err}")
