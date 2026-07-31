@@ -316,6 +316,21 @@ def save():
         after  = _apply_payload(copy.deepcopy(c_live), data)
         _merge_changed(c_live, before, after)
         c = c_live
+        # Earn planner limits are a self-contained dict — always write directly
+        # to avoid diff-merge issues with mutable object references.
+        if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
+            import earn_planner as _ep
+            clean = {}
+            for k, v in data["earn_planner_limits"].items():
+                if k not in _ep.HISTORY_NAME:
+                    continue
+                try:
+                    n = int(v)
+                except (TypeError, ValueError):
+                    continue
+                if n > 0:
+                    clean[k] = n
+            c.setdefault("earn_planner", {})["limits"] = clean
         creds_changed = (data.get("email") != base.get("email")
                          or data.get("password") != base.get("password"))
         pin_changed = (data.get("pin_required") != base.get("pin_required")
