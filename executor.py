@@ -331,6 +331,10 @@ def _parse_earn_queue_rows(soup) -> list:
 
 def _ensure_auto_earn_mode(page):
     """Make sure the AUTO earn panel is visible (it can collapse after a page reload)."""
+    try:
+        page.wait_for_selector("div.mm-earn-mode-auto", timeout=5000)
+    except Exception:
+        return
     auto_div = page.query_selector("div.mm-earn-mode-auto")
     if not auto_div:
         return
