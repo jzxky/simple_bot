@@ -2552,6 +2552,22 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
     (/jail/duty.asp). If the auto queue is active (manual panel hidden), clear
     the queue and toggle to manual first, then submit one Work."""
     page = browser.page()
+
+    # Clear any auto queue first — check on duties.asp (plural) before
+    # navigating to the manual form on duty.asp (singular).
+    _nav(_u("/jail/duties.asp"), state)
+    if not _check_session(state):
+        return
+    try:
+        page.wait_for_selector("div.mm-earn-mode-auto", timeout=5000)
+    except Exception:
+        pass
+    auto_div = page.query_selector("div.mm-earn-mode-auto")
+    if auto_div:
+        auto_style = auto_div.get_attribute("style") or ""
+        if "display: none" not in auto_style and "display:none" not in auto_style:
+            handle_clear_jail_duty_queue(Action("clear_jail_duty_queue"), state)
+
     _nav(_u("/jail/duty.asp"), state)
     if not _check_session(state):
         return
@@ -2568,12 +2584,7 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
 
     style = manual.get_attribute("style") or ""
     if "display: none" in style or "display:none" in style:
-        # Auto queue is active — clear it, then switch to manual mode.
-        clear_btn = page.query_selector("button.mm-earn-queue-clear-btn")
-        if clear_btn:
-            clear_btn.click()
-            page.wait_for_load_state("domcontentloaded")
-            state.add_log("Jail duties: cleared queue before manual work.")
+        # Toggle to manual mode.
         knob = page.query_selector("span.mm-earn-toggle-knob")
         if knob:
             knob.click()

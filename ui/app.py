@@ -346,8 +346,12 @@ def save():
                      pin_required=data.get("pin_required"),
                      pin=data.get("ui_pin"))
 
-    if c.get("jail", {}).get("duty", "laundry") != prev_duty and bot.is_running():
+    new_duty = c.get("jail", {}).get("duty", "laundry")
+    _MANUAL_DUTIES = {"makeshank", "digtunnel"}
+    if new_duty != prev_duty and bot.is_running():
         bot.request_clear_jail_duty_queue()
+        if prev_duty in _MANUAL_DUTIES and new_duty not in _MANUAL_DUTIES:
+            bot.request_run_jail_duties()
 
     cfg.save(c)
     settings_rev.bump()
