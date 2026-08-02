@@ -513,7 +513,7 @@ def _run(c: dict):
             sched.tick(state, executor)
             _scheduler_snapshot = sched.snapshot(state)
 
-            if not _startup_earns_done and state.logged_in:
+            if not _startup_earns_done and state.logged_in and not state.in_jail:
                 _startup_earns_done = True
                 state.add_log("Startup: refreshing earn catalog.")
                 try:
