@@ -2556,6 +2556,11 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
     if not _check_session(state):
         return
 
+    try:
+        page.wait_for_selector("div.mm-earn-mode-manual", timeout=5000)
+    except Exception:
+        state.add_log("Jail duties: manual panel not found.")
+        return
     manual = page.query_selector("div.mm-earn-mode-manual")
     if manual is None:
         state.add_log("Jail duties: manual panel not found.")
