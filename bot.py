@@ -104,6 +104,7 @@ _travel_dests_request: queue.Queue = queue.Queue(maxsize=1)
 _travel_dests_result: queue.Queue = queue.Queue(maxsize=1)
 _clear_earn_event = threading.Event()
 _clear_jail_duty_queue_event = threading.Event()
+_run_jail_duties_event = threading.Event()
 _respect_refresh_queue: queue.Queue = queue.Queue()
 _ws_monitor_queue: queue.Queue = queue.Queue()
 _profile_request: queue.Queue = queue.Queue(maxsize=1)
@@ -580,6 +581,12 @@ def _run(c: dict):
                 _clear_jail_duty_queue_event.clear()
                 executor.execute(Action("clear_jail_duty_queue"), state)
 
+            # Run jail duties immediately (e.g. after switching from manual to auto)
+            if _run_jail_duties_event.is_set():
+                _run_jail_duties_event.clear()
+                duty = c.get("jail", {}).get("duty", "laundry")
+                executor.execute(Action("jail_duties", duty=duty), state)
+
             # Jailed notification — fires once when in_jail flips True
             if state.in_jail and not _was_in_jail:
                 if c.get("notifications", {}).get("jailed", False):
@@ -812,6 +819,10 @@ def request_clear_earn_queue():
 
 def request_clear_jail_duty_queue():
     _clear_jail_duty_queue_event.set()
+
+
+def request_run_jail_duties():
+    _run_jail_duties_event.set()
 
 
 def request_bar_threads(timeout: float = 15.0) -> dict:
