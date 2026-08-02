@@ -48,6 +48,8 @@ class AutoPromoTask(Task):
             return False
         if not state.in_jail and is_jail_rank:
             return False
+        if state.in_jail and state.rank == "Lifer":
+            return False
         if state.rank_progress < 100:
             return False
         if state.snipe_top_job_pending:
