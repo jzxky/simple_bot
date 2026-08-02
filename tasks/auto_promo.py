@@ -1,6 +1,6 @@
 """
-Checks main.asp when rank_progress = 100% and submits the configured A/B choice
-if the game redirects to a promotion page.
+Checks main.asp (or jail.asp for jail ranks) when rank_progress = 100% and
+submits the configured A/B choice if the game redirects to a promotion page.
 
 Runs when auto-promo is enabled (regular ranks; top jobs are left to the
 sniper). Additionally, when top-job monitoring is on but auto-promo is off, it
@@ -26,6 +26,8 @@ _EXCLUDED_RANKS = {
     "Hospital Director", "Boss", "Godfather", "Capo di tutti capi",
 }
 
+_JAIL_RANKS = {"Schooled", "Mule", "Hardrock", "Lifer"}
+
 # The top jobs the sniper monitors — completed here as a fallback when top-job
 # monitoring is on, even if auto-promo itself is toggled off.
 _MONITORED_TOP_JOBS = set(_TOP_JOB_MAP)
@@ -39,7 +41,12 @@ class AutoPromoTask(Task):
         self._last_run: float = 0.0
 
     def can_run(self, state: GameState) -> bool:
-        if not state.logged_in or state.in_jail or state.in_hospital:
+        if not state.logged_in or state.in_hospital:
+            return False
+        is_jail_rank = state.next_rank in _JAIL_RANKS
+        if state.in_jail and not is_jail_rank:
+            return False
+        if not state.in_jail and is_jail_rank:
             return False
         if state.rank_progress < 100:
             return False
@@ -68,8 +75,9 @@ class AutoPromoTask(Task):
     def run(self, state: GameState, executor):
         self._last_run = time.monotonic()
 
+        landing = "/jail/jail.asp" if state.next_rank in _JAIL_RANKS else "/main.asp"
         try:
-            html = browser.navigate(urls.BASE_URL + "/main.asp")
+            html = browser.navigate(urls.BASE_URL + landing)
             parse_state(html, browser.current_url(), state)
         except Exception as e:
             state.add_log(f"AutoPromo: nav error: {e}")
