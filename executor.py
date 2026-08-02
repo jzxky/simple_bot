@@ -3691,16 +3691,27 @@ def handle_check_warrants(action: Action, state: GameState):
 def handle_turn_in_warrant(action: Action, state: GameState):
     url = action.params["url"]
     case_id = action.params.get("case_id", "")
+    jail_time = action.params.get("jail_time", "")
+    css = action.params.get("css", "")
+    fine = action.params.get("fine", "")
+    defense = action.params.get("defense", "")
+    details = ", ".join(p for p in [
+        f"jail: {jail_time}" if jail_time else "",
+        f"CS: {css}" if css else "",
+        f"fine: {fine}" if fine else "",
+        f"defense: {defense}" if defense else "",
+    ] if p)
     _nav(url, state)
     soup = BeautifulSoup(state.page_html, "html.parser")
     success = soup.find("div", id="success")
     fail = soup.find("div", id="fail")
+    detail_str = f" ({details})" if details else ""
     if success:
-        state.add_log(f"Warrant {case_id}: turned in — {success.get_text(strip=True)}")
+        state.add_log(f"Warrant {case_id}{detail_str}: turned in — {success.get_text(strip=True)}")
     elif fail:
-        state.add_log(f"Warrant {case_id}: failed — {fail.get_text(strip=True)}")
+        state.add_log(f"Warrant {case_id}{detail_str}: failed — {fail.get_text(strip=True)}")
     else:
-        state.add_log(f"Warrant {case_id}: submitted.")
+        state.add_log(f"Warrant {case_id}{detail_str}: submitted.")
 
 
 # ---------------------------------------------------------------------------
@@ -3906,7 +3917,9 @@ def handle_travel(action: Action, state: GameState) -> int:
 
             if should_turn_in:
                 handle_turn_in_warrant(
-                    Action("turn_in_warrant", url=w["turn_in_url"], case_id=w["case_id"]),
+                    Action("turn_in_warrant", url=w["turn_in_url"], case_id=w["case_id"],
+                           jail_time=w.get("jail_time", ""), css=w.get("css", ""),
+                           fine=w.get("fine", ""), defense=w.get("defense", "")),
                     state,
                 )
                 turned_in_ids.add(w["case_id"])
