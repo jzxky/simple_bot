@@ -2548,16 +2548,15 @@ def _pick_jail_duty(duty: str, available: list) -> "str | None":
 
 
 def _handle_jail_duty_manual(duty: str, state: GameState):
-    """Make Shank / Dig a tunnel are only on the manual jail-duty form
-    (/jail/duty.asp). If the auto queue is active (manual panel hidden), clear
+    """Make Shank / Dig a tunnel are on the manual jail-duty form
+    (/jail/duties.asp). If the auto queue is active (manual panel hidden), clear
     the queue and toggle to manual first, then submit one Work."""
     page = browser.page()
-
-    # Clear any auto queue first — check on duties.asp (plural) before
-    # navigating to the manual form on duty.asp (singular).
     _nav(_u("/jail/duties.asp"), state)
     if not _check_session(state):
         return
+
+    # If auto form is visible (queue active), clear it first.
     try:
         page.wait_for_selector("div.mm-earn-mode-auto", timeout=5000)
     except Exception:
@@ -2567,10 +2566,9 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
         auto_style = auto_div.get_attribute("style") or ""
         if "display: none" not in auto_style and "display:none" not in auto_style:
             handle_clear_jail_duty_queue(Action("clear_jail_duty_queue"), state)
-
-    _nav(_u("/jail/duty.asp"), state)
-    if not _check_session(state):
-        return
+            _nav(_u("/jail/duties.asp"), state)
+            if not _check_session(state):
+                return
 
     try:
         page.wait_for_selector("div.mm-earn-mode-manual", timeout=5000)
