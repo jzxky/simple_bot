@@ -1201,9 +1201,13 @@ def api_top_jobs():
     ]
     now_utc = datetime.now(timezone.utc)
     all_p = _db.get_all_players()
-    holders = [p for p in all_p if p.get("occupation") in TOP_JOBS and p.get("active", 1)]
+    _RANK_JOBS = {"Commissioner-General"}
+    holders = [p for p in all_p
+               if (p.get("occupation") in TOP_JOBS or p.get("rank") in _RANK_JOBS)
+               and p.get("active", 1)]
     result = []
     for p in holders:
+        matched_job = p.get("rank") if p.get("rank") in _RANK_JOBS else p.get("occupation")
         history = _db.get_career_history(p["username"])
         duration_secs = None
         for entry in history:
@@ -1218,7 +1222,7 @@ def api_top_jobs():
                 break
         result.append({
             "username": p["username"],
-            "occupation": p["occupation"],
+            "occupation": matched_job,
             "homecity": p.get("homecity", ""),
             "rank": p.get("rank", ""),
             "duration_secs": duration_secs,
