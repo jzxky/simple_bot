@@ -3644,9 +3644,12 @@ def handle_journal_action(action: Action, state: GameState):
     if not action_url:
         state.add_log("Journal action: no URL provided.")
         return
-    full = _u(action_url) if action_url.startswith("/") else (
-        action_url if action_url.startswith("http") else _u("/" + action_url)
-    )
+    if action_url.startswith("http"):
+        full = action_url
+    elif action_url.startswith("/"):
+        full = _u(action_url)
+    else:
+        full = _u("/journals/" + action_url)
     _nav(full, state)
     if not _check_session(state):
         return
