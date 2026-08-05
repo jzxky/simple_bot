@@ -83,6 +83,8 @@ _MIGRATIONS = [
     ("players",  "godfather",             "TEXT DEFAULT ''"),
     ("players",  "crew_name",             "TEXT DEFAULT ''"),
     ("players",  "capos",                 "TEXT DEFAULT ''"),
+    ("players",  "alias",                "TEXT DEFAULT ''"),
+    ("players",  "notes",                "TEXT DEFAULT ''"),
 ]
 
 
@@ -241,7 +243,7 @@ def get_all_players() -> list:
                           group_name, agg_crimes, case_work,
                           character_age, jail_age, died_at, born_at, pic_url,
                           monitoring, sex, wealth, scripting, godfather,
-                          crew_name, capos, scraped_at
+                          crew_name, capos, scraped_at, alias, notes
                    FROM players ORDER BY username COLLATE NOCASE"""
             ).fetchall()
             result = []
@@ -493,6 +495,18 @@ def set_assignment(username: str, context: str, value: str):
                 f"UPDATE players SET {col}=?, assignments_updated_at=? WHERE username=?",
                 (value, ts, username),
             )
+            con.commit()
+        finally:
+            con.close()
+
+
+def set_player_field(username: str, field: str, value: str):
+    if field not in ("alias", "notes"):
+        return
+    with _lock:
+        con = _conn()
+        try:
+            con.execute(f"UPDATE players SET {field}=? WHERE username=?", (value, username))
             con.commit()
         finally:
             con.close()

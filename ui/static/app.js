@@ -3332,6 +3332,7 @@ function _plRebuildFilters() {
 
 function plFilter() {
   const search    = (document.getElementById("pl-search")?.value || "").toLowerCase();
+  const aliasFlt  = (document.getElementById("pl-filter-alias")?.value || "").toLowerCase();
   const onlineFlt = document.getElementById("pl-filter-online")?.value || "";
   const rank      = document.getElementById("pl-filter-rank")?.value || "";
   const occ       = document.getElementById("pl-filter-occupation")?.value || "";
@@ -3346,6 +3347,7 @@ function plFilter() {
   _plFiltered = _plData.filter(p => {
     if (activeOnly && !p.active) return false;
     if (search && !p.username.toLowerCase().includes(search)) return false;
+    if (aliasFlt && !(p.alias||"").toLowerCase().includes(aliasFlt)) return false;
     if (onlineFlt && _onlineStatus(p.username) !== onlineFlt) return false;
     if (rank  && p.rank !== rank) return false;
     if (occ   && p.occupation !== occ) return false;
@@ -3462,6 +3464,7 @@ function _plRenderTable() {
     rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow(${escJsStr(p.username)})" style="cursor:pointer">
       <td style="text-align:center">${dot}</td>
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
+      <td>${escHtml(p.alias||"")}</td>
       <td>${escHtml(p.rank||"—")}</td>
       <td>${escHtml(p.occupation||"—")}</td>
       <td>${escHtml(careerGrp)}</td>
@@ -3476,7 +3479,7 @@ function _plRenderTable() {
     </tr>`);
 
     if (expanded) {
-      rows.push(`<tr class="pl-detail-row"><td colspan="13"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
+      rows.push(`<tr class="pl-detail-row"><td colspan="14"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
     }
   });
   tbody.innerHTML = rows.join("");
@@ -3495,6 +3498,10 @@ function _plDetailHtml(p) {
   return `
 <div class="pl-detail-grid">
   <div class="pl-detail-item"><span class="pl-detail-label">Status</span>${p.active?"Active":"Inactive"}</div>
+  <div class="pl-detail-item">
+    <span class="pl-detail-label">Alias</span>
+    <input type="text" value="${escHtml(p.alias||'')}" onchange="plSetField(${escJsStr(p.username)}, 'alias', this.value)" onclick="event.stopPropagation()" style="width:120px" class="pl-filter-input">
+  </div>
   <div class="pl-detail-item"><span class="pl-detail-label">Character Age</span>${_fmtAge(p.character_age||0)}</div>
   <div class="pl-detail-item"><span class="pl-detail-label">Jail Age</span>${_fmtAge(p.jail_age||0)}</div>
   <div class="pl-detail-item">
@@ -3528,6 +3535,12 @@ ${p.scraped_at ? `<div class="pl-detail-grid" style="margin-top:6px">
   <div class="pl-detail-item"><span class="pl-detail-label">Crew</span>${escHtml(p.crew_name||"—")}</div>
   <div class="pl-detail-item"><span class="pl-detail-label">Capos</span>${escHtml(p.capos||"—")}</div>
 </div>` : ''}
+<div class="pl-detail-item" style="margin-top:6px">
+  <span class="pl-detail-label">Notes</span>
+  <textarea rows="3" style="width:100%;resize:vertical;font-size:0.85rem" class="pl-filter-input"
+    onclick="event.stopPropagation()"
+    onchange="plSetField(${escJsStr(p.username)}, 'notes', this.value)">${escHtml(p.notes||'')}</textarea>
+</div>
 <div class="pl-history-toggle" onclick="plLoadHistory(${escJsStr(p.username)}, '${histId}', this); event.stopPropagation()">
   ▸ Show Career History
 </div>
@@ -3864,6 +3877,17 @@ function plSetAssignment(username, context, value) {
   }).then(() => {
     const p = _plData.find(x => x.username === username);
     if (p) p[context] = value;
+    _plRenderTable();
+  }).catch(() => {});
+}
+
+function plSetField(username, field, value) {
+  fetch("/players/set_field", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username, field, value}),
+  }).then(() => {
+    const p = _plData.find(x => x.username === username);
+    if (p) p[field] = value;
     _plRenderTable();
   }).catch(() => {});
 }

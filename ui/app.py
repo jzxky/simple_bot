@@ -1252,6 +1252,14 @@ def players_assign():
     return jsonify({"ok": True})
 
 
+@app.route("/players/set_field", methods=["POST"])
+def players_set_field():
+    import player_db as _db
+    data = request.get_json()
+    _db.set_player_field(data["username"], data["field"], data.get("value", ""))
+    return jsonify({"ok": True})
+
+
 @app.route("/promo/bar_threads")
 def promo_bar_threads():
     if not bot.is_running():
