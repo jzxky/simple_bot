@@ -374,3 +374,24 @@ def save(cfg):
     with _lock:
         with open(CONFIG_PATH, "w") as f:
             json.dump(safe, f, indent=2)
+
+
+def blind_eye_queue_add(name: str):
+    cfg = load()
+    q = cfg.get("blind_eye_queue", [])
+    q.append(name)
+    cfg["blind_eye_queue"] = q
+    save(cfg)
+
+
+def blind_eye_queue_peek() -> list[str]:
+    return load().get("blind_eye_queue", [])
+
+
+def blind_eye_queue_remove(name: str):
+    cfg = load()
+    q = cfg.get("blind_eye_queue", [])
+    if name in q:
+        q.remove(name)
+    cfg["blind_eye_queue"] = q
+    save(cfg)
