@@ -199,12 +199,28 @@ def set_repair_complete_queue(q: "queue.Queue"):
     _repair_complete_queue = q
 
 
+_blind_eye_queue: "queue.Queue | None" = None
+_journal_action_queue: "queue.Queue | None" = None
+
+
+def set_blind_eye_queue(q: "queue.Queue"):
+    global _blind_eye_queue
+    _blind_eye_queue = q
+
+
+def set_journal_action_queue(q: "queue.Queue"):
+    global _journal_action_queue
+    _journal_action_queue = q
+
+
 def dispatch_journal_action(entry: dict, state: GameState):
     import config as cfg
     if entry.get("title") == "Drug Trade Offer":
         if cfg.load().get("autobuy", {}).get("enabled", False):
             if _drug_trade_queue is not None:
                 _drug_trade_queue.put(True)
+    if entry.get("title") == "Drug Smuggle":
+        _handle_drug_smuggle(entry, state)
     if entry.get("title") == "Illness":
         if _FLU_TEXT in entry.get("text", "").lower():
             if _illness_queue is not None:
@@ -217,6 +233,25 @@ def dispatch_journal_action(entry: dict, state: GameState):
         if "completed the repairs on your vehicle" in entry.get("text", "").lower():
             if _repair_complete_queue is not None:
                 _repair_complete_queue.put(True)
+
+
+def _handle_drug_smuggle(entry: dict, state: GameState):
+    import config as cfg
+    import re as _re
+    entry_id = entry.get("id", "")
+    text = entry.get("text", "")
+    match = _re.search(r"(\S+)\s+has offered you", text)
+    gangster_name = match.group(1) if match else ""
+    if not gangster_name:
+        state.add_log(f"Drug Smuggle (#{entry_id}): could not extract gangster name.")
+        return
+    accept_url = f"actionevent.asp?id={entry_id}&action=accept&type=Drug Smuggle"
+    if _journal_action_queue is not None:
+        _journal_action_queue.put({"url": accept_url, "entry_id": entry_id, "action_type": "accept"})
+    cfg.blind_eye_queue_add(gangster_name)
+    state.add_log(f"Drug Smuggle (#{entry_id}): accepting bribe from {gangster_name}, added to blind eye queue.")
+    if _blind_eye_queue is not None:
+        _blind_eye_queue.put(True)
 
 
 # ---------------------------------------------------------------------------
