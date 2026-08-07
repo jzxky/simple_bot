@@ -3550,9 +3550,6 @@ ${p.scraped_at ? `<div class="pl-detail-grid" style="margin-top:6px">
   <div class="pl-detail-item"><span class="pl-detail-label">Sex</span>${escHtml(p.sex||"—")}</div>
   <div class="pl-detail-item"><span class="pl-detail-label">Wealth</span>${escHtml(p.wealth||"—")}</div>
   <div class="pl-detail-item"><span class="pl-detail-label">Scripting</span>${escHtml(p.scripting||"—")}</div>
-  <div class="pl-detail-item"><span class="pl-detail-label">Godfather</span>${escHtml(p.godfather||"—")}</div>
-  <div class="pl-detail-item"><span class="pl-detail-label">Crew</span>${escHtml(p.crew_name||"—")}</div>
-  <div class="pl-detail-item"><span class="pl-detail-label">Capos</span>${escHtml(p.capos||"—")}</div>
 </div>` : ''}
 <div class="pl-detail-item" style="margin-top:6px">
   <span class="pl-detail-label">Notes</span>

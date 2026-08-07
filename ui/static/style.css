@@ -1278,6 +1278,19 @@ input.input-unsaved { color: var(--red) !important; }
 }
 .pl-history-table tr:nth-child(even) td { background: var(--surface2, rgba(255,255,255,0.03)); }
 
+/* Mobile: player detail panel — one field per line */
+@media (max-width: 600px) {
+  .pl-detail-grid {
+    flex-direction: column;
+    gap: 8px 0;
+  }
+  .pl-detail-item { flex-direction: row; align-items: center; gap: 6px; }
+  .pl-detail-label { min-width: 80px; flex-shrink: 0; }
+  .pl-detail { padding: 10px 12px; }
+  .pl-history-table th,
+  .pl-history-table td { padding: 3px 4px; font-size: 0.72rem; }
+}
+
 /* Tags & badges */
 .pl-tags { display: flex; gap: 4px; flex-wrap: wrap; }
 .pl-tag {
