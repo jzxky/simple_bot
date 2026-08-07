@@ -3699,7 +3699,7 @@ def handle_journal_action(action: Action, state: GameState):
     elif action_url.startswith("/"):
         full = _u(action_url)
     else:
-        full = _u("/journals/" + action_url)
+        full = _u("/journal/" + action_url)
     _nav(full, state)
     if not _check_session(state):
         return
