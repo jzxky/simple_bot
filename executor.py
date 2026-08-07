@@ -3638,6 +3638,7 @@ def handle_check_journals(action: Action, state: GameState):
                 e["decline_url"] = decline_url
             data[e["id"]] = e
             changed = True
+            dispatch_journal_action(e, state)
     if changed:
         _save_journals(char, data)
         state.journals_updated_at = time.time()
