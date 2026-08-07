@@ -1379,6 +1379,9 @@
 
         <!-- Journals tab -->
         <div id="cj-journals" class="tab-panel">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <button class="action-btn" onclick="cjRefresh()" style="font-size:0.78em;padding:4px 10px">Refresh</button>
+          </div>
           <div class="cj-journal-subtabs" style="display:flex;gap:6px;margin-bottom:8px">
             <button class="tab-btn active" id="cj-sub-events" onclick="cjSwitchSub('events',this)">Events</button>
             <button class="tab-btn" id="cj-sub-requests" onclick="cjSwitchSub('requests',this)">Requests</button>
@@ -1386,8 +1389,12 @@
           <div class="cj-search-row">
             <input type="text" id="cj-search" class="task-select" placeholder="Search title, text or time…"
               oninput="cjSearch()" style="flex:1;min-width:0;">
-            <label id="cj-inactive-toggle" style="display:none;font-size:0.82em;white-space:nowrap;align-items:center;gap:4px;cursor:pointer">
-              <input type="checkbox" onchange="cjToggleInactive()"> Show inactive
+          </div>
+          <div id="cj-inactive-toggle" style="display:none;margin-bottom:8px">
+            <label class="toggle-label" style="font-size:0.82em">
+              <input type="checkbox" onchange="cjToggleInactive()">
+              <span class="toggle"></span>
+              Show inactive
             </label>
           </div>
           <div id="cj-pagination-top" class="cj-pager"></div>

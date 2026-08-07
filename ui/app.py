@@ -754,6 +754,12 @@ def journal_action():
     return jsonify({"ok": True})
 
 
+@app.route("/refresh-journals", methods=["POST"])
+def refresh_journals():
+    bot.state.has_new_journals = True
+    return jsonify({"ok": True})
+
+
 @app.route("/clear-launder-cooldown", methods=["POST"])
 def clear_launder_cooldown():
     import executor
