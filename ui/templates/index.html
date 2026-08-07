@@ -1386,6 +1386,9 @@
           <div class="cj-search-row">
             <input type="text" id="cj-search" class="task-select" placeholder="Search title, text or time…"
               oninput="cjSearch()" style="flex:1;min-width:0;">
+            <label id="cj-inactive-toggle" style="display:none;font-size:0.82em;white-space:nowrap;align-items:center;gap:4px;cursor:pointer">
+              <input type="checkbox" onchange="cjToggleInactive()"> Show inactive
+            </label>
           </div>
           <div id="cj-pagination-top" class="cj-pager"></div>
           <div id="cj-list"></div>

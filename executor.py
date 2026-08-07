@@ -3628,6 +3628,8 @@ def handle_check_journals(action: Action, state: GameState):
     _nav(_u("/journal/journal.asp?display=requests"), state)
     req_soup = BeautifulSoup(state.page_html, "html.parser")
     req_entries = _parse_journal_rows(req_soup)
+    live_ids = {e["id"] for e in req_entries}
+
     for e in req_entries:
         if e["id"] not in data:
             e["type"] = "requests"
@@ -3639,10 +3641,19 @@ def handle_check_journals(action: Action, state: GameState):
             data[e["id"]] = e
             changed = True
             dispatch_journal_action(e, state)
+        elif data[e["id"]].get("status") == "inactive":
+            data[e["id"]].pop("status", None)
+            changed = True
+
+    for eid, entry in data.items():
+        if entry.get("type") == "requests" and entry.get("status") != "inactive" and eid not in live_ids:
+            entry["status"] = "inactive"
+            changed = True
+
     if changed:
         _save_journals(char, data)
         state.journals_updated_at = time.time()
-        state.add_log(f"Journals: {len(req_entries)} request(s) found — checked requests page.")
+        state.add_log(f"Journals: {len(req_entries)} active request(s) found — checked requests page.")
 
     state.has_new_journals = False
 
