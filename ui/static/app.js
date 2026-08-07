@@ -2906,6 +2906,12 @@ function cjToggleInactive() {
   cjSearch();
 }
 
+function cjRefresh() {
+  fetch("/refresh-journals", {method: "POST"})
+    .then(r => r.json())
+    .catch(() => {});
+}
+
 function cjInit() {
   fetch("/journals")
     .then(r => r.json())
