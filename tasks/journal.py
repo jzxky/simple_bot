@@ -240,7 +240,7 @@ def _handle_drug_smuggle(entry: dict, state: GameState):
     import re as _re
     entry_id = entry.get("id", "")
     text = entry.get("text", "")
-    match = _re.search(r"(\S+)\s+has offered you", text)
+    match = _re.search(r"-(\S+)\s+has offered you", text)
     gangster_name = match.group(1) if match else ""
     if not gangster_name:
         state.add_log(f"Drug Smuggle (#{entry_id}): could not extract gangster name.")
