@@ -3503,6 +3503,57 @@ def handle_check_drug_trade(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
+# Blind eye handler
+# ---------------------------------------------------------------------------
+
+def handle_blind_eye(action: Action, state: GameState):
+    import config as cfg
+    q = cfg.blind_eye_queue_peek()
+    if not q:
+        state.add_log("Blind eye: queue is empty.")
+        return
+
+    _nav(_u("/income/blindeye.asp"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    select = soup.find("select", attrs={"name": "gangster"})
+    if not select:
+        for name in list(q):
+            cfg.blind_eye_queue_remove(name)
+        state.add_log("Blind eye: no gangster selector found on page, queue cleared.")
+        return
+
+    options = {opt.get_text(strip=True): opt.get("value", "")
+               for opt in select.find_all("option") if opt.get("value", "Please") != "Please"}
+
+    for name in list(q):
+        if name in options:
+            page = browser.page()
+            page.select_option("select[name='gangster']", options[name])
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
+            _refresh_state(state)
+            result_soup = BeautifulSoup(state.page_html, "html.parser")
+            success = result_soup.find("div", id="success")
+            fail = result_soup.find("div", id="fail")
+            if success:
+                state.add_log(f"Blind eye ({name}): {success.get_text(strip=True)}")
+            elif fail:
+                state.add_log(f"Blind eye ({name}): {fail.get_text(strip=True)}")
+            else:
+                text = result_soup.get_text(" ", strip=True)[:200]
+                state.add_log(f"Blind eye ({name}): {text}")
+            cfg.blind_eye_queue_remove(name)
+            return
+
+        cfg.blind_eye_queue_remove(name)
+        state.add_log(f"Blind eye ({name}): not found in selector, removed from queue.")
+
+    state.add_log("Blind eye: no queued names matched the selector.")
+
+
+# ---------------------------------------------------------------------------
 # Journal handlers
 # ---------------------------------------------------------------------------
 
@@ -3583,6 +3634,8 @@ def handle_check_journals(action: Action, state: GameState):
     _nav(_u("/journal/journal.asp?display=requests"), state)
     req_soup = BeautifulSoup(state.page_html, "html.parser")
     req_entries = _parse_journal_rows(req_soup)
+    live_ids = {e["id"] for e in req_entries}
+
     for e in req_entries:
         if e["id"] not in data:
             e["type"] = "requests"
@@ -3593,10 +3646,20 @@ def handle_check_journals(action: Action, state: GameState):
                 e["decline_url"] = decline_url
             data[e["id"]] = e
             changed = True
+            dispatch_journal_action(e, state)
+        elif data[e["id"]].get("status") == "inactive":
+            data[e["id"]].pop("status", None)
+            changed = True
+
+    for eid, entry in data.items():
+        if entry.get("type") == "requests" and entry.get("status") != "inactive" and eid not in live_ids:
+            entry["status"] = "inactive"
+            changed = True
+
     if changed:
         _save_journals(char, data)
         state.journals_updated_at = time.time()
-        state.add_log(f"Journals: {len(req_entries)} request(s) found — checked requests page.")
+        state.add_log(f"Journals: {len(req_entries)} active request(s) found — checked requests page.")
 
     state.has_new_journals = False
 
@@ -5011,6 +5074,7 @@ HANDLERS = {
     "archive_journals": handle_archive_journals,
     "journal_action": handle_journal_action,
     "check_drug_trade": handle_check_drug_trade,
+    "do_blind_eye": handle_blind_eye,
     "check_warrants": handle_check_warrants,
     "turn_in_warrant": handle_turn_in_warrant,
     "apply_illness_treatment": handle_apply_illness_treatment,

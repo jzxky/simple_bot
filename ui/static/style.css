@@ -1044,6 +1044,9 @@ input.input-unsaved { color: var(--red) !important; }
   margin-top: 5px;
   line-height: 1.4;
 }
+.cj-entry.cj-inactive {
+  opacity: 0.45;
+}
 .cj-pager {
   display: flex;
   gap: 4px;
@@ -1256,9 +1259,8 @@ input.input-unsaved { color: var(--red) !important; }
 .pl-history-toggle:hover { opacity: 0.8; }
 
 .pl-history-table {
-  width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   margin-top: 8px;
 }
 .pl-history-table th {
@@ -1274,6 +1276,24 @@ input.input-unsaved { color: var(--red) !important; }
   border-bottom: 1px solid var(--border, #2a2a3a);
 }
 .pl-history-table tr:nth-child(even) td { background: var(--surface2, rgba(255,255,255,0.03)); }
+
+.pl-detail select { max-width: 200px; }
+
+/* Mobile: player detail panel — one field per line */
+@media (max-width: 600px) {
+  .pl-detail-grid {
+    flex-direction: column;
+    gap: 8px 0;
+  }
+  .pl-detail-item { flex-direction: row; align-items: center; gap: 6px; }
+  .pl-detail-label { min-width: 80px; flex-shrink: 0; }
+  .pl-detail { padding: 10px 12px; }
+  .pl-detail select,
+  .pl-detail textarea { max-width: 100% !important; width: 100% !important; }
+  .pl-history-table { font-size: 0.68rem; }
+  .pl-history-table th,
+  .pl-history-table td { padding: 2px 3px; }
+}
 
 /* Tags & badges */
 .pl-tags { display: flex; gap: 4px; flex-wrap: wrap; }

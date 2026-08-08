@@ -2879,6 +2879,7 @@ let _cjData = [];         // full sorted journal list
 let _cjFiltered = [];     // after search filter
 let _cjPage = 1;
 let _cjSubTab = "events"; // "events" or "requests"
+let _cjShowInactive = false;
 let _cjLastUpdated = 0;   // last journals_updated_at seen from /status
 let _chLastUpdated = 0;   // last char_history_updated_at seen from /status
 const CJ_PAGE_SIZE = 10;
@@ -2887,11 +2888,28 @@ function cjSwitchSub(tab, btn) {
   _cjSubTab = tab;
   document.querySelectorAll(".cj-journal-subtabs .tab-btn").forEach(b => b.classList.remove("active"));
   if (btn) btn.classList.add("active");
+  const toggle = document.getElementById("cj-inactive-toggle");
+  if (toggle) toggle.style.display = tab === "requests" ? "flex" : "none";
   cjSearch();
 }
 
 function _cjFilterByTab(entries) {
-  return entries.filter(e => (e.type || "events") === _cjSubTab);
+  return entries.filter(e => {
+    if ((e.type || "events") !== _cjSubTab) return false;
+    if (_cjSubTab === "requests" && !_cjShowInactive && e.status === "inactive") return false;
+    return true;
+  });
+}
+
+function cjToggleInactive() {
+  _cjShowInactive = !_cjShowInactive;
+  cjSearch();
+}
+
+function cjRefresh() {
+  fetch("/refresh-journals", {method: "POST"})
+    .then(r => r.json())
+    .catch(() => {});
 }
 
 function cjInit() {
@@ -2959,13 +2977,14 @@ function cjRender() {
   const slice = _cjFiltered.slice(start, start + CJ_PAGE_SIZE);
 
   list.innerHTML = slice.map(e => {
+    const inactive = e.status === "inactive";
     let actions = "";
-    if (_cjSubTab === "requests") {
+    if (_cjSubTab === "requests" && !inactive) {
       if (e.accept_url) actions += `<button class="action-btn" onclick="cjDoAction('${escHtml(e.id)}','${escHtml(e.accept_url)}','accept')">Accept</button>`;
       if (e.decline_url) actions += `<button class="btn-secondary" onclick="cjDoAction('${escHtml(e.id)}','${escHtml(e.decline_url)}','decline')">Decline</button>`;
     }
-    return `<div class="cj-entry" id="cje-${escHtml(e.id || '')}">
-      <span class="cj-entry-title">${escHtml(e.title || "")}</span>
+    return `<div class="cj-entry${inactive ? ' cj-inactive' : ''}" id="cje-${escHtml(e.id || '')}">
+      <span class="cj-entry-title">${escHtml(e.title || "")}${inactive ? ' <em style="font-size:0.8em;opacity:0.6">(inactive)</em>' : ''}</span>
       <span class="cj-entry-time">${escHtml(e.time || "")}</span>
       <div class="cj-entry-text">${escHtml(e.text || "")}</div>
       ${actions ? `<div class="cj-entry-actions" style="margin-top:4px;display:flex;gap:6px">${actions}</div>` : ""}
@@ -3531,22 +3550,19 @@ ${p.scraped_at ? `<div class="pl-detail-grid" style="margin-top:6px">
   <div class="pl-detail-item"><span class="pl-detail-label">Sex</span>${escHtml(p.sex||"—")}</div>
   <div class="pl-detail-item"><span class="pl-detail-label">Wealth</span>${escHtml(p.wealth||"—")}</div>
   <div class="pl-detail-item"><span class="pl-detail-label">Scripting</span>${escHtml(p.scripting||"—")}</div>
-  <div class="pl-detail-item"><span class="pl-detail-label">Godfather</span>${escHtml(p.godfather||"—")}</div>
-  <div class="pl-detail-item"><span class="pl-detail-label">Crew</span>${escHtml(p.crew_name||"—")}</div>
-  <div class="pl-detail-item"><span class="pl-detail-label">Capos</span>${escHtml(p.capos||"—")}</div>
 </div>` : ''}
+<button class="btn-secondary" id="plupdate-${escHtml(p.username)}" style="margin-top:6px"
+        onclick="plUpdatePlayer(${escJsStr(p.username)}, this); event.stopPropagation()">Update</button>
 <div class="pl-detail-item" style="margin-top:6px">
   <span class="pl-detail-label">Notes</span>
-  <textarea rows="3" style="width:100%;resize:vertical;font-size:0.85rem" class="pl-filter-input"
+  <textarea rows="3" style="max-width:400px;width:100%;resize:vertical;font-size:0.85rem" class="pl-filter-input"
     onclick="event.stopPropagation()"
     onchange="plSetField(${escJsStr(p.username)}, 'notes', this.value)">${escHtml(p.notes||'')}</textarea>
 </div>
 <div class="pl-history-toggle" onclick="plLoadHistory(${escJsStr(p.username)}, '${histId}', this); event.stopPropagation()">
   ▸ Show Career History
 </div>
-<div id="${histId}" style="display:none"></div>
-<button class="btn-secondary" id="plupdate-${escHtml(p.username)}" style="margin-top:6px"
-        onclick="plUpdatePlayer(${escJsStr(p.username)}, this); event.stopPropagation()">Update</button>`;
+<div id="${histId}" style="display:none"></div>`;
 }
 
 function plUpdatePlayer(username, btn) {
@@ -3607,10 +3623,10 @@ function plLoadHistory(username, containerId, toggleEl) {
       }
       container.innerHTML = `
 <table class="pl-history-table">
-  <thead><tr><th>Date</th><th>Rank</th><th>Occupation</th><th>City</th></tr></thead>
+  <thead><tr><th>Occupation</th><th>Rank</th><th>City</th><th>Date</th></tr></thead>
   <tbody>${rows.map(r => `<tr>
-    <td>${escHtml(r.ts||"")}</td><td>${escHtml(r.rank||"")}</td>
-    <td>${escHtml(r.occupation||"")}</td><td>${escHtml(r.homecity||"")}</td>
+    <td>${escHtml(r.occupation||"")}</td><td>${escHtml(r.rank||"")}</td>
+    <td>${escHtml(r.homecity||"")}</td><td>${escHtml((r.ts||"").replace(/^\d{4}-/,"").replace(/T/," ").replace(/:\d{2}Z$/,""))}</td>
   </tr>`).join("")}</tbody>
 </table>`;
       container.dataset.loaded = "1";

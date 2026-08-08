@@ -44,8 +44,9 @@ from tasks.character_history import CharacterHistoryTask
 from tasks.obituary_history import ObituaryHistoryTask
 from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJailBreakTask
 from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask, AutoJailConsumablesRestoreTask
-from tasks.journal import JournalCheckTask, ArchiveJournalsTask, JournalActionTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue
+from tasks.journal import JournalCheckTask, ArchiveJournalsTask, JournalActionTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue, set_journal_action_queue
 from tasks.drug_trade import DrugTradeTask
+from tasks.blind_eye import BlindEyeTask
 from tasks.illness import IllnessTask
 from tasks.gym import GymTask
 from tasks.casino import CasinoTask
@@ -94,6 +95,7 @@ _illness_queue: queue.Queue = queue.Queue()
 set_illness_queue(_illness_queue)
 _repair_complete_queue: queue.Queue = queue.Queue()
 set_repair_complete_queue(_repair_complete_queue)
+set_journal_action_queue(_journal_action_queue)
 _jail_inmates_request: queue.Queue = queue.Queue(maxsize=1)
 _jail_inmates_result: queue.Queue = queue.Queue(maxsize=1)
 _warrants_request: queue.Queue = queue.Queue(maxsize=1)
@@ -236,6 +238,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(ArchiveJournalsTask(_archive_journals_queue))
     sched.add(JournalActionTask(_journal_action_queue))
     sched.add(DrugTradeTask(_drug_trade_queue))
+    sched.add(BlindEyeTask())
     sched.add(IllnessTask(_illness_queue))
     sched.add(GymTask())
     sched.add(CasinoTask())

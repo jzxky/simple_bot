@@ -37,7 +37,7 @@ def start(headless: bool = False):
     os.makedirs(PROFILE_DIR, exist_ok=True)
     _clear_window_placement()
     _playwright = sync_playwright().start()
-    args = ["--disable-notifications", "--disable-save-password-bubble"]
+    args = ["--disable-notifications", "--disable-save-password-bubble", "--disable-wake-lock"]
     DESKTOP_UA = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
