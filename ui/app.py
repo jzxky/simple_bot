@@ -1236,6 +1236,48 @@ def api_top_jobs():
     return jsonify({"holders": result, "jobs": TOP_JOBS})
 
 
+_CAREER_GROUPS = {
+    "Hospital":     ["Nurse", "Doctor", "Surgeon", "Hospital Director"],
+    "Fire":         ["Fire Fighter", "Fire Chief"],
+    "Bank":         ["Bank Teller", "Loan Officer", "Bank Manager"],
+    "Funeral":      ["Mortician Assistant", "Mortician", "Funeral Director"],
+    "Construction": ["Mechanic", "Technician", "Engineer", "Chief Engineer"],
+    "Customs":      ["Inspector", "Supervisor", "Superintendent", "Commissioner-General"],
+}
+_OCC_TO_CATEGORY = {}
+for _cat, _ranks in _CAREER_GROUPS.items():
+    for _r in _ranks:
+        _OCC_TO_CATEGORY[_r] = _cat
+
+
+@app.route("/api/players/career_group")
+def api_career_group():
+    import player_db as _db
+    occupation = request.args.get("occupation", "")
+    city = request.args.get("city", "")
+    category = _OCC_TO_CATEGORY.get(occupation)
+    if not category or not city:
+        return jsonify({"players": []})
+    ranks_in_cat = _CAREER_GROUPS[category]
+    rank_set = set(ranks_in_cat)
+    all_p = _db.get_all_players()
+    players = []
+    for p in all_p:
+        if not p.get("active", 1):
+            continue
+        if p.get("homecity") != city:
+            continue
+        p_occ = p.get("occupation", "")
+        p_rank = p.get("rank", "")
+        matched = p_occ if p_occ in rank_set else (p_rank if p_rank in rank_set else None)
+        if not matched or matched == occupation:
+            continue
+        players.append({"username": p["username"], "occupation": matched})
+    rank_order = {r: i for i, r in enumerate(ranks_in_cat)}
+    players.sort(key=lambda x: (rank_order.get(x["occupation"], 99), x["username"]))
+    return jsonify({"players": players})
+
+
 @app.route("/api/players/<username>/history")
 def api_player_history(username):
     import player_db as _db

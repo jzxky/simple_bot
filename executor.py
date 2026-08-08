@@ -842,6 +842,7 @@ def handle_check_banking_cases(action: Action, state: GameState):
             if success:
                 laundered += 1
                 state.add_log(f"Banking {name}: {success.get_text(strip=True)}")
+                break  # case timer starts after first launder; rest would fail
             elif fail:
                 state.add_log(f"Banking {name}: transfer failed — {fail.get_text(strip=True)}")
             else:
