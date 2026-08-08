@@ -3851,13 +3851,15 @@ function plLoadTopJobs() {
             </tr></thead><tbody>`;
         jobs.forEach(job => {
           const h = cities[city][job];
+          const expandId = `tjexp-${escHtml(city)}-${escHtml(job)}`.replace(/\s+/g, '_');
           if (h) {
             const since = h.duration_secs != null ? _topJobDuration(h.duration_secs) : "—";
-            html += `<tr style="border-bottom:1px solid var(--border)">
+            html += `<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="_tjToggleCareer('${expandId}', ${escJsStr(job)}, ${escJsStr(city)})">
               <td style="padding:4px 6px">${escHtml(job)}</td>
               <td style="padding:4px 6px;font-weight:500">${escHtml(h.username)}</td>
               <td style="padding:4px 6px;color:var(--text-muted);white-space:nowrap">${since}</td>
-            </tr>`;
+            </tr>
+            <tr id="${expandId}" style="display:none"><td colspan="3" style="padding:0"></td></tr>`;
           } else {
             html += `<tr style="border-bottom:1px solid var(--border)">
               <td style="padding:4px 6px">${escHtml(job)}</td>
@@ -3882,6 +3884,31 @@ function _topJobDuration(secs) {
   const hours = Math.floor((secs % 86400) / 3600);
   if (days < 1) return hours + "h";
   return days + "d " + hours + "h";
+}
+
+function _tjToggleCareer(expandId, occupation, city) {
+  const row = document.getElementById(expandId);
+  if (!row) return;
+  if (row.style.display !== 'none') { row.style.display = 'none'; return; }
+  const cell = row.querySelector('td');
+  cell.innerHTML = '<div style="padding:4px 6px 8px;color:var(--text-muted);font-size:0.8rem">Loading…</div>';
+  row.style.display = '';
+  fetch(`/api/players/career_group?occupation=${encodeURIComponent(occupation)}&city=${encodeURIComponent(city)}`)
+    .then(r => r.json())
+    .then(data => {
+      const players = data.players || [];
+      if (!players.length) {
+        cell.innerHTML = '<div style="padding:4px 6px 8px 20px;color:var(--text-muted);font-size:0.8rem">No other players in this career path.</div>';
+        return;
+      }
+      let html = '<div style="padding:2px 6px 8px 20px;font-size:0.8rem">';
+      players.forEach(p => {
+        html += `<div style="padding:2px 0"><span style="color:var(--text-muted)">${escHtml(p.occupation)}</span> — <span style="font-weight:500">${escHtml(p.username)}</span></div>`;
+      });
+      html += '</div>';
+      cell.innerHTML = html;
+    })
+    .catch(() => { cell.innerHTML = '<div style="padding:4px 6px 8px 20px;color:var(--error);font-size:0.8rem">Failed to load.</div>'; });
 }
 
 // ── Assignments & groups ──────────────────────────────────────────────────────
