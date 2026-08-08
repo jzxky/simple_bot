@@ -3551,18 +3551,18 @@ ${p.scraped_at ? `<div class="pl-detail-grid" style="margin-top:6px">
   <div class="pl-detail-item"><span class="pl-detail-label">Wealth</span>${escHtml(p.wealth||"—")}</div>
   <div class="pl-detail-item"><span class="pl-detail-label">Scripting</span>${escHtml(p.scripting||"—")}</div>
 </div>` : ''}
+<button class="btn-secondary" id="plupdate-${escHtml(p.username)}" style="margin-top:6px"
+        onclick="plUpdatePlayer(${escJsStr(p.username)}, this); event.stopPropagation()">Update</button>
 <div class="pl-detail-item" style="margin-top:6px">
   <span class="pl-detail-label">Notes</span>
-  <textarea rows="3" style="width:100%;resize:vertical;font-size:0.85rem" class="pl-filter-input"
+  <textarea rows="3" style="max-width:400px;width:100%;resize:vertical;font-size:0.85rem" class="pl-filter-input"
     onclick="event.stopPropagation()"
     onchange="plSetField(${escJsStr(p.username)}, 'notes', this.value)">${escHtml(p.notes||'')}</textarea>
 </div>
 <div class="pl-history-toggle" onclick="plLoadHistory(${escJsStr(p.username)}, '${histId}', this); event.stopPropagation()">
   ▸ Show Career History
 </div>
-<div id="${histId}" style="display:none"></div>
-<button class="btn-secondary" id="plupdate-${escHtml(p.username)}" style="margin-top:6px"
-        onclick="plUpdatePlayer(${escJsStr(p.username)}, this); event.stopPropagation()">Update</button>`;
+<div id="${histId}" style="display:none"></div>`;
 }
 
 function plUpdatePlayer(username, btn) {
@@ -3623,10 +3623,10 @@ function plLoadHistory(username, containerId, toggleEl) {
       }
       container.innerHTML = `
 <table class="pl-history-table">
-  <thead><tr><th>Date</th><th>Rank</th><th>Occupation</th><th>City</th></tr></thead>
+  <thead><tr><th>Occupation</th><th>Rank</th><th>City</th><th>Date</th></tr></thead>
   <tbody>${rows.map(r => `<tr>
-    <td>${escHtml(r.ts||"")}</td><td>${escHtml(r.rank||"")}</td>
-    <td>${escHtml(r.occupation||"")}</td><td>${escHtml(r.homecity||"")}</td>
+    <td>${escHtml(r.occupation||"")}</td><td>${escHtml(r.rank||"")}</td>
+    <td>${escHtml(r.homecity||"")}</td><td class="pl-history-date">${escHtml(r.ts||"")}</td>
   </tr>`).join("")}</tbody>
 </table>`;
       container.dataset.loaded = "1";
