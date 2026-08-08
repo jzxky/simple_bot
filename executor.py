@@ -3515,7 +3515,9 @@ def handle_blind_eye(action: Action, state: GameState):
     soup = BeautifulSoup(state.page_html, "html.parser")
     select = soup.find("select", attrs={"name": "gangster"})
     if not select:
-        state.add_log("Blind eye: no gangster selector found on page.")
+        for name in list(q):
+            cfg.blind_eye_queue_remove(name)
+        state.add_log("Blind eye: no gangster selector found on page, queue cleared.")
         return
 
     options = {opt.get_text(strip=True): opt.get("value", "")
