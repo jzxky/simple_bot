@@ -2530,6 +2530,10 @@ def handle_clear_jail_duty_queue(action: Action, state: GameState):
     _refresh_state(state)
     state.add_log("Jail duty queue cleared.")
 
+    duty = cfg.load().get("jail", {}).get("duty", "laundry")
+    if duty in ("workshop", "kitchen", "laundry"):
+        handle_jail_duties(Action("jail_duties", duty=duty), state)
+
 
 # Jail-duty fallback order (highest tier → lowest). If the selected duty isn't
 # available, step down from its position to the first available option
@@ -3712,7 +3716,7 @@ def handle_journal_action(action: Action, state: GameState):
     elif action_url.startswith("/"):
         full = _u(action_url)
     else:
-        full = _u("/journal/" + action_url)
+        full = _u("/journals/" + action_url)
     _nav(full, state)
     if not _check_session(state):
         return
