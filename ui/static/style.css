@@ -1278,6 +1278,9 @@ input.input-unsaved { color: var(--red) !important; }
 }
 .pl-history-table tr:nth-child(even) td { background: var(--surface2, rgba(255,255,255,0.03)); }
 
+.pl-history-date { font-size: 0.7rem; white-space: nowrap; }
+.pl-detail select { max-width: 200px; }
+
 /* Mobile: player detail panel — one field per line */
 @media (max-width: 600px) {
   .pl-detail-grid {
@@ -1287,8 +1290,12 @@ input.input-unsaved { color: var(--red) !important; }
   .pl-detail-item { flex-direction: row; align-items: center; gap: 6px; }
   .pl-detail-label { min-width: 80px; flex-shrink: 0; }
   .pl-detail { padding: 10px 12px; }
+  .pl-detail select,
+  .pl-detail textarea { max-width: 100% !important; width: 100% !important; }
   .pl-history-table th,
   .pl-history-table td { padding: 3px 4px; font-size: 0.72rem; }
+  .pl-history-date { font-size: 0.65rem; }
+  .pl-history-table { table-layout: auto; }
 }
 
 /* Tags & badges */
