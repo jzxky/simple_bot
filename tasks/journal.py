@@ -199,13 +199,7 @@ def set_repair_complete_queue(q: "queue.Queue"):
     _repair_complete_queue = q
 
 
-_blind_eye_queue: "queue.Queue | None" = None
 _journal_action_queue: "queue.Queue | None" = None
-
-
-def set_blind_eye_queue(q: "queue.Queue"):
-    global _blind_eye_queue
-    _blind_eye_queue = q
 
 
 def set_journal_action_queue(q: "queue.Queue"):
@@ -250,8 +244,6 @@ def _handle_drug_smuggle(entry: dict, state: GameState):
         _journal_action_queue.put({"url": accept_url, "entry_id": entry_id, "action_type": "accept"})
     cfg.blind_eye_queue_add(gangster_name)
     state.add_log(f"Drug Smuggle (#{entry_id}): accepting bribe from {gangster_name}, added to blind eye queue.")
-    if _blind_eye_queue is not None:
-        _blind_eye_queue.put(True)
 
 
 # ---------------------------------------------------------------------------
