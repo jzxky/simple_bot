@@ -3626,7 +3626,7 @@ function plLoadHistory(username, containerId, toggleEl) {
   <thead><tr><th>Occupation</th><th>Rank</th><th>City</th><th>Date</th></tr></thead>
   <tbody>${rows.map(r => `<tr>
     <td>${escHtml(r.occupation||"")}</td><td>${escHtml(r.rank||"")}</td>
-    <td>${escHtml(r.homecity||"")}</td><td class="pl-history-date">${escHtml(r.ts||"")}</td>
+    <td>${escHtml(r.homecity||"")}</td><td>${escHtml((r.ts||"").replace(/^\d{4}-/,"").replace(/T/," ").replace(/:\d{2}Z$/,""))}</td>
   </tr>`).join("")}</tbody>
 </table>`;
       container.dataset.loaded = "1";
