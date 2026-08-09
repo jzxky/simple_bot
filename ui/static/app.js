@@ -344,6 +344,8 @@ function _buildPayload() {
     banking_auto_invest_enabled: (document.getElementById("banking_auto_invest_enabled")||{checked:false}).checked,
     banking_investment_term: (document.getElementById("banking_investment_term")||{value:"3,2.25"}).value,
     banking_invest_amount: (document.getElementById("banking_invest_amount")||{value:0}).value,
+    banking_auto_weed: (document.getElementById("banking_auto_weed")||{checked:false}).checked,
+    banking_weed_queue_threshold: (document.getElementById("banking_weed_queue_threshold")||{value:5}).value,
     smart_travel_enabled:            (document.getElementById("smart_travel_enabled")||{checked:false}).checked,
     smart_travel_store_priority:     (document.getElementById("smart_travel_store_priority")||{value:"bionics"}).value,
     smart_travel_window_vs_activity: (document.getElementById("smart_travel_window_vs_activity")||{value:"windows"}).value,

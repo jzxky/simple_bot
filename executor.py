@@ -779,20 +779,20 @@ def _parse_money(text: str) -> int:
     return int(digits) if digits else 0
 
 
-def handle_check_banking_cases(action: Action, state: GameState):
-    """Poll the bank-launder deals list; for any gangster with a balance to launder,
-    launder it and auto-transfer the cleaned funds back."""
+def _count_launder_queue(state: GameState):
+    """Navigate to banklaunder.asp, count pending deals, save to config. Returns list of (name, url)."""
     page = browser.page()
     _nav(_u("/income/banklaunder.asp"), state)
     if not _check_session(state):
-        return
+        return []
 
     soup = BeautifulSoup(page.content(), "html.parser")
     table = soup.find("table", style=lambda s: s and "90%" in s)
     if not table:
-        return
+        _save_launder_queue_size(0)
+        return []
 
-    pending = []  # (name, gangster_url)
+    pending = []
     for row in table.find_all("tr"):
         cells = row.find_all("td", class_="display_border")
         if len(cells) < 3:
@@ -808,15 +808,23 @@ def handle_check_banking_cases(action: Action, state: GameState):
         url = _u("/income/") + href if not href.startswith("http") else href
         pending.append((name, url))
 
-    if not pending:
-        return
+    _save_launder_queue_size(len(pending))
+    return pending
 
-    state.add_log(f"Banking: {len(pending)} deal(s) with money to launder.")
-    laundered = 0
+
+def _save_launder_queue_size(size: int):
+    import config as _cfg
+    c = _cfg.load()
+    c.setdefault("banking", {})["launder_queue_size"] = size
+    _cfg.save(c)
+
+
+def _do_one_launder(pending, state: GameState) -> bool:
+    """Attempt to launder the first pending deal. Returns True if successful."""
+    page = browser.page()
     for name, url in pending:
         try:
             _nav(url, state)
-            # Step 1 — select "Launder Money" (display=result) and submit
             sel = page.query_selector("select[name='display']")
             if not sel:
                 state.add_log(f"Banking {name}: launder form not found — skipping.")
@@ -825,14 +833,13 @@ def handle_check_banking_cases(action: Action, state: GameState):
             page.click("input[type='submit'][name='B1']")
             page.wait_for_load_state("domcontentloaded")
 
-            # Step 2 — Auto Funds Transfer
             transfer_btn = page.query_selector("input[name='B1'][value='Auto Funds Transfer']")
             if not transfer_btn:
                 soup2 = BeautifulSoup(page.content(), "html.parser")
                 fail = soup2.find("div", id="fail")
                 msg = fail.get_text(strip=True) if fail else "no transfer form"
                 state.add_log(f"Banking {name}: launder produced no transfer ({msg}).")
-                continue
+                return False
             transfer_btn.click()
             page.wait_for_load_state("domcontentloaded")
 
@@ -840,18 +847,76 @@ def handle_check_banking_cases(action: Action, state: GameState):
             success = soup3.find("div", id="success")
             fail = soup3.find("div", id="fail")
             if success:
-                laundered += 1
                 state.add_log(f"Banking {name}: {success.get_text(strip=True)}")
-                break  # case timer starts after first launder; rest would fail
+                return True
             elif fail:
                 state.add_log(f"Banking {name}: transfer failed — {fail.get_text(strip=True)}")
             else:
                 state.add_log(f"Banking {name}: transfer submitted (no result div).")
+            return False
         except Exception as e:
             state.add_log(f"Banking {name}: error ({e}).")
+            return False
+    return False
+
+
+def handle_check_banking_cases(action: Action, state: GameState):
+    """Poll the bank-launder deals list; launder one deal, then auto-weed loop if enabled."""
+    import config as _cfg
+
+    pending = _count_launder_queue(state)
+    if not pending:
+        return
+
+    state.add_log(f"Banking: {len(pending)} deal(s) with money to launder.")
+    laundered = 0
+
+    if _do_one_launder(pending, state):
+        laundered += 1
+
+    # Auto-weed loop: consume marijuana and repeat while conditions are met
+    c = _cfg.load()
+    banking = c.get("banking", {})
+    auto_weed = banking.get("auto_weed", False)
+    threshold = int(banking.get("weed_queue_threshold", 5))
+
+    if auto_weed and laundered:
+        cons_cfg = c.get("consumables", {})
+        cons_limit = int(cons_cfg.get("consumable_limit", 33))
+        buffer_ = int(cons_cfg.get("buffer", 0))
+
+        while True:
+            pending = _count_launder_queue(state)
+            queue_size = len(pending)
+            used_24h = state.consumables_24h or 0
+            headroom = (cons_limit - buffer_) - used_24h
+
+            if queue_size < threshold:
+                state.add_log(f"Auto-weed: queue {queue_size} < threshold {threshold}, stopping.")
+                break
+            if headroom <= 0:
+                state.add_log(f"Auto-weed: daily limit reached ({used_24h}/{cons_limit}), stopping.")
+                break
+            if not pending:
+                break
+
+            # Consume 1x marijuana
+            consume_action = Action(kind="consume", type="marijuana", count=1)
+            handle_consume(consume_action, state)
+            state.add_log(f"Auto-weed: queue {queue_size}/{threshold}, consumed marijuana ({used_24h + 1}/{cons_limit} daily)")
+
+            # Navigate back and launder
+            pending = _count_launder_queue(state)
+            if not pending:
+                state.add_log("Auto-weed: no deals remaining after consume.")
+                break
+            if _do_one_launder(pending, state):
+                laundered += 1
+            else:
+                break
 
     _refresh_state(state)
-    state.add_log(f"Banking: laundered {laundered}/{len(pending)} deal(s).")
+    state.add_log(f"Banking: laundered {laundered} deal(s).")
 
 
 def _check_cs_punishment(state: GameState) -> bool:

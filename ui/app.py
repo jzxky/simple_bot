@@ -290,6 +290,8 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["banking"]["investment_term"] = data.get("banking_investment_term", "3,2.25")
     raw_amt = _re.sub(r"[^0-9]", "", str(data.get("banking_invest_amount", 0) or "0"))
     c["banking"]["invest_amount"] = min(int(raw_amt or 0), 1500000)
+    c["banking"]["auto_weed"] = data.get("banking_auto_weed", False)
+    c["banking"]["weed_queue_threshold"] = int(data.get("banking_weed_queue_threshold", 5) or 5)
 
     c.setdefault("notifications", {})
     for slug, _ in NOTIFICATION_EVENTS:

@@ -125,6 +125,9 @@ DEFAULT_CONFIG = {
         "auto_invest_enabled": False,
         "investment_term": "3,2.25",
         "invest_amount": 0,
+        "auto_weed": False,
+        "weed_queue_threshold": 5,
+        "launder_queue_size": 0,
     },
     "smart_travel": {
         "enabled": False,
