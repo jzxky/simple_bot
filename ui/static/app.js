@@ -210,6 +210,35 @@ function populateActionSub(selectedValue) {
     const show = type === "career_training" || type === "university" || type === "training_centre";
     fbLabel.style.display = show ? "" : "none";
   }
+  updateActionWarnings();
+}
+
+const _CS_AWAY_ALLOWED_RANKS = new Set([
+  "loan officer", "bank manager", "mortician", "undertaker", "funeral director",
+  "doctor", "surgeon", "hospital director", "technician", "engineer",
+  "chief engineer", "supervisor", "superintendent", "commissioner-general",
+  "lawyer", "judge", "supreme court judge", "sergeant", "senior sergeant",
+  "detective", "commissioner", "fire fighter", "fire chief", "mayor",
+]);
+const _CAREER_TRAINING_BLOCKED = new Set(["Customs", "Fire", "Police"]);
+
+function updateActionWarnings() {
+  const ctWarn = document.getElementById("career-training-warning");
+  const csWarn = document.getElementById("cs-away-warning");
+  if (ctWarn) {
+    const actionType = document.getElementById("action_type")?.value;
+    const occ = (_botState.occupation || "").toLowerCase();
+    const blocked = actionType === "career_training" && _CAREER_TRAINING_BLOCKED.has(_careerGroup(_botState.occupation));
+    ctWarn.style.display = blocked ? "" : "none";
+  }
+  if (csWarn) {
+    const awayType = document.getElementById("away_action_type")?.value;
+    const rank = (_botState.rank || "").toLowerCase();
+    const occ = (_botState.occupation || "").toLowerCase();
+    const eligible = _CS_AWAY_ALLOWED_RANKS.has(rank) || _CS_AWAY_ALLOWED_RANKS.has(occ);
+    const blocked = awayType === "community_service" && !eligible;
+    csWarn.style.display = blocked ? "" : "none";
+  }
 }
 
 function toggleAwayCrime() {
@@ -1030,6 +1059,7 @@ function pollStatus() {
         logged_in: !!d.logged_in, in_jail: !!d.in_jail, in_hospital: !!d.in_hospital,
         action_ready: !!d.action_ready, hold_action_timer: !!d.hold_action_timer,
         city: d.city || "", home_city: d.home_city || "",
+        occupation: d.occupation || "", rank: d.rank || "",
         cs_sentence: d.cs_sentence || 0, agg_fail_count: d.agg_fail_count || 0,
         online_players: new Set(d.online_players || []),
         local_players: new Set(d.local_players || []),
@@ -1038,6 +1068,7 @@ function pollStatus() {
       _updateStatPanel();
       _updateCharPills();
       _updatePlayerPills();
+      updateActionWarnings();
       if (!_actMenuEl && document.getElementById("pl-tab-active")?.classList.contains("active")) {
         plRenderActive();
       }

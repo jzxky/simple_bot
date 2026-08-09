@@ -8,6 +8,10 @@ from tasks.base import Task, Action
 from state import GameState
 from action_cooldowns import ACTION_COOLDOWNS, should_skip_action_for_armed_robbery
 
+_BLOCKED_OCCUPATIONS = {
+    "customs", "volunteer fire fighter", "fire fighter", "fire chief", "police officer",
+}
+
 _CAREER_PATHS = {
     "fire":    "/localcity/fire.asp",
     "customs": "/localcity/customs.asp",
@@ -27,6 +31,8 @@ class CareerTrainingTask(Task):
             return False
         if not (state.logged_in and not state.in_jail and state.action_available()
                 and state.in_home_city() and not state.hold_action_timer):
+            return False
+        if (state.occupation or "").lower() in _BLOCKED_OCCUPATIONS:
             return False
         return not should_skip_action_for_armed_robbery(state, ACTION_COOLDOWNS["career_training"])
 
