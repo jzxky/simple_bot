@@ -894,8 +894,9 @@ def handle_check_banking_cases(action: Action, state: GameState):
             if queue_size < threshold:
                 state.add_log(f"Auto-weed: queue {queue_size} < threshold {threshold}, stopping.")
                 break
+            effective_limit = cons_limit - buffer_
             if headroom <= 0:
-                state.add_log(f"Auto-weed: daily limit reached ({used_24h}/{cons_limit}), stopping.")
+                state.add_log(f"Auto-weed: daily limit reached ({used_24h}/{effective_limit}), stopping.")
                 break
             if not pending:
                 break
@@ -903,7 +904,7 @@ def handle_check_banking_cases(action: Action, state: GameState):
             # Consume 1x marijuana
             consume_action = Action(kind="consume", type="marijuana", count=1)
             handle_consume(consume_action, state)
-            state.add_log(f"Auto-weed: queue {queue_size}/{threshold}, consumed marijuana ({used_24h + 1}/{cons_limit} daily)")
+            state.add_log(f"Auto-weed: queue {queue_size}/{threshold}, consumed marijuana ({used_24h + 1}/{effective_limit} daily)")
 
             # Navigate back and launder
             pending = _count_launder_queue(state)
