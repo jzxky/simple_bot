@@ -8,6 +8,15 @@ from state import GameState
 from action_cooldowns import ACTION_COOLDOWNS, should_skip_action_for_armed_robbery
 
 
+_CS_AWAY_ALLOWED_RANKS = {
+    "loan officer", "bank manager", "mortician", "undertaker", "funeral director",
+    "doctor", "surgeon", "hospital director", "technician", "engineer",
+    "chief engineer", "supervisor", "superintendent", "commissioner-general",
+    "lawyer", "judge", "supreme court judge", "sergeant", "senior sergeant",
+    "detective", "commissioner", "fire fighter", "fire chief", "mayor",
+}
+
+
 class AwayActionTask(Task):
     priority = 60
     label = 'Away Action'
@@ -21,6 +30,11 @@ class AwayActionTask(Task):
         if not (state.logged_in and not state.in_jail and state.action_available()
                 and not state.in_home_city() and not state.hold_action_timer):
             return False
+        if self.action_type == "community_service":
+            rank_lower = (state.rank or "").lower()
+            occ_lower = (state.occupation or "").lower()
+            if rank_lower not in _CS_AWAY_ALLOWED_RANKS and occ_lower not in _CS_AWAY_ALLOWED_RANKS:
+                return False
         if self.action_type == "drug_manufacturing":
             import executor
             if executor.drug_manufacture_cooldown_active():
