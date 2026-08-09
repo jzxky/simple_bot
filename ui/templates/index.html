@@ -429,14 +429,14 @@
             <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 10px">
               Polls the launder deals list and launders any gangster's balance over $5, then auto-transfers the cleaned funds back.
             </p>
-            <div class="cw-poll-row" style="margin-bottom:8px">
-              <label style="display:inline-flex;align-items:center;gap:6px;margin:0">
-                <input type="checkbox" id="banking_auto_weed"
-                  {% if config.get('banking', {}).get('auto_weed') %}checked{% endif %}
-                  onchange="autoSave()">
-                Auto-Weed
-              </label>
-              <span style="margin-left:12px">Queue ≥</span>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <label class="toggle-label"><input type="checkbox" id="banking_auto_weed"
+                {% if config.get('banking', {}).get('auto_weed') %}checked{% endif %}
+                onchange="autoSave()"><span class="toggle"></span></label>
+              <span>Auto-Weed</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <span>Queue ≥</span>
               <input type="number" id="banking_weed_queue_threshold" class="input-narrow" min="1" style="width:50px"
                 value="{{ config.get('banking', {}).get('weed_queue_threshold', 5) }}"
                 oninput="markNumDirty(this)">
