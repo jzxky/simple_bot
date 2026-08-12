@@ -214,7 +214,8 @@ def dispatch_journal_action(entry: dict, state: GameState):
             if _drug_trade_queue is not None:
                 _drug_trade_queue.put(True)
     if entry.get("title") == "Drug Smuggle":
-        _handle_drug_smuggle(entry, state)
+        if "turn a blind eye on your customs duty" in entry.get("text", "").lower():
+            _handle_drug_smuggle(entry, state)
     if entry.get("title") == "Illness":
         if _FLU_TEXT in entry.get("text", "").lower():
             if _illness_queue is not None:
