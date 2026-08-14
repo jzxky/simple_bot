@@ -22,5 +22,23 @@ class JailConsumeTask(Task):
             return False
         return state.timers.get("case", {}).get("ready", False)
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.in_jail:
+            reasons.append("Not in jail")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        jail_cfg = cfg.load().get("jail", {})
+        if not jail_cfg.get("enabled", False):
+            reasons.append("Not enabled")
+        if not jail_cfg.get("use_consumables", False):
+            reasons.append("Consumables off")
+        jcons = state.jail_consumables or {}
+        if not any(jcons.get(c, 0) > 0 for c in _PRIORITY):
+            reasons.append("No consumables")
+        if not state.timers.get("case", {}).get("ready", False):
+            reasons.append("Case timer not ready")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("jail_consume"), state)

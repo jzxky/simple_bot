@@ -1276,7 +1276,8 @@ function pollStatus() {
             const dot = t.ready
               ? '<span style="color:var(--accent)">● Ready</span>'
               : '<span style="color:var(--muted-text)">○ Blocked</span>';
-            return `<tr><td>${escHtml(t.label)}</td><td>${t.priority}</td><td>${dot}</td></tr>`;
+            const reasons = (t.reasons || []).map(r => escHtml(r)).join(", ");
+            return `<tr><td>${escHtml(t.label)}</td><td>${t.priority}</td><td>${dot}</td><td style="color:var(--muted-text);font-size:0.85em">${reasons}</td></tr>`;
           }).join("");
         }).catch(() => {});
       }

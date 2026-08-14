@@ -50,5 +50,27 @@ class BankingInvestTask(Task):
             return False
         return server_now.timestamp() >= mature_at
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        import config as cfg
+        if not cfg.load().get("banking", {}).get("auto_invest_enabled", False):
+            reasons.append("Not enabled")
+        else:
+            mature_at = load_mature_date()
+            if mature_at > 0:
+                server_now = state._estimated_server_time()
+                if server_now is None:
+                    reasons.append("Server time unknown")
+                elif server_now.timestamp() < mature_at:
+                    remaining = (mature_at - server_now.timestamp()) / 60
+                    reasons.append(f"Investment not matured ({int(remaining)}m)")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("do_bank_invest"), state)

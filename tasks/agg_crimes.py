@@ -90,6 +90,26 @@ class AggCrimeTask(Task):
             return False
         return True
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.cs_sentence > 0:
+            reasons.append("CS sentence active")
+        if state.agg_fail_count() >= 3:
+            reasons.append("Too many agg fails")
+        remaining = self._cooldown_until - time.monotonic()
+        if remaining > 0:
+            reasons.append(f"Cooldown ({int(remaining)}s)")
+        crime, _ = self._pick_crime(state)
+        if crime is None:
+            reasons.append("No crime available")
+        elif crime == "armed" and "gangster" not in state.occupation.lower() and not state.action_available():
+            reasons.append("Action timer busy (armed robbery)")
+        return reasons
+
     def run(self, state: GameState, executor):
         crime, threshold = self._pick_crime(state)
         if not crime:

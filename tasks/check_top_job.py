@@ -47,6 +47,23 @@ class CheckTopJobTask(Task):
             return False
         return time.monotonic() - self._last_run >= _CHECK_INTERVAL
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.snipe_top_job_pending:
+            reasons.append("Snipe pending")
+        if not cfg.load().get("promo", {}).get("monitor_top_job", False):
+            reasons.append("Not enabled")
+        if state.next_rank not in _TOP_JOB_PATHS:
+            reasons.append("Next rank not a top job")
+        if state.rank_progress < 100:
+            reasons.append(f"Rank progress {state.rank_progress}%")
+        remaining = _CHECK_INTERVAL - (time.monotonic() - self._last_run)
+        if remaining > 0:
+            reasons.append(f"Interval ({int(remaining // 60)}m)")
+        return reasons
+
     def run(self, state: GameState, executor):
         self._last_run = time.monotonic()
         top_job = state.next_rank

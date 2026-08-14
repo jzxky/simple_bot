@@ -18,5 +18,21 @@ class CommunityServiceTask(Task):
             return False
         return not should_skip_action_for_armed_robbery(state, ACTION_COOLDOWNS["community_service"])
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if not state.action_available():
+            reasons.append("Action timer busy")
+        if not state.in_home_city():
+            reasons.append("Not in home city")
+        if state.hold_action_timer:
+            reasons.append("Action timer held")
+        if should_skip_action_for_armed_robbery(state, ACTION_COOLDOWNS["community_service"]):
+            reasons.append("Waiting for armed robbery")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("do_community_service", in_home_city=state.in_home_city()), state)

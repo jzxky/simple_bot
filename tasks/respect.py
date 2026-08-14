@@ -45,5 +45,21 @@ class RespectTask(Task):
         elapsed = (time.time() - load_respect_data().get("last_check", 0.0)) / 3600
         return elapsed >= _RESPECT_COOLDOWN_HOURS
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        if not state.own_name:
+            reasons.append("No character name")
+        elapsed = (time.time() - load_respect_data().get("last_check", 0.0)) / 3600
+        if elapsed < _RESPECT_COOLDOWN_HOURS:
+            remaining = (_RESPECT_COOLDOWN_HOURS - elapsed) * 60
+            reasons.append(f"Cooldown ({int(remaining)}m)")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("fetch_respect"), state)

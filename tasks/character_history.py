@@ -26,6 +26,20 @@ class CharacterHistoryTask(Task):
         interval = c.get("refresh_interval_minutes", 30) * 60
         return (time.time() - self._last_run) >= interval
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        c = cfg.load().get("character_history", {})
+        if not c.get("enabled", False):
+            reasons.append("Not enabled")
+        elif self._queue.empty():
+            interval = c.get("refresh_interval_minutes", 30) * 60
+            remaining = interval - (time.time() - self._last_run)
+            if remaining > 0:
+                reasons.append(f"Interval ({int(remaining // 60)}m)")
+        return reasons
+
     def run(self, state: GameState, executor):
         # Drain any pending manual request
         while not self._queue.empty():

@@ -72,6 +72,24 @@ class EventConsumeTask(Task):
             return False
         return self._pick(state, eb.get("consume", {})) is not None
 
+    def blocked_reasons(self, state):
+        reasons = []
+        eb = cfg.load().get("event_boss", {})
+        if not eb.get("enabled", False):
+            reasons.append("Not enabled")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        remaining = _POLL - (time.monotonic() - self._last)
+        if remaining > 0:
+            reasons.append(f"Poll cooldown ({int(remaining)}s)")
+        if self._pick(state, eb.get("consume", {})) is None:
+            reasons.append("No eligible consumable")
+        return reasons
+
     def run(self, state: GameState, executor):
         self._last = time.monotonic()
         picked = self._pick(state, cfg.load().get("event_boss", {}).get("consume", {}))
@@ -90,6 +108,16 @@ class ManualEventConsumeTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         return state.logged_in and not state.in_jail and not self._queue.empty()
+
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if self._queue.empty():
+            reasons.append("Queue empty")
+        return reasons
 
     def run(self, state: GameState, executor):
         try:

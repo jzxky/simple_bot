@@ -21,5 +21,19 @@ class BlindEyeTask(Task):
             and len(cfg.blind_eye_queue_peek()) > 0
         )
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if not state.in_home_city():
+            reasons.append("Not in home city")
+        if not state.timer_ready("traffick"):
+            reasons.append("Traffick timer not ready")
+        if len(cfg.blind_eye_queue_peek()) == 0:
+            reasons.append("Queue empty")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("do_blind_eye"), state)

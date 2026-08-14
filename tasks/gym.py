@@ -60,5 +60,32 @@ class GymTask(Task):
         elapsed_hours = (time.time() - load_last_gym_use()) / 3600
         return elapsed_hours >= _GYM_COOLDOWN_HOURS
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        import config as cfg
+        gym_cfg = cfg.load().get("gym", {})
+        if not gym_cfg.get("enabled", False):
+            reasons.append("Not enabled")
+        elif state.current_city.lower() != "chicago":
+            if cfg.load().get("smart_travel", {}).get("enabled", False):
+                reasons.append("Not in Chicago (smart travel)")
+            elif not gym_cfg.get("auto_travel", False):
+                reasons.append("Not in Chicago")
+            else:
+                import executor
+                if executor.travel_warrant_cooldown_active():
+                    reasons.append("Warrant travel cooldown")
+                if executor.gym_travel_cooldown_active():
+                    reasons.append("Gym travel cooldown")
+        elapsed_hours = (time.time() - load_last_gym_use()) / 3600
+        if elapsed_hours < _GYM_COOLDOWN_HOURS:
+            remaining = (_GYM_COOLDOWN_HOURS - elapsed_hours) * 60
+            reasons.append(f"Cooldown ({int(remaining)}m)")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("do_gym"), state)

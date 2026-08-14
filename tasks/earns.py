@@ -18,6 +18,17 @@ class EarnsTask(Task):
     def can_run(self, state) -> bool:
         return state.logged_in and not state.in_jail and time.monotonic() - self._last_fired >= self._interval
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        remaining = self._interval - (time.monotonic() - self._last_fired)
+        if remaining > 0:
+            reasons.append(f"Interval ({int(remaining // 60)}m left)")
+        return reasons
+
     def run(self, state, executor):
         self._last_fired = time.monotonic()
         executor.execute(Action("check_earns", earn_type=self.earn_type), state)

@@ -22,6 +22,9 @@ class Task(ABC):
     def can_run(self, state) -> bool:
         return True
 
+    def blocked_reasons(self, state) -> list:
+        return []
+
     @abstractmethod
     def run(self, state, executor):
         pass
