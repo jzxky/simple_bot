@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import player_db
 
@@ -143,7 +143,7 @@ async def player(ctx, *, name: str = ""):
         ("Alias", match.get("alias")),
         ("Sex", match.get("sex")),
         ("Wealth", match.get("wealth")),
-        ("Character Age", match.get("character_age")),
+        ("Character Age", f"{match.get('character_age', 0) // 60}h" if match.get("character_age") else None),
         ("Crew", match.get("crew_name")),
         ("Godfather", match.get("godfather")),
     ]
@@ -155,9 +155,67 @@ async def player(ctx, *, name: str = ""):
     await ctx.send(embed=embed)
 
 
+_prev_top_holders = {}
+
+
+def _snapshot_top_holders():
+    all_players = player_db.get_all_players()
+    holders = {}
+    for p in all_players:
+        if not p.get("active", 1):
+            continue
+        if p.get("occupation") in TOP_JOBS:
+            job = p["occupation"]
+        elif p.get("rank") in _RANK_JOBS:
+            job = p["rank"]
+        else:
+            continue
+        city = p.get("homecity", "Unknown")
+        holders[(city, job)] = p["username"]
+    return holders
+
+
+@tasks.loop(minutes=15)
+async def monitor_top_jobs():
+    global _prev_top_holders
+    current = _snapshot_top_holders()
+
+    if not _prev_top_holders:
+        _prev_top_holders = current
+        return
+
+    if not CHANNEL_ID:
+        _prev_top_holders = current
+        return
+
+    channel = bot.get_channel(int(CHANNEL_ID))
+    if not channel:
+        _prev_top_holders = current
+        return
+
+    for (city, job), old_holder in _prev_top_holders.items():
+        new_holder = current.get((city, job))
+        if new_holder == old_holder:
+            continue
+        msg = f"⚠️ Top Job Change: **{old_holder}** is no longer **{job}** in **{city}**"
+        if new_holder:
+            msg += f"\nNew holder: **{new_holder}**"
+        else:
+            msg += "\nPosition is now **vacant**"
+        await channel.send(msg)
+
+    for (city, job), new_holder in current.items():
+        if (city, job) not in _prev_top_holders:
+            await channel.send(f"⚠️ New top job holder: **{new_holder}** is now **{job}** in **{city}**")
+
+    _prev_top_holders = current
+
+
 @bot.event
 async def on_ready():
     print(f"Discord bot connected as {bot.user}")
+    if CHANNEL_ID:
+        monitor_top_jobs.start()
 
 
 if __name__ == "__main__":
