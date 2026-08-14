@@ -16,6 +16,16 @@ class DepositTask(Task):
             return False
         return not self._queue.empty()
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if self._queue.empty():
+            reasons.append("Queue empty")
+        return reasons
+
     def run(self, state: GameState, executor):
         try:
             self._queue.get_nowait()

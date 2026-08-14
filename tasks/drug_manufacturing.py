@@ -22,5 +22,24 @@ class DrugManufacturingTask(Task):
                 and "gangster" in state.occupation.lower()
                 and not state.hold_action_timer)
 
+    def blocked_reasons(self, state):
+        reasons = []
+        import executor
+        if executor.drug_manufacture_cooldown_active():
+            reasons.append("Manufacture cooldown")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if not state.action_available():
+            reasons.append("Action timer busy")
+        if not state.in_home_city():
+            reasons.append("Not in home city")
+        if "gangster" not in state.occupation.lower():
+            reasons.append("Not a gangster")
+        if state.hold_action_timer:
+            reasons.append("Action timer held")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("do_drug_manufacturing"), state)

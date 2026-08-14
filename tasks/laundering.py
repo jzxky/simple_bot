@@ -26,6 +26,23 @@ class LaunderMoneyTask(Task):
             return False
         return True
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_home_city():
+            reasons.append("In home city")
+        if state.dirty_money < 5:
+            reasons.append("Not enough dirty money")
+        if "launder" in state.timers and not state.timer_ready("launder"):
+            reasons.append("Launder timer not ready")
+        import executor
+        if executor.launder_cooldown_active(state.current_city):
+            reasons.append("Launder cooldown")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("launder_money",
                                 launder_amount=self.launder_amount,

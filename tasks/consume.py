@@ -176,6 +176,30 @@ class ConsumeTask(Task):
             return consume_type == "ecstasy"
         return True
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if not reasons:
+            c = cfg.load()
+            cons_cfg = c.get("consumables", {})
+            away = state.current_city != state.home_city
+            auto_ready = self._auto_consume_ready(state, c, cons_cfg)
+            if auto_ready and away and cons_cfg.get("auto_consumable", "") != "ecstasy":
+                reasons.append("Away from home (non-ecstasy)")
+            elif not auto_ready and self._queue.empty():
+                reasons.append("Auto-consume not ready, queue empty")
+            elif not auto_ready and away:
+                try:
+                    consume_type = self._queue.queue[0]
+                except IndexError:
+                    consume_type = None
+                if consume_type != "ecstasy":
+                    reasons.append("Away from home (non-ecstasy)")
+        return reasons
+
     def _auto_consume_ready(self, state: GameState, c: dict, cons_cfg: dict) -> bool:
         if not cons_cfg.get("auto_consume", False):
             return False

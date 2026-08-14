@@ -43,6 +43,36 @@ class AwayActionTask(Task):
         cooldown = ACTION_COOLDOWNS.get(cooldown_key, 10)
         return not should_skip_action_for_armed_robbery(state, cooldown)
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not self.action_type:
+            reasons.append("No action type")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if not state.action_available():
+            reasons.append("Action timer busy")
+        if state.in_home_city():
+            reasons.append("In home city")
+        if state.hold_action_timer:
+            reasons.append("Action timer held")
+        if self.action_type == "community_service":
+            rank_lower = (state.rank or "").lower()
+            occ_lower = (state.occupation or "").lower()
+            if rank_lower not in _CS_AWAY_ALLOWED_RANKS and occ_lower not in _CS_AWAY_ALLOWED_RANKS:
+                reasons.append("Rank/occupation not allowed")
+        if self.action_type == "drug_manufacturing":
+            import executor
+            if executor.drug_manufacture_cooldown_active():
+                reasons.append("Manufacture cooldown")
+        if self.action_type:
+            cooldown_key = "community_service_away" if self.action_type == "community_service" else self.action_type
+            cooldown = ACTION_COOLDOWNS.get(cooldown_key, 10)
+            if should_skip_action_for_armed_robbery(state, cooldown):
+                reasons.append("Waiting for armed robbery")
+        return reasons
+
     def run(self, state: GameState, executor):
         if self.action_type == "community_service":
             executor.execute(Action("do_community_service", in_home_city=False), state)

@@ -57,5 +57,32 @@ class CasinoTask(Task):
                 return False
         return time.time() >= load_casino_release_at()
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        import config as cfg
+        casino_cfg = cfg.load().get("casino", {})
+        if not casino_cfg.get("enabled", False):
+            reasons.append("Not enabled")
+        elif state.current_city.lower() != "beirut":
+            if cfg.load().get("smart_travel", {}).get("enabled", False):
+                reasons.append("Not in Beirut (smart travel)")
+            elif not casino_cfg.get("auto_travel", False):
+                reasons.append("Not in Beirut")
+            else:
+                import executor
+                if executor.travel_warrant_cooldown_active():
+                    reasons.append("Warrant travel cooldown")
+        release_at = load_casino_release_at()
+        if time.time() < release_at:
+            remaining = (release_at - time.time()) / 60
+            reasons.append(f"Release cooldown ({int(remaining)}m)")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("play_casino"), state)

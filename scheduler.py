@@ -37,16 +37,21 @@ class Scheduler:
                     state.add_log(f"[DEBUG] {label}: blocked")
 
     def snapshot(self, state) -> list[dict]:
-        """Return current can_run status for all tasks without running any."""
+        """Return current can_run status and blocking reasons for all tasks."""
         result = []
         for task in self._tasks:
+            reasons = []
+            if state.in_hospital and not task.run_in_hospital:
+                reasons.append("In hospital")
             try:
-                ready = task.can_run(state)
+                reasons.extend(task.blocked_reasons(state))
             except Exception:
-                ready = False
+                reasons.append("Error checking guards")
+            ready = len(reasons) == 0
             result.append({
                 "label": task.label or type(task).__name__,
                 "priority": task.priority,
                 "ready": ready,
+                "reasons": reasons,
             })
         return result

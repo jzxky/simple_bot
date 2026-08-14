@@ -32,6 +32,23 @@ class CaseWorkTask(Task):
             return False
         return time.monotonic() - self._last_checked >= self._poll_interval
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.occupation not in self.ELIGIBLE_OCCUPATIONS:
+            reasons.append("Wrong occupation")
+        if self.HOME_CITY_ONLY and not state.in_home_city():
+            reasons.append("Not in home city")
+        if self.USES_CASE_TIMER and not state.timer_ready("case"):
+            reasons.append("Case timer not ready")
+        remaining = self._poll_interval - (time.monotonic() - self._last_checked)
+        if remaining > 0:
+            reasons.append(f"Poll interval ({int(remaining)}s)")
+        return reasons
+
     def run(self, state: GameState, executor):
         self._last_checked = time.monotonic()
         executor.execute(self._action(), state)

@@ -27,6 +27,22 @@ class MaintainCashTask(Task):
             return True
         return False
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        remaining = _INTERVAL - (time.time() - self._last_run)
+        if remaining > 0:
+            reasons.append(f"Interval ({int(remaining // 60)}m)")
+        min_cash = int(cfg.load().get("misc", {}).get("min_cash_on_hand", 0))
+        if min_cash == 0:
+            reasons.append("No min cash configured")
+        elif not (state.clean_money > min_cash or (state.clean_money < min_cash and state.bank_balance > 0)):
+            reasons.append("Cash at target level")
+        return reasons
+
     def run(self, state: GameState, executor):
         min_cash = int(cfg.load().get("misc", {}).get("min_cash_on_hand", 0))
         if state.clean_money > min_cash:

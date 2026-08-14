@@ -258,6 +258,14 @@ class JournalCheckTask(Task):
     def can_run(self, state: GameState) -> bool:
         return state.logged_in and state.has_new_journals
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if not state.has_new_journals:
+            reasons.append("No new journals")
+        return reasons
+
     def run(self, state: GameState, executor):
         executor.execute(Action("check_journals"), state)
 
@@ -276,6 +284,14 @@ class ArchiveJournalsTask(Task):
     def can_run(self, state: GameState) -> bool:
         return state.logged_in and not self._queue.empty()
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if self._queue.empty():
+            reasons.append("Queue empty")
+        return reasons
+
     def run(self, state: GameState, executor):
         try:
             params = self._queue.get_nowait()
@@ -293,6 +309,14 @@ class JournalActionTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         return state.logged_in and not self._queue.empty()
+
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if self._queue.empty():
+            reasons.append("Queue empty")
+        return reasons
 
     def run(self, state: GameState, executor):
         try:

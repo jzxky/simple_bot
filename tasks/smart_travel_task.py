@@ -44,6 +44,26 @@ class SmartTravelTask(Task):
             return False
         return time.monotonic() - self._last >= _POLL_INTERVAL
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not cfg.load().get("smart_travel", {}).get("enabled", False):
+            reasons.append("Not enabled")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        if state.hold_action_timer:
+            reasons.append("Action timer held")
+        from executor import travel_warrant_cooldown_active
+        if travel_warrant_cooldown_active():
+            reasons.append("Warrant travel cooldown")
+        remaining = _POLL_INTERVAL - (time.monotonic() - self._last)
+        if remaining > 0:
+            reasons.append(f"Poll interval ({int(remaining)}s)")
+        return reasons
+
     def _build_ctx(self, state: GameState, c: dict) -> dict:
         return {
             "now_ts": time.time(),

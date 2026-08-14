@@ -17,5 +17,15 @@ class ManualEarnsTask(Task):
             return False
         return state.timer_ready("earn")
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if not state.timer_ready("earn"):
+            reasons.append("Earn timer not ready")
+        return reasons
+
     def run(self, state, executor):
         executor.execute(Action("manual_earn", earn_type=self.earn_type), state)

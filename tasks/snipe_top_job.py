@@ -29,6 +29,20 @@ class SnipeTopJobTask(Task):
             and state.next_rank in _TOP_JOB_MAP
         )
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if not state.snipe_top_job_pending:
+            reasons.append("No snipe pending")
+        if not state.snipe_top_job_promo_url:
+            reasons.append("No promo URL")
+        if state.next_rank not in _TOP_JOB_MAP:
+            reasons.append("Next rank not a top job")
+        return reasons
+
     def run(self, state: GameState, executor):
         import bot as _bot
         promo_url = state.snipe_top_job_promo_url

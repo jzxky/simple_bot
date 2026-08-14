@@ -15,6 +15,14 @@ class ScrapePlayersTask(Task):
     def can_run(self, state: GameState) -> bool:
         return state.logged_in and not self._queue.empty()
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if self._queue.empty():
+            reasons.append("Queue empty")
+        return reasons
+
     def run(self, state: GameState, executor):
         try:
             item = self._queue.get_nowait()

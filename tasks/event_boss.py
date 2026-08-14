@@ -48,6 +48,23 @@ class EventBossTask(Task):
             return False
         return self._event_available(state)
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not cfg.load().get("event_boss", {}).get("enabled", False):
+            reasons.append("Not enabled")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        now = time.monotonic()
+        if now < self._hold_until:
+            reasons.append(f"Hold ({int(self._hold_until - now)}s)")
+        if now - self._last_run < POLL_SECONDS:
+            reasons.append(f"Poll cooldown ({int(POLL_SECONDS - (now - self._last_run))}s)")
+        if not self._event_available(state):
+            reasons.append("Event timer not ready")
+        return reasons
+
     def run(self, state: GameState, executor):
         self._last_run = time.monotonic()
         state._event_boss_hold = False

@@ -22,6 +22,17 @@ class LoginTask(Task):
     def can_run(self, state) -> bool:
         return not state.logged_in and not state.relog_suppressed and time.monotonic() - self._last_attempt >= RETRY_INTERVAL
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if state.logged_in:
+            reasons.append("Already logged in")
+        if state.relog_suppressed:
+            reasons.append("Relog suppressed")
+        remaining = RETRY_INTERVAL - (time.monotonic() - self._last_attempt)
+        if remaining > 0:
+            reasons.append(f"Retry cooldown ({int(remaining)}s)")
+        return reasons
+
     def run(self, state, executor):
         self._last_attempt = time.monotonic()
         executor.execute(Action("login", email=self.email, password=self.password), state)

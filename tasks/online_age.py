@@ -34,6 +34,19 @@ class OnlineAgeTask(Task):
             return False
         return time.monotonic() - self._last_run >= _INTERVAL
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        remaining = _INTERVAL - (time.monotonic() - self._last_run)
+        if remaining > 0:
+            reasons.append(f"Interval ({int(remaining // 60)}m)")
+        return reasons
+
     def run(self, state: GameState, executor):
         self._last_run = time.monotonic()
 

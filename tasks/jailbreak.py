@@ -13,6 +13,16 @@ class PlanJailBreakTask(Task):
     def can_run(self, state: GameState) -> bool:
         return state.logged_in and not state.in_jail and not self._queue.empty()
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if self._queue.empty():
+            reasons.append("Queue empty")
+        return reasons
+
     def run(self, state: GameState, executor):
         try:
             params = self._queue.get_nowait()
@@ -31,6 +41,16 @@ class ExecuteJailBreakTask(Task):
     def can_run(self, state: GameState) -> bool:
         return state.logged_in and state.action_available() and not self._queue.empty()
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if not state.action_available():
+            reasons.append("Action timer busy")
+        if self._queue.empty():
+            reasons.append("Queue empty")
+        return reasons
+
     def run(self, state: GameState, executor):
         try:
             self._queue.get_nowait()
@@ -48,6 +68,14 @@ class CallOffJailBreakTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         return state.logged_in and not self._queue.empty()
+
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if self._queue.empty():
+            reasons.append("Queue empty")
+        return reasons
 
     def run(self, state: GameState, executor):
         try:

@@ -33,6 +33,24 @@ class CSPunishmentTask(Task):
             return False
         return True
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if state.cs_sentence <= 0:
+            reasons.append("No CS sentence")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        if not state.action_available():
+            reasons.append("Action timer busy")
+        if state.hold_action_timer:
+            reasons.append("Action timer held")
+        if not state.in_home_city():
+            reasons.append("Not in home city")
+        return reasons
+
     def run(self, state: GameState, executor):
         # Verify CS is still required
         executor.execute(Action("probe_agcrime"), state)

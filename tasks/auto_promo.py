@@ -74,6 +74,39 @@ class AutoPromoTask(Task):
 
         return time.monotonic() - self._last_run >= _CHECK_INTERVAL
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        is_jail_rank = state.next_rank in _JAIL_RANKS
+        if state.in_jail and not is_jail_rank:
+            reasons.append("In jail (non-jail rank)")
+        if not state.in_jail and is_jail_rank:
+            reasons.append("Not in jail (jail rank)")
+        if state.in_jail and state.rank == "Lifer":
+            reasons.append("Lifer rank")
+        if state.rank_progress < 100:
+            reasons.append(f"Rank progress {state.rank_progress}%")
+        if state.snipe_top_job_pending:
+            reasons.append("Snipe pending")
+        if state.next_rank not in PROMO_BY_RANK:
+            reasons.append("Unknown next rank")
+        else:
+            promo_cfg = cfg.load().get("promo", {})
+            auto_on = promo_cfg.get("auto_promo", {}).get("enabled", False)
+            monitor_on = promo_cfg.get("monitor_top_job", False)
+            if auto_on:
+                if state.next_rank in _EXCLUDED_RANKS:
+                    reasons.append("Excluded rank")
+            elif not (monitor_on and state.next_rank in _MONITORED_TOP_JOBS):
+                reasons.append("Not enabled")
+        remaining = _CHECK_INTERVAL - (time.monotonic() - self._last_run)
+        if remaining > 0:
+            reasons.append(f"Interval ({int(remaining)}s)")
+        return reasons
+
     def run(self, state: GameState, executor):
         self._last_run = time.monotonic()
 

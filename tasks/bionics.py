@@ -72,6 +72,28 @@ class BionicsTask(Task):
             return False
         return True
 
+    def blocked_reasons(self, state):
+        import config as cfg
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        if state.current_city.lower() != "chicago":
+            reasons.append("Not in Chicago")
+        b = cfg.load().get("bionics", {})
+        if not b.get("enabled", False):
+            reasons.append("Not enabled")
+        else:
+            interval_secs = store_windows.interval_secs(b, state.ingame_mins)
+            if self.last_checked_at > 0:
+                remaining = interval_secs - (time.time() - self.last_checked_at)
+                if remaining > 0:
+                    reasons.append(f"Interval ({int(remaining)}s)")
+        return reasons
+
     def _manage_window(self, state: GameState):
         """Auto-disable 'check during window only' once the covered window passes
         with no restock renewing it (restock moves window_start/end)."""

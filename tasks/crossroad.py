@@ -30,6 +30,16 @@ class CrossroadTask(Task):
             return False
         return "crossroad.asp" in (browser.current_url() or "")
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not cfg.load().get("crossroads", {}).get("enabled", False):
+            reasons.append("Not enabled")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if "crossroad.asp" not in (browser.current_url() or ""):
+            reasons.append("Not on crossroad page")
+        return reasons
+
     def run(self, state: GameState, executor):
         selection = cfg.load().get("crossroads", {}).get("selection", "current")
         executor.execute(Action("crossroad", selection=selection), state)

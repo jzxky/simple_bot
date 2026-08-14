@@ -30,6 +30,23 @@ class ObituaryHistoryTask(Task):
         # Last-run time is persisted in config so a restart doesn't re-trigger it.
         return time.time() - float(c.get("obituary_last_run", 0) or 0) >= _DAY
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        c = cfg.load().get("character_history", {})
+        if not c.get("enabled", False):
+            reasons.append("Not enabled")
+        elapsed = time.time() - float(c.get("obituary_last_run", 0) or 0)
+        if elapsed < _DAY:
+            remaining = (_DAY - elapsed) / 3600
+            reasons.append(f"Cooldown ({int(remaining)}h)")
+        return reasons
+
     def run(self, state: GameState, executor):
         c = cfg.load()
         c.setdefault("character_history", {})["obituary_last_run"] = int(time.time())

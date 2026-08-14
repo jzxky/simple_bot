@@ -34,6 +34,19 @@ class WSMonitorTask(Task):
             return False
         return time.monotonic() - self._last >= self._interval()
 
+    def blocked_reasons(self, state):
+        reasons = []
+        if not cfg.load().get("war_mode", {}).get("enabled", False):
+            reasons.append("Not enabled")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if not war_mode.all_names():
+            reasons.append("No watch names")
+        remaining = self._interval() - (time.monotonic() - self._last)
+        if remaining > 0:
+            reasons.append(f"Interval ({int(remaining // 60)}m)")
+        return reasons
+
     def run(self, state: GameState, executor):
         self._last = time.monotonic()
         executor.execute(Action("ws_monitor"), state)
