@@ -637,6 +637,11 @@ def _run(c: dict):
     except Exception as e:
         state.add_log(f"Bot crashed: {e}")
     finally:
+        t = getattr(state, 'snipe_top_job_thread', None)
+        if t and t.is_alive():
+            state.add_log("Waiting for sniper thread to finish...")
+            _cancel_snipe_event.set()
+            t.join(timeout=10)
         try:
             if state.logged_in and c.get("misc", {}).get("logout_on_stop", True):
                 state.add_log("Logging out...")

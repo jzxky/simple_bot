@@ -5,12 +5,15 @@ All time comparisons use server time, never the system clock.
 
 from __future__ import annotations
 import re
+import threading
 import time as _time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
 from bs4 import BeautifulSoup
 import urls
+
+state_lock = threading.Lock()
 
 SERVER_TIME_FMT = "%m/%d/%Y %I:%M:%S %p"
 
@@ -53,6 +56,7 @@ class GameState:
     current_task: str = ""
     snipe_top_job_pending: bool = False
     snipe_top_job_promo_url: str = ""
+    snipe_top_job_thread: "threading.Thread | None" = None
     in_jail: bool = False
     jail_rank: str = ""
     has_new_journals: bool = False
@@ -115,21 +119,23 @@ class GameState:
         return False
 
     def add_log(self, message: str):
-        ts = self.server_time.strftime("%H:%M:%S") if self.server_time else "?"
-        entry = f"[{ts}] {message}"
-        self.log.append(entry)
-        if len(self.log) > 200:
-            self.log = self.log[-200:]
+        with state_lock:
+            ts = self.server_time.strftime("%H:%M:%S") if self.server_time else "?"
+            entry = f"[{ts}] {message}"
+            self.log.append(entry)
+            if len(self.log) > 200:
+                self.log = self.log[-200:]
         print(entry)
 
     def push_notification(self, event_type: str, message: str):
-        ts = self.server_time.strftime("%H:%M:%S") if self.server_time else "?"
-        self.notifications.append({
-            "id": str(int(_time.time() * 1000)),
-            "ts": ts,
-            "event_type": event_type,
-            "message": message,
-        })
+        with state_lock:
+            ts = self.server_time.strftime("%H:%M:%S") if self.server_time else "?"
+            self.notifications.append({
+                "id": str(int(_time.time() * 1000)),
+                "ts": ts,
+                "event_type": event_type,
+                "message": message,
+            })
 
 
 def _parse_money(text: str) -> int:
@@ -137,6 +143,11 @@ def _parse_money(text: str) -> int:
 
 
 def parse_state(html: str, url: str, existing: GameState) -> GameState:
+    with state_lock:
+        return _parse_state_locked(html, url, existing)
+
+
+def _parse_state_locked(html: str, url: str, existing: GameState) -> GameState:
     soup = BeautifulSoup(html, "html.parser")
     s = existing
     s.page_html = html
