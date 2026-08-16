@@ -5167,6 +5167,46 @@ def handle_use_skill(action: Action, state: GameState):
         state.add_log(f"{skill_name} ({target}): {text}")
 
 
+def handle_use_news_editor(action: Action, state: GameState):
+    skill_id = action.params.get("skill_id", "")
+    target = action.params.get("target", "")
+    title = action.params.get("title", "")
+    event = action.params.get("event", "")
+    skill_name = action.params.get("skill_name", "News Editor")
+
+    _nav(_u("/income/charskills.asp"), state)
+    if not _check_session(state):
+        return
+    page = browser.page()
+    selector = f"form:has(input[name='skill'][value='{skill_id}'])"
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    form = None
+    for f in soup.find_all("form", action=True):
+        si = f.find("input", attrs={"name": "skill", "type": "hidden"})
+        if si and si.get("value") == skill_id:
+            form = f
+            break
+    if not form:
+        state.add_log(f"{skill_name}: skill form not found on page.")
+        return
+    page.fill(f"{selector} input[name='title']", title[:30])
+    page.fill(f"{selector} textarea[name='event']", event[:1000])
+    page.fill(f"{selector} input[name='target']", target)
+    page.click(f"{selector} input[name='doskill']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    result_soup = BeautifulSoup(state.page_html, "html.parser")
+    success = result_soup.find("div", id="success")
+    fail = result_soup.find("div", id="fail")
+    if success:
+        state.add_log(f"{skill_name} ({target}): {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"{skill_name} ({target}): {fail.get_text(strip=True)}")
+    else:
+        text = result_soup.get_text(" ", strip=True)[:200]
+        state.add_log(f"{skill_name} ({target}): {text}")
+
+
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
@@ -5231,6 +5271,7 @@ HANDLERS = {
     "scrape_player": handle_scrape_player,
     "discover_skills": handle_discover_skills,
     "use_skill": handle_use_skill,
+    "use_news_editor": handle_use_news_editor,
 }
 
 

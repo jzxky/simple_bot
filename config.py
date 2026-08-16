@@ -228,6 +228,7 @@ DEFAULT_CONFIG = {
         "biometric_virus": {"target": ""},
         "travel_expert": {"enabled": False, "target": "", "travel_timer_threshold": 2},
         "all_seeing_eye": {"enabled": False, "target": "", "group": ""},
+        "news_editor": {"target": "", "title": "", "event": ""},
     },
     "sync": {
         "enabled": False,
