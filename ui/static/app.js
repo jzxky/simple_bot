@@ -385,6 +385,14 @@ function _buildPayload() {
     sync_online_time:   (document.getElementById("sync_online_time")||{checked:true}).checked,
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
+    skill_combat_medic_enabled: (document.getElementById("skill_combat_medic_enabled")||{checked:false}).checked,
+    skill_combat_medic_target: (document.getElementById("skill_combat_medic_target")||{value:""}).value,
+    skill_biometric_virus_enabled: (document.getElementById("skill_biometric_virus_enabled")||{checked:false}).checked,
+    skill_biometric_virus_target: (document.getElementById("skill_biometric_virus_target")||{value:""}).value,
+    skill_travel_expert_enabled: (document.getElementById("skill_travel_expert_enabled")||{checked:false}).checked,
+    skill_travel_expert_threshold: parseInt((document.getElementById("skill_travel_expert_threshold")||{value:"120"}).value)||120,
+    skill_all_seeing_eye_enabled: (document.getElementById("skill_all_seeing_eye_enabled")||{checked:false}).checked,
+    skill_all_seeing_eye_group: (document.getElementById("skill_all_seeing_eye_group")||{value:""}).value,
     ..._collectEventConsume(),
     ..._collectNotifSettings(),
   };
@@ -1974,6 +1982,7 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleEventConsumeSettings();
   toggleWarModeLink();
   loadEarnPlanner();
+  _loadSkillsGroupDropdown();
   // Capture the baseline the diff-based save compares against, once dynamic
   // tables/summaries have populated from the server-rendered values.
   // Delay must be long enough for loadEarnPlanner fetch to complete.
@@ -2006,6 +2015,22 @@ function _renumberTable(tbodyId) {
     if (num) num.textContent = i + 1;
   });
   if (_BUYLIST_SUMMARY[tbodyId]) _renderBuyListSummary(tbodyId, _BUYLIST_SUMMARY[tbodyId]);
+}
+
+function _loadSkillsGroupDropdown() {
+  const sel = document.getElementById("skill_all_seeing_eye_group");
+  if (!sel) return;
+  const cur = sel.dataset.current || sel.value;
+  fetch("/api/player_groups").then(r => r.json()).then(groups => {
+    sel.innerHTML = '<option value="">-- select --</option>';
+    groups.forEach(g => {
+      const opt = document.createElement("option");
+      opt.value = g;
+      opt.textContent = g;
+      if (g === cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }).catch(() => {});
 }
 
 function findThreadId() {

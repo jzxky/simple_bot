@@ -62,6 +62,7 @@ from tasks.event_consume import EventConsumeTask, ManualEventConsumeTask
 from tasks.scrape_players import ScrapePlayersTask
 from tasks.crossroad import CrossroadTask
 from tasks.ws_monitor import WSMonitorTask
+from tasks.skills_task import DiscoverSkillsTask, CombatMedicTask, BiometricVirusTask, AllSeeingEyeTask
 from players import PlayerRefreshTask, SyncTask
 
 _thread: threading.Thread = None
@@ -256,6 +257,10 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(ManualEventConsumeTask(_event_consume_queue))
     sched.add(ScrapePlayersTask(_scrape_queue))
     sched.add(CrossroadTask())
+    sched.add(DiscoverSkillsTask())
+    sched.add(CombatMedicTask())
+    sched.add(BiometricVirusTask())
+    sched.add(AllSeeingEyeTask())
     sched.add(WSMonitorTask())
     sched.add(PlayerRefreshTask())
     sched.add(SyncTask())

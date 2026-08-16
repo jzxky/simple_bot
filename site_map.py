@@ -48,7 +48,7 @@ URLS = {
     "jail":                BASE + "/jail/default.asp",
     "online_players":      BASE + "/players/online.asp",
     "income_overview":     BASE + "/income/default.asp",
-    "character_skills":    BASE + "/income/characterskills.asp",
+    "character_skills":    BASE + "/income/charskills.asp",
     "dog_training":        BASE + "/localcity/dogtraining.asp",
     "vehicle_yard":        BASE + "/localcity/vehicleyard.asp",
     "airport":             BASE + "/localcity/airport.asp",

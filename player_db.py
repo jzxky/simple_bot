@@ -85,6 +85,8 @@ _MIGRATIONS = [
     ("players",  "capos",                 "TEXT DEFAULT ''"),
     ("players",  "alias",                "TEXT DEFAULT ''"),
     ("players",  "notes",                "TEXT DEFAULT ''"),
+    ("players",  "respect",              "TEXT DEFAULT ''"),
+    ("players",  "respect_last_checked", "REAL DEFAULT 0"),
 ]
 
 
@@ -274,6 +276,20 @@ def get_players_by_group(group_name: str) -> list:
                 d["tags"] = _compute_tags(r["username"], con)
                 result.append(d)
             return result
+        finally:
+            con.close()
+
+
+def update_respect(username: str, respect: str):
+    import time as _time
+    with _lock:
+        con = _conn()
+        try:
+            con.execute(
+                "UPDATE players SET respect=?, respect_last_checked=? WHERE username=?",
+                (respect, _time.time(), username),
+            )
+            con.commit()
         finally:
             con.close()
 

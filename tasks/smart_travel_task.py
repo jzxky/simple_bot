@@ -79,10 +79,41 @@ class SmartTravelTask(Task):
             "casino_release_at": load_casino_release_at(),
         }
 
+    def _try_travel_expert(self, state: GameState, executor) -> bool:
+        from tasks.skills_task import SKILL_IDS
+        c = cfg.load()
+        te = c.get("skills", {}).get("travel_expert", {})
+        if not te.get("enabled", False):
+            return False
+        if SKILL_IDS["travel_expert"] not in state.available_skills:
+            return False
+        if not state.timer_ready("skill"):
+            return False
+        t = state.timers.get("travel", {})
+        end = t.get("end")
+        if not end:
+            return False
+        now = state._estimated_server_time()
+        if now is None:
+            return False
+        remaining = (end - now).total_seconds()
+        threshold = te.get("travel_timer_threshold", 120)
+        if remaining < threshold:
+            return False
+        state.add_log(f"Travel Expert: travel timer has {int(remaining)}s left (threshold {threshold}s), using skill.")
+        executor.execute(Action(
+            "use_skill",
+            skill_id=SKILL_IDS["travel_expert"],
+            target=state.own_name,
+            skill_name="Travel Expert",
+        ), state)
+        return True
+
     def run(self, state: GameState, executor):
         self._last = time.monotonic()
 
         if not _travel_free(state):
+            self._try_travel_expert(state, executor)
             return
         c = cfg.load()
         plan = director.decide_target_city(self._build_ctx(state, c))

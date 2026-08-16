@@ -5093,6 +5093,80 @@ def handle_scrape_player(action: Action, state: GameState):
     state.add_log(f"Scrape: updated profile for {username}")
 
 
+# ---------------------------------------------------------------------------
+# Skills handlers
+# ---------------------------------------------------------------------------
+
+def handle_discover_skills(action: Action, state: GameState):
+    _nav(_u("/income/charskills.asp"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    found = set()
+    for form in soup.find_all("form", action=True):
+        if "charskills.asp" not in form.get("action", ""):
+            continue
+        skill_input = form.find("input", attrs={"name": "skill", "type": "hidden"})
+        if skill_input and skill_input.get("value"):
+            found.add(skill_input["value"])
+    state.available_skills = found
+    if found:
+        state.add_log(f"Skills: discovered {len(found)} — {', '.join(sorted(found))}")
+    else:
+        state.add_log("Skills: none unlocked.")
+    _nav(_u("/main.asp"), state)
+
+
+def handle_use_skill(action: Action, state: GameState):
+    skill_id = action.params.get("skill_id", "")
+    target = action.params.get("target", "")
+    skill_name = action.params.get("skill_name", skill_id)
+    update_respect = action.params.get("update_respect", False)
+
+    _nav(_u("/income/charskills.asp"), state)
+    if not _check_session(state):
+        return
+    page = browser.page()
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    form = None
+    for f in soup.find_all("form", action=True):
+        si = f.find("input", attrs={"name": "skill", "type": "hidden"})
+        if si and si.get("value") == skill_id:
+            form = f
+            break
+    if not form:
+        state.add_log(f"{skill_name}: skill form not found on page.")
+        return
+    rank_input = form.find("input", attrs={"name": "rank", "type": "hidden"})
+    rank = rank_input["value"] if rank_input else "1"
+    target_input = form.find("input", attrs={"name": "target"})
+    if not target_input:
+        state.add_log(f"{skill_name}: no target input found.")
+        return
+    form_idx = [f for f in soup.find_all("form", action=True)
+                if "charskills.asp" in f.get("action", "")].index(form)
+    selector = f"form:has(input[name='skill'][value='{skill_id}'])"
+    page.fill(f"{selector} input[name='target']", target)
+    page.click(f"{selector} input[name='doskill']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    result_soup = BeautifulSoup(state.page_html, "html.parser")
+    success = result_soup.find("div", id="success")
+    fail = result_soup.find("div", id="fail")
+    if success:
+        msg = success.get_text(strip=True)
+        state.add_log(f"{skill_name} ({target}): {msg}")
+        if update_respect:
+            import re
+            import player_db
+            player_db.update_respect(target, msg)
+    elif fail:
+        state.add_log(f"{skill_name} ({target}): {fail.get_text(strip=True)}")
+    else:
+        text = result_soup.get_text(" ", strip=True)[:200]
+        state.add_log(f"{skill_name} ({target}): {text}")
+
+
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
@@ -5155,6 +5229,8 @@ HANDLERS = {
     "fetch_profile": handle_fetch_profile,
     "navigate": handle_navigate,
     "scrape_player": handle_scrape_player,
+    "discover_skills": handle_discover_skills,
+    "use_skill": handle_use_skill,
 }
 
 

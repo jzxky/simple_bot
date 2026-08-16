@@ -140,6 +140,7 @@
           <button class="tab-btn" onclick="showTab('income-casework', this)">Case Work</button>
           <button class="tab-btn" id="income-tab-banking" onclick="showTab('income-banking', this)">Banking</button>
           <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)">Jail</button>
+          <button class="tab-btn" onclick="showTab('income-skills', this)">Skills</button>
         </div>
         <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
         <div id="income-jail" class="tab-panel">
@@ -586,6 +587,91 @@
                 </tr>
                 {% endfor %}
               </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Skills tab -->
+        <div id="income-skills" class="tab-panel">
+          <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Combat Medic</h3>
+              <p class="placeholder" style="color:var(--danger);margin-bottom:8px">⚠ Protection must be dropped to use this skill.</p>
+              <label class="inline-toggle setting-row" style="margin-bottom:12px">
+                Enable
+                <label class="toggle-label">
+                  <input type="checkbox" id="skill_combat_medic_enabled"
+                    {% if config.get('skills', {}).get('combat_medic', {}).get('enabled') %}checked{% endif %}
+                    onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row">
+                <label for="skill_combat_medic_target">Target Player</label>
+                <input type="text" id="skill_combat_medic_target" style="width:200px"
+                  value="{{ config.get('skills', {}).get('combat_medic', {}).get('target', '') }}"
+                  onchange="autoSave()">
+              </div>
+            </div>
+
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Biometric Virus</h3>
+              <p class="placeholder" style="color:var(--danger);margin-bottom:8px">⚠ Protection must be dropped to use this skill.</p>
+              <label class="inline-toggle setting-row" style="margin-bottom:12px">
+                Enable
+                <label class="toggle-label">
+                  <input type="checkbox" id="skill_biometric_virus_enabled"
+                    {% if config.get('skills', {}).get('biometric_virus', {}).get('enabled') %}checked{% endif %}
+                    onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row">
+                <label for="skill_biometric_virus_target">Target Player</label>
+                <input type="text" id="skill_biometric_virus_target" style="width:200px"
+                  value="{{ config.get('skills', {}).get('biometric_virus', {}).get('target', '') }}"
+                  onchange="autoSave()">
+              </div>
+            </div>
+
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Travel Expert</h3>
+              <label class="inline-toggle setting-row" style="margin-bottom:12px">
+                Enable
+                <label class="toggle-label">
+                  <input type="checkbox" id="skill_travel_expert_enabled"
+                    {% if config.get('skills', {}).get('travel_expert', {}).get('enabled') %}checked{% endif %}
+                    onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row">
+                <label for="skill_travel_expert_threshold">Travel Timer Threshold (seconds)</label>
+                <input type="number" id="skill_travel_expert_threshold" class="input-narrow" min="0"
+                  value="{{ config.get('skills', {}).get('travel_expert', {}).get('travel_timer_threshold', 120) }}"
+                  oninput="markNumDirty(this)">
+              </div>
+              <p class="placeholder">Uses Travel Expert on self when travel timer remaining exceeds this threshold.</p>
+            </div>
+
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>All Seeing Eye</h3>
+              <label class="inline-toggle setting-row" style="margin-bottom:12px">
+                Enable
+                <label class="toggle-label">
+                  <input type="checkbox" id="skill_all_seeing_eye_enabled"
+                    {% if config.get('skills', {}).get('all_seeing_eye', {}).get('enabled') %}checked{% endif %}
+                    onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row">
+                <label for="skill_all_seeing_eye_group">Player Group</label>
+                <select id="skill_all_seeing_eye_group" style="width:200px" data-current="{{ config.get('skills', {}).get('all_seeing_eye', {}).get('group', '') }}" onchange="autoSave()">
+                  <option value="">-- select --</option>
+                </select>
+              </div>
+              <p class="placeholder">Iterates through players in the selected group, checking respect level for the player with the oldest check.</p>
             </div>
           </div>
         </div>

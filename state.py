@@ -70,6 +70,7 @@ class GameState:
     local_players: set = field(default_factory=set)    # subset with * (same city as bot)
     jail_players: set = field(default_factory=set)     # usernames flagged in jail (jail class)
     notifications: list = field(default_factory=list)
+    available_skills: set = field(default_factory=set)
 
     @property
     def ingame_mins(self) -> "int | None":

@@ -223,6 +223,12 @@ DEFAULT_CONFIG = {
             "cocaine":   {"max_price": 4500,  "max_qty": 500}
         }
     },
+    "skills": {
+        "combat_medic": {"enabled": False, "target": ""},
+        "biometric_virus": {"enabled": False, "target": ""},
+        "travel_expert": {"enabled": False, "travel_timer_threshold": 120},
+        "all_seeing_eye": {"enabled": False, "group": ""},
+    },
     "sync": {
         "enabled": False,
         "server_url": "",
