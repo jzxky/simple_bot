@@ -97,14 +97,16 @@ class SmartTravelTask(Task):
         if now is None:
             return False
         remaining = (end - now).total_seconds()
-        threshold = te.get("travel_timer_threshold", 120)
-        if remaining < threshold:
+        threshold_mins = te.get("travel_timer_threshold", 2)
+        threshold_secs = threshold_mins * 60
+        if remaining < threshold_secs:
             return False
-        state.add_log(f"Travel Expert: travel timer has {int(remaining)}s left (threshold {threshold}s), using skill.")
+        target = te.get("target", "").strip() or state.own_name
+        state.add_log(f"Travel Expert: travel timer has {int(remaining // 60)}m left (threshold {threshold_mins}m), using skill on {target}.")
         executor.execute(Action(
             "use_skill",
             skill_id=SKILL_IDS["travel_expert"],
-            target=state.own_name,
+            target=target,
             skill_name="Travel Expert",
         ), state)
         return True

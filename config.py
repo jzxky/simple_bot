@@ -224,10 +224,10 @@ DEFAULT_CONFIG = {
         }
     },
     "skills": {
-        "combat_medic": {"enabled": False, "target": ""},
-        "biometric_virus": {"enabled": False, "target": ""},
-        "travel_expert": {"enabled": False, "travel_timer_threshold": 120},
-        "all_seeing_eye": {"enabled": False, "group": ""},
+        "combat_medic": {"target": ""},
+        "biometric_virus": {"target": ""},
+        "travel_expert": {"enabled": False, "target": "", "travel_timer_threshold": 2},
+        "all_seeing_eye": {"enabled": False, "target": "", "group": ""},
     },
     "sync": {
         "enabled": False,
