@@ -46,6 +46,32 @@ def _ecstasy_blocked_by_fails(state: GameState) -> bool:
     return state.agg_fail_count() >= 3
 
 
+def _action_timer_remaining_mins(state: GameState) -> float:
+    """Minutes remaining on the action timer, or 0 if ready."""
+    if state.action_timer_ready:
+        return 0.0
+    if state.action_timer_end is None:
+        return 0.0
+    now = state._estimated_server_time()
+    if now is None:
+        return 0.0
+    remaining = (state.action_timer_end - now).total_seconds()
+    return max(0.0, remaining / 60.0)
+
+
+def _should_deduct_action_timer(state: GameState, agg_cfg: dict) -> bool:
+    """True when ecstasy consumption should account for action timer cooldown.
+
+    Applies only when armed robbery is selected and the player is not a gangster
+    (gangsters don't consume the action timer for armed robbery).
+    """
+    if agg_cfg.get("primary", {}).get("crime") != "armed":
+        return False
+    if "gangster" in (state.occupation or "").lower():
+        return False
+    return True
+
+
 def _ecstasy_target_threshold(state: GameState, agg_cfg: dict) -> float:
     """Energy % that ecstasy should fill up to.
 
@@ -105,6 +131,8 @@ def _smart_count(consume_type: str, state: GameState, cfg_cons: dict, agg_cfg: d
         threshold_pct = _ecstasy_target_threshold(state, agg_cfg)
         current_pct = state.energy if state.energy is not None else 0.0
         gap_mins = _energy_to_mins(threshold_pct) - _energy_to_mins(current_pct)
+        if _should_deduct_action_timer(state, agg_cfg):
+            gap_mins -= _action_timer_remaining_mins(state)
         count = math.ceil(gap_mins / 3)
     else:
         timer_key = CONSUMABLE_TIMER_MAP.get(consume_type)
@@ -144,6 +172,8 @@ def _ecstasy_passes_gate(state: GameState, cfg_cons: dict, agg_cfg: dict) -> boo
 
     current_pct = state.energy if state.energy is not None else 0.0
     gap = _energy_to_mins(threshold_pct) - _energy_to_mins(current_pct)
+    if _should_deduct_action_timer(state, agg_cfg):
+        gap -= _action_timer_remaining_mins(state)
     return gap > limit_mins
 
 
