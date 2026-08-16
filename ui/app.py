@@ -269,6 +269,20 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["weapon_store"]["window_end"] = data.get("weapon_store_window_end", "23:59")
     c["weapon_store"]["auto_restock"] = data.get("weapon_store_auto_restock", False)
 
+    c.setdefault("skills", {})
+    c["skills"].setdefault("combat_medic", {})
+    c["skills"]["combat_medic"]["enabled"] = data.get("skill_combat_medic_enabled", False)
+    c["skills"]["combat_medic"]["target"] = data.get("skill_combat_medic_target", "")
+    c["skills"].setdefault("biometric_virus", {})
+    c["skills"]["biometric_virus"]["enabled"] = data.get("skill_biometric_virus_enabled", False)
+    c["skills"]["biometric_virus"]["target"] = data.get("skill_biometric_virus_target", "")
+    c["skills"].setdefault("travel_expert", {})
+    c["skills"]["travel_expert"]["enabled"] = data.get("skill_travel_expert_enabled", False)
+    c["skills"]["travel_expert"]["travel_timer_threshold"] = int(data.get("skill_travel_expert_threshold", 120) or 120)
+    c["skills"].setdefault("all_seeing_eye", {})
+    c["skills"]["all_seeing_eye"]["enabled"] = data.get("skill_all_seeing_eye_enabled", False)
+    c["skills"]["all_seeing_eye"]["group"] = data.get("skill_all_seeing_eye_group", "")
+
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
     c["case_work"].setdefault("hospital", {})
@@ -1070,6 +1084,23 @@ def logs_viewer(filename):
         lines = []
     return render_template("log.html", filename=safe, log_files=files,
                            lines=lines, line_count=len(lines))
+
+
+@app.route("/api/available_skills")
+def api_available_skills():
+    return jsonify(sorted(bot.state.available_skills))
+
+
+@app.route("/api/player_groups")
+def api_player_groups():
+    import player_db
+    with player_db._lock:
+        con = player_db._conn()
+        try:
+            rows = con.execute("SELECT DISTINCT group_name FROM players WHERE group_name != '' ORDER BY group_name COLLATE NOCASE").fetchall()
+            return jsonify([r["group_name"] for r in rows])
+        finally:
+            con.close()
 
 
 @app.route("/api/scheduler")
