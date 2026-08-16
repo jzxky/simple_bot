@@ -740,6 +740,7 @@ def status():
         "notifications": bot.state.notifications,
         "launder_cooldown": __import__("executor").launder_cooldown_remaining(),
         "banking_mature_at": _get_banking_mature_at(),
+        "available_skills": sorted(bot.state.available_skills),
     })
 
 
@@ -1116,10 +1117,6 @@ def logs_viewer(filename):
     return render_template("log.html", filename=safe, log_files=files,
                            lines=lines, line_count=len(lines))
 
-
-@app.route("/api/available_skills")
-def api_available_skills():
-    return jsonify(sorted(bot.state.available_skills))
 
 
 @app.route("/api/player_groups")
