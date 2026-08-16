@@ -122,8 +122,12 @@ def is_cloudflare_challenge() -> bool:
 
 
 def _wait_for_cloudflare():
+    _wait_for_cloudflare_on(_page)
+
+
+def _wait_for_cloudflare_on(pg: Page):
     try:
-        _page.wait_for_function(
+        pg.wait_for_function(
             """() => !document.title.includes('Just a moment') &&
                     !document.querySelector('#cf-spinner') &&
                     !document.querySelector('.cf-browser-verification')""",
@@ -131,3 +135,27 @@ def _wait_for_cloudflare():
         )
     except Exception:
         pass
+
+
+def new_page() -> Page:
+    return _context.new_page()
+
+
+def close_page(pg: Page):
+    try:
+        pg.close()
+    except Exception:
+        pass
+
+
+def navigate_page(pg: Page, url: str) -> str:
+    for attempt in range(2):
+        try:
+            pg.goto(url, wait_until="domcontentloaded", timeout=30000)
+            break
+        except Exception as e:
+            if "ERR_ABORTED" in str(e) and attempt == 0:
+                continue
+            raise
+    _wait_for_cloudflare_on(pg)
+    return pg.content()
