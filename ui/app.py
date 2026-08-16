@@ -283,6 +283,11 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["skills"]["all_seeing_eye"]["target"] = data.get("skill_all_seeing_eye_target", "")
     c["skills"]["all_seeing_eye"]["group"] = data.get("skill_all_seeing_eye_group", "")
 
+    c.setdefault("skills", {}).setdefault("news_editor", {})
+    c["skills"]["news_editor"]["target"] = data.get("skill_news_editor_target", "")
+    c["skills"]["news_editor"]["title"] = data.get("skill_news_editor_title", "")
+    c["skills"]["news_editor"]["event"] = data.get("skill_news_editor_event", "")
+
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
     c["case_work"].setdefault("hospital", {})
@@ -1101,6 +1106,39 @@ def api_player_groups():
             return jsonify([r["group_name"] for r in rows])
         finally:
             con.close()
+
+
+@app.route("/api/use_skill", methods=["POST"])
+def api_use_skill():
+    if not bot.is_running():
+        return jsonify({"error": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    skill = data.get("skill", "")
+    if not skill:
+        return jsonify({"error": "skill is required"}), 400
+    from tasks.skills_task import SKILL_IDS
+    if skill == "news_editor":
+        params = {
+            "_action_kind": "use_news_editor",
+            "skill_id": SKILL_IDS["news_editor"],
+            "target": data.get("target", "").strip(),
+            "title": data.get("title", "").strip(),
+            "event": data.get("event", "").strip(),
+            "skill_name": "News Editor",
+        }
+    else:
+        skill_id = SKILL_IDS.get(skill, "")
+        if not skill_id:
+            return jsonify({"error": f"Unknown skill: {skill}"}), 400
+        params = {
+            "skill_id": skill_id,
+            "target": data.get("target", "").strip(),
+            "skill_name": data.get("skill_name", skill),
+        }
+        if skill == "all_seeing_eye":
+            params["update_respect"] = True
+    bot.request_use_skill(params)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/scheduler")

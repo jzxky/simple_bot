@@ -604,7 +604,11 @@
                   value="{{ config.get('skills', {}).get('combat_medic', {}).get('target', '') }}"
                   onchange="autoSave()">
               </div>
-              <p class="placeholder">Uses skill automatically when target is set and skill timer is ready.</p>
+              <div class="setting-row">
+                <label>&nbsp;</label>
+                <button type="button" class="action-btn" onclick="useSkillNow('combat_medic','Combat Medic')">Use Now</button>
+              </div>
+              <p class="placeholder">Also uses automatically when target is set and skill timer is ready.</p>
             </div>
 
             <div class="settings-group skill-group" data-skill="skill_destroybionics" style="grid-column: 1 / -1; display:none">
@@ -616,7 +620,11 @@
                   value="{{ config.get('skills', {}).get('biometric_virus', {}).get('target', '') }}"
                   onchange="autoSave()">
               </div>
-              <p class="placeholder">Uses skill automatically when target is set and skill timer is ready.</p>
+              <div class="setting-row">
+                <label>&nbsp;</label>
+                <button type="button" class="action-btn" onclick="useSkillNow('biometric_virus','Biometric Virus')">Use Now</button>
+              </div>
+              <p class="placeholder">Also uses automatically when target is set and skill timer is ready.</p>
             </div>
 
             <div class="settings-group skill-group" data-skill="skill_jetsetter" style="grid-column: 1 / -1; display:none">
@@ -628,6 +636,10 @@
                   onchange="autoSave()">
               </div>
               <p class="placeholder">Leave blank to use on self.</p>
+              <div class="setting-row">
+                <label>&nbsp;</label>
+                <button type="button" class="action-btn" onclick="useSkillNow('travel_expert','Travel Expert')">Use Now</button>
+              </div>
               <hr class="stat-divider">
               <label class="inline-toggle setting-row" style="margin-bottom:12px">
                 Auto Travel Expert
@@ -655,6 +667,10 @@
                   value="{{ config.get('skills', {}).get('all_seeing_eye', {}).get('target', '') }}"
                   onchange="autoSave()">
               </div>
+              <div class="setting-row">
+                <label>&nbsp;</label>
+                <button type="button" class="action-btn" onclick="useSkillNow('all_seeing_eye','All Seeing Eye')">Use Now</button>
+              </div>
               <hr class="stat-divider">
               <label class="inline-toggle setting-row" style="margin-bottom:12px">
                 Auto Respect Check
@@ -672,6 +688,32 @@
                 </select>
               </div>
               <p class="placeholder">Iterates through players in the selected group, checking respect level for the player with the oldest check.</p>
+            </div>
+
+            <div class="settings-group skill-group" data-skill="skill_newseditor" style="grid-column: 1 / -1; display:none">
+              <h3>News Editor</h3>
+              <div class="setting-row">
+                <label for="skill_news_editor_target">Target Player</label>
+                <input type="text" id="skill_news_editor_target" style="width:200px"
+                  value="{{ config.get('skills', {}).get('news_editor', {}).get('target', '') }}"
+                  onchange="autoSave()">
+              </div>
+              <div class="setting-row">
+                <label for="skill_news_editor_title">Event Title</label>
+                <input type="text" id="skill_news_editor_title" maxlength="30" style="width:200px"
+                  value="{{ config.get('skills', {}).get('news_editor', {}).get('title', '') }}"
+                  onchange="autoSave()">
+              </div>
+              <div class="setting-row">
+                <label for="skill_news_editor_event">Event Description</label>
+                <textarea id="skill_news_editor_event" maxlength="1000" rows="3" style="width:300px"
+                  onchange="autoSave()">{{ config.get('skills', {}).get('news_editor', {}).get('event', '') }}</textarea>
+              </div>
+              <div class="setting-row">
+                <label>&nbsp;</label>
+                <button type="button" class="action-btn" onclick="useNewsEditor()">Send</button>
+              </div>
+              <p class="placeholder">Sends a custom event to the target player. Title max 30 chars, description max 1000 chars. Also uses automatically when all three fields are filled and skill timer is ready.</p>
             </div>
           </div>
         </div>

@@ -62,7 +62,7 @@ from tasks.event_consume import EventConsumeTask, ManualEventConsumeTask
 from tasks.scrape_players import ScrapePlayersTask
 from tasks.crossroad import CrossroadTask
 from tasks.ws_monitor import WSMonitorTask
-from tasks.skills_task import DiscoverSkillsTask, CombatMedicTask, BiometricVirusTask, AllSeeingEyeTask
+from tasks.skills_task import DiscoverSkillsTask, CombatMedicTask, BiometricVirusTask, AllSeeingEyeTask, NewsEditorTask
 from players import PlayerRefreshTask, SyncTask
 
 _thread: threading.Thread = None
@@ -114,6 +114,7 @@ _profile_request: queue.Queue = queue.Queue(maxsize=1)
 _profile_result: queue.Queue = queue.Queue(maxsize=1)
 _navigate_queue: queue.Queue = queue.Queue()
 _repair_vehicle_queue: queue.Queue = queue.Queue()
+_skill_queue: queue.Queue = queue.Queue()
 _bar_threads_request: queue.Queue = queue.Queue(maxsize=1)
 _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
 _bulk_launder_queue: queue.Queue = queue.Queue()
@@ -261,6 +262,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(CombatMedicTask())
     sched.add(BiometricVirusTask())
     sched.add(AllSeeingEyeTask())
+    sched.add(NewsEditorTask())
     sched.add(WSMonitorTask())
     sched.add(PlayerRefreshTask())
     sched.add(SyncTask())
@@ -499,6 +501,15 @@ def _run(c: dict):
                     executor.execute(Action("repair_vehicle"), state)
                 except Exception as e:
                     state.add_log(f"Repair vehicle error: {e}")
+
+            # Manual skill use requests from the Flask thread
+            if not _skill_queue.empty():
+                try:
+                    params = _skill_queue.get_nowait()
+                    action_kind = params.pop("_action_kind", "use_skill")
+                    executor.execute(Action(action_kind, **params), state)
+                except Exception as e:
+                    state.add_log(f"Skill use error: {e}")
 
             # Travel destination fetch (for UI dropdowns)
             if not _travel_dests_request.empty():
@@ -889,6 +900,10 @@ def request_turn_in_warrant(url: str, case_id: str):
 
 def request_travel(target_city: str, method: str):
     _travel_queue.put({"target_city": target_city, "method": method})
+
+
+def request_use_skill(params: dict):
+    _skill_queue.put(params)
 
 
 def _fetch_travel_dests(method: str) -> list:

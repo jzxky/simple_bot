@@ -393,6 +393,9 @@ function _buildPayload() {
     skill_all_seeing_eye_enabled: (document.getElementById("skill_all_seeing_eye_enabled")||{checked:false}).checked,
     skill_all_seeing_eye_target: (document.getElementById("skill_all_seeing_eye_target")||{value:""}).value,
     skill_all_seeing_eye_group: (document.getElementById("skill_all_seeing_eye_group")||{value:""}).value,
+    skill_news_editor_target: (document.getElementById("skill_news_editor_target")||{value:""}).value,
+    skill_news_editor_title: (document.getElementById("skill_news_editor_title")||{value:""}).value,
+    skill_news_editor_event: (document.getElementById("skill_news_editor_event")||{value:""}).value,
     ..._collectEventConsume(),
     ..._collectNotifSettings(),
   };
@@ -2048,6 +2051,36 @@ function _loadAvailableSkills() {
     });
     if (msg) msg.style.display = anyVisible ? "none" : "";
   }).catch(() => {});
+}
+
+function useSkillNow(skill, skillName) {
+  const targetEl = document.getElementById("skill_" + skill + "_target");
+  const target = (targetEl ? targetEl.value : "").trim();
+  if (!target) { alert("Enter a target player first."); return; }
+  fetch("/api/use_skill", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({skill: skill, target: target, skill_name: skillName})
+  }).then(r => r.json()).then(d => {
+    if (d.error) alert(d.error);
+  }).catch(e => alert("Error: " + e));
+}
+
+function useNewsEditor() {
+  const target = (document.getElementById("skill_news_editor_target")||{}).value||"";
+  const title = (document.getElementById("skill_news_editor_title")||{}).value||"";
+  const event = (document.getElementById("skill_news_editor_event")||{}).value||"";
+  if (!target.trim() || !title.trim() || !event.trim()) {
+    alert("All three fields (target, title, event) are required.");
+    return;
+  }
+  fetch("/api/use_skill", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({skill: "news_editor", target: target.trim(), title: title.trim(), event: event.trim()})
+  }).then(r => r.json()).then(d => {
+    if (d.error) alert(d.error);
+  }).catch(e => alert("Error: " + e));
 }
 
 function findThreadId() {

@@ -15,6 +15,7 @@ SKILL_IDS = {
     "biometric_virus": "skill_destroybionics",
     "travel_expert": "skill_jetsetter",
     "all_seeing_eye": "skill_allseeingeye",
+    "news_editor": "skill_newseditor",
 }
 
 
@@ -199,4 +200,59 @@ class AllSeeingEyeTask(Task):
             target=oldest["username"],
             skill_name="All Seeing Eye",
             update_respect=True,
+        ), state)
+
+
+class NewsEditorTask(Task):
+    priority = 30
+    label = "News Editor"
+
+    def can_run(self, state: GameState) -> bool:
+        c = cfg.load().get("skills", {}).get("news_editor", {})
+        if not c.get("target", "").strip():
+            return False
+        if not c.get("title", "").strip():
+            return False
+        if not c.get("event", "").strip():
+            return False
+        if SKILL_IDS["news_editor"] not in state.available_skills:
+            return False
+        if not state.logged_in or state.in_jail or state.in_hospital:
+            return False
+        if state.hold_action_timer:
+            return False
+        return state.timer_ready("skill")
+
+    def blocked_reasons(self, state):
+        reasons = []
+        c = cfg.load().get("skills", {}).get("news_editor", {})
+        if not c.get("target", "").strip():
+            reasons.append("No target set")
+        if not c.get("title", "").strip():
+            reasons.append("No title set")
+        if not c.get("event", "").strip():
+            reasons.append("No event set")
+        if SKILL_IDS["news_editor"] not in state.available_skills:
+            reasons.append("Skill not unlocked")
+        if not state.logged_in:
+            reasons.append("Not logged in")
+        if state.in_jail:
+            reasons.append("In jail")
+        if state.in_hospital:
+            reasons.append("In hospital")
+        if state.hold_action_timer:
+            reasons.append("Action timer held")
+        if not state.timer_ready("skill"):
+            reasons.append("Skill timer not ready")
+        return reasons
+
+    def run(self, state: GameState, executor):
+        c = cfg.load().get("skills", {}).get("news_editor", {})
+        executor.execute(Action(
+            "use_news_editor",
+            skill_id=SKILL_IDS["news_editor"],
+            target=c["target"].strip(),
+            title=c["title"].strip(),
+            event=c["event"].strip(),
+            skill_name="News Editor",
         ), state)
