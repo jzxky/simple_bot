@@ -10,6 +10,14 @@ from tasks.base import Task, Action
 from state import GameState
 
 
+_rediscover_flag = False
+
+
+def request_skill_rediscover():
+    global _rediscover_flag
+    _rediscover_flag = True
+
+
 SKILL_IDS = {
     "combat_medic": "skill_combatmedic",
     "biometric_virus": "skill_destroybionics",
@@ -27,13 +35,13 @@ class DiscoverSkillsTask(Task):
         self._discovered = False
 
     def can_run(self, state: GameState) -> bool:
-        if self._discovered:
+        if self._discovered and not _rediscover_flag:
             return False
         return state.logged_in and not state.in_jail and not state.in_hospital
 
     def blocked_reasons(self, state):
         reasons = []
-        if self._discovered:
+        if self._discovered and not _rediscover_flag:
             reasons.append("Already discovered")
         if not state.logged_in:
             reasons.append("Not logged in")
@@ -44,7 +52,9 @@ class DiscoverSkillsTask(Task):
         return reasons
 
     def run(self, state: GameState, executor):
+        global _rediscover_flag
         self._discovered = True
+        _rediscover_flag = False
         executor.execute(Action("discover_skills"), state)
 
 

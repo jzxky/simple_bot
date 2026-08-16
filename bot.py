@@ -262,7 +262,11 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(ManualEventConsumeTask(_event_consume_queue))
     sched.add(ScrapePlayersTask(_scrape_queue))
     sched.add(CrossroadTask())
-    sched.add(DiscoverSkillsTask())
+    if old_sched:
+        existing = next((t for t in old_sched._tasks if isinstance(t, DiscoverSkillsTask)), None)
+        sched.add(existing or DiscoverSkillsTask())
+    else:
+        sched.add(DiscoverSkillsTask())
     sched.add(CombatMedicTask())
     sched.add(BiometricVirusTask())
     sched.add(AllSeeingEyeTask())
