@@ -385,13 +385,13 @@ function _buildPayload() {
     sync_online_time:   (document.getElementById("sync_online_time")||{checked:true}).checked,
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
-    skill_combat_medic_enabled: (document.getElementById("skill_combat_medic_enabled")||{checked:false}).checked,
     skill_combat_medic_target: (document.getElementById("skill_combat_medic_target")||{value:""}).value,
-    skill_biometric_virus_enabled: (document.getElementById("skill_biometric_virus_enabled")||{checked:false}).checked,
     skill_biometric_virus_target: (document.getElementById("skill_biometric_virus_target")||{value:""}).value,
     skill_travel_expert_enabled: (document.getElementById("skill_travel_expert_enabled")||{checked:false}).checked,
-    skill_travel_expert_threshold: parseInt((document.getElementById("skill_travel_expert_threshold")||{value:"120"}).value)||120,
+    skill_travel_expert_target: (document.getElementById("skill_travel_expert_target")||{value:""}).value,
+    skill_travel_expert_threshold: parseInt((document.getElementById("skill_travel_expert_threshold")||{value:"2"}).value)||2,
     skill_all_seeing_eye_enabled: (document.getElementById("skill_all_seeing_eye_enabled")||{checked:false}).checked,
+    skill_all_seeing_eye_target: (document.getElementById("skill_all_seeing_eye_target")||{value:""}).value,
     skill_all_seeing_eye_group: (document.getElementById("skill_all_seeing_eye_group")||{value:""}).value,
     ..._collectEventConsume(),
     ..._collectNotifSettings(),
@@ -1291,7 +1291,7 @@ function pollStatus() {
       }
     })
     .catch(() => {})
-    .finally(() => setTimeout(pollStatus, 3000));
+    .finally(() => { _loadAvailableSkills(); setTimeout(pollStatus, 3000); });
 }
 
 loadPlayers();
@@ -1983,6 +1983,7 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleWarModeLink();
   loadEarnPlanner();
   _loadSkillsGroupDropdown();
+  _loadAvailableSkills();
   // Capture the baseline the diff-based save compares against, once dynamic
   // tables/summaries have populated from the server-rendered values.
   // Delay must be long enough for loadEarnPlanner fetch to complete.
@@ -2030,6 +2031,22 @@ function _loadSkillsGroupDropdown() {
       if (g === cur) opt.selected = true;
       sel.appendChild(opt);
     });
+  }).catch(() => {});
+}
+
+function _loadAvailableSkills() {
+  fetch("/api/available_skills").then(r => r.json()).then(skills => {
+    const msg = document.getElementById("skills-none-msg");
+    let anyVisible = false;
+    document.querySelectorAll(".skill-group").forEach(el => {
+      if (skills.includes(el.dataset.skill)) {
+        el.style.display = "";
+        anyVisible = true;
+      } else {
+        el.style.display = "none";
+      }
+    });
+    if (msg) msg.style.display = anyVisible ? "none" : "";
   }).catch(() => {});
 }
 

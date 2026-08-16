@@ -53,8 +53,6 @@ class CombatMedicTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         c = cfg.load().get("skills", {}).get("combat_medic", {})
-        if not c.get("enabled", False):
-            return False
         if not c.get("target", "").strip():
             return False
         if SKILL_IDS["combat_medic"] not in state.available_skills:
@@ -70,9 +68,7 @@ class CombatMedicTask(Task):
     def blocked_reasons(self, state):
         reasons = []
         c = cfg.load().get("skills", {}).get("combat_medic", {})
-        if not c.get("enabled", False):
-            reasons.append("Not enabled")
-        elif not c.get("target", "").strip():
+        if not c.get("target", "").strip():
             reasons.append("No target set")
         if SKILL_IDS["combat_medic"] not in state.available_skills:
             reasons.append("Skill not unlocked")
@@ -106,8 +102,6 @@ class BiometricVirusTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         c = cfg.load().get("skills", {}).get("biometric_virus", {})
-        if not c.get("enabled", False):
-            return False
         if not c.get("target", "").strip():
             return False
         if SKILL_IDS["biometric_virus"] not in state.available_skills:
@@ -123,9 +117,7 @@ class BiometricVirusTask(Task):
     def blocked_reasons(self, state):
         reasons = []
         c = cfg.load().get("skills", {}).get("biometric_virus", {})
-        if not c.get("enabled", False):
-            reasons.append("Not enabled")
-        elif not c.get("target", "").strip():
+        if not c.get("target", "").strip():
             reasons.append("No target set")
         if SKILL_IDS["biometric_virus"] not in state.available_skills:
             reasons.append("Skill not unlocked")

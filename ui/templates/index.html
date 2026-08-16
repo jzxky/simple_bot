@@ -593,51 +593,44 @@
 
         <!-- Skills tab -->
         <div id="income-skills" class="tab-panel">
+          <p id="skills-none-msg" class="placeholder">No skills discovered yet. Start the bot to detect available skills.</p>
           <div class="settings-groups">
-            <div class="settings-group" style="grid-column: 1 / -1">
+            <div class="settings-group skill-group" data-skill="skill_combatmedic" style="grid-column: 1 / -1; display:none">
               <h3>Combat Medic</h3>
               <p class="placeholder" style="color:var(--danger);margin-bottom:8px">⚠ Protection must be dropped to use this skill.</p>
-              <label class="inline-toggle setting-row" style="margin-bottom:12px">
-                Enable
-                <label class="toggle-label">
-                  <input type="checkbox" id="skill_combat_medic_enabled"
-                    {% if config.get('skills', {}).get('combat_medic', {}).get('enabled') %}checked{% endif %}
-                    onchange="autoSave()">
-                  <span class="toggle"></span>
-                </label>
-              </label>
               <div class="setting-row">
                 <label for="skill_combat_medic_target">Target Player</label>
                 <input type="text" id="skill_combat_medic_target" style="width:200px"
                   value="{{ config.get('skills', {}).get('combat_medic', {}).get('target', '') }}"
                   onchange="autoSave()">
               </div>
+              <p class="placeholder">Uses skill automatically when target is set and skill timer is ready.</p>
             </div>
 
-            <div class="settings-group" style="grid-column: 1 / -1">
+            <div class="settings-group skill-group" data-skill="skill_destroybionics" style="grid-column: 1 / -1; display:none">
               <h3>Biometric Virus</h3>
               <p class="placeholder" style="color:var(--danger);margin-bottom:8px">⚠ Protection must be dropped to use this skill.</p>
-              <label class="inline-toggle setting-row" style="margin-bottom:12px">
-                Enable
-                <label class="toggle-label">
-                  <input type="checkbox" id="skill_biometric_virus_enabled"
-                    {% if config.get('skills', {}).get('biometric_virus', {}).get('enabled') %}checked{% endif %}
-                    onchange="autoSave()">
-                  <span class="toggle"></span>
-                </label>
-              </label>
               <div class="setting-row">
                 <label for="skill_biometric_virus_target">Target Player</label>
                 <input type="text" id="skill_biometric_virus_target" style="width:200px"
                   value="{{ config.get('skills', {}).get('biometric_virus', {}).get('target', '') }}"
                   onchange="autoSave()">
               </div>
+              <p class="placeholder">Uses skill automatically when target is set and skill timer is ready.</p>
             </div>
 
-            <div class="settings-group" style="grid-column: 1 / -1">
+            <div class="settings-group skill-group" data-skill="skill_jetsetter" style="grid-column: 1 / -1; display:none">
               <h3>Travel Expert</h3>
+              <div class="setting-row">
+                <label for="skill_travel_expert_target">Target Player</label>
+                <input type="text" id="skill_travel_expert_target" style="width:200px"
+                  value="{{ config.get('skills', {}).get('travel_expert', {}).get('target', '') }}"
+                  onchange="autoSave()">
+              </div>
+              <p class="placeholder">Leave blank to use on self.</p>
+              <hr class="stat-divider">
               <label class="inline-toggle setting-row" style="margin-bottom:12px">
-                Enable
+                Auto Travel Expert
                 <label class="toggle-label">
                   <input type="checkbox" id="skill_travel_expert_enabled"
                     {% if config.get('skills', {}).get('travel_expert', {}).get('enabled') %}checked{% endif %}
@@ -646,18 +639,25 @@
                 </label>
               </label>
               <div class="setting-row">
-                <label for="skill_travel_expert_threshold">Travel Timer Threshold (seconds)</label>
+                <label for="skill_travel_expert_threshold">Travel Timer Threshold (minutes)</label>
                 <input type="number" id="skill_travel_expert_threshold" class="input-narrow" min="0"
-                  value="{{ config.get('skills', {}).get('travel_expert', {}).get('travel_timer_threshold', 120) }}"
+                  value="{{ config.get('skills', {}).get('travel_expert', {}).get('travel_timer_threshold', 2) }}"
                   oninput="markNumDirty(this)">
               </div>
-              <p class="placeholder">Uses Travel Expert on self when travel timer remaining exceeds this threshold.</p>
+              <p class="placeholder">Automatically uses Travel Expert when travel timer remaining exceeds this threshold.</p>
             </div>
 
-            <div class="settings-group" style="grid-column: 1 / -1">
+            <div class="settings-group skill-group" data-skill="skill_allseeingeye" style="grid-column: 1 / -1; display:none">
               <h3>All Seeing Eye</h3>
+              <div class="setting-row">
+                <label for="skill_all_seeing_eye_target">Target Player</label>
+                <input type="text" id="skill_all_seeing_eye_target" style="width:200px"
+                  value="{{ config.get('skills', {}).get('all_seeing_eye', {}).get('target', '') }}"
+                  onchange="autoSave()">
+              </div>
+              <hr class="stat-divider">
               <label class="inline-toggle setting-row" style="margin-bottom:12px">
-                Enable
+                Auto Respect Check
                 <label class="toggle-label">
                   <input type="checkbox" id="skill_all_seeing_eye_enabled"
                     {% if config.get('skills', {}).get('all_seeing_eye', {}).get('enabled') %}checked{% endif %}
