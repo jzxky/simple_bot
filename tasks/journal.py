@@ -228,6 +228,9 @@ def dispatch_journal_action(entry: dict, state: GameState):
         if "completed the repairs on your vehicle" in entry.get("text", "").lower():
             if _repair_complete_queue is not None:
                 _repair_complete_queue.put(True)
+    if "skill gained" in entry.get("title", "").lower():
+        from tasks.skills_task import request_skill_rediscover
+        request_skill_rediscover()
 
 
 def _handle_drug_smuggle(entry: dict, state: GameState):

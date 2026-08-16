@@ -1320,7 +1320,7 @@ function pollStatus() {
       }
     })
     .catch(() => {})
-    .finally(() => { _loadAvailableSkills(); setTimeout(pollStatus, 3000); });
+    .finally(() => { setTimeout(pollStatus, 3000); });
 }
 
 loadPlayers();
