@@ -3294,17 +3294,6 @@ def handle_check_drug_store(action: Action, state: GameState):
     else:
         ordered_wanted = list(wanted)
 
-    max_price = max(DRUG_STORE_PRICES.get(i, 0) for i in ordered_wanted)
-    if state.clean_money + state.bank_balance < max_price:
-        cheapest = min(DRUG_STORE_PRICES.get(i, 0) for i in ordered_wanted)
-        if state.clean_money + state.bank_balance < cheapest:
-            state.add_log(f"Drug Store: cannot afford any wanted item (need ${cheapest:,}).")
-            if task is not None:
-                task.last_checked_at = time.time()
-                from tasks.drug_store import save_drug_store_state
-                save_drug_store_state({"last_checked_at": task.last_checked_at})
-            return
-
     page = browser.page()
 
     def _parse_store() -> dict:
@@ -3326,13 +3315,11 @@ def handle_check_drug_store(action: Action, state: GameState):
             items[item_val] = {"stock": stock, "price": DRUG_STORE_PRICES.get(item_val, 0)}
         return items
 
-    # Withdraw enough to cover the most expensive wanted item before visiting the store
     most_expensive = max(DRUG_STORE_PRICES.get(i, 0) for i in ordered_wanted)
     if state.clean_money < most_expensive:
-        needed = min(most_expensive - state.clean_money, state.bank_balance)
-        if needed > 0:
-            state.add_log(f"Drug Store: withdrawing ${needed:,}.")
-            handle_withdraw(Action("withdraw", amount=needed), state)
+        needed = most_expensive - state.clean_money
+        state.add_log(f"Drug Store: withdrawing ${needed:,}.")
+        handle_withdraw(Action("withdraw", amount=needed), state)
 
     _nav(_u("/localcity/drugstore.asp"), state)
     if not _check_session(state):
@@ -3342,6 +3329,22 @@ def handle_check_drug_store(action: Action, state: GameState):
 
     if task is not None:
         from tasks.drug_store import save_drug_store_state
+        # Restock detection
+        if task.last_stock:
+            restocked = [
+                item for item, d in store.items()
+                if d.get("stock", 0) > task.last_stock.get(item, 0)
+            ]
+            if restocked:
+                now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                c = cfg.load()
+                c.setdefault("drug_store", {})["last_restock_at"] = now_str
+                cfg.save(c)
+                import settings_rev; settings_rev.bump()
+                msg = (f"Drug Store restock detected ({', '.join(restocked)}) at {now_str}.")
+                state.add_log(msg)
+                _notify(state, "drug_store_restock", msg)
+
         task.last_checked_at = time.time()
         task.last_stock = {item: d.get("stock", 0) for item, d in store.items()}
         save_drug_store_state({
@@ -3349,51 +3352,48 @@ def handle_check_drug_store(action: Action, state: GameState):
             "last_stock": task.last_stock,
         })
 
-    all_in_stock = [i for i, d in store.items() if d.get("stock", 0) > 0]
-    if all_in_stock:
-        msg = f"Drug Store: in stock — {', '.join(all_in_stock)}."
-        state.add_log(msg)
-        _notify(state, "drug_store_in_stock", msg)
-
     def _in_stock_affordable():
         return [i for i in ordered_wanted
                 if store.get(i, {}).get("stock", 0) > 0
                 and DRUG_STORE_PRICES.get(i, 0) <= state.clean_money + state.bank_balance]
 
     can_buy = _in_stock_affordable()
-    if not [i for i in ordered_wanted if store.get(i, {}).get("stock", 0) > 0]:
-        state.add_log("Drug Store: no wanted items in stock.")
-        return
-
     if not can_buy:
-        in_stock = [i for i in ordered_wanted if store.get(i, {}).get("stock", 0) > 0]
-        parts = [f"{i} ${DRUG_STORE_PRICES.get(i, 0):,}" for i in in_stock]
-        state.add_log(f"Drug Store: in stock but cannot afford — {', '.join(parts)}.")
         return
 
-    target = can_buy[0]
-    price = DRUG_STORE_PRICES.get(target, 0)
-    state.add_log(f"Drug Store: purchasing {target} for ${price:,}.")
-    page.check(f"input[name='product'][value='{target}']")
-    page.click("input[type='submit'][name='B1'][value='Purchase']")
-    page.wait_for_load_state("domcontentloaded")
-    _refresh_state(state)
+    for _attempt in range(3):
+        target = can_buy[0]
+        price = DRUG_STORE_PRICES.get(target, 0)
+        state.add_log(f"Drug Store: purchasing {target} for ${price:,}.")
+        page.check(f"input[name='product'][value='{target}']")
+        page.click("input[type='submit'][name='B1'][value='Purchase']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
 
-    result_soup = BeautifulSoup(page.content(), "html.parser")
-    success_div = result_soup.find("div", id="success")
-    fail_div = result_soup.find("div", id="fail")
+        result_soup = BeautifulSoup(page.content(), "html.parser")
+        success_div = result_soup.find("div", id="success")
+        fail_div = result_soup.find("div", id="fail")
 
-    if success_div:
-        msg = f"Drug Store: purchased {target} — {success_div.get_text(strip=True)}"
-        state.add_log(msg)
-        _notify(state, "drug_store_purchased", msg)
-        if task is not None:
-            task.purchase_cooldown_until = time.time() + 1800
-            save_drug_store_state({"purchase_cooldown_until": task.purchase_cooldown_until})
-    elif fail_div:
-        state.add_log(f"Drug Store: purchase failed — {fail_div.get_text(strip=True)}")
-    else:
-        state.add_log("Drug Store: unexpected page after purchase — aborting.")
+        if success_div:
+            msg = f"Drug Store: purchased {target} — {success_div.get_text(strip=True)}"
+            state.add_log(msg)
+            _notify(state, "drug_store_purchased", msg)
+            if task is not None:
+                task.purchase_cooldown_until = time.time() + 1800
+                save_drug_store_state({"purchase_cooldown_until": task.purchase_cooldown_until})
+            return
+        elif fail_div:
+            state.add_log(f"Drug Store: purchase failed — {fail_div.get_text(strip=True)}, retrying.")
+            _nav(_u("/localcity/drugstore.asp"), state)
+            if not _check_session(state):
+                return
+            store = _parse_store()
+            can_buy = _in_stock_affordable()
+            if not can_buy:
+                return
+        else:
+            state.add_log("Drug Store: unexpected page after purchase — aborting.")
+            return
 
 
 def handle_withdraw(action: Action, state: GameState):

@@ -1288,6 +1288,11 @@ function pollStatus() {
         }
       }
 
+      const dsRestockEl = document.getElementById("drug-store-last-restock");
+      if (dsRestockEl && d.drug_store_last_restock_at) {
+        dsRestockEl.textContent = d.drug_store_last_restock_at;
+      }
+
       // Log — only update live view; switch back to live if first log file matches
       const logSel = document.getElementById("log-file-select");
       if (logSel && logSel.options.length && logSel.options[0].value === _logCurrentFile) {
