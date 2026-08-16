@@ -1307,6 +1307,20 @@ function pollStatus() {
 
       // Scheduler visualization
       const schedBody = document.getElementById("scheduler-body");
+      if (d.available_skills) {
+        let anyVisible = false;
+        document.querySelectorAll(".skill-group").forEach(el => {
+          if (d.available_skills.includes(el.dataset.skill)) {
+            el.style.display = "";
+            anyVisible = true;
+          } else {
+            el.style.display = "none";
+          }
+        });
+        const skillMsg = document.getElementById("skills-none-msg");
+        if (skillMsg) skillMsg.style.display = anyVisible ? "none" : "";
+      }
+
       if (schedBody) {
         fetch("/api/scheduler").then(r => r.json()).then(s => {
           schedBody.innerHTML = (s.tasks || []).map(t => {
@@ -2039,7 +2053,6 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleWarModeLink();
   loadEarnPlanner();
   _loadSkillsGroupDropdown();
-  _loadAvailableSkills();
   // Capture the baseline the diff-based save compares against, once dynamic
   // tables/summaries have populated from the server-rendered values.
   // Delay must be long enough for loadEarnPlanner fetch to complete.
@@ -2087,22 +2100,6 @@ function _loadSkillsGroupDropdown() {
       if (g === cur) opt.selected = true;
       sel.appendChild(opt);
     });
-  }).catch(() => {});
-}
-
-function _loadAvailableSkills() {
-  fetch("/api/available_skills").then(r => r.json()).then(skills => {
-    const msg = document.getElementById("skills-none-msg");
-    let anyVisible = false;
-    document.querySelectorAll(".skill-group").forEach(el => {
-      if (skills.includes(el.dataset.skill)) {
-        el.style.display = "";
-        anyVisible = true;
-      } else {
-        el.style.display = "none";
-      }
-    });
-    if (msg) msg.style.display = anyVisible ? "none" : "";
   }).catch(() => {});
 }
 
