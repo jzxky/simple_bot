@@ -63,11 +63,13 @@ from tasks.scrape_players import ScrapePlayersTask
 from tasks.crossroad import CrossroadTask
 from tasks.ws_monitor import WSMonitorTask
 from tasks.skills_task import DiscoverSkillsTask, CombatMedicTask, BiometricVirusTask, AllSeeingEyeTask, NewsEditorTask
+from tasks.drug_store import DrugStoreTask
 from players import PlayerRefreshTask, SyncTask
 
 _thread: threading.Thread = None
 _bionics_task = None
 _weapon_store_task = None
+_drug_store_task = None
 _auto_jail_task = None
 _auto_jail_check_queue: queue.Queue = queue.Queue()
 _scheduler_snapshot: list = []
@@ -247,11 +249,13 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(BankingInvestTask())
     sched.add(SmartTravelTask())
     sched.add(OnlineAgeTask())
-    global _bionics_task, _weapon_store_task
+    global _bionics_task, _weapon_store_task, _drug_store_task
     _bionics_task = BionicsTask()
     sched.add(_bionics_task)
     _weapon_store_task = WeaponStoreTask()
     sched.add(_weapon_store_task)
+    _drug_store_task = DrugStoreTask()
+    sched.add(_drug_store_task)
     sched.add(RespectTask())
     sched.add(EventBossTask())
     sched.add(EventConsumeTask())
@@ -682,6 +686,10 @@ def get_bionics_task():
 
 def get_weapon_store_task():
     return _weapon_store_task
+
+
+def get_drug_store_task():
+    return _drug_store_task
 
 
 def get_state():
