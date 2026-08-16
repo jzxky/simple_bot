@@ -3326,12 +3326,13 @@ def handle_check_drug_store(action: Action, state: GameState):
             items[item_val] = {"stock": stock, "price": DRUG_STORE_PRICES.get(item_val, 0)}
         return items
 
-    def _withdraw_for(price: int):
-        if state.clean_money < price:
-            needed = min(price - state.clean_money, state.bank_balance)
-            if needed > 0:
-                state.add_log(f"Drug Store: withdrawing ${needed:,}.")
-                handle_withdraw(Action("withdraw", amount=needed), state)
+    # Withdraw enough to cover the most expensive wanted item before visiting the store
+    most_expensive = max(DRUG_STORE_PRICES.get(i, 0) for i in ordered_wanted)
+    if state.clean_money < most_expensive:
+        needed = min(most_expensive - state.clean_money, state.bank_balance)
+        if needed > 0:
+            state.add_log(f"Drug Store: withdrawing ${needed:,}.")
+            handle_withdraw(Action("withdraw", amount=needed), state)
 
     _nav(_u("/localcity/drugstore.asp"), state)
     if not _check_session(state):
@@ -3372,7 +3373,6 @@ def handle_check_drug_store(action: Action, state: GameState):
 
     target = can_buy[0]
     price = DRUG_STORE_PRICES.get(target, 0)
-    _withdraw_for(price)
     state.add_log(f"Drug Store: purchasing {target} for ${price:,}.")
     page.check(f"input[name='product'][value='{target}']")
     page.click("input[type='submit'][name='B1'][value='Purchase']")
