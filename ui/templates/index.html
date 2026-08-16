@@ -914,6 +914,10 @@
                 <span class="stat-label">Next check</span>
                 <span id="drug-store-next-check" class="stat-value">--</span>
               </div>
+              <div class="setting-row">
+                <span class="stat-label">Last restock</span>
+                <span id="drug-store-last-restock" class="stat-value">{{ config.get('drug_store', {}).get('last_restock_at', '--') or '--' }}</span>
+              </div>
             </div>
           </div>
           <div class="settings-groups" style="margin-top:16px">
