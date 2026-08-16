@@ -363,6 +363,11 @@ function _buildPayload() {
     weapon_store_window_start: (document.getElementById("weapon_store_window_start")||{value:"00:00"}).value,
     weapon_store_window_end:   (document.getElementById("weapon_store_window_end")||{value:"23:59"}).value,
     weapon_store_auto_restock: (document.getElementById("weapon_store_auto_restock")||{checked:false}).checked,
+    drug_store_enabled: (document.getElementById("drug_store_enabled")||{checked:false}).checked,
+    drug_store_wanted_items: _dsCheckedItems(),
+    drug_store_priority_order: _serializePriorityItems("drug-store-priority-body"),
+    drug_store_interval_minutes: parseInt((document.getElementById("drug_store_interval_minutes")||{value:5}).value)||0,
+    drug_store_interval_seconds: parseInt((document.getElementById("drug_store_interval_seconds")||{value:0}).value)||0,
     gym_enabled:    (document.getElementById("gym_enabled")||{checked:false}).checked,
     gym_activity:   (document.getElementById("gym_activity")||{value:"weights"}).value,
     gym_auto_travel:(document.getElementById("gym_auto_travel")||{checked:false}).checked,
@@ -1267,6 +1272,22 @@ function pollStatus() {
         if (we && we !== document.activeElement) we.value = d.weapon_store_window_end;
       }
 
+      // Drug store next check
+      const dsNextEl = document.getElementById("drug-store-next-check");
+      if (dsNextEl) {
+        if (d.drug_store_next_check_at) {
+          const secsLeft = Math.max(0, Math.round(d.drug_store_next_check_at - Date.now() / 1000));
+          if (secsLeft <= 0) {
+            dsNextEl.textContent = "Ready";
+          } else {
+            const h = Math.floor(secsLeft / 3600), m = Math.floor((secsLeft % 3600) / 60), s = secsLeft % 60;
+            dsNextEl.textContent = (h ? h + "h " : "") + String(m).padStart(2, "0") + "m " + String(s).padStart(2, "0") + "s";
+          }
+        } else {
+          dsNextEl.textContent = "--";
+        }
+      }
+
       // Log — only update live view; switch back to live if first log file matches
       const logSel = document.getElementById("log-file-select");
       if (logSel && logSel.options.length && logSel.options[0].value === _logCurrentFile) {
@@ -1836,6 +1857,8 @@ function _serializePriorityTable(tbodyId) {
 
 // ── Priority list helpers for bionics + weapon store ──────────────────────────
 
+const DS_ITEMS = ["Pseudoephedrine", "Epipen", "Medipack"];
+
 const WS_ITEMS = [
   "Baseball Bat","Pistol","Hand Grenade","Assault Rifle","Katana","Shotgun",
   "Lightsaber","Sniper Rifle","FlameThrower","Omega Death Laser","Plasma Rifle",
@@ -1926,6 +1949,29 @@ function closeWeaponBuyList() {
   _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
 }
 
+function _dsCheckedItems() {
+  return DS_ITEMS.filter(item => {
+    const el = document.getElementById("ds_want_" + item.replace(/ /g, "_"));
+    return el && el.checked;
+  });
+}
+
+function dsOnBuyListChange() {
+  _syncPriorityList("drug-store-priority-body", _dsCheckedItems());
+  _renderBuyListSummary("drug-store-priority-body", "drug-store-buylist-summary");
+  autoSave();
+}
+
+function openDrugBuyList() {
+  const ov = document.getElementById("drug-buylist-overlay");
+  if (ov) ov.style.display = "flex";
+}
+function closeDrugBuyList() {
+  const ov = document.getElementById("drug-buylist-overlay");
+  if (ov) ov.style.display = "none";
+  _renderBuyListSummary("drug-store-priority-body", "drug-store-buylist-summary");
+}
+
 function _initPriorityDrag(tbodyId) {
   const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
@@ -1980,8 +2026,10 @@ function _initPriorityDrag(tbodyId) {
 document.addEventListener("DOMContentLoaded", () => {
   _initPriorityDrag("bionics-priority-body");
   _initPriorityDrag("weapon-store-priority-body");
+  _initPriorityDrag("drug-store-priority-body");
   _renderBuyListSummary("bionics-priority-body", "bionics-buylist-summary");
   _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
+  _renderBuyListSummary("drug-store-priority-body", "drug-store-buylist-summary");
   toggleEventConsumeSettings();
   toggleWarModeLink();
   loadEarnPlanner();

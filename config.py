@@ -211,6 +211,13 @@ DEFAULT_CONFIG = {
         "window_end": "23:59",
         "auto_restock": False
     },
+    "drug_store": {
+        "enabled": False,
+        "wanted_items": [],
+        "priority_order": [],
+        "check_interval_minutes": 5,
+        "check_interval_seconds": 0
+    },
     "autobuy": {
         "enabled": False,
         "drugs": {

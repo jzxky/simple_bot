@@ -23,6 +23,8 @@ NOTIFICATION_EVENTS = [
     ("weapon_store_in_stock",  "Weapon store in stock"),
     ("weapon_store_purchased", "Weapon store purchased"),
     ("weapon_store_restock",   "Weapon store restock detected"),
+    ("drug_store_in_stock",    "Drug store in stock"),
+    ("drug_store_purchased",   "Drug store purchased"),
     ("promotion_success",   "Rank promotion"),
     ("auto_promo",          "Auto-promotion triggered"),
     ("session_expired",     "Session expired"),
@@ -268,6 +270,13 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["weapon_store"]["window_start"] = data.get("weapon_store_window_start", "00:00")
     c["weapon_store"]["window_end"] = data.get("weapon_store_window_end", "23:59")
     c["weapon_store"]["auto_restock"] = data.get("weapon_store_auto_restock", False)
+
+    c.setdefault("drug_store", {})
+    c["drug_store"]["enabled"] = data.get("drug_store_enabled", False)
+    c["drug_store"]["wanted_items"] = data.get("drug_store_wanted_items", [])
+    c["drug_store"]["priority_order"] = data.get("drug_store_priority_order", [])
+    c["drug_store"]["check_interval_minutes"] = max(0, min(59, int(data.get("drug_store_interval_minutes", 5) or 5)))
+    c["drug_store"]["check_interval_seconds"] = max(0, min(59, int(data.get("drug_store_interval_seconds", 0) or 0)))
 
     c.setdefault("skills", {})
     c["skills"].setdefault("combat_medic", {})
@@ -641,6 +650,20 @@ def _get_weapon_store_next_check_at(state) -> "float | None":
     return next_at
 
 
+def _get_drug_store_next_check_at(state) -> "float | None":
+    import time as _time
+    task = bot.get_drug_store_task()
+    if not task or task.last_checked_at <= 0:
+        return None
+    now = _time.time()
+    if task.purchase_cooldown_until > now:
+        return task.purchase_cooldown_until
+    d = cfg.load().get("drug_store", {})
+    interval = max(1, int(d.get("check_interval_minutes", 5)) * 60
+                   + int(d.get("check_interval_seconds", 0)))
+    return task.last_checked_at + interval
+
+
 @app.route("/status")
 def status():
     s = bot.state
@@ -704,6 +727,7 @@ def status():
         "weapon_store_next_check_at": _get_weapon_store_next_check_at(s),
         "weapon_store_window_start": cfg.load().get("weapon_store", {}).get("window_start", "00:00"),
         "weapon_store_window_end":   cfg.load().get("weapon_store", {}).get("window_end",   "23:59"),
+        "drug_store_next_check_at": _get_drug_store_next_check_at(s),
         "is_git_repo": _is_git_repo(),
         "flight_departs_at": s.flight_departs_at,
         "vehicle_health": s.vehicle_health,

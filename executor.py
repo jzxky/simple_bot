@@ -3275,6 +3275,127 @@ def handle_check_weapon_store(action: Action, state: GameState):
         state.add_log(f"Weapon Store session complete — purchased: {', '.join(purchased)}.")
 
 
+DRUG_STORE_PRICES = {"Pseudoephedrine": 500, "Epipen": 25_000, "Medipack": 1_000_000}
+
+
+def handle_check_drug_store(action: Action, state: GameState):
+    import config as cfg
+    ds_cfg = cfg.load().get("drug_store", {})
+    wanted = ds_cfg.get("wanted_items", [])
+    task = action.params.get("_task")
+
+    if not wanted:
+        state.add_log("Drug Store: no wanted items configured.")
+        return
+
+    priority_cfg = ds_cfg.get("priority_order", [])
+    if priority_cfg:
+        ordered_wanted = [i for i in priority_cfg if i in wanted]
+    else:
+        ordered_wanted = list(wanted)
+
+    max_price = max(DRUG_STORE_PRICES.get(i, 0) for i in ordered_wanted)
+    if state.clean_money + state.bank_balance < max_price:
+        cheapest = min(DRUG_STORE_PRICES.get(i, 0) for i in ordered_wanted)
+        if state.clean_money + state.bank_balance < cheapest:
+            state.add_log(f"Drug Store: cannot afford any wanted item (need ${cheapest:,}).")
+            if task is not None:
+                task.last_checked_at = time.time()
+                from tasks.drug_store import save_drug_store_state
+                save_drug_store_state({"last_checked_at": task.last_checked_at})
+            return
+
+    page = browser.page()
+
+    def _parse_store() -> dict:
+        soup = BeautifulSoup(page.content(), "html.parser")
+        items = {}
+        for row in soup.select("table tr"):
+            radio = row.find("input", {"name": "product", "type": "radio"})
+            if not radio:
+                continue
+            item_val = radio.get("value", "")
+            tds = row.find_all("td")
+            if len(tds) < 4:
+                continue
+            stock_text = tds[3].get_text(strip=True)
+            try:
+                stock = int(stock_text)
+            except ValueError:
+                continue
+            items[item_val] = {"stock": stock, "price": DRUG_STORE_PRICES.get(item_val, 0)}
+        return items
+
+    def _withdraw_for(price: int):
+        if state.clean_money < price:
+            needed = min(price - state.clean_money, state.bank_balance)
+            if needed > 0:
+                state.add_log(f"Drug Store: withdrawing ${needed:,}.")
+                handle_withdraw(Action("withdraw", amount=needed), state)
+
+    _nav(_u("/localcity/drugstore.asp"), state)
+    if not _check_session(state):
+        return
+
+    store = _parse_store()
+
+    if task is not None:
+        from tasks.drug_store import save_drug_store_state
+        task.last_checked_at = time.time()
+        task.last_stock = {item: d.get("stock", 0) for item, d in store.items()}
+        save_drug_store_state({
+            "last_checked_at": task.last_checked_at,
+            "last_stock": task.last_stock,
+        })
+
+    all_in_stock = [i for i, d in store.items() if d.get("stock", 0) > 0]
+    if all_in_stock:
+        msg = f"Drug Store: in stock — {', '.join(all_in_stock)}."
+        state.add_log(msg)
+        _notify(state, "drug_store_in_stock", msg)
+
+    def _in_stock_affordable():
+        return [i for i in ordered_wanted
+                if store.get(i, {}).get("stock", 0) > 0
+                and DRUG_STORE_PRICES.get(i, 0) <= state.clean_money + state.bank_balance]
+
+    can_buy = _in_stock_affordable()
+    if not [i for i in ordered_wanted if store.get(i, {}).get("stock", 0) > 0]:
+        state.add_log("Drug Store: no wanted items in stock.")
+        return
+
+    if not can_buy:
+        in_stock = [i for i in ordered_wanted if store.get(i, {}).get("stock", 0) > 0]
+        parts = [f"{i} ${DRUG_STORE_PRICES.get(i, 0):,}" for i in in_stock]
+        state.add_log(f"Drug Store: in stock but cannot afford — {', '.join(parts)}.")
+        return
+
+    target = can_buy[0]
+    price = DRUG_STORE_PRICES.get(target, 0)
+    _withdraw_for(price)
+    state.add_log(f"Drug Store: purchasing {target} for ${price:,}.")
+    page.check(f"input[name='product'][value='{target}']")
+    page.click("input[type='submit'][name='B1'][value='Purchase']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+
+    result_soup = BeautifulSoup(page.content(), "html.parser")
+    success_div = result_soup.find("div", id="success")
+    fail_div = result_soup.find("div", id="fail")
+
+    if success_div:
+        msg = f"Drug Store: purchased {target} — {success_div.get_text(strip=True)}"
+        state.add_log(msg)
+        _notify(state, "drug_store_purchased", msg)
+        if task is not None:
+            task.purchase_cooldown_until = time.time() + 1800
+            save_drug_store_state({"purchase_cooldown_until": task.purchase_cooldown_until})
+    elif fail_div:
+        state.add_log(f"Drug Store: purchase failed — {fail_div.get_text(strip=True)}")
+    else:
+        state.add_log("Drug Store: unexpected page after purchase — aborting.")
+
+
 def handle_withdraw(action: Action, state: GameState):
     amount = int(action.params.get("amount", 0))
     if amount <= 0:
@@ -5229,6 +5350,7 @@ HANDLERS = {
     "probe_agcrime":        handle_probe_agcrime,
     "check_bionics":        handle_check_bionics,
     "check_weapon_store":   handle_check_weapon_store,
+    "check_drug_store":     handle_check_drug_store,
     "do_community_service": handle_community_service,
     "do_dog_trains": handle_do_dog_trains,
     "do_fire_duties": handle_fire_duties,

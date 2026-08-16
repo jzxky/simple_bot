@@ -877,6 +877,44 @@
                 <span id="weapon-store-next-check" class="stat-value">--</span>
               </div>
             </div>
+
+            {% set drug_store_cfg = config.get('drug_store', {}) %}
+            {% set ds_items = [
+              ('Pseudoephedrine', '$500'),
+              ('Epipen', '$25,000'),
+              ('Medipack', '$1,000,000')
+            ] %}
+            <div class="settings-group">
+              <h3>Drug Store (Auckland)</h3>
+              <label class="inline-toggle setting-row">Enable Drug Store
+                <label class="toggle-label">
+                  <input type="checkbox" id="drug_store_enabled" {% if drug_store_cfg.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <div class="setting-row" style="align-items:start">
+                <label style="padding-top:4px">Buy list</label>
+                <div>
+                  <div id="drug-store-buylist-summary" style="font-size:0.85rem;color:var(--muted);margin-bottom:6px">None</div>
+                  <button type="button" class="btn-secondary" onclick="openDrugBuyList()">Edit Buy List ▸</button>
+                </div>
+              </div>
+              <div class="setting-row">
+                <label>Check interval</label>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <input type="number" id="drug_store_interval_minutes" min="0" max="59" style="width:60px"
+                    value="{{ drug_store_cfg.get('check_interval_minutes', 5) }}" onchange="autoSave()">
+                  <span>min</span>
+                  <input type="number" id="drug_store_interval_seconds" min="0" max="59" style="width:60px"
+                    value="{{ drug_store_cfg.get('check_interval_seconds', 0) }}" onchange="autoSave()">
+                  <span>sec</span>
+                </div>
+              </div>
+              <div class="setting-row" style="margin-top:6px">
+                <span class="stat-label">Next check</span>
+                <span id="drug-store-next-check" class="stat-value">--</span>
+              </div>
+            </div>
           </div>
           <div class="settings-groups" style="margin-top:16px">
             <div class="settings-group">
@@ -2218,6 +2256,62 @@
               {% if item in (weapon_store_cfg.get('wanted_items', []) or []) and item not in wp_ns.shown %}
                 <tr data-item="{{ item }}" draggable="true">
                   <td class="priority-num">{{ wp_ns.shown|length + loop.index }}</td>
+                  <td>{{ item }}</td>
+                  <td><div class="priority-move">
+                    <button type="button" onclick="_moveRow(this,-1)">▲</button>
+                    <button type="button" onclick="_moveRow(this,1)">▼</button>
+                  </div></td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Drug store buy-list overlay -->
+<div id="drug-buylist-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px;" onclick="closeDrugBuyList()">
+  <div style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:24px;width:100%;max-width:620px;" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h4 style="margin:0;color:#cdd6f4;">Drug Store Buy List</h4>
+      <button class="btn-secondary" onclick="closeDrugBuyList()">Done</button>
+    </div>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:0.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Items</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          {% for item, price in ds_items %}
+          <label class="inline-toggle">
+            <input type="checkbox" id="ds_want_{{ item|replace(' ','_') }}" {% if item in drug_store_cfg.get('wanted_items', []) %}checked{% endif %} onchange="dsOnBuyListChange()">
+            {{ item }} ({{ price }})
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <div style="font-size:0.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Priority order</div>
+        <table class="priority-table" style="width:300px">
+          <tbody id="drug-store-priority-body">
+            {% set dp_ns = namespace(shown=[]) %}
+            {% for item in (drug_store_cfg.get('priority_order', []) or []) %}
+              {% if item in (drug_store_cfg.get('wanted_items', []) or []) %}
+                <tr data-item="{{ item }}" draggable="true">
+                  <td class="priority-num">{{ loop.index }}</td>
+                  <td>{{ item }}</td>
+                  <td><div class="priority-move">
+                    <button type="button" onclick="_moveRow(this,-1)">▲</button>
+                    <button type="button" onclick="_moveRow(this,1)">▼</button>
+                  </div></td>
+                </tr>
+                {% set dp_ns.shown = dp_ns.shown + [item] %}
+              {% endif %}
+            {% endfor %}
+            {% for item, _ in ds_items %}
+              {% if item in (drug_store_cfg.get('wanted_items', []) or []) and item not in dp_ns.shown %}
+                <tr data-item="{{ item }}" draggable="true">
+                  <td class="priority-num">{{ dp_ns.shown|length + loop.index }}</td>
                   <td>{{ item }}</td>
                   <td><div class="priority-move">
                     <button type="button" onclick="_moveRow(this,-1)">▲</button>
