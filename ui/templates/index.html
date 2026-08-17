@@ -1032,6 +1032,10 @@
                   <button type="button" class="btn-secondary" onclick="findThreadId()">Find ID</button>
                 </div>
               </div>
+              <div class="setting-row">
+                <span>Manual Snipe</span>
+                <button type="button" class="btn-secondary" onclick="startSnipe()">Start Snipe</button>
+              </div>
             </div>
             {% set crossroads = config.get('crossroads', {}) %}
             <div class="settings-group" style="grid-column: 1 / -1">

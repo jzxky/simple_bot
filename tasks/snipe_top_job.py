@@ -3,17 +3,17 @@ Hammers main.asp until the promotion page for the target top job appears,
 then submits it and posts a forum announcement if a thread ID is configured
 and the character is in their home city.
 
-Runs in a dedicated browser tab and thread so other tasks continue on the
-main page.
+Runs cooperatively: the scheduler triggers run() once to open a second tab,
+then bot.py calls tick_snipe() each loop iteration to do one navigation on
+that tab, while sched.tick() continues running other tasks on the main tab.
 """
 
 import re
-import threading
 import time
 import config as cfg
 import browser
 import urls
-from state import GameState, parse_state, state_lock, SERVER_TIME_FMT
+from state import GameState, parse_state, SERVER_TIME_FMT
 from tasks.base import Task, Action
 from tasks.check_top_job import TOP_JOB_MAP as _TOP_JOB_MAP
 from promotions import PROMO_BY_RANK, get_choice
@@ -25,9 +25,14 @@ class SnipeTopJobTask(Task):
     priority = 99
     label = 'Snipe Top Job'
 
+    def __init__(self):
+        self._snipe_page = None
+        self._deadline: float = 0
+        self._promo_url: str = ""
+        self._top_job: str = ""
+
     def can_run(self, state: GameState) -> bool:
-        t = state.snipe_top_job_thread
-        if t and t.is_alive():
+        if state.snipe_active:
             return False
         return (
             state.logged_in
@@ -39,9 +44,8 @@ class SnipeTopJobTask(Task):
 
     def blocked_reasons(self, state):
         reasons = []
-        t = state.snipe_top_job_thread
-        if t and t.is_alive():
-            reasons.append("Sniper thread already running")
+        if state.snipe_active:
+            reasons.append("Snipe already active")
         if not state.logged_in:
             reasons.append("Not logged in")
         if state.in_jail:
@@ -55,93 +59,87 @@ class SnipeTopJobTask(Task):
         return reasons
 
     def run(self, state: GameState, executor):
-        t = threading.Thread(
-            target=self._snipe_loop,
-            args=(state,),
-            name="sniper",
-            daemon=True,
-        )
-        state.snipe_top_job_thread = t
-        t.start()
+        self._promo_url = state.snipe_top_job_promo_url
+        self._top_job = state.next_rank or "Unknown"
 
-    def _snipe_loop(self, state: GameState):
-        import bot as _bot
-        snipe_page = None
         try:
-            snipe_page = browser.new_page()
-            with state_lock:
-                promo_url = state.snipe_top_job_promo_url
-                top_job = state.next_rank or "Unknown"
-                home_city = state.home_city
-                current_city = state.current_city
-
-            state.add_log(f"SnipeTopJob: starting in new tab — targeting {top_job}, hammering main.asp for up to 30 minutes.")
-
-            travel_failed = False
-            if current_city and home_city and current_city != home_city:
-                state.add_log(f"SnipeTopJob: not in home city ({home_city}), travelling from {current_city}.")
-                travel_failed = not self._inline_travel(snipe_page, home_city, state)
-
-            deadline = time.monotonic() + SNIPE_TIMEOUT
-            promoted = False
-
-            while time.monotonic() < deadline and not _bot._stop_event.is_set() and not _bot._cancel_snipe_event.is_set():
-                try:
-                    html = browser.navigate_page(snipe_page, urls.BASE_URL + "/main.asp")
-                except Exception as e:
-                    state.add_log(f"SnipeTopJob: nav error: {e}")
-                    continue
-
-                temp = GameState()
-                parse_state(html, snipe_page.url, temp)
-
-                with state_lock:
-                    if temp.server_time:
-                        state.server_time = temp.server_time
-                        state.server_time_monotonic = temp.server_time_monotonic
-
-                if temp.occupation == top_job:
-                    with state_lock:
-                        state.occupation = temp.occupation
-                    state.add_log(f"SnipeTopJob: occupation updated to {top_job} via state parse.")
-                    promoted = True
-                    break
-
-                if snipe_page.url.rstrip("/") == promo_url.rstrip("/"):
-                    state.add_log("SnipeTopJob: promotion page detected — submitting.")
-                    promoted = self._submit_promo(state, top_job, snipe_page)
-                    if promoted:
-                        break
-
-            cancelled = _bot._cancel_snipe_event.is_set()
-            _bot._cancel_snipe_event.clear()
-
-            if not promoted:
-                if cancelled:
-                    state.add_log("SnipeTopJob: cancelled by user.")
-                elif _bot._stop_event.is_set():
-                    state.add_log("SnipeTopJob: stopped — bot shutting down.")
-                else:
-                    state.add_log("SnipeTopJob: timed out after 30 minutes without promotion.")
-
-            with state_lock:
-                state.snipe_top_job_pending = False
-                state.snipe_top_job_promo_url = ""
-
-            if promoted:
-                if travel_failed:
-                    state.add_log(f"SnipeTopJob: retrying travel to home city ({home_city}) after promotion.")
-                    self._inline_travel(snipe_page, home_city, state)
-                self._post_forum(state, top_job, snipe_page)
-
+            self._snipe_page = browser.new_page()
         except Exception as e:
-            state.add_log(f"SnipeTopJob: fatal error in sniper thread: {e}")
-            with state_lock:
-                state.snipe_top_job_pending = False
-                state.snipe_top_job_promo_url = ""
-        finally:
-            if snipe_page:
-                browser.close_page(snipe_page)
+            state.add_log(f"SnipeTopJob: failed to open new tab: {e}")
+            state.snipe_top_job_pending = False
+            state.snipe_top_job_promo_url = ""
+            return
+
+        state.add_log(f"SnipeTopJob: starting in new tab — targeting {self._top_job}, hammering main.asp for up to 30 minutes.")
+
+        if not state.in_home_city():
+            state.add_log(f"SnipeTopJob: not in home city ({state.home_city}), travelling from {state.current_city}.")
+            self._inline_travel(self._snipe_page, state.home_city, state)
+
+        self._deadline = time.monotonic() + SNIPE_TIMEOUT
+        state.snipe_active = True
+
+    def tick_snipe(self, state: GameState):
+        import bot as _bot
+
+        if _bot._cancel_snipe_event.is_set():
+            _bot._cancel_snipe_event.clear()
+            state.add_log("SnipeTopJob: cancelled by user.")
+            self._finish_snipe(state, promoted=False)
+            return
+
+        if _bot._stop_event.is_set():
+            state.add_log("SnipeTopJob: stopped — bot shutting down.")
+            self._finish_snipe(state, promoted=False)
+            return
+
+        if time.monotonic() >= self._deadline:
+            state.add_log("SnipeTopJob: timed out after 30 minutes without promotion.")
+            self._finish_snipe(state, promoted=False)
+            return
+
+        try:
+            html = browser.navigate_page(self._snipe_page, urls.BASE_URL + "/main.asp")
+        except Exception as e:
+            state.add_log(f"SnipeTopJob: nav error: {e}")
+            return
+
+        temp = GameState()
+        parse_state(html, self._snipe_page.url, temp)
+
+        if temp.server_time:
+            state.server_time = temp.server_time
+            state.server_time_monotonic = temp.server_time_monotonic
+
+        if temp.occupation == self._top_job:
+            state.occupation = temp.occupation
+            state.add_log(f"SnipeTopJob: occupation updated to {self._top_job} via state parse.")
+            self._finish_snipe(state, promoted=True)
+            return
+
+        if self._snipe_page.url.rstrip("/") == self._promo_url.rstrip("/"):
+            state.add_log("SnipeTopJob: promotion page detected — submitting.")
+            if self._submit_promo(state, self._top_job, self._snipe_page):
+                self._finish_snipe(state, promoted=True)
+                return
+
+    def _finish_snipe(self, state: GameState, promoted: bool):
+        if promoted:
+            if not state.in_home_city():
+                state.add_log(f"SnipeTopJob: retrying travel to home city ({state.home_city}) after promotion.")
+                self._inline_travel(self._snipe_page, state.home_city, state)
+            self._post_forum(state, self._top_job, self._snipe_page)
+
+        if self._snipe_page:
+            browser.close_page(self._snipe_page)
+            self._snipe_page = None
+
+        state.snipe_top_job_pending = False
+        state.snipe_top_job_promo_url = ""
+        state.snipe_active = False
+        self._promo_url = ""
+        self._top_job = ""
+        self._deadline = 0
 
     def _inline_travel(self, pg, target_city: str, state: GameState) -> bool:
         from bs4 import BeautifulSoup
@@ -184,8 +182,7 @@ class SnipeTopJobTask(Task):
             temp = GameState()
             parse_state(pg.content(), pg.url, temp)
             if temp.occupation == top_job:
-                with state_lock:
-                    state.occupation = temp.occupation
+                state.occupation = temp.occupation
                 msg = f"SnipeTopJob: promoted to {top_job} (option {choice})!"
                 state.add_log(msg)
                 if cfg.load().get("notifications", {}).get("promotion_success", False):
@@ -202,22 +199,16 @@ class SnipeTopJobTask(Task):
         if not thread_id:
             return
 
-        with state_lock:
-            in_home = state.current_city != "" and state.current_city == state.home_city
-        if not in_home:
+        if not state.in_home_city():
             temp = GameState()
             html = browser.navigate_page(pg, urls.BASE_URL + "/main.asp")
             parse_state(html, pg.url, temp)
-            in_home = temp.current_city != "" and temp.current_city == temp.home_city
+            if not (temp.current_city and temp.current_city == temp.home_city):
+                state.add_log("SnipeTopJob: skipping forum post — not in home city.")
+                return
 
-        if not in_home:
-            state.add_log("SnipeTopJob: skipping forum post — not in home city.")
-            return
-
-        with state_lock:
-            ts = state.server_time.strftime(SERVER_TIME_FMT) if state.server_time else "?"
-            own_name = state.own_name
-        message = f"{own_name} - {top_job} - {ts}"
+        ts = state.server_time.strftime(SERVER_TIME_FMT) if state.server_time else "?"
+        message = f"{state.own_name} - {top_job} - {ts}"
         post_url = urls.BASE_URL + f"/forum/postreply.asp?t={thread_id}"
         try:
             pg.goto(post_url, wait_until="domcontentloaded", timeout=15000)

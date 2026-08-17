@@ -880,6 +880,10 @@ function cancelSnipe() {
   if (btn) btn.style.display = "none";
 }
 
+function startSnipe() {
+  fetch("/start-snipe", {method: "POST"}).catch(() => {});
+}
+
 function toggleBot() {
   if (_botRunning) {
     // Stop is queued on the bot thread — don't change UI now; let pollStatus
@@ -959,7 +963,7 @@ function pollStatus() {
       if (taskEl) taskEl.textContent = (d.running && !d.paused && d.current_task) ? d.current_task : "";
 
       const cancelBtn = document.getElementById("cancel-snipe-btn");
-      if (cancelBtn) cancelBtn.style.display = (d.running && !d.paused && d.current_task === "Snipe Top Job") ? "inline-block" : "none";
+      if (cancelBtn) cancelBtn.style.display = (d.running && !d.paused && (d.snipe_active || d.current_task === "Snipe Top Job")) ? "inline-block" : "none";
 
       // Only uncheck earns if the bot just disabled it (true→false transition)
       if (d.earns_enabled != null) {
