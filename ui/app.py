@@ -456,6 +456,12 @@ def cancel_snipe():
     return jsonify({"ok": True})
 
 
+@app.route("/start-snipe", methods=["POST"])
+def start_snipe():
+    bot.start_snipe()
+    return jsonify({"ok": True})
+
+
 @app.route("/banklaunder/bulk_add", methods=["POST"])
 def banklaunder_bulk_add():
     if not bot.is_running():
@@ -703,6 +709,7 @@ def status():
         "earn_type": cfg.load().get("earns", {}).get("earn_type", ""),
         "earn_mode": cfg.load().get("earns", {}).get("earn_mode", "auto"),
         "current_task": s.current_task,
+        "snipe_active": s.snipe_active,
         "in_jail": s.in_jail,
         "jail_rank": s.jail_rank,
         "jail_consumables": s.jail_consumables,

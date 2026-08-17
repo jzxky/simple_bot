@@ -71,6 +71,7 @@ _bionics_task = None
 _weapon_store_task = None
 _drug_store_task = None
 _auto_jail_task = None
+_snipe_task = None
 _auto_jail_check_queue: queue.Queue = queue.Queue()
 _scheduler_snapshot: list = []
 _sched: "Scheduler | None" = None
@@ -275,7 +276,9 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(PlayerRefreshTask())
     sched.add(SyncTask())
     sched.add(CheckTopJobTask())
-    sched.add(SnipeTopJobTask())
+    global _snipe_task
+    _snipe_task = SnipeTopJobTask()
+    sched.add(_snipe_task)
     sched.add(AutoPromoTask())
     sched.add(JailDutiesTask())
     sched.add(JailActionTask())
@@ -539,6 +542,10 @@ def _run(c: dict):
                 state.add_log("Config reloaded.")
 
             sched.tick(state, executor)
+
+            if state.snipe_active and _snipe_task is not None:
+                _snipe_task.tick_snipe(state)
+
             _scheduler_snapshot = sched.snapshot(state)
 
             if not _startup_earns_done and state.logged_in and not state.in_jail:
@@ -637,11 +644,9 @@ def _run(c: dict):
     except Exception as e:
         state.add_log(f"Bot crashed: {e}")
     finally:
-        t = getattr(state, 'snipe_top_job_thread', None)
-        if t and t.is_alive():
-            state.add_log("Waiting for sniper thread to finish...")
+        if state.snipe_active and _snipe_task is not None:
             _cancel_snipe_event.set()
-            t.join(timeout=10)
+            _snipe_task.tick_snipe(state)
         try:
             if state.logged_in and c.get("misc", {}).get("logout_on_stop", True):
                 state.add_log("Logging out...")
@@ -676,6 +681,19 @@ def stop():
 
 def cancel_snipe():
     _cancel_snipe_event.set()
+
+
+def start_snipe():
+    from tasks.check_top_job import TOP_JOB_MAP
+    if state is None or not state.logged_in:
+        return
+    if state.snipe_top_job_pending or state.snipe_active:
+        return
+    if state.next_rank not in TOP_JOB_MAP:
+        return
+    state.snipe_top_job_promo_url = TOP_JOB_MAP[state.next_rank]
+    state.snipe_top_job_pending = True
+    state.add_log(f"SnipeTopJob: manually triggered for {state.next_rank}.")
 
 
 def pause():
