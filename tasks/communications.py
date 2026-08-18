@@ -219,13 +219,10 @@ def set_comms_archive_queue(q: "queue.Queue"):
 # ---------------------------------------------------------------------------
 
 class CommsCheckTask(Task):
-    priority = 34
+    priority = 35
     label = "Comms Check"
 
     def can_run(self, state: GameState) -> bool:
-        import config
-        if not config.load().get("communications", {}).get("enabled", False):
-            return False
         return state.logged_in and state.has_new_comms
 
     def blocked_reasons(self, state):

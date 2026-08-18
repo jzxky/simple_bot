@@ -727,6 +727,7 @@ def status():
         "journals_updated_at": s.journals_updated_at,
         "has_new_comms": s.has_new_comms,
         "comms_updated_at": s.comms_updated_at,
+        "comms_enabled": cfg.load().get("communications", {}).get("enabled", False),
         "event_boss_enabled": cfg.load().get("event_boss", {}).get("enabled", False),
         "event_consumables": s.event_consumables,
         "settings_rev": __import__("settings_rev").get(),

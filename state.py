@@ -163,10 +163,13 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
         s.has_new_journals = journal_span.get("class", ["journal"]) != ["journal"]
 
     # New comms — class="commN" where N is any digit means unread messages
-    comms_span = soup.find("span", id="comms_span_id")
-    if comms_span:
-        cls = comms_span.get("class", ["comm"])
-        s.has_new_comms = any(re.match(r"comm\d+", c) for c in cls)
+    # Only auto-detect when communications toggle is enabled
+    import config as _cfg
+    if _cfg.load().get("communications", {}).get("enabled", False):
+        comms_span = soup.find("span", id="comms_span_id")
+        if comms_span:
+            cls = comms_span.get("class", ["comm"])
+            s.has_new_comms = any(re.match(r"comm\d+", c) for c in cls)
 
     # Jail detection — body class mm-in-jail is definitive; also check nav_right for "Jail Rank"
     body_el = soup.find("body")
