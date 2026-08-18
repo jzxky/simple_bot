@@ -1182,6 +1182,9 @@ function pollStatus() {
         commsRefreshData();
       }
 
+      const _crBtn = document.getElementById("comms-refresh-btn");
+      if (_crBtn) _crBtn.disabled = !!d.has_new_comms;
+
       // Launder cooldown
       const lcdBar = document.getElementById("launder-cooldown-bar");
       if (lcdBar) {
@@ -4821,7 +4824,9 @@ function commsRefreshData() {
 }
 
 function commsRefresh() {
-  fetch("/communications/refresh", {method: "POST"}).then(r => r.json()).catch(() => {});
+  const btn = document.getElementById("comms-refresh-btn");
+  if (btn) btn.disabled = true;
+  fetch("/communications/refresh", {method: "POST"}).then(r => r.json()).catch(() => { if (btn) btn.disabled = false; });
 }
 
 function commsSearch() {

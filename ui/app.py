@@ -997,6 +997,8 @@ def communications_reply():
 
 @app.route("/communications/refresh", methods=["POST"])
 def communications_refresh():
+    if not bot.state:
+        return jsonify({"error": "Bot state not available."}), 400
     bot.state.has_new_comms = True
     return jsonify({"ok": True})
 
