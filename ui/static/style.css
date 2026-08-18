@@ -1627,3 +1627,23 @@ button, [onclick] { touch-action: manipulation; }
 
 /* Mayor italics */
 .pl-active-mayor { font-style: italic; }
+
+/* ── Communications ──────────────────────────────────────────────────────── */
+.comms-row { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 4px; cursor: pointer; transition: border-color 0.15s; }
+.comms-row:hover { border-color: var(--accent); }
+.comms-row-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.comms-row-player { font-weight: 600; color: var(--accent); font-size: 0.85em; }
+.comms-row-count { font-size: 0.75em; color: var(--muted); }
+.comms-row-time { font-size: 0.75em; color: var(--muted); margin-left: auto; }
+.comms-row-subject { font-size: 0.82em; color: var(--text); }
+.comms-row-excerpt { font-size: 0.78em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comms-search-row { display: flex; gap: 6px; }
+
+.comms-message { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 6px; }
+.comms-msg-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.comms-msg-from { font-weight: 600; color: var(--accent); font-size: 0.85em; }
+.comms-msg-time { font-size: 0.75em; color: var(--muted); }
+.comms-msg-body { font-size: 0.84em; white-space: pre-wrap; line-height: 1.5; }
+
+.comms-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+.comms-overlay-content { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; width: 440px; max-width: 95vw; max-height: 85vh; overflow-y: auto; }

@@ -262,6 +262,7 @@ DEFAULT_CONFIG = {
         "warrants_outstanding": True,
         "agg_not_available":   False,
         "dog_trains_unavailable": False,
+        "new_message":         False,
     }
 }
 

@@ -45,6 +45,7 @@ from tasks.obituary_history import ObituaryHistoryTask
 from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJailBreakTask
 from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask, AutoJailConsumablesRestoreTask
 from tasks.journal import JournalCheckTask, ArchiveJournalsTask, JournalActionTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue, set_journal_action_queue
+from tasks.communications import CommsCheckTask, CommsSendTask, CommsArchiveTask, set_comms_send_queue, set_comms_archive_queue
 from tasks.drug_trade import DrugTradeTask
 from tasks.blind_eye import BlindEyeTask
 from tasks.illness import IllnessTask
@@ -93,6 +94,10 @@ _scrape_queue: queue.Queue = queue.Queue()
 _jailbreak_execute_queue: queue.Queue = queue.Queue()
 _jailbreak_calloff_queue: queue.Queue = queue.Queue()
 _archive_journals_queue: queue.Queue = queue.Queue()
+_comms_send_queue: queue.Queue = queue.Queue()
+_comms_archive_queue: queue.Queue = queue.Queue()
+set_comms_send_queue(_comms_send_queue)
+set_comms_archive_queue(_comms_archive_queue)
 _drug_trade_queue: queue.Queue = queue.Queue()
 set_drug_trade_queue(_drug_trade_queue)
 _illness_queue: queue.Queue = queue.Queue()
@@ -242,6 +247,9 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(JournalCheckTask())
     sched.add(ArchiveJournalsTask(_archive_journals_queue))
     sched.add(JournalActionTask(_journal_action_queue))
+    sched.add(CommsCheckTask())
+    sched.add(CommsSendTask(_comms_send_queue))
+    sched.add(CommsArchiveTask(_comms_archive_queue))
     sched.add(DrugTradeTask(_drug_trade_queue))
     sched.add(BlindEyeTask())
     sched.add(IllnessTask(_illness_queue))
@@ -806,6 +814,18 @@ def request_jailbreak_calloff():
 
 def request_archive_journals(pages: int | None = None):
     _archive_journals_queue.put({"pages": pages})
+
+
+def request_send_comms(to: str, subject: str, body: str):
+    _comms_send_queue.put({"_action": "send_comms", "to": to, "subject": subject, "body": body})
+
+
+def request_reply_comms(conv_id: str, body: str):
+    _comms_send_queue.put({"_action": "reply_comms", "conv_id": conv_id, "body": body})
+
+
+def request_archive_comms(pages: int | None = None):
+    _comms_archive_queue.put({"pages": pages})
 
 
 def request_jail_inmates(timeout: float = 15.0) -> dict:

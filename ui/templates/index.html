@@ -1556,13 +1556,59 @@
       </h2>
       <div class="card-body">
         <div class="tab-bar">
-          <button class="tab-btn active" onclick="showTab('cj-communications', this)">Communications</button>
+          <button class="tab-btn active" onclick="showTab('cj-communications', this); commsInit()">Communications</button>
           <button class="tab-btn" onclick="showTab('cj-journals', this); cjInit()">Journals</button>
         </div>
 
         <!-- Communications tab -->
         <div id="cj-communications" class="tab-panel active">
-          <p class="placeholder">Coming soon.</p>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <button class="action-btn" onclick="commsRefresh()" style="font-size:0.78em;padding:4px 10px">Refresh</button>
+            <button class="action-btn" onclick="commsShowCompose()" style="font-size:0.78em;padding:4px 10px">New Message</button>
+          </div>
+          <div class="comms-search-row" style="margin-bottom:8px">
+            <input type="text" id="comms-search" class="task-select" placeholder="Search conversations…"
+              oninput="commsSearch()" style="flex:1;min-width:0;">
+          </div>
+          <div id="comms-inbox-list"></div>
+          <div id="comms-pagination" class="cj-pager"></div>
+
+          <!-- Thread view (hidden by default) -->
+          <div id="comms-thread-view" style="display:none">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <button class="btn-secondary" onclick="commsBackToInbox()" style="font-size:0.78em;padding:4px 10px">← Back</button>
+              <strong id="comms-thread-subject"></strong>
+            </div>
+            <div id="comms-thread-messages"></div>
+            <div style="margin-top:10px">
+              <textarea id="comms-reply-body" class="task-select" rows="3" placeholder="Type your reply…" style="width:100%;resize:vertical"></textarea>
+              <button class="action-btn" onclick="commsSendReply()" style="margin-top:4px;font-size:0.78em;padding:4px 10px">Send Reply</button>
+            </div>
+          </div>
+
+          <!-- Compose overlay -->
+          <div id="comms-compose-overlay" class="comms-overlay" style="display:none">
+            <div class="comms-overlay-content">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <h3 style="margin:0">New Message</h3>
+                <button class="btn-secondary" onclick="commsHideCompose()" style="font-size:0.78em;padding:4px 10px">✕ Close</button>
+              </div>
+              <div class="task-row" style="margin-bottom:8px">
+                <label class="task-label">To:</label>
+                <input type="text" id="comms-compose-to" class="task-select" placeholder="Player name" style="flex:1" onblur="commsValidatePlayer()">
+                <span id="comms-compose-to-status" style="font-size:0.8em;margin-left:6px"></span>
+              </div>
+              <div class="task-row" style="margin-bottom:8px">
+                <label class="task-label">Subject:</label>
+                <input type="text" id="comms-compose-subject" class="task-select" placeholder="Subject" style="flex:1">
+              </div>
+              <div style="margin-bottom:8px">
+                <label class="task-label">Message:</label>
+                <textarea id="comms-compose-body" class="task-select" rows="6" placeholder="Type your message…" style="width:100%;resize:vertical"></textarea>
+              </div>
+              <button class="action-btn" id="comms-compose-send-btn" onclick="commsSendNew()" style="font-size:0.78em;padding:4px 10px" disabled>Send Message</button>
+            </div>
+          </div>
         </div>
 
         <!-- Journals tab -->

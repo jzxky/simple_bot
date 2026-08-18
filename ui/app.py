@@ -723,6 +723,8 @@ def status():
         "jail_players": list(s.jail_players),
         "has_new_journals": s.has_new_journals,
         "journals_updated_at": s.journals_updated_at,
+        "has_new_comms": s.has_new_comms,
+        "comms_updated_at": s.comms_updated_at,
         "event_boss_enabled": cfg.load().get("event_boss", {}).get("enabled", False),
         "event_consumables": s.event_consumables,
         "settings_rev": __import__("settings_rev").get(),
@@ -939,6 +941,100 @@ def journals():
     if not char:
         return jsonify({})
     return jsonify(_load_journals(char))
+
+
+@app.route("/communications")
+def communications():
+    from tasks.communications import _load_comms
+    char = bot.state.own_name
+    if not char:
+        return jsonify({})
+    return jsonify(_load_comms(char))
+
+
+@app.route("/communications/<conv_id>")
+def communications_thread(conv_id):
+    from tasks.communications import _load_comms
+    char = bot.state.own_name
+    if not char:
+        return jsonify({})
+    data = _load_comms(char)
+    return jsonify(data.get(conv_id, {}))
+
+
+@app.route("/communications/send", methods=["POST"])
+def communications_send():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    data = request.get_json()
+    to_name = data.get("to", "").strip()
+    subject = data.get("subject", "").strip()
+    body = data.get("body", "").strip()
+    if not to_name or not body:
+        return jsonify({"error": "Recipient and message body are required."}), 400
+    import player_db
+    valid, reason = _validate_player(to_name)
+    if not valid:
+        return jsonify({"error": reason}), 400
+    bot.request_send_comms(to_name, subject, body)
+    return jsonify({"ok": True})
+
+
+@app.route("/communications/reply", methods=["POST"])
+def communications_reply():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    data = request.get_json()
+    conv_id = data.get("conv_id", "").strip()
+    body = data.get("body", "").strip()
+    if not conv_id or not body:
+        return jsonify({"error": "Conversation ID and message body are required."}), 400
+    bot.request_reply_comms(conv_id, body)
+    return jsonify({"ok": True})
+
+
+@app.route("/communications/refresh", methods=["POST"])
+def communications_refresh():
+    bot.state.has_new_comms = True
+    return jsonify({"ok": True})
+
+
+@app.route("/tasks/archive_comms", methods=["POST"])
+def tasks_archive_comms():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    data = request.get_json(silent=True) or {}
+    pages = data.get("pages")
+    if pages is not None:
+        try:
+            pages = int(pages)
+        except (ValueError, TypeError):
+            pages = None
+    bot.request_archive_comms(pages)
+    return jsonify({"ok": True})
+
+
+@app.route("/communications/validate-player/<name>")
+def validate_player(name):
+    valid, reason = _validate_player(name)
+    return jsonify({"valid": valid, "reason": reason})
+
+
+def _validate_player(name: str) -> tuple[bool, str]:
+    import player_db
+    try:
+        con = player_db._conn()
+        row = con.execute(
+            "SELECT active FROM players WHERE username = ? COLLATE NOCASE", (name,)
+        ).fetchone()
+        con.close()
+    except Exception:
+        return False, "Database error."
+    if not row:
+        return False, f"Player '{name}' not found."
+    if not row["active"]:
+        return False, f"Player '{name}' is not active (dead or inactive)."
+    return True, "OK"
 
 
 @app.route("/character_history")
