@@ -306,6 +306,7 @@ function _buildPayload() {
     show_scheduler: (document.getElementById("show_scheduler")||{checked:false}).checked,
     debug_logging: (document.getElementById("debug_logging")||{checked:false}).checked,
     headless: document.getElementById("headless").checked,
+    comms_enabled: (document.getElementById("comms_enabled")||{checked:false}).checked,
     event_boss_enabled: (document.getElementById("event_boss_enabled")||{checked:false}).checked,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,

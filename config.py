@@ -245,6 +245,9 @@ DEFAULT_CONFIG = {
         "sync_lists": True,
         "sync_groups": True,
     },
+    "communications": {
+        "enabled": False
+    },
     "notifications": {
         "bionics_in_stock":        True,
         "bionics_purchased":       True,

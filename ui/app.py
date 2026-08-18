@@ -201,6 +201,8 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
     c["misc"]["min_cash_on_hand"] = int(data.get("min_cash_on_hand", 0))
     c["misc"]["headless"] = data.get("headless", False)
+    c.setdefault("communications", {})
+    c["communications"]["enabled"] = data.get("comms_enabled", False)
     c["misc"]["show_scheduler"] = data.get("show_scheduler", False)
     c["misc"]["debug_logging"] = data.get("debug_logging", False)
     c.setdefault("event_boss", {})

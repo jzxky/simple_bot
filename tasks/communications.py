@@ -152,7 +152,11 @@ def parse_thread(soup) -> dict:
 
         # sender
         sender_link = msg_row.find("a", href=re.compile(r"/userprofile\.asp\?u="))
-        msg["from"] = sender_link.get_text(strip=True) if sender_link else ""
+        if sender_link:
+            um = re.search(r"u=([^&]+)", sender_link["href"])
+            msg["from"] = um.group(1) if um else sender_link.get_text(strip=True)
+        else:
+            msg["from"] = ""
 
         # timestamp
         ts_el = msg_row.find("abbr", class_="timestamp")
@@ -219,6 +223,9 @@ class CommsCheckTask(Task):
     label = "Comms Check"
 
     def can_run(self, state: GameState) -> bool:
+        import config
+        if not config.load().get("communications", {}).get("enabled", False):
+            return False
         return state.logged_in and state.has_new_comms
 
     def blocked_reasons(self, state):
