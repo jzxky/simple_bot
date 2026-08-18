@@ -975,6 +975,7 @@ function pollStatus() {
 
       // Character stats
       document.getElementById("stat-name").textContent = d.own_name || "--";
+      _commsOwnName = d.own_name || "";
       document.getElementById("stat-next-rank").textContent = d.next_rank || "--";
       document.getElementById("stat-rank-progress").textContent = d.rank_progress != null ? d.rank_progress + "%" : "--";
       document.getElementById("stat-city").textContent = d.city || "--";
@@ -4780,6 +4781,7 @@ let _commsFiltered = [];
 let _commsPage = 1;
 let _commsLastUpdated = 0;
 let _commsActiveConvId = null;
+let _commsOwnName = "";
 const COMMS_PAGE_SIZE = 10;
 
 function commsInit() {
@@ -4885,17 +4887,16 @@ function commsOpenThread(convId) {
   fetch("/communications/" + encodeURIComponent(convId))
     .then(r => r.json())
     .then(data => {
-      document.getElementById("comms-thread-subject").textContent = data.subject || "(no subject)";
+      document.getElementById("comms-thread-subject").innerHTML =
+        `Conversation between ${escHtml(_commsOwnName || "You")} and ${escHtml(data.other_player || "Unknown")}` +
+        `<div style="font-weight:normal;font-size:0.85em;color:var(--muted);margin-top:2px">Subject: ${escHtml(data.subject || "(no subject)")}</div>`;
       const container = document.getElementById("comms-thread-messages");
       if (!data.messages || data.messages.length === 0) {
         container.innerHTML = '<p class="cj-empty">No messages.</p>';
       } else {
         container.innerHTML = data.messages.map(m => `<div class="comms-message">
-          <div class="comms-msg-header">
-            <span class="comms-msg-from">${escHtml(m.from || "Unknown")}</span>
-            <span class="comms-msg-time">${escHtml(m.time || "")}</span>
-          </div>
-          <div class="comms-msg-body">${escHtml(m.body || "")}</div>
+          <span class="comms-msg-from">${escHtml(m.from || "Unknown")}</span>: ${escHtml(m.body || "")}
+          <span class="comms-msg-time">${escHtml(m.time || "")}</span>
         </div>`).join("");
       }
       document.getElementById("comms-reply-body").value = "";
