@@ -3921,6 +3921,193 @@ def handle_journal_action(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
+# Communications handlers
+# ---------------------------------------------------------------------------
+
+def handle_check_comms(action: Action, state: GameState):
+    from tasks.communications import (
+        _load_comms, _save_comms, parse_inbox_rows, parse_thread,
+        inbox_next_page_url,
+    )
+    char = state.own_name
+    if not char:
+        return
+
+    data = _load_comms(char)
+    url = _u("/communications/comms.asp?display=inbox")
+    changed = False
+
+    while True:
+        _nav(url, state)
+        if not _check_session(state):
+            return
+        soup = BeautifulSoup(state.page_html, "html.parser")
+
+        for conv in parse_inbox_rows(soup):
+            cid = conv["conv_id"]
+            existing = data.get(cid, {})
+            new_count = conv.get("message_count", 0)
+            old_count = existing.get("message_count", 0)
+
+            if cid not in data or new_count != old_count:
+                thread_url = _u(f"/communications/comms.asp?display=viewconv&id={cid}")
+                _nav(thread_url, state)
+                if not _check_session(state):
+                    return
+                thread_soup = BeautifulSoup(state.page_html, "html.parser")
+                thread_data = parse_thread(thread_soup)
+
+                conv["messages"] = thread_data.get("messages", [])
+                if not conv.get("subject"):
+                    conv["subject"] = thread_data.get("subject", "")
+                data[cid] = conv
+                changed = True
+
+                if cid not in existing or new_count > old_count:
+                    import config as cfg
+                    if cfg.load().get("notifications", {}).get("new_message", False):
+                        sender = conv.get("other_player", "Unknown")
+                        state.push_notification("new_message", f"New message from {sender}: {conv.get('subject', '')}")
+            else:
+                for k, v in conv.items():
+                    if k != "messages":
+                        data[cid][k] = v
+
+        next_url = inbox_next_page_url(soup)
+        if next_url:
+            url = next_url
+            continue
+        break
+
+    if changed:
+        _save_comms(char, data)
+        state.comms_updated_at = time.time()
+
+    state.has_new_comms = False
+    state.add_log(f"Comms: checked inbox, {len(data)} conversation(s) stored.")
+
+
+def handle_send_comms(action: Action, state: GameState):
+    from tasks.communications import _load_comms, _save_comms
+    to_name = action.params.get("to", "")
+    subject = action.params.get("subject", "")
+    body = action.params.get("body", "")
+    if not to_name or not body:
+        state.add_log("Comms send: missing recipient or body.")
+        return
+
+    _nav(_u("/communications/compose.asp"), state)
+    if not _check_session(state):
+        return
+
+    page = browser.page()
+    page.fill("input[name='toname']", to_name)
+    page.fill("input[name='msgsubject']", subject)
+    page.fill("textarea[name='messagebody']", body)
+    page.select_option("select[name='msgtype']", "character")
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    html = page.content()
+    parse_state(html, browser.current_url(), state)
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    success = soup.find("div", id="success")
+    fail = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Comms: sent message to {to_name} — {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Comms: send failed — {fail.get_text(strip=True)}")
+    else:
+        state.add_log(f"Comms: sent message to {to_name} (subject: {subject})")
+
+
+def handle_reply_comms(action: Action, state: GameState):
+    from tasks.communications import _load_comms, _save_comms
+    conv_id = action.params.get("conv_id", "")
+    body = action.params.get("body", "")
+    if not conv_id or not body:
+        state.add_log("Comms reply: missing conv_id or body.")
+        return
+
+    _nav(_u(f"/communications/comms.asp?display=viewconv&id={conv_id}"), state)
+    if not _check_session(state):
+        return
+
+    page = browser.page()
+    page.fill("textarea[name='newmessagebody']", body)
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    html = page.content()
+    parse_state(html, browser.current_url(), state)
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    success = soup.find("div", id="success")
+    fail = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"Comms: replied to conversation #{conv_id} — {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"Comms: reply failed — {fail.get_text(strip=True)}")
+    else:
+        state.add_log(f"Comms: replied to conversation #{conv_id}")
+
+    # Re-read the thread to update stored messages
+    char = state.own_name
+    if char:
+        from tasks.communications import parse_thread
+        _nav(_u(f"/communications/comms.asp?display=viewconv&id={conv_id}"), state)
+        thread_soup = BeautifulSoup(state.page_html, "html.parser")
+        thread_data = parse_thread(thread_soup)
+        data = _load_comms(char)
+        if conv_id in data:
+            data[conv_id]["messages"] = thread_data.get("messages", [])
+            data[conv_id]["message_count"] = len(thread_data.get("messages", []))
+        _save_comms(char, data)
+        state.comms_updated_at = time.time()
+
+
+def handle_archive_comms(action: Action, state: GameState):
+    from tasks.communications import (
+        _load_comms, _save_comms, parse_inbox_rows,
+        inbox_next_page_url,
+    )
+    char = state.own_name
+    if not char:
+        return
+
+    max_pages = action.params.get("pages")
+    data = _load_comms(char)
+    url = _u("/communications/comms.asp?display=inbox")
+    page_num = 1
+    changed = False
+
+    while True:
+        _nav(url, state)
+        if not _check_session(state):
+            return
+        soup = BeautifulSoup(state.page_html, "html.parser")
+
+        for conv in parse_inbox_rows(soup):
+            cid = conv["conv_id"]
+            if cid not in data:
+                data[cid] = conv
+                data[cid]["messages"] = []
+                changed = True
+
+        next_url = inbox_next_page_url(soup)
+        if not next_url:
+            break
+        if max_pages is not None and page_num >= max_pages:
+            break
+        url = next_url
+        page_num += 1
+
+    if changed:
+        _save_comms(char, data)
+        state.comms_updated_at = time.time()
+    state.add_log(f"Comms: archived {len(data)} conversation(s).")
+
+
+# ---------------------------------------------------------------------------
 # Warrant handlers
 # ---------------------------------------------------------------------------
 
@@ -5376,6 +5563,10 @@ HANDLERS = {
     "check_journals": handle_check_journals,
     "archive_journals": handle_archive_journals,
     "journal_action": handle_journal_action,
+    "check_comms": handle_check_comms,
+    "send_comms": handle_send_comms,
+    "reply_comms": handle_reply_comms,
+    "archive_comms": handle_archive_comms,
     "check_drug_trade": handle_check_drug_trade,
     "do_blind_eye": handle_blind_eye,
     "check_warrants": handle_check_warrants,

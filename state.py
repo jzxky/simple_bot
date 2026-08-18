@@ -58,6 +58,8 @@ class GameState:
     jail_rank: str = ""
     has_new_journals: bool = False
     journals_updated_at: float = 0.0
+    has_new_comms: bool = False
+    comms_updated_at: float = 0.0
     jail_consumables: dict = field(default_factory=dict)
     jail_release_secs: "int | None" = None
     hold_action_timer: bool = False
@@ -159,6 +161,12 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     journal_span = soup.find("span", id="journals_span_id")
     if journal_span:
         s.has_new_journals = journal_span.get("class", ["journal"]) != ["journal"]
+
+    # New comms — class="commN" where N is any digit means unread messages
+    comms_span = soup.find("span", id="comms_span_id")
+    if comms_span:
+        cls = comms_span.get("class", ["comm"])
+        s.has_new_comms = any(re.match(r"comm\d+", c) for c in cls)
 
     # Jail detection — body class mm-in-jail is definitive; also check nav_right for "Jail Rank"
     body_el = soup.find("body")

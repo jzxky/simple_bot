@@ -1175,6 +1175,11 @@ function pollStatus() {
         cjRefreshData();
       }
 
+      if ((d.comms_updated_at || 0) > _commsLastUpdated) {
+        _commsLastUpdated = d.comms_updated_at;
+        commsRefreshData();
+      }
+
       // Launder cooldown
       const lcdBar = document.getElementById("launder-cooldown-bar");
       if (lcdBar) {
@@ -2057,6 +2062,7 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleWarModeLink();
   loadEarnPlanner();
   _loadSkillsGroupDropdown();
+  commsInit();
   // Capture the baseline the diff-based save compares against, once dynamic
   // tables/summaries have populated from the server-rendered values.
   // Delay must be long enough for loadEarnPlanner fetch to complete.
@@ -4765,5 +4771,213 @@ function _renderProfile(d) {
   }
 
   return h.join("");
+}
+
+// ── Communications ──────────────────────────────────────────────────────────
+
+let _commsData = [];
+let _commsFiltered = [];
+let _commsPage = 1;
+let _commsLastUpdated = 0;
+let _commsActiveConvId = null;
+const COMMS_PAGE_SIZE = 10;
+
+function commsInit() {
+  fetch("/communications")
+    .then(r => r.json())
+    .then(data => {
+      _commsData = Object.values(data).sort((a, b) => {
+        const ta = Date.parse(a.last_message_time || "0") || 0;
+        const tb = Date.parse(b.last_message_time || "0") || 0;
+        return tb - ta;
+      });
+      _commsFiltered = _commsData;
+      _commsPage = 1;
+      commsRender();
+    })
+    .catch(() => {});
+}
+
+function commsRefreshData() {
+  fetch("/communications")
+    .then(r => r.json())
+    .then(data => {
+      _commsData = Object.values(data).sort((a, b) => {
+        const ta = Date.parse(a.last_message_time || "0") || 0;
+        const tb = Date.parse(b.last_message_time || "0") || 0;
+        return tb - ta;
+      });
+      const q = (document.getElementById("comms-search")?.value || "").toLowerCase().trim();
+      if (!q) {
+        _commsFiltered = _commsData;
+        commsRender();
+      }
+      if (_commsActiveConvId) commsOpenThread(_commsActiveConvId);
+    })
+    .catch(() => {});
+}
+
+function commsRefresh() {
+  fetch("/communications/refresh", {method: "POST"}).then(r => r.json()).catch(() => {});
+}
+
+function commsSearch() {
+  const q = (document.getElementById("comms-search").value || "").toLowerCase().trim();
+  if (!q) {
+    _commsFiltered = _commsData;
+  } else {
+    const words = q.split(/\s+/).filter(Boolean);
+    _commsFiltered = _commsData.filter(c => {
+      const haystack = [c.other_player || "", c.subject || "", c.excerpt || ""].join(" ").toLowerCase();
+      return words.every(w => haystack.includes(w));
+    });
+  }
+  _commsPage = 1;
+  commsRender();
+}
+
+function commsRender() {
+  const list = document.getElementById("comms-inbox-list");
+  const pager = document.getElementById("comms-pagination");
+  if (!list || !pager) return;
+
+  if (_commsFiltered.length === 0) {
+    list.innerHTML = '<p class="cj-empty">No conversations found.</p>';
+    pager.innerHTML = "";
+    return;
+  }
+
+  const totalPages = Math.ceil(_commsFiltered.length / COMMS_PAGE_SIZE);
+  if (_commsPage > totalPages) _commsPage = totalPages;
+  const start = (_commsPage - 1) * COMMS_PAGE_SIZE;
+  const slice = _commsFiltered.slice(start, start + COMMS_PAGE_SIZE);
+
+  list.innerHTML = slice.map(c => `<div class="comms-row" onclick="commsOpenThread('${escHtml(c.conv_id)}')">
+    <div class="comms-row-header">
+      <span class="comms-row-player">${escHtml(c.other_player || "Unknown")}</span>
+      <span class="comms-row-count">${c.message_count || 0} msg${(c.message_count||0) !== 1 ? 's' : ''}</span>
+      <span class="comms-row-time">${escHtml(c.last_message_time || "")}</span>
+    </div>
+    <div class="comms-row-subject">${escHtml(c.subject || "(no subject)")}</div>
+    <div class="comms-row-excerpt">${escHtml(c.excerpt || "")}</div>
+  </div>`).join("");
+
+  let btns = "";
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++)
+      btns += `<button onclick="commsGoPage(${i})" class="${i === _commsPage ? 'active' : ''}">${i}</button>`;
+  } else {
+    const pages = new Set([1, totalPages, _commsPage, _commsPage - 1, _commsPage + 1].filter(p => p >= 1 && p <= totalPages));
+    let prev = 0;
+    [...pages].sort((a,b) => a-b).forEach(p => {
+      if (prev && p - prev > 1) btns += `<button disabled>…</button>`;
+      btns += `<button onclick="commsGoPage(${p})" class="${p === _commsPage ? 'active' : ''}">${p}</button>`;
+      prev = p;
+    });
+  }
+  pager.innerHTML = btns;
+}
+
+function commsGoPage(n) { _commsPage = n; commsRender(); }
+
+function commsOpenThread(convId) {
+  _commsActiveConvId = convId;
+  fetch("/communications/" + encodeURIComponent(convId))
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById("comms-thread-subject").textContent = data.subject || "(no subject)";
+      const container = document.getElementById("comms-thread-messages");
+      if (!data.messages || data.messages.length === 0) {
+        container.innerHTML = '<p class="cj-empty">No messages.</p>';
+      } else {
+        container.innerHTML = data.messages.map(m => `<div class="comms-message">
+          <div class="comms-msg-header">
+            <span class="comms-msg-from">${escHtml(m.from || "Unknown")}</span>
+            <span class="comms-msg-time">${escHtml(m.time || "")}</span>
+          </div>
+          <div class="comms-msg-body">${escHtml(m.body || "")}</div>
+        </div>`).join("");
+      }
+      document.getElementById("comms-reply-body").value = "";
+      document.getElementById("comms-inbox-list").parentElement.querySelector(".comms-search-row").style.display = "none";
+      document.getElementById("comms-inbox-list").style.display = "none";
+      document.getElementById("comms-pagination").style.display = "none";
+      document.getElementById("comms-thread-view").style.display = "";
+    })
+    .catch(() => {});
+}
+
+function commsBackToInbox() {
+  _commsActiveConvId = null;
+  document.getElementById("comms-thread-view").style.display = "none";
+  document.getElementById("comms-inbox-list").parentElement.querySelector(".comms-search-row").style.display = "";
+  document.getElementById("comms-inbox-list").style.display = "";
+  document.getElementById("comms-pagination").style.display = "";
+}
+
+function commsSendReply() {
+  if (!_commsActiveConvId) return;
+  const body = document.getElementById("comms-reply-body").value.trim();
+  if (!body) return;
+  fetch("/communications/reply", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({conv_id: _commsActiveConvId, body: body}),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) document.getElementById("comms-reply-body").value = "";
+  }).catch(() => {});
+}
+
+function commsShowCompose() {
+  document.getElementById("comms-compose-overlay").style.display = "flex";
+  document.getElementById("comms-compose-to").value = "";
+  document.getElementById("comms-compose-subject").value = "";
+  document.getElementById("comms-compose-body").value = "";
+  document.getElementById("comms-compose-to-status").textContent = "";
+  document.getElementById("comms-compose-send-btn").disabled = true;
+}
+
+function commsHideCompose() {
+  document.getElementById("comms-compose-overlay").style.display = "none";
+}
+
+function commsValidatePlayer() {
+  const name = document.getElementById("comms-compose-to").value.trim();
+  const status = document.getElementById("comms-compose-to-status");
+  const btn = document.getElementById("comms-compose-send-btn");
+  if (!name) { status.textContent = ""; btn.disabled = true; return; }
+  status.textContent = "checking…";
+  status.style.color = "var(--muted)";
+  fetch("/communications/validate-player/" + encodeURIComponent(name))
+    .then(r => r.json())
+    .then(d => {
+      if (d.valid) {
+        status.textContent = "✓ valid";
+        status.style.color = "var(--success)";
+        btn.disabled = false;
+      } else {
+        status.textContent = d.reason || "not found";
+        status.style.color = "var(--red)";
+        btn.disabled = true;
+      }
+    })
+    .catch(() => { status.textContent = "error"; status.style.color = "var(--red)"; btn.disabled = true; });
+}
+
+function commsSendNew() {
+  const to = document.getElementById("comms-compose-to").value.trim();
+  const subject = document.getElementById("comms-compose-subject").value.trim();
+  const body = document.getElementById("comms-compose-body").value.trim();
+  if (!to || !body) return;
+  const btn = document.getElementById("comms-compose-send-btn");
+  btn.disabled = true;
+  fetch("/communications/send", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({to, subject, body}),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) commsHideCompose();
+    else { btn.disabled = false; alert(d.error || "Send failed"); }
+  }).catch(() => { btn.disabled = false; });
 }
 
