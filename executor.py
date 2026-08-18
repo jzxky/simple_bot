@@ -3949,7 +3949,7 @@ def handle_check_comms(action: Action, state: GameState):
             new_count = conv.get("message_count", 0)
             old_count = existing.get("message_count", 0)
 
-            if cid not in data or new_count != old_count:
+            if cid not in data or new_count != old_count or not existing.get("messages"):
                 thread_url = _u(f"/communications/comms.asp?display=viewconv&id={cid}")
                 _nav(thread_url, state)
                 if not _check_session(state):
