@@ -1429,6 +1429,10 @@
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>General</h3>
+              <label class="inline-toggle setting-row">Communications
+                <label class="toggle-label"><input type="checkbox" id="comms_enabled" {% if config.get('communications', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <p class="setting-note">Monitor and check new in-game messages automatically.</p>
               <label class="inline-toggle setting-row">Headless Mode
                 <label class="toggle-label"><input type="checkbox" id="headless" {% if config.get('misc', {}).get('headless', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
