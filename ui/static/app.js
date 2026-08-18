@@ -1184,6 +1184,8 @@ function pollStatus() {
 
       const _crBtn = document.getElementById("comms-refresh-btn");
       if (_crBtn) _crBtn.disabled = !!d.has_new_comms;
+      const _commsNotice = document.getElementById("comms-auto-off-notice");
+      if (_commsNotice) _commsNotice.style.display = d.comms_enabled ? "none" : "block";
 
       // Launder cooldown
       const lcdBar = document.getElementById("launder-cooldown-bar");
