@@ -4869,7 +4869,7 @@ function commsRender() {
       <span class="comms-row-time">${escHtml(c.last_message_time || "")}</span>
     </div>
     <div class="comms-row-subject">${escHtml(c.subject || "(no subject)")}</div>
-    <div class="comms-row-excerpt">${escHtml(c.excerpt || "")}</div>
+    <div class="comms-row-excerpt">${escHtml((() => { const msgs = c.messages || []; if (!msgs.length) return c.excerpt || ""; const last = msgs[msgs.length - 1]; const body = last.body || ""; return body.length > 50 ? body.slice(0, 50) + "…" : body; })())}</div>
   </div>`).join("");
 
   let btns = "";
