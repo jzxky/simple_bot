@@ -1,4 +1,5 @@
 let _earnCatalog = [];
+let _earnsLastUpdated = 0;
 
 const ACTION_SUB_MAP = {
   community_service: [],  // bot always picks the highest tier automatically
@@ -1180,6 +1181,11 @@ function pollStatus() {
       if ((d.comms_updated_at || 0) > _commsLastUpdated) {
         _commsLastUpdated = d.comms_updated_at;
         commsRefreshData();
+      }
+
+      if ((d.earns_updated_at || 0) > _earnsLastUpdated) {
+        _earnsLastUpdated = d.earns_updated_at;
+        loadAvailableEarns();
       }
 
       const _crBtn = document.getElementById("comms-refresh-btn");
