@@ -42,7 +42,9 @@ class StartupTask(Task):
 
         state.add_log("Startup: checking earn queue.")
         try:
-            executor.execute(Action("check_earns"), state)
+            import config as cfg
+            earn_type = cfg.load().get("earns", {}).get("earn_type", "surgeon")
+            executor.execute(Action("check_earns", earn_type=earn_type), state)
         except Exception as e:
             state.add_log(f"Startup earn queue check failed: {e}")
 
