@@ -305,6 +305,7 @@ function _buildPayload() {
     auto_jail_partner: document.getElementById("auto_jail_partner")?.value ?? "",
     show_scheduler: (document.getElementById("show_scheduler")||{checked:false}).checked,
     debug_logging: (document.getElementById("debug_logging")||{checked:false}).checked,
+    show_timers_row: (document.getElementById("show_timers_row")||{checked:true}).checked,
     headless: document.getElementById("headless").checked,
     comms_enabled: (document.getElementById("comms_enabled")||{checked:false}).checked,
     event_boss_enabled: (document.getElementById("event_boss_enabled")||{checked:false}).checked,
@@ -422,6 +423,12 @@ function toggleWarModeLink() {
   if (el) el.style.display = on ? "" : "none";
 }
 
+function toggleTimersRow() {
+  const on = (document.getElementById("show_timers_row") || {checked:true}).checked;
+  const el = document.getElementById("stat-timers-grid");
+  if (el) el.style.display = on ? "" : "none";
+}
+
 // Snapshot of the last config this tab synced with the server. Saves send only
 // the fields that differ from it, so one tab can't clobber another tab's — or
 // the bot's background — changes. `null` until the first baseline capture.
@@ -472,6 +479,14 @@ function autoSave() {
   _doSave();
   _updateIncomePills();
   _updateIncomeTabColors();
+}
+
+// Some toggles (War Mode, Scheduler) gate a server-rendered main tab/section
+// behind a Jinja {% if %} — the nav button and its section simply aren't in
+// the DOM until the page re-renders, so a plain autoSave() leaves the tab
+// missing until a manual refresh. Use this instead for those toggles.
+function autoSaveAndReload() {
+  _doSave().then(() => location.reload());
 }
 
 // ── Debounced save (3s) for free-text/number inputs; also flushed on blur ─────
@@ -800,12 +815,17 @@ function _renderEarnCatalogRows() {
       <td style="padding:6px 8px;">${entry.label}</td>
       <td style="padding:6px 8px;color:${availColor};font-weight:600;">${avail}</td>
       <td style="padding:6px 8px;">
-        <select class="earn-cat-select" style="background:#2a2a3a;color:#cdd6f4;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:0.82rem;">
+        <select class="earn-cat-select" onchange="setEarnRowCategory(${escJsStr(entry.label)}, this.value)" style="background:#2a2a3a;color:#cdd6f4;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:0.82rem;">
           ${catOptions}
         </select>
       </td>`;
     tbody.appendChild(tr);
   }
+}
+
+function setEarnRowCategory(label, category) {
+  const entry = _earnCatalog.find(e => e.label === label);
+  if (entry) entry.category = category;
 }
 
 async function saveEarnCatalog() {
@@ -1324,7 +1344,7 @@ function pollStatus() {
               const btn = document.createElement("button");
               btn.type = "button";
               btn.className = "action-btn";
-              btn.style.cssText = "width:100%;text-align:left;padding:8px 12px";
+              btn.style.cssText = "width:110px;text-align:left;padding:8px 12px";
               btn.textContent = name;
               btn.onclick = () => openSkillOverlay(sid, name);
               listEl.appendChild(btn);

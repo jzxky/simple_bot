@@ -68,7 +68,8 @@ DEFAULT_CONFIG = {
         "min_cash_on_hand": 0,
         "headless": False,
         "show_scheduler": False,
-        "debug_logging": False
+        "debug_logging": False,
+        "show_timers_row": True
     },
     "event_boss": {
         "enabled": False,
