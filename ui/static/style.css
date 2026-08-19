@@ -1647,3 +1647,63 @@ button, [onclick] { touch-action: manipulation; }
 
 .comms-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
 .comms-overlay-content { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; width: 440px; max-width: 95vw; max-height: 85vh; overflow-y: auto; }
+
+/* ── Main Tab Bar ──────────────────────────────────────────────────────── */
+.main-tab-bar {
+  display: flex;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin-bottom: 14px;
+}
+.main-tab-bar::-webkit-scrollbar { display: none; }
+
+.main-tab {
+  flex: 1 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.main-tab:hover { color: var(--text); background: rgba(200,168,75,0.06); }
+.main-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: rgba(200,168,75,0.08);
+}
+.main-tab-icon { display: none; flex-shrink: 0; }
+
+/* Section visibility — only active section shown */
+main > section.main-section { display: none; }
+main > section.main-section.main-active { display: block; }
+
+/* Mobile: icon-only tabs */
+@media (max-width: 540px) {
+  .main-tab { padding: 10px 12px; flex: 0 0 auto; }
+  .main-tab-label { display: none; }
+  .main-tab-icon { display: block; }
+}
+@media (min-width: 541px) and (max-width: 768px) {
+  .main-tab { padding: 8px 12px; font-size: 0.78rem; }
+}
+
+/* In-jail theme overrides */
+.in-jail .main-tab.active { color: #e0e0e0; border-bottom-color: #e0e0e0; background: rgba(255,255,255,0.06); }
+.in-jail .main-tab:hover { color: #ccc; background: rgba(255,255,255,0.04); }

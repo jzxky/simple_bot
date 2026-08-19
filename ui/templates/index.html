@@ -48,12 +48,48 @@
       <button id="screenshot-btn" onclick="takeScreenshot()">Screenshot</button>
     </div>
 
+    <!-- Main Tab Bar -->
+    <nav id="main-tab-bar" class="main-tab-bar">
+      <button class="main-tab active" data-section="s-character">
+        <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="main-tab-label">Status</span>
+      </button>
+      <button class="main-tab" data-section="s-income">
+        <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span class="main-tab-label">Income</span>
+      </button>
+      <button class="main-tab" data-section="s-settings">
+        <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="main-tab-label">Settings</span>
+      </button>
+      <button class="main-tab" data-section="s-log">
+        <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span class="main-tab-label">Log</span>
+      </button>
+      <button class="main-tab" data-section="s-comms-journals">
+        <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="main-tab-label">Comms</span>
+      </button>
+      <button class="main-tab" data-section="s-tasks">
+        <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span class="main-tab-label">Tasks</span>
+      </button>
+      <button class="main-tab" data-section="s-players">
+        <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="main-tab-label">Players</span>
+      </button>
+      {% if config.get('misc', {}).get('show_scheduler', False) %}
+      <button class="main-tab" data-section="scheduler-section">
+        <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="main-tab-label">Scheduler</span>
+      </button>
+      {% endif %}
+    </nav>
+
     <!-- Status -->
-    <section class="card tabs-card" id="s-character">
+    <section class="card tabs-card main-section main-active" id="s-character">
       <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-character')">▾</button>
         Status <span class="stat-name-header">— <span id="stat-name">--</span></span><span id="stat-jail-badge" style="display:none"> <span class="jail-badge">JAIL</span></span>
-        <span class="section-pills" id="pills-s-character"></span>
       </h2>
       <div class="card-body">
         <div class="tab-bar">
@@ -122,15 +158,9 @@
     </section>
 
     <!-- Income (Earns, Aggravated Crimes, Actions) -->
-    <section class="card tabs-card" id="s-income">
+    <section class="card tabs-card main-section" id="s-income">
       <h2 class="income-h2">
-        <button class="collapse-btn" onclick="toggleSection('s-income')">▾</button>
         Income
-        <div class="income-pills-block" id="income-pills-block">
-          <div class="income-pills-row" id="pills-income-earns"></div>
-          <div class="income-pills-row" id="pills-income-crimes"></div>
-          <div class="income-pills-row" id="pills-income-actions"></div>
-        </div>
       </h2>
       <div class="card-body">
         <div class="tab-bar">
@@ -642,9 +672,8 @@
     </section>
 
     <!-- Settings Tabs -->
-    <section class="card tabs-card" id="s-settings">
+    <section class="card tabs-card main-section" id="s-settings">
       <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-settings')">▾</button>
         Settings
       </h2>
       <div class="card-body">
@@ -1458,9 +1487,8 @@
     </section>
 
     <!-- Activity Log -->
-    <section class="card log-card" id="s-log">
+    <section class="card log-card main-section" id="s-log">
       <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-log')">▾</button>
         Activity Log
       </h2>
       <div class="card-body">
@@ -1473,9 +1501,8 @@
     </section>
 
     <!-- Communications and Journals -->
-    <section class="card tabs-card" id="s-comms-journals">
+    <section class="card tabs-card main-section" id="s-comms-journals">
       <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-comms-journals')">▾</button>
         Communications &amp; Journals
       </h2>
       <div class="card-body">
@@ -1565,9 +1592,8 @@
 
     <!-- Character Stats -->
     <!-- Tasks -->
-    <section class="card" id="s-tasks">
+    <section class="card main-section" id="s-tasks">
       <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-tasks')">▾</button>
         Tasks
       </h2>
       <div class="card-body">
@@ -1678,11 +1704,9 @@
     </section>
 
     <!-- Players -->
-    <section class="card tabs-card" id="s-players">
+    <section class="card tabs-card main-section" id="s-players">
       <h2>
-        <button class="collapse-btn" onclick="toggleSection('s-players')">▾</button>
         Players
-        <span class="section-pills" id="pills-s-players"></span>
       </h2>
       <div class="card-body">
         <div class="tab-bar">
@@ -1929,9 +1953,8 @@
     </section>
 
   {% if config.get('misc', {}).get('show_scheduler', False) %}
-  <section class="card" id="scheduler-section">
+  <section class="card main-section" id="scheduler-section">
     <h2>
-      <button class="collapse-btn" onclick="toggleSection('scheduler-section')">▾</button>
       Scheduler
     </h2>
     <div class="card-body">
@@ -1971,8 +1994,7 @@
     loadAutoJailPartners();
     populateActionSub(INITIAL_ACTION_SUB);
     toggleAwayCrime();
-    initCollapse();
-    _updateIncomePills();
+    initMainTabs();
     _updateIncomeTabColors();
     if (document.getElementById("char_history_enabled").checked) loadCharHistory();
     loadPlayers();
