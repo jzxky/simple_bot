@@ -23,22 +23,7 @@
       <span id="status-task" class="status-task"></span>
       <button id="cancel-snipe-btn" style="display:none; margin-left:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; padding:2px 10px; cursor:pointer; font-size:12px;" onclick="cancelSnipe()">Cancel Snipe</button>
     </div>
-    <button id="notif-bell" class="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications" style="display:none">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      <span id="notif-badge" class="notif-badge">0</span>
-    </button>
   </header>
-
-  <div id="notif-panel" class="notif-panel" style="display:none">
-    <div class="notif-panel-head">
-      <span class="notif-head-bell"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
-      <span class="notif-panel-title" style="margin-left:8px">Notifications</span>
-      <span style="flex:1"></span>
-      <button class="notif-clear-btn" onclick="clearAllNotifs()">Clear all</button>
-      <button class="notif-clear-btn" onclick="toggleNotifPanel()" title="Collapse" style="margin-left:6px">▲</button>
-    </div>
-    <div id="notif-list"></div>
-  </div>
 
   <main>
     <!-- Controls -->
@@ -81,6 +66,10 @@
       <button class="main-tab" data-section="s-log">
         <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
         <span class="main-tab-label">Activity Log</span>
+      </button>
+      <button class="main-tab" data-section="s-notifications">
+        <svg class="main-tab-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="main-tab-label">Notifications</span>
       </button>
       {% if config.get('misc', {}).get('show_scheduler', False) %}
       <button class="main-tab" data-section="scheduler-section">
@@ -1459,9 +1448,8 @@
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Notifications</h3>
-              <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification badge in the header so you can see them when you return AFK.</p>
+              <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification in the Notifications tab so you can see them when you return AFK.</p>
               {% set notif_cfg = config.get('notifications', {}) %}
-              {% set notif_defaults = {'bionics_in_stock': True, 'bionics_purchased': True, 'bionics_restock': False, 'promotion_success': True, 'auto_promo': True, 'session_expired': True, 'jailed': False, 'targets_exhausted': False, 'mhs_protected': True, 'warrants_outstanding': True, 'agg_not_available': False, 'dog_trains_unavailable': False} %}
               {% for slug, label in notification_events %}
               <label class="inline-toggle setting-row">{{ label }}
                 <label class="toggle-label"><input type="checkbox" id="notif_{{ slug }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
@@ -1541,6 +1529,19 @@
           <button id="log-open-btn" class="log-open-btn" onclick="openFullLog()">Open full log ↗</button>
         </div>
         <div id="log-box"></div>
+      </div>
+    </section>
+
+    <!-- Notifications -->
+    <section class="card main-section" id="s-notifications">
+      <h2>
+        Notifications
+      </h2>
+      <div class="card-body">
+        <div class="notif-tab-head">
+          <button type="button" id="notif-mark-all-btn" class="action-btn" onclick="notifMarkAllRead()">Mark all read</button>
+        </div>
+        <div id="notif-tab-list"></div>
       </div>
     </section>
 

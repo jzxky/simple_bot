@@ -1,5 +1,6 @@
 .env
 config.json
+notifications.json
 .browser_profile/
 __pycache__/
 *.pyc

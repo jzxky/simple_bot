@@ -15,6 +15,7 @@ import paths
 import players as pl
 import character_history as ch
 import trait_requirements as tr
+import notifications_store
 
 NOTIFICATION_EVENTS = [
     ("bionics_in_stock",       "Bionics in stock"),
@@ -80,6 +81,7 @@ def logout():
 def index():
     c = cfg.load()
     return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS,
+                           notif_defaults=cfg.DEFAULT_CONFIG["notifications"],
                            pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin())
 
 
@@ -382,17 +384,45 @@ def save():
     return jsonify({"ok": True, "settings_rev": settings_rev.get()})
 
 
-@app.route("/notifications/dismiss", methods=["POST"])
-def notif_dismiss():
+@app.route("/api/notifications", methods=["GET"])
+def api_notifications_list():
+    notifs = [n for n in notifications_store.load() if n.get("status") != "deleted"]
+    notifs.sort(key=lambda n: n.get("id", ""), reverse=True)
+    return jsonify(notifs)
+
+
+def _sync_state_notifications():
+    bot.state.notifications = notifications_store.load()
+
+
+@app.route("/api/notifications/toggle_read", methods=["POST"])
+def api_notifications_toggle_read():
     nid = (request.get_json() or {}).get("id")
-    if nid:
-        bot.state.notifications = [n for n in bot.state.notifications if n["id"] != nid]
+    if not nid:
+        return jsonify({"ok": False}), 400
+    current = next((n for n in notifications_store.load() if n.get("id") == nid), None)
+    if not current:
+        return jsonify({"ok": False}), 404
+    new_status = "unread" if current.get("status") == "read" else "read"
+    notifications_store.set_status(nid, new_status)
+    _sync_state_notifications()
+    return jsonify({"ok": True, "status": new_status})
+
+
+@app.route("/api/notifications/mark_all_read", methods=["POST"])
+def api_notifications_mark_all_read():
+    notifications_store.mark_all_read()
+    _sync_state_notifications()
     return jsonify({"ok": True})
 
 
-@app.route("/notifications/clear", methods=["POST"])
-def notif_clear():
-    bot.state.notifications = []
+@app.route("/api/notifications/delete", methods=["POST"])
+def api_notifications_delete():
+    nid = (request.get_json() or {}).get("id")
+    if not nid:
+        return jsonify({"ok": False}), 400
+    notifications_store.set_status(nid, "deleted")
+    _sync_state_notifications()
     return jsonify({"ok": True})
 
 
@@ -745,7 +775,7 @@ def status():
         "hospital_release_at": s.hospital_release_at,
         "respect_pct": _get_respect_data().get("respect_pct"),
         "respect_last_check": _get_respect_data().get("last_check", 0.0),
-        "notifications": bot.state.notifications,
+        "notifications_unread_count": sum(1 for n in bot.state.notifications if n.get("status") == "unread"),
         "launder_cooldown": __import__("executor").launder_cooldown_remaining(),
         "banking_mature_at": _get_banking_mature_at(),
         "available_skills": sorted(bot.state.available_skills),

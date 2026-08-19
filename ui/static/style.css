@@ -1502,100 +1502,48 @@ button, [onclick] { touch-action: manipulation; }
 .tab-btn.tab-disabled:hover { color: var(--red-hover); border-bottom-color: var(--red); }
 .tab-btn.tab-disabled.active { color: var(--red); border-bottom-color: var(--red); }
 
-/* ── Notification bell ───────────────────────────── */
-.notif-bell-btn {
-  position: relative;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--accent);
-  cursor: pointer;
-  padding: 5px 8px;
-  margin-top: 8px;
+/* ── Notifications tab ────────────────────────────── */
+.notif-tab-head {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: flex-end;
+  margin-bottom: 10px;
 }
-.notif-bell-btn:hover { background: var(--surface); }
-.notif-badge {
-  background: var(--red, #cc2a2a);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 10px;
-  padding: 1px 5px;
-  min-width: 16px;
-  text-align: center;
-  line-height: 1.4;
-}
-
-/* ── Notification panel (in-flow; pushes content down, full section width) ── */
-.notif-panel {
-  width: 100%;
-  max-height: 420px;
-  margin-bottom: 14px;
-  background: var(--surface);   /* match the other sections */
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  display: flex;              /* inline display:none hides it; JS clears inline to show */
-  flex-direction: column;
-  transform-origin: top left;
-  animation: notifExpand .14s ease-out;
-}
-@keyframes notifExpand {
-  from { opacity: 0; transform: scale(0.85); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.notif-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.notif-panel-title {
-  font-weight: 700;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--accent);          /* match section header font colour */
-}
-.notif-panel-head .notif-head-bell { color: var(--accent); display: flex; align-items: center; }
-.notif-clear-btn {
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--muted);
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  cursor: pointer;
-}
-.notif-clear-btn:hover { color: var(--text); border-color: var(--muted); }
-#notif-list { overflow-y: auto; flex: 1; }
-.notif-item {
+.notif-tab-item {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
 }
-.notif-item:last-child { border-bottom: none; }
-.notif-item-body { flex: 1; min-width: 0; }
-.notif-ts { font-size: 0.72rem; color: var(--muted); display: block; margin-bottom: 2px; }
-.notif-msg { font-size: 0.85rem; word-break: break-word; }
-.notif-dismiss-btn {
-  background: none;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px 4px;
-  flex-shrink: 0;
-  line-height: 1;
+.notif-tab-item:last-child { border-bottom: none; }
+.notif-tab-item-unread {
+  border-left-color: var(--accent);
+  background: rgba(200,168,75,0.05);
 }
-.notif-dismiss-btn:hover { color: var(--text); }
+.notif-tab-item-body { flex: 1; min-width: 0; }
+.notif-tab-ts { font-size: 0.72rem; color: var(--muted); display: block; margin-bottom: 2px; }
+.notif-tab-msg { font-size: 0.85rem; word-break: break-word; color: var(--text); }
+.notif-tab-item-unread .notif-tab-msg { font-weight: 600; }
+.notif-tab-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* Unread-count badge overlaid on the Notifications main tab's icon (mobile, icon-only view) */
+.notif-count-badge {
+  display: none;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: var(--red, #cc2a2a);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0 4px;
+  min-width: 14px;
+  line-height: 14px;
+  text-align: center;
+}
 
 /* Cross-tab settings-sync banner */
 .settings-sync-banner {
@@ -1677,6 +1625,7 @@ button, [onclick] { touch-action: manipulation; }
 .main-tab-bar::-webkit-scrollbar { display: none; }
 
 .main-tab {
+  position: relative;
   flex: 1 0 auto;
   display: flex;
   align-items: center;
@@ -1710,6 +1659,7 @@ main > section.main-section.main-active { display: block; }
   .main-tab { padding: 10px 12px; flex: 0 0 auto; }
   .main-tab-label { display: none; }
   .main-tab-icon { display: block; }
+  .notif-count-badge.has-count { display: flex; align-items: center; justify-content: center; }
 }
 @media (min-width: 541px) and (max-width: 768px) {
   .main-tab { padding: 8px 12px; font-size: 0.78rem; }
