@@ -4903,8 +4903,8 @@ function commsOpenThread(convId) {
         container.innerHTML = '<p class="cj-empty">No messages.</p>';
       } else {
         container.innerHTML = data.messages.map(m => `<div class="comms-message">
+          <div class="comms-msg-time">${escHtml(m.time || "")}</div>
           <span class="comms-msg-from">${escHtml(m.from || "Unknown")}</span>: ${escHtml(m.body || "")}
-          <span class="comms-msg-time">${escHtml(m.time || "")}</span>
         </div>`).join("");
       }
       document.getElementById("comms-reply-body").value = "";

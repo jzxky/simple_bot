@@ -1641,7 +1641,7 @@ button, [onclick] { touch-action: manipulation; }
 
 .comms-message { padding: 4px 0; font-size: 0.84em; line-height: 1.5; border-bottom: 1px solid var(--border); }
 .comms-msg-from { font-weight: 600; color: var(--accent); }
-.comms-msg-time { font-size: 0.75em; color: var(--muted); float: right; }
+.comms-msg-time { font-size: 0.75em; color: var(--muted); margin-bottom: 2px; }
 
 .comms-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
 .comms-overlay-content { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; width: 440px; max-width: 95vw; max-height: 85vh; overflow-y: auto; }
