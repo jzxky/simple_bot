@@ -77,9 +77,8 @@ function _renderEarnSelect(selectedValue) {
     return;
   }
   sel.innerHTML = items.map(e => {
-    const style = e.available === false ? ' style="color:red"' : '';
     const selected = e.schedule_value === selectedValue ? " selected" : "";
-    return `<option value="${e.schedule_value}"${selected}${style}>${e.label}</option>`;
+    return `<option value="${e.schedule_value}"${selected}>${e.label}</option>`;
   }).join("");
   _updateEarnsPills();
 }
@@ -2153,13 +2152,13 @@ function openSkillOverlay(skillId, skillName) {
     html += field("Target Player", "skill-overlay-target")
       + field("Event Title", "skill-overlay-title-input", {maxlength: 30})
       + field("Event Description", "skill-overlay-event", {textarea: true, maxlength: 1000, rows: 3})
-      + '<button type="button" class="action-btn" style="width:100%" onclick="submitSkillOverlay()">Send</button>';
+      + '<button type="button" class="action-btn" onclick="submitSkillOverlay()">Send</button>';
   } else if (key === "travel_expert") {
     html += field("Target Player", "skill-overlay-target", {placeholder: "Leave blank for self"})
-      + '<button type="button" class="action-btn" style="width:100%" onclick="submitSkillOverlay()">Submit</button>';
+      + '<button type="button" class="action-btn" onclick="submitSkillOverlay()">Submit</button>';
   } else {
     html += field("Target Player", "skill-overlay-target")
-      + '<button type="button" class="action-btn" style="width:100%" onclick="submitSkillOverlay()">Submit</button>';
+      + '<button type="button" class="action-btn" onclick="submitSkillOverlay()">Submit</button>';
   }
   body.innerHTML = html;
 
@@ -4923,7 +4922,7 @@ function commsRender() {
   list.innerHTML = slice.map(c => `<div class="comms-row" onclick="commsOpenThread('${escHtml(c.conv_id)}')">
     <div class="comms-row-header">
       <span class="comms-row-player">${escHtml(c.other_player || "Unknown")}</span>
-      <span class="comms-row-count">${c.message_count || 0} msg${(c.message_count||0) !== 1 ? 's' : ''}</span>
+      <span class="comms-row-count">(${c.message_count || 0})</span>
       <span class="comms-row-time">${escHtml(c.last_message_time || "")}</span>
     </div>
     <div class="comms-row-subject">${escHtml(c.subject || "(no subject)")}</div>

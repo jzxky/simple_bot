@@ -1,0 +1,46 @@
+<div id="war-disabled" class="card" style="display:none">
+  <p class="war-empty">War Mode is disabled. Enable it under Settings → War Mode.</p>
+</div>
+
+<div id="war-content" style="display:none">
+  <section class="card">
+    <h2>WS Monitoring</h2>
+    <div class="card-body">
+      <div class="war-add">
+        <input type="text" id="war-add-name" placeholder="Player name">
+        <select id="war-add-side">
+          <option value="opps">Opps</option>
+          <option value="friendlies">Friendlies</option>
+        </select>
+        <button class="btn-secondary" onclick="warAdd()">Add</button>
+        <span style="flex:1"></span>
+        <label style="flex:none;color:var(--muted);font-size:0.8rem">Check every
+          <select id="war-interval" onchange="warSetInterval()" style="width:90px">
+            <option value="2">2 min</option><option value="3">3 min</option>
+            <option value="4">4 min</option><option value="5">5 min</option>
+            <option value="6">6 min</option><option value="7">7 min</option>
+            <option value="8">8 min</option><option value="9">9 min</option>
+            <option value="10">10 min</option>
+          </select>
+        </label>
+        <button class="btn-secondary" onclick="warCheckNow()">Check Now</button>
+      </div>
+      <div id="war-add-msg" style="font-size:0.8rem;margin-bottom:8px"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Opps</h2>
+    <div class="card-body"><div id="war-opps"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>Friendlies</h2>
+    <div class="card-body"><div id="war-friendlies"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>War Log <button class="btn-secondary" style="float:right;padding:3px 10px" onclick="warClearEvents()">Clear</button></h2>
+    <div class="card-body"><div class="war-log" id="war-log"></div></div>
+  </section>
+</div>

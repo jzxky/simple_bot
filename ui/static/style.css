@@ -166,6 +166,13 @@ select option { background: var(--surface2); }
 .toggle-label input:checked + .toggle { background: var(--accent); }
 .toggle-label input:checked + .toggle::after { left: 19px; }
 
+.label-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
 .inline-toggle {
   flex-direction: row;
   align-items: center;
@@ -182,26 +189,27 @@ label.setting-row.inline-toggle {
   gap: 10px;
 }
 
-/* Tabs */
-.tab-bar { display: flex; gap: 2px; margin-bottom: 14px; flex-wrap: wrap; }
+/* Tabs — styled to match the top-level main tabs */
+.tab-bar { display: flex; gap: 0; flex-wrap: wrap; margin-bottom: 14px; }
 .tab-btn {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius) var(--radius) 0 0;
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
   color: var(--muted);
-  padding: 7px 14px;
+  padding: 8px 14px;
   cursor: pointer;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  transition: color 0.15s, border-color 0.15s;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.tab-btn:hover { color: var(--text); }
-.tab-btn.active { color: var(--accent); border-color: var(--accent); border-bottom-color: var(--surface); }
+.tab-btn:hover { color: var(--text); background: rgba(200,168,75,0.06); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(200,168,75,0.08); }
 
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .placeholder { color: var(--muted); font-style: italic; padding: 10px 0; }
+#earn-planner-group { display: none !important; }
 .muted { color: var(--muted); font-weight: normal; }
 
 /* Controls */
@@ -556,13 +564,16 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px;
-  height: 220px;
+  height: 420px;
   overflow-y: auto;
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 11px;
   color: var(--text);
   display: flex;
   flex-direction: column-reverse;
+}
+@media (max-width: 600px) {
+  #log-box { height: 50vh; max-height: 420px; }
 }
 #log-box .log-line {
   padding: 2px 0;
@@ -689,9 +700,9 @@ input.input-unsaved { color: var(--red) !important; }
   color: #8ecb8e !important;
 }
 /* Jail variants for the rest of the status-section elements */
-.in-jail .tab-btn { background: #525252; color: #c0c0c0; border-color: #666; }
-.in-jail .tab-btn:hover { color: #f0f0f0; }
-.in-jail .tab-btn.active { background: #4a4a4a; color: #f0f0f0; border-color: #888; border-bottom-color: #4a4a4a; }
+.in-jail .tab-btn { color: #c0c0c0; }
+.in-jail .tab-btn:hover { color: #f0f0f0; background: rgba(255,255,255,0.04); }
+.in-jail .tab-btn.active { color: #e0e0e0; border-bottom-color: #e0e0e0; background: rgba(255,255,255,0.06); }
 /* Character history */
 .in-jail .ch-section { background: #525252; border-color: #666; }
 .in-jail .ch-section-head { background: #4a4a4a; border-bottom-color: #666; }
@@ -996,7 +1007,7 @@ input.input-unsaved { color: var(--red) !important; }
   margin-top: 10px;
 }
 .task-inline-btn { white-space: nowrap; flex-shrink: 0; }
-.task-submit-btn { margin-top: 6px; width: 100%; }
+.task-submit-btn { margin-top: 6px; }
 .task-feedback {
   padding: 7px 10px;
   border-radius: var(--radius);
@@ -1487,9 +1498,9 @@ button, [onclick] { touch-action: manipulation; }
 .income-pills-row:empty { display: none; }
 
 /* ── Disabled tab coloring ───────────────────────── */
-.tab-btn.tab-disabled { color: var(--red); border-color: rgba(204,42,42,0.5); }
-.tab-btn.tab-disabled:hover { color: var(--red-hover); border-color: var(--red); }
-.tab-btn.tab-disabled.active { color: var(--red); border-color: var(--red); border-bottom-color: var(--surface); }
+.tab-btn.tab-disabled { color: var(--red); border-bottom-color: rgba(204,42,42,0.5); }
+.tab-btn.tab-disabled:hover { color: var(--red-hover); border-bottom-color: var(--red); }
+.tab-btn.tab-disabled.active { color: var(--red); border-bottom-color: var(--red); }
 
 /* ── Notification bell ───────────────────────────── */
 .notif-bell-btn {
@@ -1635,10 +1646,10 @@ button, [onclick] { touch-action: manipulation; }
 .comms-row:hover { border-color: var(--accent); }
 .comms-row-header { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
 .comms-row-player { font-weight: 600; color: var(--accent); font-size: 0.88rem; }
-.comms-row-count { font-size: 0.78rem; color: var(--muted); }
+.comms-row-count { font-size: 0.88rem; font-weight: 600; color: var(--text); }
 .comms-row-time { font-size: 0.78rem; color: var(--muted); margin-left: auto; }
-.comms-row-subject { font-size: 0.85rem; color: var(--text); }
-.comms-row-excerpt { font-size: 0.82rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comms-row-subject { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.comms-row-excerpt { font-size: 0.83rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .comms-search-row { display: flex; gap: 6px; }
 
 .comms-message { padding: 6px 0; font-size: 0.88rem; line-height: 1.5; border-bottom: 1px solid var(--border); }
@@ -1707,3 +1718,46 @@ main > section.main-section.main-active { display: block; }
 /* In-jail theme overrides */
 .in-jail .main-tab.active { color: #e0e0e0; border-bottom-color: #e0e0e0; background: rgba(255,255,255,0.06); }
 .in-jail .main-tab:hover { color: #ccc; background: rgba(255,255,255,0.04); }
+
+/* ── War Mode ─────────────────────────────────────────────────────────────
+   Shared between the standalone /war page and the embedded War Mode main tab. */
+.war-add { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+.war-add input[type=text] { width:200px; }
+.war-table { width:100%; border-collapse:collapse; margin-bottom:8px; font-size:0.82rem; }
+.war-table th, .war-table td { border:1px solid var(--border); padding:5px 7px; text-align:left; }
+.war-table th { background:var(--surface2); color:var(--muted); text-transform:uppercase; font-size:0.7rem; letter-spacing:.04em; }
+.war-status { font-weight:700; }
+.war-status.Open { color:#5bbf5b; }
+.war-status.In-Window { color:#e0a53a; }
+.war-status.Protected { color:#cc5555; }
+.war-whack-cell { white-space:nowrap; }
+.war-clear { background:transparent; border:none; color:var(--muted); cursor:pointer; font-size:0.85rem; padding:0 4px; }
+.war-clear:hover { color:var(--red); }
+.war-th { cursor:pointer; user-select:none; white-space:nowrap; }
+.war-th:hover { color:var(--accent); }
+.war-actions { display:flex; gap:6px; }
+.war-btn { padding:3px 10px; font-size:0.72rem; }
+.war-del:hover { border-color:var(--red); color:var(--red); }
+.war-log { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px; height:200px; overflow-y:auto; font-family:monospace; font-size:0.78rem; }
+.war-log-line { padding:2px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+.war-empty { color:var(--muted); font-style:italic; }
+.war-time-input { width:150px; font-size:0.78rem; }
+.war-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+/* Phones: stack each row into a labelled card instead of a wide table. */
+@media (max-width: 640px) {
+  .war-add input[type=text] { width:100%; }
+  .war-table-wrap { overflow-x:visible; }
+  .war-table { font-size:0.85rem; }
+  .war-table thead { display:none; }
+  .war-table, .war-table tbody, .war-table tr, .war-table td { display:block; width:100%; }
+  .war-table tr { border:1px solid var(--border); border-radius:8px; margin-bottom:10px; background:var(--surface2); }
+  .war-table td { border:none; border-bottom:1px solid rgba(255,255,255,.06); padding:8px 12px;
+                  display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .war-table td:last-child { border-bottom:none; }
+  .war-table td::before { content:attr(data-label); color:var(--muted); font-size:0.7rem;
+                          text-transform:uppercase; letter-spacing:.04em; flex:0 0 auto; }
+  .war-table td[data-label=""]::before { content:""; }
+  .war-time-input { width:auto; flex:1; min-width:0; }
+  .war-table select { width:auto; max-width:60%; }
+}
