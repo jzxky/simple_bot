@@ -282,23 +282,12 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["drug_store"]["check_interval_seconds"] = max(0, min(59, int(data.get("drug_store_interval_seconds", 0) or 0)))
 
     c.setdefault("skills", {})
-    c["skills"].setdefault("combat_medic", {})
-    c["skills"]["combat_medic"]["target"] = data.get("skill_combat_medic_target", "")
-    c["skills"].setdefault("biometric_virus", {})
-    c["skills"]["biometric_virus"]["target"] = data.get("skill_biometric_virus_target", "")
     c["skills"].setdefault("travel_expert", {})
     c["skills"]["travel_expert"]["enabled"] = data.get("skill_travel_expert_enabled", False)
-    c["skills"]["travel_expert"]["target"] = data.get("skill_travel_expert_target", "")
     c["skills"]["travel_expert"]["travel_timer_threshold"] = int(data.get("skill_travel_expert_threshold", 2) or 2)
     c["skills"].setdefault("all_seeing_eye", {})
     c["skills"]["all_seeing_eye"]["enabled"] = data.get("skill_all_seeing_eye_enabled", False)
-    c["skills"]["all_seeing_eye"]["target"] = data.get("skill_all_seeing_eye_target", "")
     c["skills"]["all_seeing_eye"]["group"] = data.get("skill_all_seeing_eye_group", "")
-
-    c.setdefault("skills", {}).setdefault("news_editor", {})
-    c["skills"]["news_editor"]["target"] = data.get("skill_news_editor_target", "")
-    c["skills"]["news_editor"]["title"] = data.get("skill_news_editor_title", "")
-    c["skills"]["news_editor"]["event"] = data.get("skill_news_editor_event", "")
 
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)

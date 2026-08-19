@@ -594,53 +594,13 @@
         <!-- Skills tab -->
         <div id="income-skills" class="tab-panel">
           <p id="skills-none-msg" class="placeholder">No skills discovered yet. Start the bot to detect available skills.</p>
-          <div class="settings-groups">
-            <div class="settings-group skill-group" data-skill="skill_combatmedic" style="grid-column: 1 / -1; display:none">
-              <h3>Combat Medic</h3>
-              <p class="placeholder" style="color:var(--danger);margin-bottom:8px">⚠ Protection must be dropped to use this skill.</p>
-              <div class="setting-row">
-                <label for="skill_combat_medic_target">Target Player</label>
-                <input type="text" id="skill_combat_medic_target" style="width:200px"
-                  value="{{ config.get('skills', {}).get('combat_medic', {}).get('target', '') }}"
-                  onchange="autoSave()">
-              </div>
-              <div class="setting-row">
-                <label>&nbsp;</label>
-                <button type="button" class="action-btn" style="width:200px" onclick="useSkillNow('combat_medic','Combat Medic')">Submit</button>
-              </div>
-              <p class="placeholder">Also uses automatically when target is set and skill timer is ready.</p>
+          <div id="skills-list" class="settings-groups" style="display:none">
+            <div class="settings-group" style="grid-column:1/-1">
+              <h3>Unlocked Skills</h3>
+              <div id="skills-list-items" style="display:flex;flex-direction:column;gap:4px"></div>
             </div>
-
-            <div class="settings-group skill-group" data-skill="skill_destroybionics" style="grid-column: 1 / -1; display:none">
-              <h3>Biometric Virus</h3>
-              <p class="placeholder" style="color:var(--danger);margin-bottom:8px">⚠ Protection must be dropped to use this skill.</p>
-              <div class="setting-row">
-                <label for="skill_biometric_virus_target">Target Player</label>
-                <input type="text" id="skill_biometric_virus_target" style="width:200px"
-                  value="{{ config.get('skills', {}).get('biometric_virus', {}).get('target', '') }}"
-                  onchange="autoSave()">
-              </div>
-              <div class="setting-row">
-                <label>&nbsp;</label>
-                <button type="button" class="action-btn" style="width:200px" onclick="useSkillNow('biometric_virus','Biometric Virus')">Submit</button>
-              </div>
-              <p class="placeholder">Also uses automatically when target is set and skill timer is ready.</p>
-            </div>
-
-            <div class="settings-group skill-group" data-skill="skill_jetsetter" style="grid-column: 1 / -1; display:none">
-              <h3>Travel Expert</h3>
-              <div class="setting-row">
-                <label for="skill_travel_expert_target">Target Player</label>
-                <input type="text" id="skill_travel_expert_target" style="width:200px"
-                  value="{{ config.get('skills', {}).get('travel_expert', {}).get('target', '') }}"
-                  onchange="autoSave()">
-              </div>
-              <p class="placeholder">Leave blank to use on self.</p>
-              <div class="setting-row">
-                <label>&nbsp;</label>
-                <button type="button" class="action-btn" style="width:200px" onclick="useSkillNow('travel_expert','Travel Expert')">Submit</button>
-              </div>
-              <hr class="stat-divider">
+            <div class="settings-group" style="grid-column:1/-1">
+              <h3>Automated</h3>
               <label class="inline-toggle setting-row" style="margin-bottom:12px">
                 Auto Travel Expert
                 <label class="toggle-label">
@@ -656,21 +616,7 @@
                   value="{{ config.get('skills', {}).get('travel_expert', {}).get('travel_timer_threshold', 2) }}"
                   oninput="markNumDirty(this)">
               </div>
-              <p class="placeholder">Automatically uses Travel Expert when travel timer remaining exceeds this threshold.</p>
-            </div>
-
-            <div class="settings-group skill-group" data-skill="skill_allseeingeye" style="grid-column: 1 / -1; display:none">
-              <h3>All Seeing Eye</h3>
-              <div class="setting-row">
-                <label for="skill_all_seeing_eye_target">Target Player</label>
-                <input type="text" id="skill_all_seeing_eye_target" style="width:200px"
-                  value="{{ config.get('skills', {}).get('all_seeing_eye', {}).get('target', '') }}"
-                  onchange="autoSave()">
-              </div>
-              <div class="setting-row">
-                <label>&nbsp;</label>
-                <button type="button" class="action-btn" style="width:200px" onclick="useSkillNow('all_seeing_eye','All Seeing Eye')">Submit</button>
-              </div>
+              <p class="placeholder">Automatically uses Travel Expert on self when travel timer remaining exceeds this threshold.</p>
               <hr class="stat-divider">
               <label class="inline-toggle setting-row" style="margin-bottom:12px">
                 Auto Respect Check
@@ -688,32 +634,6 @@
                 </select>
               </div>
               <p class="placeholder">Iterates through players in the selected group, checking respect level for the player with the oldest check.</p>
-            </div>
-
-            <div class="settings-group skill-group" data-skill="skill_newseditor" style="grid-column: 1 / -1; display:none">
-              <h3>News Editor</h3>
-              <div class="setting-row">
-                <label for="skill_news_editor_target">Target Player</label>
-                <input type="text" id="skill_news_editor_target" style="width:200px"
-                  value="{{ config.get('skills', {}).get('news_editor', {}).get('target', '') }}"
-                  onchange="autoSave()">
-              </div>
-              <div class="setting-row">
-                <label for="skill_news_editor_title">Event Title</label>
-                <input type="text" id="skill_news_editor_title" maxlength="30" style="width:200px"
-                  value="{{ config.get('skills', {}).get('news_editor', {}).get('title', '') }}"
-                  onchange="autoSave()">
-              </div>
-              <div class="setting-row">
-                <label for="skill_news_editor_event">Event Description</label>
-                <textarea id="skill_news_editor_event" maxlength="1000" rows="3" style="width:300px"
-                  onchange="autoSave()">{{ config.get('skills', {}).get('news_editor', {}).get('event', '') }}</textarea>
-              </div>
-              <div class="setting-row">
-                <label>&nbsp;</label>
-                <button type="button" class="action-btn" style="width:200px" onclick="useNewsEditor()">Send</button>
-              </div>
-              <p class="placeholder">Sends a custom event to the target player. Title max 30 chars, description max 1000 chars. Also uses automatically when all three fields are filled and skill timer is ready.</p>
             </div>
           </div>
         </div>
@@ -2164,6 +2084,17 @@
     </div>
   </div>
 </div>
+<!-- Skill overlay -->
+<div id="skill-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeSkillOverlay()">
+  <div class="pl-modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 id="skill-overlay-title" style="margin:0"></h3>
+      <button class="btn-secondary" style="padding:4px 10px" onclick="closeSkillOverlay()">&times;</button>
+    </div>
+    <div id="skill-overlay-body"></div>
+  </div>
+</div>
+
   <!-- Overlays live outside all collapsible sections so display:none on card-body never clips them -->
   <div id="respect-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;" onclick="closeRespectOverlay()">
     <div style="background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:24px;min-width:260px;max-width:360px;" onclick="event.stopPropagation()">
