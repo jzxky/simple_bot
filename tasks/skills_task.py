@@ -27,22 +27,33 @@ SKILL_IDS = {
 }
 
 
+_REDISCOVER_COOLDOWN = 24 * 60 * 60
+
+
 class DiscoverSkillsTask(Task):
     priority = 90
     label = "Discover Skills"
 
     def __init__(self):
         self._discovered = False
+        self._last_run_time: float = 0.0
 
     def can_run(self, state: GameState) -> bool:
-        if self._discovered and not _rediscover_flag:
-            return False
+        if self._discovered:
+            if not _rediscover_flag:
+                return False
+            if time.monotonic() - self._last_run_time < _REDISCOVER_COOLDOWN:
+                return False
         return state.logged_in and not state.in_jail and not state.in_hospital
 
     def blocked_reasons(self, state):
         reasons = []
         if self._discovered and not _rediscover_flag:
             reasons.append("Already discovered")
+        elif self._discovered and _rediscover_flag:
+            remaining = _REDISCOVER_COOLDOWN - (time.monotonic() - self._last_run_time)
+            if remaining > 0:
+                reasons.append(f"Cooldown ({int(remaining // 3600)}h left)")
         if not state.logged_in:
             reasons.append("Not logged in")
         if state.in_jail:
@@ -54,6 +65,7 @@ class DiscoverSkillsTask(Task):
     def run(self, state: GameState, executor):
         global _rediscover_flag
         self._discovered = True
+        self._last_run_time = time.monotonic()
         _rediscover_flag = False
         executor.execute(Action("discover_skills"), state)
 

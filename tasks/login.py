@@ -4,6 +4,7 @@ Handles initial login and automatic session re-login.
 
 import time
 import config as cfg
+import browser
 from tasks.base import Task, Action
 
 RETRY_INTERVAL = 15
@@ -20,7 +21,12 @@ class LoginTask(Task):
         self._last_attempt: float = 0.0
 
     def can_run(self, state) -> bool:
-        return not state.logged_in and not state.relog_suppressed and time.monotonic() - self._last_attempt >= RETRY_INTERVAL
+        if state.logged_in or state.relog_suppressed:
+            return False
+        cur = browser.current_url() or ""
+        if cur.endswith("/default.asp") or cur.endswith("/default.asp?"):
+            return True
+        return time.monotonic() - self._last_attempt >= RETRY_INTERVAL
 
     def blocked_reasons(self, state):
         reasons = []

@@ -27,7 +27,7 @@ class OnlineAgeTask(Task):
     label = "Online Age Tracker"
 
     def __init__(self):
-        self._last_run: float = 0.0
+        self._last_run: float = time.monotonic()
 
     def can_run(self, state: GameState) -> bool:
         if not state.logged_in or state.in_jail or state.in_hospital:

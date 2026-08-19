@@ -65,6 +65,7 @@ from tasks.crossroad import CrossroadTask
 from tasks.ws_monitor import WSMonitorTask
 from tasks.skills_task import DiscoverSkillsTask, CombatMedicTask, BiometricVirusTask, AllSeeingEyeTask, NewsEditorTask
 from tasks.drug_store import DrugStoreTask
+from tasks.startup_task import StartupTask
 from players import PlayerRefreshTask, SyncTask
 
 _thread: threading.Thread = None
@@ -151,6 +152,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     creds = c.get("credentials", {})
     sched.add(LoginTask(creds.get("email", ""), creds.get("password", "")))
 
+    _earns_task_ref = None
     if c.get("earns", {}).get("enabled", False):
         earn_cfg = c["earns"]
         if earn_cfg.get("earn_mode", "auto") == "manual":
@@ -158,10 +160,11 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
                 earn_type=earn_cfg.get("earn_type", "surgeon"),
             ))
         else:
-            sched.add(EarnsTask(
+            _earns_task_ref = EarnsTask(
                 earn_type=earn_cfg.get("earn_type", "surgeon"),
                 interval_minutes=earn_cfg.get("check_interval_minutes", 30),
-            ))
+            )
+            sched.add(_earns_task_ref)
 
     if c.get("aggravated_crimes", {}).get("enabled", False):
         ac = c["aggravated_crimes"]
@@ -234,7 +237,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(DepositTask(_deposit_queue))
     sched.add(WithdrawTask(_withdraw_queue))
     sched.add(MaintainCashTask())
-    sched.add(CharacterHistoryTask(_char_history_queue))
+    _char_history_task_ref = CharacterHistoryTask(_char_history_queue)
+    sched.add(_char_history_task_ref)
     sched.add(ObituaryHistoryTask())
     sched.add(PlanJailBreakTask(_jailbreak_plan_queue))
     sched.add(ExecuteJailBreakTask(_jailbreak_execute_queue))
@@ -281,7 +285,19 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(AllSeeingEyeTask())
     sched.add(NewsEditorTask())
     sched.add(WSMonitorTask())
-    sched.add(PlayerRefreshTask())
+    _player_refresh_task_ref = PlayerRefreshTask()
+    sched.add(_player_refresh_task_ref)
+    if old_sched:
+        existing_startup = next((t for t in old_sched._tasks if isinstance(t, StartupTask)), None)
+        if existing_startup:
+            existing_startup._earns_task = _earns_task_ref
+            existing_startup._char_history_task = _char_history_task_ref
+            existing_startup._player_refresh_task = _player_refresh_task_ref
+            sched.add(existing_startup)
+        else:
+            sched.add(StartupTask(_earns_task_ref, _char_history_task_ref, _player_refresh_task_ref))
+    else:
+        sched.add(StartupTask(_earns_task_ref, _char_history_task_ref, _player_refresh_task_ref))
     sched.add(SyncTask())
     sched.add(CheckTopJobTask())
     global _snipe_task
@@ -393,7 +409,6 @@ def _run(c: dict):
         _sched = sched
         _state = state
 
-        _startup_earns_done = False
         _was_in_jail = False
 
         while not _stop_event.is_set():
@@ -555,14 +570,6 @@ def _run(c: dict):
                 _snipe_task.tick_snipe(state)
 
             _scheduler_snapshot = sched.snapshot(state)
-
-            if not _startup_earns_done and state.logged_in and not state.in_jail:
-                _startup_earns_done = True
-                state.add_log("Startup: refreshing earn catalog.")
-                try:
-                    executor.execute(Action("refresh_earn_catalog"), state)
-                except Exception as _e:
-                    state.add_log(f"Startup earn catalog refresh failed: {_e}")
 
             # Respect refresh requests from the Flask thread
             if not _respect_refresh_queue.empty():
