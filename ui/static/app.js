@@ -519,6 +519,7 @@ function showMainSection(sectionId) {
   document.querySelectorAll('.main-tab').forEach(b => b.classList.remove('active'));
   const section = document.getElementById(sectionId);
   if (section) section.classList.add('main-active');
+  if (sectionId === 's-notifications') notifTabLoad();
   const btn = document.querySelector(`.main-tab[data-section="${sectionId}"]`);
   if (btn) {
     btn.classList.add('active');
@@ -1177,7 +1178,10 @@ function pollStatus() {
       }
 
       // Notifications
-      _updateNotifBell(d.notifications || []);
+      _updateNotifIndicators(d.notifications_unread_count || 0);
+      if (document.getElementById("s-notifications")?.classList.contains("main-active")) {
+        notifTabLoad();
+      }
 
       // Character history live reload — refresh when char_history_updated_at advances
       if ((d.char_history_updated_at || 0) > _chLastUpdated) {
@@ -4610,71 +4614,92 @@ function plUpdateGroupAssignment(name, context, value) {
   }).catch(() => {});
 }
 
-// ── Notifications ─────────────────────────────────────────────────────────────
+// ── Notifications tab ────────────────────────────────────────────────────────
 
-let _notifPanelOpen = false;
+let _notifList = [];
 
-function _updateNotifBell(notifs) {
-  const bell = document.getElementById("notif-bell");
-  const badge = document.getElementById("notif-badge");
-  const panel = document.getElementById("notif-panel");
-  if (!bell) return;
-  if (notifs.length > 0) {
-    badge.textContent = notifs.length;
-    // Bell is visible only when collapsed; when expanded the panel replaces it.
-    bell.style.display = _notifPanelOpen ? "none" : "";
-  } else {
-    bell.style.display = "none";
-    _notifPanelOpen = false;
-    if (panel) panel.style.display = "none";
-  }
-  if (_notifPanelOpen) _renderNotifList(notifs);
+function notifTabLoad() {
+  fetch("/api/notifications")
+    .then(r => r.json())
+    .then(notifs => { _notifList = notifs; notifRender(); })
+    .catch(() => {});
 }
 
-function toggleNotifPanel() {
-  const panel = document.getElementById("notif-panel");
-  const bell = document.getElementById("notif-bell");
-  if (!panel) return;
-  _notifPanelOpen = !_notifPanelOpen;
-  panel.style.display = _notifPanelOpen ? "" : "none";   // expand into full section
-  if (bell) bell.style.display = _notifPanelOpen ? "none" : "";  // collapse back to bell
-}
-
-function _renderNotifList(notifs) {
-  const list = document.getElementById("notif-list");
+function notifRender() {
+  const list = document.getElementById("notif-tab-list");
+  const markAllBtn = document.getElementById("notif-mark-all-btn");
   if (!list) return;
-  if (!notifs.length) { list.innerHTML = ""; return; }
-  list.innerHTML = notifs.map(n => {
+  const unreadCount = _notifList.filter(n => n.status === "unread").length;
+  if (markAllBtn) markAllBtn.disabled = unreadCount === 0;
+  if (!_notifList.length) {
+    list.innerHTML = '<p class="cj-empty">No notifications.</p>';
+    return;
+  }
+  list.innerHTML = _notifList.map(n => {
+    const unread = n.status === "unread";
     const extra = n.event_type === "warrants_outstanding"
-      ? `<button class="btn-secondary" style="font-size:11px;padding:2px 8px;margin-top:4px" onclick="clearWarrantCooldown('${escHtml(n.id)}')">Clear Cooldown</button>`
+      ? `<button class="btn-secondary" style="font-size:11px;padding:2px 8px;margin-top:6px" onclick="notifClearWarrantCooldown('${escHtml(n.id)}')">Clear Cooldown</button>`
       : "";
     return `
-    <div class="notif-item">
-      <div class="notif-item-body">
-        <span class="notif-ts">${escHtml(n.ts)}</span>
-        <span class="notif-msg">${escHtml(n.message)}</span>
+    <div class="notif-tab-item${unread ? " notif-tab-item-unread" : ""}">
+      <div class="notif-tab-item-body">
+        <span class="notif-tab-ts">${escHtml(n.ts)}</span>
+        <span class="notif-tab-msg">${escHtml(n.message)}</span>
         ${extra}
       </div>
-      <button class="notif-dismiss-btn" onclick="dismissNotif('${escHtml(n.id)}')" title="Dismiss">✕</button>
+      <div class="notif-tab-item-actions">
+        <button class="action-btn icon-btn" onclick="notifToggleRead('${escHtml(n.id)}')" title="${unread ? "Mark read" : "Mark unread"}">
+          ${unread
+            ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+            : '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="6"/></svg>'}
+        </button>
+        <button class="action-btn icon-btn" onclick="notifDelete('${escHtml(n.id)}')" title="Delete">✕</button>
+      </div>
     </div>`;
   }).join("");
 }
 
-function dismissNotif(id) {
-  fetch("/notifications/dismiss", {
+function notifToggleRead(id) {
+  fetch("/api/notifications/toggle_read", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({id}),
-  }).catch(() => {});
+  }).then(() => notifTabLoad()).catch(() => {});
 }
 
-function clearAllNotifs() {
-  fetch("/notifications/clear", {method: "POST"}).catch(() => {});
+function notifDelete(id) {
+  fetch("/api/notifications/delete", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id}),
+  }).then(() => notifTabLoad()).catch(() => {});
 }
 
-function clearWarrantCooldown(notifId) {
+function notifMarkAllRead() {
+  fetch("/api/notifications/mark_all_read", {method: "POST"})
+    .then(() => notifTabLoad()).catch(() => {});
+}
+
+function notifClearWarrantCooldown(notifId) {
   fetch("/travel/clear-warrant-cooldown", {method: "POST"}).catch(() => {});
-  dismissNotif(notifId);
+  notifDelete(notifId);
+}
+
+function _updateNotifIndicators(count) {
+  const tabBtn = document.querySelector('.main-tab[data-section="s-notifications"]');
+  if (tabBtn) {
+    const label = tabBtn.querySelector(".main-tab-label");
+    if (label) label.textContent = count > 0 ? `Notifications (${count})` : "Notifications";
+    let mobileBadge = tabBtn.querySelector(".notif-count-badge");
+    if (!mobileBadge) {
+      mobileBadge = document.createElement("span");
+      mobileBadge.className = "notif-count-badge";
+      tabBtn.querySelector(".main-tab-icon")?.insertAdjacentElement("afterend", mobileBadge);
+    }
+    mobileBadge.textContent = count > 4 ? "5+" : String(count);
+    mobileBadge.classList.toggle("has-count", count > 0);
+  }
+  document.title = count > 0 ? `(${count}) MafiaMatrix Bot` : "MafiaMatrix Bot";
 }
 
 function _collectNotifSettings() {

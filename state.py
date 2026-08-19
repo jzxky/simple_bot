@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from bs4 import BeautifulSoup
 import urls
+import notifications_store
 
 SERVER_TIME_FMT = "%m/%d/%Y %I:%M:%S %p"
 
@@ -75,6 +76,9 @@ class GameState:
     notifications: list = field(default_factory=list)
     available_skills: set = field(default_factory=set)
 
+    def __post_init__(self):
+        self.notifications = notifications_store.load()
+
     @property
     def ingame_mins(self) -> "int | None":
         if self.server_time is None:
@@ -127,12 +131,8 @@ class GameState:
 
     def push_notification(self, event_type: str, message: str):
         ts = self.server_time.strftime("%H:%M:%S") if self.server_time else "?"
-        self.notifications.append({
-            "id": str(int(_time.time() * 1000)),
-            "ts": ts,
-            "event_type": event_type,
-            "message": message,
-        })
+        entry = notifications_store.add(event_type, message, ts)
+        self.notifications.append(entry)
 
 
 def _parse_money(text: str) -> int:
