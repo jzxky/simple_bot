@@ -562,6 +562,12 @@ def _git_run(*args) -> "tuple[int, str]":
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
+def _get_earns_mtime() -> float:
+    try:
+        return os.path.getmtime(os.path.join(paths.data_dir(), "available_earns.json"))
+    except Exception:
+        return 0.0
+
 def _get_last_gym_use() -> float:
     try:
         from tasks.gym import load_last_gym_use
@@ -727,6 +733,7 @@ def status():
         "journals_updated_at": s.journals_updated_at,
         "has_new_comms": s.has_new_comms,
         "comms_updated_at": s.comms_updated_at,
+        "earns_updated_at": _get_earns_mtime(),
         "comms_enabled": cfg.load().get("communications", {}).get("enabled", False),
         "event_boss_enabled": cfg.load().get("event_boss", {}).get("enabled", False),
         "event_consumables": s.event_consumables,
