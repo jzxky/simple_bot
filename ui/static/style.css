@@ -1368,6 +1368,8 @@ input.input-unsaved { color: var(--red) !important; }
 }
 .pl-modal-box h3 { margin: 0; font-size: 1rem; }
 .pl-modal-box > div { display: flex; gap: 8px; justify-content: flex-end; }
+#skill-overlay .pl-modal-box { max-width: 360px; }
+#skill-overlay-body { flex-direction: column; justify-content: flex-start; gap: 12px; }
 
 /* Icon buttons */
 .pl-icon-btn {

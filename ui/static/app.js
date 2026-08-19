@@ -2153,27 +2153,37 @@ function openSkillOverlay(skillId, skillName) {
   title.textContent = skillName;
   body.innerHTML = "";
 
+  const field = (label, id, opts) => {
+    const tag = opts && opts.textarea ? "textarea" : "input";
+    const extra = opts && opts.placeholder ? ' placeholder="' + opts.placeholder + '"' : "";
+    const maxlen = opts && opts.maxlength ? ' maxlength="' + opts.maxlength + '"' : "";
+    const rows = opts && opts.rows ? ' rows="' + opts.rows + '"' : "";
+    return '<div style="display:flex;flex-direction:column;gap:4px">'
+      + '<label style="font-size:13px;color:var(--text)">' + label + '</label>'
+      + '<' + tag + ' type="text" id="' + id + '" style="width:100%"' + extra + maxlen + rows + '>'
+      + (tag === "textarea" ? '</' + tag + '>' : '')
+      + '</div>';
+  };
+
   const warn = (key === "combat_medic" || key === "biometric_virus");
+  let html = "";
   if (warn) {
-    const p = document.createElement("p");
-    p.className = "placeholder";
-    p.style.cssText = "color:var(--danger);margin:8px 0 4px";
-    p.textContent = "⚠ Protection must be dropped to use this skill.";
-    body.appendChild(p);
+    html += '<p style="color:var(--danger);font-size:13px;margin:0">⚠ Protection must be dropped to use this skill.</p>';
   }
 
   if (key === "news_editor") {
-    body.innerHTML += '<div class="setting-row"><label>Target Player</label><input type="text" id="skill-overlay-target" style="width:200px"></div>'
-      + '<div class="setting-row"><label>Event Title</label><input type="text" id="skill-overlay-title-input" maxlength="30" style="width:200px"></div>'
-      + '<div class="setting-row"><label>Event Description</label><textarea id="skill-overlay-event" maxlength="1000" rows="3" style="width:100%"></textarea></div>'
-      + '<div class="setting-row" style="margin-top:8px"><button type="button" class="action-btn" style="width:200px" onclick="submitSkillOverlay()">Send</button></div>';
+    html += field("Target Player", "skill-overlay-target")
+      + field("Event Title", "skill-overlay-title-input", {maxlength: 30})
+      + field("Event Description", "skill-overlay-event", {textarea: true, maxlength: 1000, rows: 3})
+      + '<button type="button" class="action-btn" style="width:100%" onclick="submitSkillOverlay()">Send</button>';
   } else if (key === "travel_expert") {
-    body.innerHTML += '<div class="setting-row"><label>Target Player</label><input type="text" id="skill-overlay-target" style="width:200px" placeholder="Leave blank for self"></div>'
-      + '<div class="setting-row" style="margin-top:8px"><button type="button" class="action-btn" style="width:200px" onclick="submitSkillOverlay()">Submit</button></div>';
+    html += field("Target Player", "skill-overlay-target", {placeholder: "Leave blank for self"})
+      + '<button type="button" class="action-btn" style="width:100%" onclick="submitSkillOverlay()">Submit</button>';
   } else {
-    body.innerHTML += '<div class="setting-row"><label>Target Player</label><input type="text" id="skill-overlay-target" style="width:200px"></div>'
-      + '<div class="setting-row" style="margin-top:8px"><button type="button" class="action-btn" style="width:200px" onclick="submitSkillOverlay()">Submit</button></div>';
+    html += field("Target Player", "skill-overlay-target")
+      + '<button type="button" class="action-btn" style="width:100%" onclick="submitSkillOverlay()">Submit</button>';
   }
+  body.innerHTML = html;
 
   overlay.dataset.skillKey = key;
   overlay.dataset.skillId = skillId;
