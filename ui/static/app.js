@@ -2136,23 +2136,32 @@ function useSkillNow(skill, skillName) {
     body: JSON.stringify({skill: skill, target: target, skill_name: skillName})
   }).then(r => r.json()).then(d => {
     if (d.error) alert(d.error);
+    else if (targetEl) targetEl.value = "";
   }).catch(e => alert("Error: " + e));
 }
 
 function useNewsEditor() {
-  const target = (document.getElementById("skill_news_editor_target")||{}).value||"";
-  const title = (document.getElementById("skill_news_editor_title")||{}).value||"";
-  const event = (document.getElementById("skill_news_editor_event")||{}).value||"";
-  if (!target.trim() || !title.trim() || !event.trim()) {
+  const targetEl = document.getElementById("skill_news_editor_target");
+  const titleEl = document.getElementById("skill_news_editor_title");
+  const eventEl = document.getElementById("skill_news_editor_event");
+  const target = (targetEl ? targetEl.value : "").trim();
+  const title = (titleEl ? titleEl.value : "").trim();
+  const event = (eventEl ? eventEl.value : "").trim();
+  if (!target || !title || !event) {
     alert("All three fields (target, title, event) are required.");
     return;
   }
   fetch("/api/use_skill", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({skill: "news_editor", target: target.trim(), title: title.trim(), event: event.trim()})
+    body: JSON.stringify({skill: "news_editor", target: target, title: title, event: event})
   }).then(r => r.json()).then(d => {
     if (d.error) alert(d.error);
+    else {
+      if (targetEl) targetEl.value = "";
+      if (titleEl) titleEl.value = "";
+      if (eventEl) eventEl.value = "";
+    }
   }).catch(e => alert("Error: " + e));
 }
 
