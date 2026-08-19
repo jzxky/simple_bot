@@ -515,48 +515,26 @@ function autobuyMarkDirty() {
 
 // ── Collapse ──────────────────────────────────────────────────────────────────
 
-function _collapseState() {
-  try { return JSON.parse(localStorage.getItem("mm_collapse") || "{}"); } catch { return {}; }
+function showMainSection(sectionId) {
+  document.querySelectorAll('main > section.main-section').forEach(s => s.classList.remove('main-active'));
+  document.querySelectorAll('.main-tab').forEach(b => b.classList.remove('active'));
+  const section = document.getElementById(sectionId);
+  if (section) section.classList.add('main-active');
+  const btn = document.querySelector(`.main-tab[data-section="${sectionId}"]`);
+  if (btn) {
+    btn.classList.add('active');
+    btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }
+  localStorage.setItem('mm_active_tab', sectionId);
 }
 
-function toggleSection(id) {
-  const section = document.getElementById(id);
-  const body = section.querySelector(".card-body");
-  const btn = section.querySelector(".collapse-btn");
-  const collapsed = body.classList.toggle("collapsed");
-  btn.classList.toggle("collapsed", collapsed);
-  section.classList.toggle("is-collapsed", collapsed);
-  const state = _collapseState();
-  state[id] = collapsed;
-  localStorage.setItem("mm_collapse", JSON.stringify(state));
-}
-
-function initCollapse() {
-  const state = _collapseState();
-  document.querySelectorAll(".card[id]").forEach(section => {
-    if (state[section.id]) {
-      const body = section.querySelector(".card-body");
-      const btn = section.querySelector(".collapse-btn");
-      if (body) body.classList.add("collapsed");
-      if (btn) btn.classList.add("collapsed");
-      section.classList.add("is-collapsed");
-    }
-
-    // Make the whole section header clickable to expand/collapse.
-    const header = section.querySelector("h2");
-    const cbtn = header && header.querySelector(".collapse-btn");
-    if (header && cbtn) {
-      const m = /toggleSection\('([^']+)'\)/.exec(cbtn.getAttribute("onclick") || "");
-      const id = m ? m[1] : section.id;
-      cbtn.style.pointerEvents = "none";  // clicks pass through to the header
-      header.style.cursor = "pointer";
-      header.addEventListener("click", (e) => {
-        // Ignore clicks on interactive controls inside the header.
-        if (e.target.closest("input, select, textarea, a, button:not(.collapse-btn)")) return;
-        toggleSection(id);
-      });
-    }
+function initMainTabs() {
+  document.querySelectorAll('.main-tab').forEach(btn => {
+    btn.addEventListener('click', () => showMainSection(btn.dataset.section));
   });
+  const saved = localStorage.getItem('mm_active_tab') || 's-character';
+  const target = document.getElementById(saved) ? saved : 's-character';
+  showMainSection(target);
 }
 
 // ── Section pills ─────────────────────────────────────────────────────────────
