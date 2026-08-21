@@ -2154,7 +2154,7 @@ function openSkillOverlay(skillId, skillName) {
   title.textContent = skillName;
   body.innerHTML = "";
 
-  const field = (label, id, opts) => {
+  const textField = (label, id, opts) => {
     const tag = opts && opts.textarea ? "textarea" : "input";
     const extra = opts && opts.placeholder ? ' placeholder="' + opts.placeholder + '"' : "";
     const maxlen = opts && opts.maxlength ? ' maxlength="' + opts.maxlength + '"' : "";
@@ -2166,6 +2166,20 @@ function openSkillOverlay(skillId, skillName) {
       + '</div>';
   };
 
+  const targetSelector = () => {
+    return '<div style="display:flex;flex-direction:column;gap:4px">'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<label style="font-size:13px;color:var(--text);flex:none">Target Player</label>'
+      + '<button type="button" class="btn-secondary" style="padding:2px 6px;line-height:1;min-width:unset" onclick="refreshSkillTargets()" title="Refresh local players">'
+      + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M1 4v6h6"/><path d="M23 20v-6h-6"/>'
+      + '<path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>'
+      + '</svg></button></div>'
+      + '<select id="skill-overlay-target-select" style="width:100%" onchange="skillTargetChanged()"></select>'
+      + '<input type="text" id="skill-overlay-target" style="width:100%;display:none" placeholder="Enter player name">'
+      + '</div>';
+  };
+
   const warn = (key === "combat_medic" || key === "biometric_virus");
   let html = "";
   if (warn) {
@@ -2173,18 +2187,16 @@ function openSkillOverlay(skillId, skillName) {
   }
 
   if (key === "news_editor") {
-    html += field("Target Player", "skill-overlay-target")
-      + field("Event Title", "skill-overlay-title-input", {maxlength: 30})
-      + field("Event Description", "skill-overlay-event", {textarea: true, maxlength: 1000, rows: 3})
-      + '<button type="button" class="action-btn" onclick="submitSkillOverlay()">Send</button>';
-  } else if (key === "travel_expert") {
-    html += field("Target Player", "skill-overlay-target", {placeholder: "Leave blank for self"})
-      + '<button type="button" class="action-btn" onclick="submitSkillOverlay()">Submit</button>';
+    html += targetSelector()
+      + textField("Event Title", "skill-overlay-title-input", {maxlength: 30})
+      + textField("Event Description", "skill-overlay-event", {textarea: true, maxlength: 1000, rows: 3})
+      + '<button type="button" class="action-btn" style="width:100%" onclick="submitSkillOverlay()">Send</button>';
   } else {
-    html += field("Target Player", "skill-overlay-target")
-      + '<button type="button" class="action-btn" onclick="submitSkillOverlay()">Submit</button>';
+    html += targetSelector()
+      + '<button type="button" class="action-btn" style="width:100%" onclick="submitSkillOverlay()">Submit</button>';
   }
   body.innerHTML = html;
+  _populateSkillTargets(key === "travel_expert");
 
   overlay.dataset.skillKey = key;
   overlay.dataset.skillId = skillId;
@@ -2192,38 +2204,96 @@ function openSkillOverlay(skillId, skillName) {
   overlay.classList.add("active");
 }
 
+function _populateSkillTargets(includeSelf) {
+  const sel = document.getElementById("skill-overlay-target-select");
+  if (!sel) return;
+  sel.innerHTML = "";
+  const def = document.createElement("option");
+  def.value = "";
+  def.textContent = "-- select --";
+  sel.appendChild(def);
+  if (includeSelf && _commsOwnName) {
+    const self = document.createElement("option");
+    self.value = _commsOwnName;
+    self.textContent = _commsOwnName + " (self)";
+    sel.appendChild(self);
+  }
+  const players = _botState.local_players ? [..._botState.local_players].sort() : [];
+  players.forEach(name => {
+    if (includeSelf && name === _commsOwnName) return;
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  const other = document.createElement("option");
+  other.value = "__other__";
+  other.textContent = "Other...";
+  sel.appendChild(other);
+  const inp = document.getElementById("skill-overlay-target");
+  if (inp) { inp.style.display = "none"; inp.value = ""; }
+}
+
+function skillTargetChanged() {
+  const sel = document.getElementById("skill-overlay-target-select");
+  const inp = document.getElementById("skill-overlay-target");
+  if (!sel || !inp) return;
+  if (sel.value === "__other__") {
+    inp.style.display = "";
+    inp.focus();
+  } else {
+    inp.style.display = "none";
+    inp.value = "";
+  }
+}
+
+function refreshSkillTargets() {
+  fetch("/status").then(r => r.json()).then(d => {
+    _botState.local_players = new Set(d.local_players || []);
+    const overlay = document.getElementById("skill-overlay");
+    _populateSkillTargets(overlay && overlay.dataset.skillKey === "travel_expert");
+  }).catch(() => {});
+}
+
 function closeSkillOverlay() {
   document.getElementById("skill-overlay").classList.remove("active");
+}
+
+function _getSkillTarget() {
+  const sel = document.getElementById("skill-overlay-target-select");
+  if (sel && sel.value === "__other__") {
+    return (document.getElementById("skill-overlay-target") || {}).value || "";
+  }
+  return sel ? sel.value : "";
 }
 
 function submitSkillOverlay() {
   const overlay = document.getElementById("skill-overlay");
   const key = overlay.dataset.skillKey;
   const skillName = overlay.dataset.skillName;
+  const target = _getSkillTarget().trim();
 
   if (key === "news_editor") {
-    const target = (document.getElementById("skill-overlay-target")||{}).value||"";
     const title = (document.getElementById("skill-overlay-title-input")||{}).value||"";
     const event = (document.getElementById("skill-overlay-event")||{}).value||"";
-    if (!target.trim() || !title.trim() || !event.trim()) {
+    if (!target || !title.trim() || !event.trim()) {
       alert("All three fields (target, title, event) are required.");
       return;
     }
     fetch("/api/use_skill", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({skill: "news_editor", target: target.trim(), title: title.trim(), event: event.trim()})
+      body: JSON.stringify({skill: "news_editor", target: target, title: title.trim(), event: event.trim()})
     }).then(r => r.json()).then(d => {
       if (d.error) alert(d.error);
       else closeSkillOverlay();
     }).catch(e => alert("Error: " + e));
   } else {
-    const target = (document.getElementById("skill-overlay-target")||{}).value||"";
-    if (!target.trim() && key !== "travel_expert") { alert("Enter a target player first."); return; }
+    if (!target) { alert("Select a target player first."); return; }
     fetch("/api/use_skill", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({skill: key, target: target.trim(), skill_name: skillName})
+      body: JSON.stringify({skill: key, target: target, skill_name: skillName})
     }).then(r => r.json()).then(d => {
       if (d.error) alert(d.error);
       else closeSkillOverlay();
