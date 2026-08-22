@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MafiaMatrix Bot</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v={{ app_version }}">
 </head>
 <body>
 
@@ -2049,9 +2049,9 @@
   </main>
 </div>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v={{ app_version }}"></script>
 {% if config.get('war_mode', {}).get('enabled', False) %}
-<script src="/static/war.js"></script>
+<script src="/static/war.js?v={{ app_version }}"></script>
 {% endif %}
 <script>
   pollStatus();
