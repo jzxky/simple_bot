@@ -16,6 +16,9 @@ import players as pl
 import character_history as ch
 import trait_requirements as tr
 import notifications_store
+import pathlib
+
+_APP_VERSION = pathlib.Path(os.path.dirname(os.path.dirname(__file__)), "VERSION").read_text().strip()
 
 NOTIFICATION_EVENTS = [
     ("bionics_in_stock",       "Bionics in stock"),
@@ -82,7 +85,8 @@ def index():
     c = cfg.load()
     return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS,
                            notif_defaults=cfg.DEFAULT_CONFIG["notifications"],
-                           pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin())
+                           pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin(),
+                           app_version=_APP_VERSION)
 
 
 def _merge_changed(target: dict, before: dict, after: dict):
