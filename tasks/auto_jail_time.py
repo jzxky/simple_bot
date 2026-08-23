@@ -6,6 +6,17 @@ from tasks.base import Task, Action
 from state import GameState
 
 _WARRANT_CHECK_INTERVAL = 1800  # seconds between warrant checks
+_JAIL_CHECK_INTERVAL = 1800     # seconds between jail.asp roster checks
+
+# Accounts that can show up in name lists but can never actually be jailed
+# (e.g. "Administrator" has appeared tagged with the online-list "jail" CSS
+# class without genuinely being in jail).
+_NON_TARGETABLE = {"administrator"}
+
+
+def _real_inmates(names) -> list:
+    return [n for n in names if n and n.strip().lower() not in _NON_TARGETABLE]
+
 
 # Respect-change timing (server time). The respect changeover is 01:00.
 # We start looking for a break at 22:30, and once one is planned we visit
@@ -47,6 +58,7 @@ class AutoJailTimeTask(Task):
 
     def __init__(self):
         self._last_warrant_check: float = 0.0
+        self._last_jail_check: float = 0.0
 
     def can_run(self, state: GameState) -> bool:
         if not state.logged_in or state.in_jail or state.in_hospital:
@@ -79,9 +91,12 @@ class AutoJailTimeTask(Task):
             # Rate-limit warrant checks to every 30 minutes
             return time.time() - self._last_warrant_check >= _WARRANT_CHECK_INTERVAL
         else:
-            # Only run if there are local jail targets visible on the current page
+            # Run if there are local jail targets visible on the current page,
+            # or periodically to check the authoritative jail.asp roster instead.
             pop = bot.online_population()
-            return bool(pop.get("jail_inmates"))
+            if pop.get("jail_inmates"):
+                return True
+            return time.time() - self._last_jail_check >= _JAIL_CHECK_INTERVAL
 
     def blocked_reasons(self, state):
         reasons = []
@@ -119,7 +134,11 @@ class AutoJailTimeTask(Task):
         else:
             pop = bot.online_population()
             if not pop.get("jail_inmates"):
-                reasons.append("No jail inmates online")
+                remaining = _JAIL_CHECK_INTERVAL - (time.time() - self._last_jail_check)
+                if remaining > 0:
+                    reasons.append(f"No jail inmates online (jail.asp recheck in {int(remaining // 60)}m)")
+                else:
+                    reasons.append("No jail inmates online (jail.asp recheck due)")
         return reasons
 
     def run(self, state: GameState, executor):
@@ -146,9 +165,21 @@ class AutoJailTimeTask(Task):
 
         if not target:
             pop = bot.online_population()
-            names = pop.get("jail_inmates", [])
+            names = _real_inmates(pop.get("jail_inmates", []))
             if names:
                 target = names[0]
+
+        if not target:
+            # Authoritative fallback — the online list only reflects who's
+            # currently shown on the current page; jail.asp is the real roster.
+            self._last_jail_check = time.time()
+            try:
+                result = bot._fetch_jail_inmates()
+                names = _real_inmates(result.get("inmates", []))
+                if names:
+                    target = names[0]
+            except Exception as e:
+                state.add_log(f"Auto Jail Time: jail.asp lookup failed: {e}")
 
         if not target:
             state.add_log("Auto Jail Time: no target found.")
