@@ -1528,7 +1528,7 @@ button, [onclick] { touch-action: manipulation; }
 .notif-tab-item-unread .notif-tab-msg { font-weight: 600; }
 .notif-tab-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
-/* Unread-count badge overlaid on the Notifications main tab's icon (mobile, icon-only view) */
+/* Unread-count badge overlaid on the Notifications main tab's icon */
 .notif-count-badge {
   display: none;
   position: absolute;
@@ -1544,6 +1544,7 @@ button, [onclick] { touch-action: manipulation; }
   line-height: 14px;
   text-align: center;
 }
+.notif-count-badge.has-count { display: flex; align-items: center; justify-content: center; }
 
 /* Cross-tab settings-sync banner */
 .settings-sync-banner {
@@ -1626,12 +1627,12 @@ button, [onclick] { touch-action: manipulation; }
 
 .main-tab {
   position: relative;
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 16px;
+  padding: 10px 14px;
   background: none;
   border: none;
   border-bottom: 3px solid transparent;
@@ -1648,21 +1649,17 @@ button, [onclick] { touch-action: manipulation; }
   border-bottom-color: var(--accent);
   background: rgba(200,168,75,0.08);
 }
-.main-tab-icon { display: none; flex-shrink: 0; }
+.main-tab-icon { display: block; flex-shrink: 0; width: 22px; height: 22px; }
+.main-tab-label { display: none; }
 
 /* Section visibility — only active section shown */
 main > section.main-section { display: none; }
 main > section.main-section.main-active { display: block; }
 
-/* Mobile: icon-only tabs */
+/* Mobile: tighter tab padding */
 @media (max-width: 540px) {
-  .main-tab { padding: 10px 12px; flex: 0 0 auto; }
-  .main-tab-label { display: none; }
-  .main-tab-icon { display: block; }
-  .notif-count-badge.has-count { display: flex; align-items: center; justify-content: center; }
-}
-@media (min-width: 541px) and (max-width: 768px) {
-  .main-tab { padding: 8px 12px; font-size: 0.78rem; }
+  .main-tab { padding: 10px 10px; }
+  .main-tab-icon { width: 18px; height: 18px; }
 }
 
 /* In-jail theme overrides */

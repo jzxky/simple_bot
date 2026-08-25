@@ -4787,8 +4787,7 @@ function notifClearWarrantCooldown(notifId) {
 function _updateNotifIndicators(count) {
   const tabBtn = document.querySelector('.main-tab[data-section="s-notifications"]');
   if (tabBtn) {
-    const label = tabBtn.querySelector(".main-tab-label");
-    if (label) label.textContent = count > 0 ? `Notifications (${count})` : "Notifications";
+    tabBtn.title = count > 0 ? `Notifications (${count})` : "Notifications";
     let mobileBadge = tabBtn.querySelector(".notif-count-badge");
     if (!mobileBadge) {
       mobileBadge = document.createElement("span");
