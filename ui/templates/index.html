@@ -458,6 +458,52 @@
             <div id="cw-eng-history" style="margin-top:10px"></div>
           </div>
 
+          <!-- Law -->
+          <div id="cw-law" style="display:none">
+            <div class="cw-poll-row">
+              Poll defend page every
+              <input type="number" id="law_poll_interval" class="input-narrow" min="10"
+                value="{{ config.get('case_work', {}).get('law', {}).get('poll_interval', 31) }}"
+                oninput="markNumDirty(this)">
+              seconds
+            </div>
+            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 10px">
+              Polls the defend cases page and automatically defends available cases in the current city.
+            </p>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <label class="toggle-label"><input type="checkbox" id="law_auto_weed"
+                {% if config.get('case_work', {}).get('law', {}).get('auto_weed') %}checked{% endif %}
+                onchange="autoSave()"><span class="toggle"></span></label>
+              <span>Auto-Weed</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <span>Queue ≥</span>
+              <input type="number" id="law_weed_queue_threshold" class="input-narrow" min="1" style="width:50px"
+                value="{{ config.get('case_work', {}).get('law', {}).get('weed_queue_threshold', 1) }}"
+                oninput="markNumDirty(this)">
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <label class="toggle-label"><input type="checkbox" id="law_prioritize_friendly"
+                {% if config.get('case_work', {}).get('law', {}).get('prioritize_friendly') %}checked{% endif %}
+                onchange="autoSave()"><span class="toggle"></span></label>
+              <span>Prioritize Friendly Groups</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <label class="toggle-label"><input type="checkbox" id="law_travel_guard"
+                {% if config.get('case_work', {}).get('law', {}).get('travel_guard') %}checked{% endif %}
+                onchange="autoSave()"><span class="toggle"></span></label>
+              <span>Travel Guard</span>
+              <span style="font-size:0.8rem;color:var(--muted)">(don't leave city while cases remain)</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <label class="toggle-label"><input type="checkbox" id="law_auto_travel"
+                {% if config.get('case_work', {}).get('law', {}).get('auto_travel') %}checked{% endif %}
+                onchange="autoSave()"><span class="toggle"></span></label>
+              <span>Auto-Travel</span>
+              <span style="font-size:0.8rem;color:var(--muted)">(travel to cities with pending cases)</span>
+            </div>
+          </div>
+
           <!-- Banking -->
           <div id="cw-banking" style="display:none">
             <div class="cw-poll-row">
