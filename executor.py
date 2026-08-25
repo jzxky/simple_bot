@@ -920,6 +920,187 @@ def handle_check_banking_cases(action: Action, state: GameState):
     state.add_log(f"Banking: laundered {laundered} deal(s).")
 
 
+def _parse_lawyer_defend_page(html: str) -> list:
+    """Parse /court/lawyer.asp?display=defend and return list of case dicts."""
+    soup = BeautifulSoup(html, "html.parser")
+    cases = []
+    for a in soup.find_all("a", class_="box green", href=True):
+        href = a.get("href", "")
+        if "defend.asp" not in href or "defendcase" not in href:
+            continue
+        m = re.search(r'id=(\d+)', href)
+        if not m:
+            continue
+        case_id = m.group(1)
+        row = a.find_parent("tr")
+        if not row:
+            continue
+        cells = row.find_all("td")
+        if len(cells) < 5:
+            continue
+        crime = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+        suspect = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+        location = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+        fee = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+        defend_url = href if href.startswith("http") else _u("/court/") + href.lstrip("/")
+        cases.append({
+            "id": case_id,
+            "crime": crime,
+            "suspect": suspect,
+            "location": location,
+            "fee": fee,
+            "defend_url": defend_url,
+        })
+    return cases
+
+
+def _is_friendly_player(username: str) -> bool:
+    """Check if a player belongs to a group with type='friendly'."""
+    import player_db
+    try:
+        con = player_db._conn()
+        row = con.execute(
+            "SELECT group_name FROM players WHERE username=?", (username,)
+        ).fetchone()
+        if not row or not row["group_name"]:
+            con.close()
+            return False
+        group_row = con.execute(
+            "SELECT type FROM groups WHERE name=?", (row["group_name"],)
+        ).fetchone()
+        con.close()
+        return group_row is not None and group_row["type"] == "friendly"
+    except Exception:
+        return False
+
+
+def handle_check_lawyer_cases(action: Action, state: GameState):
+    """Poll the defend cases page; defend one case, then auto-weed loop if enabled."""
+    import config as _cfg
+
+    _nav(_u("/court/lawyer.asp?display=defend"), state)
+    if not _check_session(state):
+        return
+
+    page = browser.page()
+    cases = _parse_lawyer_defend_page(page.content())
+
+    # Update state with cases grouped by city
+    by_city = {}
+    for c_item in cases:
+        city = c_item.get("location", "Unknown")
+        by_city.setdefault(city, []).append(c_item)
+    state.lawyer_cases_by_city = by_city
+
+    if not cases:
+        state.add_log("Lawyer: no cases to defend.")
+        return
+
+    state.add_log(f"Lawyer: {len(cases)} case(s) available to defend.")
+
+    c = _cfg.load()
+    law_cfg = c.get("case_work", {}).get("law", {})
+    prioritize_friendly = law_cfg.get("prioritize_friendly", False)
+
+    # Filter to cases in current city
+    local_cases = [cs for cs in cases if cs["location"].lower() == (state.current_city or "").lower()]
+    if not local_cases:
+        state.add_log(f"Lawyer: no cases in {state.current_city}.")
+        return
+
+    # Sort friendly cases first if enabled
+    if prioritize_friendly:
+        local_cases.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
+
+    defended = 0
+
+    def _defend_one(case_list):
+        nonlocal defended
+        if not case_list:
+            return False
+        target = case_list[0]
+        try:
+            _nav(target["defend_url"], state)
+            soup = BeautifulSoup(page.content(), "html.parser")
+            success = soup.find("div", id="success")
+            fail = soup.find("div", id="fail")
+            if success:
+                state.add_log(f"Lawyer: defended case #{target['id']} ({target['crime']}) for {target['suspect']} — {success.get_text(strip=True)}")
+                defended += 1
+                return True
+            elif fail:
+                state.add_log(f"Lawyer: case #{target['id']} failed — {fail.get_text(strip=True)}")
+            else:
+                state.add_log(f"Lawyer: defended case #{target['id']} (no result div).")
+                defended += 1
+                return True
+        except Exception as e:
+            state.add_log(f"Lawyer: error defending case #{target['id']}: {e}")
+        return False
+
+    _defend_one(local_cases)
+
+    # Auto-weed loop
+    auto_weed = law_cfg.get("auto_weed", False)
+    threshold = int(law_cfg.get("weed_queue_threshold", 1))
+
+    if auto_weed and defended:
+        cons_cfg = c.get("consumables", {})
+        cons_limit = int(cons_cfg.get("consumable_limit", 33))
+        buffer_ = int(cons_cfg.get("buffer", 0))
+
+        while True:
+            # Re-check defend page
+            _nav(_u("/court/lawyer.asp?display=defend"), state)
+            cases = _parse_lawyer_defend_page(page.content())
+            local_cases = [cs for cs in cases if cs["location"].lower() == (state.current_city or "").lower()]
+
+            if prioritize_friendly:
+                local_cases.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
+
+            queue_size = len(local_cases)
+            used_24h = state.consumables_24h or 0
+            effective_limit = cons_limit - buffer_
+            headroom = effective_limit - used_24h
+
+            if queue_size < threshold:
+                state.add_log(f"Lawyer auto-weed: queue {queue_size} < threshold {threshold}, stopping.")
+                break
+            if headroom <= 0:
+                state.add_log(f"Lawyer auto-weed: daily limit reached ({used_24h}/{effective_limit}), stopping.")
+                break
+
+            consume_action = Action(kind="consume", type="marijuana", count=1)
+            handle_consume(consume_action, state)
+            state.add_log(f"Lawyer auto-weed: queue {queue_size}/{threshold}, consumed marijuana ({used_24h + 1}/{effective_limit} daily)")
+
+            # Re-check and defend
+            _nav(_u("/court/lawyer.asp?display=defend"), state)
+            cases = _parse_lawyer_defend_page(page.content())
+            local_cases = [cs for cs in cases if cs["location"].lower() == (state.current_city or "").lower()]
+
+            if prioritize_friendly:
+                local_cases.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
+
+            if not local_cases:
+                state.add_log("Lawyer auto-weed: no cases remaining after consume.")
+                break
+            if not _defend_one(local_cases):
+                break
+
+    # Update state again
+    _nav(_u("/court/lawyer.asp?display=defend"), state)
+    cases = _parse_lawyer_defend_page(page.content())
+    by_city = {}
+    for c_item in cases:
+        city = c_item.get("location", "Unknown")
+        by_city.setdefault(city, []).append(c_item)
+    state.lawyer_cases_by_city = by_city
+
+    _refresh_state(state)
+    state.add_log(f"Lawyer: defended {defended} case(s).")
+
+
 def _check_cs_punishment(state: GameState) -> bool:
     """
     Call after navigating to agcrime.asp when no target input is found.
@@ -5523,6 +5704,7 @@ HANDLERS = {
     "manual_earn": handle_manual_earn,
     "bulk_add_launder_contacts": handle_bulk_add_launder_contacts,
     "check_banking_cases": handle_check_banking_cases,
+    "check_lawyer_cases": handle_check_lawyer_cases,
     "do_crime": handle_do_crime,
     "event_boss": handle_event_boss,
     "event_consume": handle_event_consume,

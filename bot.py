@@ -26,7 +26,7 @@ from tasks.career_training import CareerTrainingTask
 from tasks.university import UniversityTask
 from tasks.fire_duties import FireDutiesTask
 from tasks.drug_manufacturing import DrugManufacturingTask
-from tasks.case_work import HospitalCaseWorkTask, EngineeringCaseWorkTask, FireCaseWorkTask, BankingCaseWorkTask
+from tasks.case_work import HospitalCaseWorkTask, EngineeringCaseWorkTask, FireCaseWorkTask, BankingCaseWorkTask, LawyerCaseWorkTask
 from tasks.away_action import AwayActionTask
 from tasks.laundering import LaunderMoneyTask
 from tasks.refresh import RefreshTask
@@ -220,6 +220,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
         sched.add(FireCaseWorkTask(poll_interval=fire.get("poll_interval", 31)))
         banking = cw_cfg.get("banking", {})
         sched.add(BankingCaseWorkTask(poll_interval=banking.get("poll_interval", 60)))
+        law = cw_cfg.get("law", {})
+        sched.add(LawyerCaseWorkTask(poll_interval=law.get("poll_interval", 31)))
 
     away_cfg = c.get("away_action", {})
     if away_cfg.get("enabled", False):

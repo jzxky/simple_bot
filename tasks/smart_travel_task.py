@@ -37,6 +37,16 @@ class SmartTravelTask(Task):
             return False
         if state.hold_action_timer:
             return False
+        # Travel guard: don't leave a city that still has lawyer cases to defend
+        c = cfg.load()
+        law_cfg = c.get("case_work", {}).get("law", {})
+        if (law_cfg.get("travel_guard", False)
+                and state.occupation == "Lawyer"
+                and state.current_city
+                and any(city.lower() == state.current_city.lower()
+                        for city in state.lawyer_cases_by_city
+                        if state.lawyer_cases_by_city[city])):
+            return False
         # Don't churn while travel is blocked by an outstanding-warrant cooldown —
         # every attempt would just be rejected and block other tasks.
         from executor import travel_warrant_cooldown_active
@@ -56,6 +66,15 @@ class SmartTravelTask(Task):
             reasons.append("In hospital")
         if state.hold_action_timer:
             reasons.append("Action timer held")
+        c = cfg.load()
+        law_cfg = c.get("case_work", {}).get("law", {})
+        if (law_cfg.get("travel_guard", False)
+                and state.occupation == "Lawyer"
+                and state.current_city
+                and any(city.lower() == state.current_city.lower()
+                        for city in state.lawyer_cases_by_city
+                        if state.lawyer_cases_by_city[city])):
+            reasons.append("Lawyer travel guard (cases in city)")
         from executor import travel_warrant_cooldown_active
         if travel_warrant_cooldown_active():
             reasons.append("Warrant travel cooldown")
@@ -77,6 +96,8 @@ class SmartTravelTask(Task):
             "casino": c.get("casino", {}),
             "last_gym_use": load_last_gym_use(),
             "casino_release_at": load_casino_release_at(),
+            "lawyer_cases_by_city": state.lawyer_cases_by_city,
+            "law_auto_travel": c.get("case_work", {}).get("law", {}).get("auto_travel", False),
         }
 
     def _try_travel_expert(self, state: GameState, executor) -> bool:
