@@ -321,6 +321,12 @@ function _buildPayload() {
     hospital_poll_interval: parseInt(document.getElementById("hospital_poll_interval").value) || 31,
     fire_poll_interval: parseInt(document.getElementById("fire_poll_interval").value) || 31,
     banking_poll_interval: parseInt(document.getElementById("banking_poll_interval")?.value) || 60,
+    law_poll_interval: parseInt(document.getElementById("law_poll_interval")?.value) || 31,
+    law_auto_weed: (document.getElementById("law_auto_weed")||{checked:false}).checked,
+    law_weed_queue_threshold: (document.getElementById("law_weed_queue_threshold")||{value:1}).value,
+    law_prioritize_friendly: (document.getElementById("law_prioritize_friendly")||{checked:false}).checked,
+    law_travel_guard: (document.getElementById("law_travel_guard")||{checked:false}).checked,
+    law_auto_travel: (document.getElementById("law_auto_travel")||{checked:false}).checked,
     hospital_tasks: _serializePriorityTable("hospital-priority-body"),
     engineering_tasks: _serializePriorityTable("engineering-priority-body"),
     player_list_enabled: document.getElementById("player_list_enabled").checked,
@@ -1785,19 +1791,22 @@ const CW_HOSPITAL_OCCUPATIONS = new Set(["Nurse", "Doctor", "Surgeon", "Hospital
 const CW_FIRE_OCCUPATIONS = new Set(["Volunteer Fire Fighter", "Fire Fighter", "Fire Chief"]);
 const CW_ENGINEERING_OCCUPATIONS = new Set(["Mechanic", "Technician", "Engineer", "Chief Engineer"]);
 const CW_BANKING_OCCUPATIONS = new Set(["Bank Teller", "Loan Officer", "Bank Manager"]);
+const CW_LAW_OCCUPATIONS = new Set(["Lawyer"]);
 
 function updateCaseWorkSection(occupation) {
   const isHospital = CW_HOSPITAL_OCCUPATIONS.has(occupation);
   const isFire = CW_FIRE_OCCUPATIONS.has(occupation);
   const isEngineering = CW_ENGINEERING_OCCUPATIONS.has(occupation);
   const isBanking = CW_BANKING_OCCUPATIONS.has(occupation);
-  const hasWork = isHospital || isFire || isEngineering || isBanking;
+  const isLaw = CW_LAW_OCCUPATIONS.has(occupation);
+  const hasWork = isHospital || isFire || isEngineering || isBanking || isLaw;
 
   document.getElementById("cw-none").style.display = hasWork ? "none" : "";
   document.getElementById("cw-hospital").style.display = isHospital ? "" : "none";
   document.getElementById("cw-fire").style.display = isFire ? "" : "none";
   document.getElementById("cw-engineering").style.display = isEngineering ? "" : "none";
   document.getElementById("cw-banking").style.display = isBanking ? "" : "none";
+  document.getElementById("cw-law").style.display = isLaw ? "" : "none";
   if (isHospital)    renderCwHospitalHistory();
   if (isEngineering) renderCwEngineeringHistory();
 }

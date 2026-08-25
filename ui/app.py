@@ -308,6 +308,13 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["case_work"]["engineering"]["poll_interval"] = max(31, int(data.get("engineering_poll_interval", 31)))
     c["case_work"].setdefault("banking", {})
     c["case_work"]["banking"]["poll_interval"] = max(31, int(data.get("banking_poll_interval", 60)))
+    c["case_work"].setdefault("law", {})
+    c["case_work"]["law"]["poll_interval"] = max(10, int(data.get("law_poll_interval", 31)))
+    c["case_work"]["law"]["auto_weed"] = data.get("law_auto_weed", False)
+    c["case_work"]["law"]["weed_queue_threshold"] = int(data.get("law_weed_queue_threshold", 1) or 1)
+    c["case_work"]["law"]["prioritize_friendly"] = data.get("law_prioritize_friendly", False)
+    c["case_work"]["law"]["travel_guard"] = data.get("law_travel_guard", False)
+    c["case_work"]["law"]["auto_travel"] = data.get("law_auto_travel", False)
     if data.get("engineering_tasks"):
         c["case_work"]["engineering"]["tasks"] = data["engineering_tasks"]
 
