@@ -1,9 +1,8 @@
 """
 Smart Travel director.
 
-Decides which city the bot should be in, given the gym/casino cooldowns and the
-bionics/weapon store windows, to minimise time in the gym/casino cities and
-maximise full-window coverage of the store cities.
+Decides which city the bot should be in based on a user-configurable priority
+list of travel reasons. Each reason maps to a city and an "active" check.
 
 City map:
     Chicago  — Bionics store (window) + Gym (transient)
@@ -11,7 +10,7 @@ City map:
     Beirut   — Casino (transient)
     <home>   — fallback when nothing is pending
 
-This module is pure decision logic (Phase 1): `decide_target_city()` returns a
+This module is pure decision logic: `decide_target_city()` returns a
 plan dict. Wiring it into travel is done separately.
 """
 
@@ -21,6 +20,14 @@ BEIRUT = "Beirut"
 
 GYM_COOLDOWN_SECS = 12 * 3600
 TWO_HOURS = 2 * 3600
+
+DEFAULT_PRIORITY = [
+    "bionics_window",
+    "weapon_window",
+    "lawyer_cases",
+    "gym",
+    "casino",
+]
 
 
 def _hhmm_to_mins(s: str) -> "int | None":
@@ -47,115 +54,117 @@ def window_active(cfg_store: dict, ingame_mins) -> bool:
 
 
 def _secs_until_gym(now_ts: float, last_gym_use: float) -> float:
-    """Seconds until the gym is next due (0 if due now)."""
     return max(0.0, (last_gym_use + GYM_COOLDOWN_SECS) - now_ts)
 
 
 def _secs_until_casino(now_ts: float, release_at: float) -> float:
-    """Seconds until the casino is next playable (0 if available now)."""
     return max(0.0, release_at - now_ts)
+
+
+def _check_bionics_window(ctx: dict) -> "tuple[str, str] | None":
+    bionics = ctx.get("bionics", {})
+    if bionics.get("enabled", False) and window_active(bionics, ctx.get("ingame_mins")):
+        return CHICAGO, "bionics store window"
+    return None
+
+
+def _check_weapon_window(ctx: dict) -> "tuple[str, str] | None":
+    weapon = ctx.get("weapon", {})
+    if weapon.get("enabled", False) and window_active(weapon, ctx.get("ingame_mins")):
+        return AUCKLAND, "weapon store window"
+    return None
+
+
+def _check_lawyer_cases(ctx: dict) -> "tuple[str, str] | None":
+    if not ctx.get("law_auto_travel", False):
+        return None
+    cases_by_city = ctx.get("lawyer_cases_by_city", {})
+    if not cases_by_city:
+        return None
+    current = (ctx.get("current_city", "") or "").lower()
+    if any(city.lower() == current and cases for city, cases in cases_by_city.items()):
+        return None  # stay — cases in current city
+    best_city = max(cases_by_city, key=lambda c: len(cases_by_city[c]))
+    if cases_by_city[best_city]:
+        return best_city, f"lawyer cases pending in {best_city}"
+    return None
+
+
+def _check_gym(ctx: dict) -> "tuple[str, str] | None":
+    gym = ctx.get("gym", {})
+    if (gym.get("enabled", False) and gym.get("auto_travel", False)
+            and _secs_until_gym(ctx["now_ts"], ctx.get("last_gym_use", 0.0)) <= 0):
+        return CHICAGO, "gym due"
+    return None
+
+
+def _check_casino(ctx: dict) -> "tuple[str, str] | None":
+    casino = ctx.get("casino", {})
+    if (casino.get("enabled", False) and casino.get("auto_travel", False)
+            and _secs_until_casino(ctx["now_ts"], ctx.get("casino_release_at", 0.0)) <= 0):
+        return BEIRUT, "casino due"
+    return None
+
+
+REASON_CHECKERS = {
+    "bionics_window": _check_bionics_window,
+    "weapon_window": _check_weapon_window,
+    "lawyer_cases": _check_lawyer_cases,
+    "gym": _check_gym,
+    "casino": _check_casino,
+}
 
 
 def decide_target_city(ctx: dict) -> dict:
     """Return a travel plan given a context dict.
 
     ctx keys:
-        now            : datetime (server/local time for window comparison)
-        now_ts         : float unix seconds (for cooldown maths)
-        current_city   : str
-        home_city      : str (the character's actual home city)
-        smart          : smart_travel config dict
-        bionics        : bionics config dict
-        weapon         : weapon_store config dict
-        gym            : gym config dict
-        casino         : casino config dict
-        last_gym_use   : float
-        casino_release_at : float
+        now_ts             : float unix seconds (for cooldown maths)
+        ingame_mins        : int | None
+        current_city       : str
+        home_city          : str (the character's actual home city)
+        smart              : smart_travel config dict
+        bionics            : bionics config dict
+        weapon             : weapon_store config dict
+        gym                : gym config dict
+        casino             : casino config dict
+        last_gym_use       : float
+        casino_release_at  : float
+        lawyer_cases_by_city : dict
+        law_auto_travel    : bool
 
     Returns: {"target": <city or None>, "stay": bool, "reason": str}
-        target == current_city / None with stay=True  → remain here.
     """
-    now_ts = ctx["now_ts"]
     current = ctx.get("current_city", "") or ""
     smart = ctx.get("smart", {})
-    bionics = ctx.get("bionics", {})
-    weapon = ctx.get("weapon", {})
-    gym = ctx.get("gym", {})
-    casino = ctx.get("casino", {})
 
-    store_priority = smart.get("store_priority", "bionics")
-    window_mode = smart.get("window_vs_activity", "windows")
-
-    # --- Resolve the home target ---
     home_sel = smart.get("home", "home_city")
     home = ctx.get("home_city", "") if home_sel == "home_city" else home_sel
 
-    # --- Active store windows (ignore a store entirely until it has a window) ---
-    ingame_mins = ctx.get("ingame_mins")
-    bionics_win = bionics.get("enabled", False) and window_active(bionics, ingame_mins)
-    weapon_win = weapon.get("enabled", False) and window_active(weapon, ingame_mins)
+    priority = smart.get("priority_order", DEFAULT_PRIORITY)
+    if not priority:
+        priority = DEFAULT_PRIORITY
 
-    # Overlapping windows in different cities → keep the priority winner.
-    if bionics_win and weapon_win:
-        if store_priority == "weapon":
-            bionics_win = False
-        else:
-            weapon_win = False
+    for reason_key in priority:
+        checker = REASON_CHECKERS.get(reason_key)
+        if not checker:
+            continue
+        result = checker(ctx)
+        if result:
+            target_city, reason = result
+            return _plan(target_city, current, reason)
 
-    window_city = CHICAGO if bionics_win else (AUCKLAND if weapon_win else None)
-
-    # --- Transient tasks due? ---
-    gym_due = (gym.get("enabled", False) and gym.get("auto_travel", False)
-               and _secs_until_gym(now_ts, ctx.get("last_gym_use", 0.0)) <= 0)
-    casino_due = (casino.get("enabled", False) and casino.get("auto_travel", False)
-                  and _secs_until_casino(now_ts, ctx.get("casino_release_at", 0.0)) <= 0)
-
-    # --- Lawyer cases (higher priority than gym/casino when a window is NOT active) ---
-    # When a store window IS active, store takes precedence; lawyer cases slot
-    # between windows and gym/casino in the priority order.
-
-    # --- A window is active ---
-    if window_city:
-        if window_mode == "windows":
-            # Windows are sacrosanct: stay in the window city for the whole window.
-            return _plan(window_city, current, f"honouring {window_city} store window")
-        # window_mode == "activity": leave for a due transient in another city, else stay.
-        if gym_due and window_city != CHICAGO:
-            return _plan(CHICAGO, current, "gym due (activity priority over window)")
-        if casino_due and window_city != BEIRUT:
-            return _plan(BEIRUT, current, "casino due (activity priority over window)")
-        return _plan(window_city, current, f"honouring {window_city} store window")
-
-    # --- Lawyer cases in another city ---
-    lawyer_cases_by_city = ctx.get("lawyer_cases_by_city", {})
-    law_auto_travel = ctx.get("law_auto_travel", False)
-    if law_auto_travel and lawyer_cases_by_city:
-        # If current city has cases, stay; otherwise pick city with most cases
-        current_lower = current.lower()
-        has_local = any(
-            city.lower() == current_lower and cases
-            for city, cases in lawyer_cases_by_city.items()
-        )
-        if not has_local:
-            best_city = max(lawyer_cases_by_city, key=lambda c: len(lawyer_cases_by_city[c]))
-            if lawyer_cases_by_city[best_city]:
-                return _plan(best_city, current, f"lawyer cases pending in {best_city}")
-
-    # --- No window active: service due transient tasks, else chain/home ---
-    if gym_due:
-        return _plan(CHICAGO, current, "gym due")
-    if casino_due:
-        return _plan(BEIRUT, current, "casino due")
-
-    # Option-B chain-then-home: if we're sitting in a transient city (just finished
-    # a gym/casino run) and another transient is due within 2h in a different city,
-    # go there next rather than bouncing home; otherwise head home.
+    # Chain: if in a transient city (not home), check if another task is due
+    # within 2h — go there instead of bouncing home.
+    now_ts = ctx["now_ts"]
+    gym = ctx.get("gym", {})
+    casino = ctx.get("casino", {})
     if current in (CHICAGO, BEIRUT) and current.lower() != (home or "").lower():
         best_city, best_secs = None, None
-        if (gym.get("enabled", False) and gym.get("auto_travel", False) and current != CHICAGO):
+        if gym.get("enabled", False) and gym.get("auto_travel", False) and current != CHICAGO:
             s = _secs_until_gym(now_ts, ctx.get("last_gym_use", 0.0))
             best_city, best_secs = CHICAGO, s
-        if (casino.get("enabled", False) and casino.get("auto_travel", False) and current != BEIRUT):
+        if casino.get("enabled", False) and casino.get("auto_travel", False) and current != BEIRUT:
             s = _secs_until_casino(now_ts, ctx.get("casino_release_at", 0.0))
             if best_secs is None or s < best_secs:
                 best_city, best_secs = BEIRUT, s

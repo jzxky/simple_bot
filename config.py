@@ -140,8 +140,7 @@ DEFAULT_CONFIG = {
     },
     "smart_travel": {
         "enabled": False,
-        "store_priority": "bionics",       # "bionics" | "weapon" — overlap tie-break
-        "window_vs_activity": "windows",   # "windows" | "activity"
+        "priority_order": ["bionics_window", "weapon_window", "lawyer_cases", "gym", "casino"],
         "home": "home_city",               # "home_city" | "Auckland" | "Beirut" | "Chicago"
     },
     "promo": {

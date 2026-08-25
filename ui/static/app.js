@@ -388,10 +388,9 @@ function _buildPayload() {
     banking_invest_amount: (document.getElementById("banking_invest_amount")||{value:0}).value,
     banking_auto_weed: (document.getElementById("banking_auto_weed")||{checked:false}).checked,
     banking_weed_queue_threshold: (document.getElementById("banking_weed_queue_threshold")||{value:5}).value,
-    smart_travel_enabled:            (document.getElementById("smart_travel_enabled")||{checked:false}).checked,
-    smart_travel_store_priority:     (document.getElementById("smart_travel_store_priority")||{value:"bionics"}).value,
-    smart_travel_window_vs_activity: (document.getElementById("smart_travel_window_vs_activity")||{value:"windows"}).value,
-    smart_travel_home:               (document.getElementById("smart_travel_home")||{value:"home_city"}).value,
+    smart_travel_enabled:        (document.getElementById("smart_travel_enabled")||{checked:false}).checked,
+    smart_travel_priority_order: _serializePriorityItems("smart-travel-priority-body"),
+    smart_travel_home:           (document.getElementById("smart_travel_home")||{value:"home_city"}).value,
     sync_enabled:       (document.getElementById("sync_enabled")||{checked:false}).checked,
     sync_server_url:    (document.getElementById("sync_server_url")||{value:""}).value.trim(),
     sync_interval:      parseInt((document.getElementById("sync_interval")||{value:"2"}).value)||2,
@@ -2090,6 +2089,7 @@ document.addEventListener("DOMContentLoaded", () => {
   _initPriorityDrag("bionics-priority-body");
   _initPriorityDrag("weapon-store-priority-body");
   _initPriorityDrag("drug-store-priority-body");
+  _initPriorityDrag("smart-travel-priority-body");
   _renderBuyListSummary("bionics-priority-body", "bionics-buylist-summary");
   _renderBuyListSummary("weapon-store-priority-body", "weapon-store-buylist-summary");
   _renderBuyListSummary("drug-store-priority-body", "drug-store-buylist-summary");

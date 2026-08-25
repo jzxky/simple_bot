@@ -255,8 +255,8 @@ def _apply_payload(c: dict, data: dict) -> dict:
 
     c.setdefault("smart_travel", {})
     c["smart_travel"]["enabled"] = data.get("smart_travel_enabled", False)
-    c["smart_travel"]["store_priority"] = data.get("smart_travel_store_priority", "bionics")
-    c["smart_travel"]["window_vs_activity"] = data.get("smart_travel_window_vs_activity", "windows")
+    c["smart_travel"]["priority_order"] = data.get("smart_travel_priority_order",
+        ["bionics_window", "weapon_window", "lawyer_cases", "gym", "casino"])
     c["smart_travel"]["home"] = data.get("smart_travel_home", "home_city")
 
     c.setdefault("bionics", {})
