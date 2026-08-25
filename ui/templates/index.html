@@ -1002,23 +1002,36 @@
               Routes travel around the gym/casino cooldowns and the bionics/weapon store windows —
               minimising time in the gym/casino cities and covering the store windows fully, then heading home.
             </p>
+            <div style="font-size:0.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Travel priority (drag to reorder)</div>
+            {% set SMART_TRAVEL_ITEMS = {
+              'bionics_window': 'Bionics Shop Window',
+              'weapon_window': 'Weapon Shop Window',
+              'lawyer_cases': 'Lawyer Cases',
+              'gym': 'Gym',
+              'casino': 'Casino',
+            } %}
+            {% set st_order = smart.get('priority_order', ['bionics_window','weapon_window','lawyer_cases','gym','casino']) or ['bionics_window','weapon_window','lawyer_cases','gym','casino'] %}
+            <table class="priority-table" style="width:280px;margin-bottom:12px">
+              <tbody id="smart-travel-priority-body">
+                {% for item in st_order %}
+                  {% if item in SMART_TRAVEL_ITEMS %}
+                  <tr data-item="{{ item }}" draggable="true">
+                    <td class="priority-num">{{ loop.index }}</td>
+                    <td>{{ SMART_TRAVEL_ITEMS[item] }}</td>
+                  </tr>
+                  {% endif %}
+                {% endfor %}
+                {% for item, label in SMART_TRAVEL_ITEMS.items() %}
+                  {% if item not in st_order %}
+                  <tr data-item="{{ item }}" draggable="true">
+                    <td class="priority-num">{{ st_order|length + loop.index }}</td>
+                    <td>{{ label }}</td>
+                  </tr>
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
             <div class="setting-row">
-              <label for="smart_travel_store_priority">Store priority (window overlap)</label>
-              <select id="smart_travel_store_priority" style="width:160px" onchange="autoSave()">
-                {% for v, l in [('bionics','Bionics'),('weapon','Weapon')] %}
-                <option value="{{ v }}" {% if smart.get('store_priority','bionics') == v %}selected{% endif %}>{{ l }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="setting-row" style="margin-top:8px">
-              <label for="smart_travel_window_vs_activity">Priority</label>
-              <select id="smart_travel_window_vs_activity" style="width:180px" onchange="autoSave()">
-                {% for v, l in [('windows','Shop windows'),('activity','Gym & Casino')] %}
-                <option value="{{ v }}" {% if smart.get('window_vs_activity','windows') == v %}selected{% endif %}>{{ l }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="setting-row" style="margin-top:8px">
               <label for="smart_travel_home">Home</label>
               <select id="smart_travel_home" style="width:160px" onchange="autoSave()">
                 {% for v, l in [('home_city','Home City'),('Auckland','Auckland'),('Beirut','Beirut'),('Chicago','Chicago')] %}
