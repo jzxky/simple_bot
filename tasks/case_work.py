@@ -90,6 +90,18 @@ class FireCaseWorkTask(CaseWorkTask):
         return Action("check_fire_cases")
 
 
+class LawyerCaseWorkTask(CaseWorkTask):
+    ELIGIBLE_OCCUPATIONS = {"Lawyer"}
+    HOME_CITY_ONLY = False
+    USES_CASE_TIMER = False
+
+    def __init__(self, poll_interval: int = 31):
+        super().__init__(poll_interval)
+
+    def _action(self) -> Action:
+        return Action("check_lawyer_cases")
+
+
 class BankingCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Bank Teller", "Loan Officer", "Bank Manager"}
     HOME_CITY_ONLY = True

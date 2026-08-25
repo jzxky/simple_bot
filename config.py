@@ -104,6 +104,14 @@ DEFAULT_CONFIG = {
         },
         "banking": {
             "poll_interval": 60
+        },
+        "law": {
+            "poll_interval": 31,
+            "auto_weed": False,
+            "weed_queue_threshold": 1,
+            "prioritize_friendly": False,
+            "travel_guard": False,
+            "auto_travel": False
         }
     },
     "players": {

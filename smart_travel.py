@@ -110,6 +110,10 @@ def decide_target_city(ctx: dict) -> dict:
     casino_due = (casino.get("enabled", False) and casino.get("auto_travel", False)
                   and _secs_until_casino(now_ts, ctx.get("casino_release_at", 0.0)) <= 0)
 
+    # --- Lawyer cases (higher priority than gym/casino when a window is NOT active) ---
+    # When a store window IS active, store takes precedence; lawyer cases slot
+    # between windows and gym/casino in the priority order.
+
     # --- A window is active ---
     if window_city:
         if window_mode == "windows":
@@ -121,6 +125,21 @@ def decide_target_city(ctx: dict) -> dict:
         if casino_due and window_city != BEIRUT:
             return _plan(BEIRUT, current, "casino due (activity priority over window)")
         return _plan(window_city, current, f"honouring {window_city} store window")
+
+    # --- Lawyer cases in another city ---
+    lawyer_cases_by_city = ctx.get("lawyer_cases_by_city", {})
+    law_auto_travel = ctx.get("law_auto_travel", False)
+    if law_auto_travel and lawyer_cases_by_city:
+        # If current city has cases, stay; otherwise pick city with most cases
+        current_lower = current.lower()
+        has_local = any(
+            city.lower() == current_lower and cases
+            for city, cases in lawyer_cases_by_city.items()
+        )
+        if not has_local:
+            best_city = max(lawyer_cases_by_city, key=lambda c: len(lawyer_cases_by_city[c]))
+            if lawyer_cases_by_city[best_city]:
+                return _plan(best_city, current, f"lawyer cases pending in {best_city}")
 
     # --- No window active: service due transient tasks, else chain/home ---
     if gym_due:
