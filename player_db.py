@@ -111,14 +111,22 @@ def _migrate_career_ts_format(con: sqlite3.Connection):
     to UTC ISO format ('YYYY-MM-DDTHH:MM:SSZ') so they compare correctly against
     sync watermarks."""
     rows = con.execute(
-        "SELECT id, ts FROM career_history WHERE ts LIKE '____-__-__ __:__:__'"
+        "SELECT id, username, ts, rank, occupation, homecity FROM career_history WHERE ts LIKE '____-__-__ __:__:__'"
     ).fetchall()
     if not rows:
         return
     for row in rows:
-        old_ts = row[1]
+        old_ts = row[2]
         new_ts = old_ts[:10] + "T" + old_ts[11:] + "Z"
-        con.execute("UPDATE career_history SET ts = ? WHERE id = ?", (new_ts, row[0]))
+        # Check if the converted timestamp would collide with an existing row
+        dup = con.execute(
+            "SELECT id FROM career_history WHERE username=? AND ts=? AND rank=? AND occupation=? AND homecity=?",
+            (row[1], new_ts, row[3], row[4], row[5])
+        ).fetchone()
+        if dup:
+            con.execute("DELETE FROM career_history WHERE id = ?", (row[0],))
+        else:
+            con.execute("UPDATE career_history SET ts = ? WHERE id = ?", (new_ts, row[0]))
     con.commit()
 
 
