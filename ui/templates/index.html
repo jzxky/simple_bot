@@ -1458,11 +1458,12 @@
               <label class="inline-toggle setting-row">Skip PIN for War Mode page
                 <label class="toggle-label"><input type="checkbox" id="war_mode_skip_pin" {% if config.get('war_mode', {}).get('skip_pin', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
-              <div class="setting-row">
-                <label for="war_mode_discord_webhook_url">Discord Webhook URL</label>
-                <input type="text" id="war_mode_discord_webhook_url" value="{{ config.get('war_mode', {}).get('discord_webhook_url', '') }}" placeholder="https://discord.com/api/webhooks/..." onchange="autoSave()" style="width:100%">
+              <div class="setting-row" style="display:flex;align-items:center;gap:8px">
+                <label for="war_mode_discord_webhook_url" style="flex:none">Discord Webhook URL</label>
+                <input type="text" id="war_mode_discord_webhook_url" value="{{ config.get('war_mode', {}).get('discord_webhook_url', '') }}" placeholder="https://discord.com/api/webhooks/..." onchange="autoSave()" style="flex:1">
+                <button type="button" class="btn-secondary" onclick="warTestWebhook()" style="flex:none">Test</button>
               </div>
-              <p class="setting-note">Sends a Discord alert when a whack is detected. Leave empty to disable.</p>
+              <p class="setting-note" id="war-webhook-msg">Sends a Discord alert when a whack is detected. Leave empty to disable.</p>
               <div class="setting-row" id="war-mode-link-row" style="display:none">
                 <span>War Mode Page</span>
                 <button type="button" class="action-btn" onclick="window.open('/war','_blank')">Open War Mode ↗</button>

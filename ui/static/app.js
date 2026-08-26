@@ -430,6 +430,18 @@ function toggleWarModeLink() {
   if (el) el.style.display = on ? "" : "none";
 }
 
+function warTestWebhook() {
+  const url = (document.getElementById("war_mode_discord_webhook_url") || {value:""}).value.trim();
+  const msg = document.getElementById("war-webhook-msg");
+  if (!url) { msg.textContent = "Enter a webhook URL first."; msg.style.color = "var(--red)"; return; }
+  msg.textContent = "Sending…"; msg.style.color = "var(--muted)";
+  fetch("/api/war/test_webhook", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({url})}).then(r => r.json()).then(d => {
+      msg.textContent = d.ok ? "Test sent!" : (d.message || "Failed.");
+      msg.style.color = d.ok ? "var(--success)" : "var(--red)";
+    }).catch(() => { msg.textContent = "Request failed."; msg.style.color = "var(--red)"; });
+}
+
 function toggleTimersRow() {
   const on = (document.getElementById("show_timers_row") || {checked:true}).checked;
   const el = document.getElementById("stat-timers-grid");

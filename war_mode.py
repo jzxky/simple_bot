@@ -225,6 +225,18 @@ def _send_discord_alert(name, side, prev_ws, new_ws):
         pass
 
 
+def send_discord_test(url):
+    """Send a test message to the given Discord webhook URL.
+    Raises on failure so the caller can report the error."""
+    import urllib.request
+    payload = json.dumps({
+        "content": "\U0001f514 War Mode test — webhook is working!"
+    }).encode()
+    req = urllib.request.Request(url, data=payload,
+                                headers={"Content-Type": "application/json"})
+    urllib.request.urlopen(req, timeout=10)
+
+
 def all_names() -> list:
     """[(side, name), …] for the monitor sweep."""
     d = _load()
