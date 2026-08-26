@@ -946,7 +946,7 @@ def _parse_lawyer_defend_page(html: str) -> dict:
 
     # Parse defendable cases (rows with a green DEFEND button — current city only)
     defendable = []
-    for a in soup.find_all("a", class_="box green", href=True):
+    for a in soup.find_all("a", href=True):
         href = a.get("href", "")
         if "defend.asp" not in href or "defendcase" not in href:
             continue
