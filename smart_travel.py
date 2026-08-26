@@ -84,7 +84,7 @@ def _check_lawyer_cases(ctx: dict) -> "tuple[str, str] | None":
     current = (ctx.get("current_city", "") or "").lower()
     if any(city.lower() == current and cases for city, cases in cases_by_city.items()):
         return None  # stay — cases in current city
-    best_city = max(cases_by_city, key=lambda c: len(cases_by_city[c]))
+    best_city = max(cases_by_city, key=lambda c: cases_by_city[c])
     if cases_by_city[best_city]:
         return best_city, f"lawyer cases pending in {best_city}"
     return None
