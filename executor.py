@@ -920,10 +920,32 @@ def handle_check_banking_cases(action: Action, state: GameState):
     state.add_log(f"Banking: laundered {laundered} deal(s).")
 
 
-def _parse_lawyer_defend_page(html: str) -> list:
-    """Parse /court/lawyer.asp?display=defend and return list of case dicts."""
+def _parse_lawyer_defend_page(html: str) -> dict:
+    """Parse /court/lawyer.asp?display=defend.
+
+    Returns {"cases_by_city": {city: count}, "defendable": [case dicts with DEFEND button]}
+    """
     soup = BeautifulSoup(html, "html.parser")
-    cases = []
+
+    # Parse the location summary table (Location | No. of Cases)
+    cases_by_city = {}
+    for table in soup.find_all("table"):
+        headers = [th.get_text(strip=True).lower() for th in table.find_all("th")]
+        if "location" in headers and any("cases" in h for h in headers):
+            for row in table.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) >= 2:
+                    city = cells[0].get_text(strip=True)
+                    try:
+                        count = int(cells[1].get_text(strip=True))
+                    except (ValueError, TypeError):
+                        continue
+                    if city and count > 0:
+                        cases_by_city[city] = count
+            break
+
+    # Parse defendable cases (rows with a green DEFEND button — current city only)
+    defendable = []
     for a in soup.find_all("a", class_="box green", href=True):
         href = a.get("href", "")
         if "defend.asp" not in href or "defendcase" not in href:
@@ -943,7 +965,7 @@ def _parse_lawyer_defend_page(html: str) -> list:
         location = cells[3].get_text(strip=True) if len(cells) > 3 else ""
         fee = cells[4].get_text(strip=True) if len(cells) > 4 else ""
         defend_url = href if href.startswith("http") else _u("/court/") + href.lstrip("/")
-        cases.append({
+        defendable.append({
             "id": case_id,
             "crime": crime,
             "suspect": suspect,
@@ -951,7 +973,8 @@ def _parse_lawyer_defend_page(html: str) -> list:
             "fee": fee,
             "defend_url": defend_url,
         })
-    return cases
+
+    return {"cases_by_city": cases_by_city, "defendable": defendable}
 
 
 def _is_friendly_player(username: str) -> bool:
@@ -974,6 +997,16 @@ def _is_friendly_player(username: str) -> bool:
         return False
 
 
+def _lawyer_best_travel_city(cases_by_city: dict, current_city: str) -> "str | None":
+    """Return the city with the most pending cases (excluding current city), or None."""
+    current_lower = (current_city or "").lower()
+    candidates = {city: count for city, count in cases_by_city.items()
+                  if city.lower() != current_lower and count > 0}
+    if not candidates:
+        return None
+    return max(candidates, key=lambda c: candidates[c])
+
+
 def handle_check_lawyer_cases(action: Action, state: GameState):
     """Poll the defend cases page; defend one case, then auto-weed loop if enabled."""
     import config as _cfg
@@ -983,34 +1016,46 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
         return
 
     page = browser.page()
-    cases = _parse_lawyer_defend_page(page.content())
+    parsed = _parse_lawyer_defend_page(page.content())
+    cases_by_city = parsed["cases_by_city"]
+    defendable = parsed["defendable"]
 
-    # Update state with cases grouped by city
-    by_city = {}
-    for c_item in cases:
-        city = c_item.get("location", "Unknown")
-        by_city.setdefault(city, []).append(c_item)
-    state.lawyer_cases_by_city = by_city
+    # Update state with the authoritative location summary
+    state.lawyer_cases_by_city = cases_by_city
 
-    if not cases:
+    total = sum(cases_by_city.values())
+    if total == 0:
         state.add_log("Lawyer: no cases to defend.")
         return
-
-    state.add_log(f"Lawyer: {len(cases)} case(s) available to defend.")
 
     c = _cfg.load()
     law_cfg = c.get("case_work", {}).get("law", {})
     prioritize_friendly = law_cfg.get("prioritize_friendly", False)
+    current_lower = (state.current_city or "").lower()
+    local_count = sum(v for k, v in cases_by_city.items() if k.lower() == current_lower)
 
-    # Filter to cases in current city
-    local_cases = [cs for cs in cases if cs["location"].lower() == (state.current_city or "").lower()]
-    if not local_cases:
-        state.add_log(f"Lawyer: no cases in {state.current_city}.")
+    summary_parts = [f"{city}: {count}" for city, count in cases_by_city.items()]
+    state.add_log(f"Lawyer: {total} case(s) — {', '.join(summary_parts)}.")
+
+    # No cases in current city — consider travel
+    if not defendable:
+        best_city = _lawyer_best_travel_city(cases_by_city, state.current_city)
+        if best_city:
+            auto_travel = law_cfg.get("auto_travel", False)
+            smart_enabled = c.get("smart_travel", {}).get("enabled", False)
+            if auto_travel and not smart_enabled:
+                # Travel directly when smart travel is off but law auto-travel is on
+                state.add_log(f"Lawyer: no cases in {state.current_city}, travelling to {best_city} ({cases_by_city[best_city]} case(s)).")
+                handle_travel(Action("travel", target_city=best_city, method="own_vehicle"), state)
+            else:
+                state.add_log(f"Lawyer: no cases in {state.current_city} — {best_city} has {cases_by_city[best_city]} case(s).")
+        else:
+            state.add_log(f"Lawyer: no cases in {state.current_city}.")
         return
 
     # Sort friendly cases first if enabled
     if prioritize_friendly:
-        local_cases.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
+        defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
 
     defended = 0
 
@@ -1038,7 +1083,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
             state.add_log(f"Lawyer: error defending case #{target['id']}: {e}")
         return False
 
-    _defend_one(local_cases)
+    _defend_one(defendable)
 
     # Auto-weed loop
     auto_weed = law_cfg.get("auto_weed", False)
@@ -1050,15 +1095,14 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
         buffer_ = int(cons_cfg.get("buffer", 0))
 
         while True:
-            # Re-check defend page
             _nav(_u("/court/lawyer.asp?display=defend"), state)
-            cases = _parse_lawyer_defend_page(page.content())
-            local_cases = [cs for cs in cases if cs["location"].lower() == (state.current_city or "").lower()]
+            parsed = _parse_lawyer_defend_page(page.content())
+            local_defendable = parsed["defendable"]
 
             if prioritize_friendly:
-                local_cases.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
+                local_defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
 
-            queue_size = len(local_cases)
+            queue_size = len(local_defendable)
             used_24h = state.consumables_24h or 0
             effective_limit = cons_limit - buffer_
             headroom = effective_limit - used_24h
@@ -1074,28 +1118,23 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
             handle_consume(consume_action, state)
             state.add_log(f"Lawyer auto-weed: queue {queue_size}/{threshold}, consumed marijuana ({used_24h + 1}/{effective_limit} daily)")
 
-            # Re-check and defend
             _nav(_u("/court/lawyer.asp?display=defend"), state)
-            cases = _parse_lawyer_defend_page(page.content())
-            local_cases = [cs for cs in cases if cs["location"].lower() == (state.current_city or "").lower()]
+            parsed = _parse_lawyer_defend_page(page.content())
+            local_defendable = parsed["defendable"]
 
             if prioritize_friendly:
-                local_cases.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
+                local_defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
 
-            if not local_cases:
+            if not local_defendable:
                 state.add_log("Lawyer auto-weed: no cases remaining after consume.")
                 break
-            if not _defend_one(local_cases):
+            if not _defend_one(local_defendable):
                 break
 
-    # Update state again
+    # Final state update
     _nav(_u("/court/lawyer.asp?display=defend"), state)
-    cases = _parse_lawyer_defend_page(page.content())
-    by_city = {}
-    for c_item in cases:
-        city = c_item.get("location", "Unknown")
-        by_city.setdefault(city, []).append(c_item)
-    state.lawyer_cases_by_city = by_city
+    parsed = _parse_lawyer_defend_page(page.content())
+    state.lawyer_cases_by_city = parsed["cases_by_city"]
 
     _refresh_state(state)
     state.add_log(f"Lawyer: defended {defended} case(s).")
