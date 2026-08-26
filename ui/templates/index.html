@@ -1451,10 +1451,18 @@
               <label class="inline-toggle setting-row">Enable War Mode
                 <label class="toggle-label"><input type="checkbox" id="war_mode_enabled" {% if config.get('war_mode', {}).get('enabled', False) %}checked{% endif %} onchange="toggleWarModeLink(); autoSaveAndReload()"><span class="toggle"></span></label>
               </label>
+              <label class="inline-toggle setting-row">Enable automatic checking
+                <label class="toggle-label"><input type="checkbox" id="war_mode_checking_enabled" {% if config.get('war_mode', {}).get('checking_enabled', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <p class="setting-note">When off, War Mode stays accessible but the bot won't run automatic WS checks.</p>
               <label class="inline-toggle setting-row">Skip PIN for War Mode page
                 <label class="toggle-label"><input type="checkbox" id="war_mode_skip_pin" {% if config.get('war_mode', {}).get('skip_pin', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
-              <p class="setting-note">Monitors whacks-survived for tracked opps/friendlies. Manage lists on the War Mode page.</p>
+              <div class="setting-row">
+                <label for="war_mode_discord_webhook_url">Discord Webhook URL</label>
+                <input type="text" id="war_mode_discord_webhook_url" value="{{ config.get('war_mode', {}).get('discord_webhook_url', '') }}" placeholder="https://discord.com/api/webhooks/..." onchange="autoSave()" style="width:100%">
+              </div>
+              <p class="setting-note">Sends a Discord alert when a whack is detected. Leave empty to disable.</p>
               <div class="setting-row" id="war-mode-link-row" style="display:none">
                 <span>War Mode Page</span>
                 <button type="button" class="action-btn" onclick="window.open('/war','_blank')">Open War Mode ↗</button>

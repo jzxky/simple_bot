@@ -168,8 +168,10 @@ DEFAULT_CONFIG = {
     },
     "war_mode": {
         "enabled": False,
+        "checking_enabled": False,
         "monitor_interval_minutes": 5,
         "skip_pin": False,
+        "discord_webhook_url": "",
     },
     "consumables": {
         "timer_limit": "00:00",

@@ -26,7 +26,10 @@ class WSMonitorTask(Task):
         return max(1, int(m or 5)) * 60
 
     def can_run(self, state: GameState) -> bool:
-        if not cfg.load().get("war_mode", {}).get("enabled", False):
+        wm = cfg.load().get("war_mode", {})
+        if not wm.get("enabled", False):
+            return False
+        if not wm.get("checking_enabled", False):
             return False
         if not state.logged_in:
             return False
@@ -36,8 +39,11 @@ class WSMonitorTask(Task):
 
     def blocked_reasons(self, state):
         reasons = []
-        if not cfg.load().get("war_mode", {}).get("enabled", False):
+        wm = cfg.load().get("war_mode", {})
+        if not wm.get("enabled", False):
             reasons.append("Not enabled")
+        if not wm.get("checking_enabled", False):
+            reasons.append("Checking disabled")
         if not state.logged_in:
             reasons.append("Not logged in")
         if not war_mode.all_names():
