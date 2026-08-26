@@ -218,7 +218,8 @@ def _send_discord_alert(name, side, prev_ws, new_ws):
         "content": f"**WHACK DETECTED** — {name} ({side}) WS {prev_ws} → {new_ws}"
     }).encode()
     req = urllib.request.Request(url, data=payload,
-                                headers={"Content-Type": "application/json"})
+                                headers={"Content-Type": "application/json",
+                                         "User-Agent": "SimpleBot"})
     try:
         urllib.request.urlopen(req, timeout=5)
     except Exception:
@@ -233,7 +234,8 @@ def send_discord_test(url):
         "content": "\U0001f514 War Mode test — webhook is working!"
     }).encode()
     req = urllib.request.Request(url, data=payload,
-                                headers={"Content-Type": "application/json"})
+                                headers={"Content-Type": "application/json",
+                                         "User-Agent": "SimpleBot"})
     urllib.request.urlopen(req, timeout=10)
 
 
