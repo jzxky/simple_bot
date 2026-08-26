@@ -190,7 +190,9 @@ def _apply_payload(c: dict, data: dict) -> dict:
 
     c.setdefault("war_mode", {})
     c["war_mode"]["enabled"] = data.get("war_mode_enabled", False)
+    c["war_mode"]["checking_enabled"] = data.get("war_mode_checking_enabled", False)
     c["war_mode"]["skip_pin"] = data.get("war_mode_skip_pin", False)
+    c["war_mode"]["discord_webhook_url"] = data.get("war_mode_discord_webhook_url", "")
 
     c.setdefault("jail", {})
     c["jail"]["enabled"] = data.get("jail_enabled", False)
@@ -1394,7 +1396,10 @@ def api_war_set_whack_time():
 @app.route("/api/war/set_interval", methods=["POST"])
 def api_war_set_interval():
     d = request.get_json(force=True) or {}
-    minutes = max(2, min(10, int(d.get("minutes", 5) or 5)))
+    _ALLOWED_INTERVALS = {1, 2, 5, 10, 30, 60}
+    minutes = int(d.get("minutes", 5) or 5)
+    if minutes not in _ALLOWED_INTERVALS:
+        minutes = min(_ALLOWED_INTERVALS, key=lambda x: abs(x - minutes))
     c = cfg.load()
     c.setdefault("war_mode", {})["monitor_interval_minutes"] = minutes
     cfg.save(c)

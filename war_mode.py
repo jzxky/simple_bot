@@ -169,6 +169,8 @@ def set_whack_time(name, side, ts_str):
 def record_ws(name, side, ws) -> bool:
     """Set a name's WS; if it increased over the stored value, stamp
     last_whack_time=now and log a war event. Returns True on such an increase."""
+    prev = None
+    whacked = False
     with _lock:
         d = _load()
         e = _find(d, side, name)
@@ -182,6 +184,8 @@ def record_ws(name, side, ws) -> bool:
             e["last_whack_time"] = _ingame_now(d).strftime(_TS_FMT)
             _add_event(d, f"{name} has been whacked (whacks survived {prev} → {ws}).")
         _save(d)
+    if whacked:
+        _send_discord_alert(name, side, prev, ws)
     return whacked
 
 
@@ -202,6 +206,23 @@ def clear_events():
         d = _load()
         d["events"] = []
         _save(d)
+
+
+def _send_discord_alert(name, side, prev_ws, new_ws):
+    import config as cfg
+    url = cfg.load().get("war_mode", {}).get("discord_webhook_url", "").strip()
+    if not url:
+        return
+    import urllib.request
+    payload = json.dumps({
+        "content": f"**WHACK DETECTED** — {name} ({side}) WS {prev_ws} → {new_ws}"
+    }).encode()
+    req = urllib.request.Request(url, data=payload,
+                                headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
 
 
 def all_names() -> list:
