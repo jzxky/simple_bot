@@ -1406,6 +1406,20 @@ def api_war_set_interval():
     return jsonify({"ok": True, "minutes": minutes})
 
 
+@app.route("/api/war/test_webhook", methods=["POST"])
+def api_war_test_webhook():
+    import war_mode
+    d = request.get_json(force=True) or {}
+    url = (d.get("url") or "").strip()
+    if not url:
+        return jsonify({"ok": False, "message": "No webhook URL provided."}), 400
+    try:
+        war_mode.send_discord_test(url)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 400
+
+
 @app.route("/api/war/check", methods=["POST"])
 def api_war_check():
     if not bot.is_running():
