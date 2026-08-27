@@ -336,6 +336,19 @@ def get_groups() -> list:
             con.close()
 
 
+def get_all_groups() -> list:
+    """Return all groups with updated_at (for sync reconciliation)."""
+    with _lock:
+        con = _conn()
+        try:
+            rows = con.execute(
+                "SELECT name, color, type, agg_crimes, case_work, updated_at FROM groups ORDER BY name"
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            con.close()
+
+
 def get_last_updated() -> "str | None":
     with _lock:
         con = _conn()
@@ -818,16 +831,27 @@ def apply_synced_groups(rows: list):
 
 
 def apply_synced_career(rows: list):
-    """Merge career history rows — INSERT OR IGNORE by (username, ts) PK."""
+    """Merge career history rows — skip if last entry for that user already has same data."""
     with _lock:
         con = _conn()
         try:
             for r in rows:
+                uname = r.get("username", "")
+                rank = r.get("rank", "")
+                occ = r.get("occupation", "")
+                city = r.get("homecity", "")
+                if not uname:
+                    continue
+                last = con.execute(
+                    "SELECT rank, occupation, homecity FROM career_history WHERE username=? ORDER BY ts DESC LIMIT 1",
+                    (uname,),
+                ).fetchone()
+                if last and last["rank"] == rank and last["occupation"] == occ and last["homecity"] == city:
+                    continue
                 con.execute(
                     """INSERT OR IGNORE INTO career_history (username, ts, rank, occupation, homecity)
                        VALUES (?,?,?,?,?)""",
-                    (r.get("username", ""), r.get("ts", ""),
-                     r.get("rank", ""), r.get("occupation", ""), r.get("homecity", "")),
+                    (uname, r.get("ts", ""), rank, occ, city),
                 )
             con.commit()
         finally:

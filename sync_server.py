@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS players (
     case_work              TEXT DEFAULT '',
     character_age          INTEGER DEFAULT 0,
     jail_age               INTEGER DEFAULT 0,
+    last_age_tick_at       TEXT DEFAULT '',
     assignments_updated_at TEXT DEFAULT '',
     scraped_at             TEXT DEFAULT ''
 );
@@ -83,8 +84,16 @@ def init_db():
             con.executescript(_SCHEMA)
             con.commit()
             _migrate_career_ts_format(con)
+            _migrate_add_last_age_tick(con)
         finally:
             con.close()
+
+
+def _migrate_add_last_age_tick(con):
+    cols = [r[1] for r in con.execute("PRAGMA table_info(players)").fetchall()]
+    if "last_age_tick_at" not in cols:
+        con.execute("ALTER TABLE players ADD COLUMN last_age_tick_at TEXT DEFAULT ''")
+        con.commit()
 
 
 def _migrate_career_ts_format(con):
@@ -112,7 +121,7 @@ def _upsert_players(con, rows: list):
         incoming_scraped = r.get("scraped_at") or ""
         incoming_assign  = r.get("assignments_updated_at") or ""
         cur = con.execute(
-            """SELECT character_age, jail_age, scraped_at, assignments_updated_at
+            """SELECT character_age, jail_age, last_age_tick_at, scraped_at, assignments_updated_at
                FROM players WHERE username=?""", (name,)
         ).fetchone()
 
@@ -154,13 +163,27 @@ def _upsert_players(con, rows: list):
                      incoming_assign, name),
                 )
 
-            # Ages: always take MAX
-            new_char = max(cur["character_age"] or 0, r.get("character_age") or 0)
-            new_jail = max(cur["jail_age"] or 0, r.get("jail_age") or 0)
-            con.execute(
-                "UPDATE players SET character_age=?, jail_age=? WHERE username=?",
-                (new_char, new_jail, name),
-            )
+            # Ages: take MAX, but only accept increases if >=30 min since last tick
+            incoming_char = r.get("character_age") or 0
+            incoming_jail = r.get("jail_age") or 0
+            cur_char = cur["character_age"] or 0
+            cur_jail = cur["jail_age"] or 0
+            if incoming_char > cur_char or incoming_jail > cur_jail:
+                last_tick = cur["last_age_tick_at"] or ""
+                now = _utcnow()
+                accept = True
+                if last_tick:
+                    try:
+                        prev = datetime.strptime(last_tick, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                        curr = datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                        accept = (curr - prev).total_seconds() >= 1500  # 25 min buffer
+                    except ValueError:
+                        pass
+                if accept:
+                    con.execute(
+                        "UPDATE players SET character_age=?, jail_age=?, last_age_tick_at=? WHERE username=?",
+                        (max(cur_char, incoming_char), max(cur_jail, incoming_jail), now, name),
+                    )
 
 
 def _upsert_groups(con, rows: list):
@@ -187,11 +210,22 @@ def _upsert_groups(con, rows: list):
 
 def _upsert_career(con, rows: list):
     for r in rows:
+        uname = r.get("username", "")
+        rank = r.get("rank", "")
+        occ = r.get("occupation", "")
+        city = r.get("homecity", "")
+        if not uname:
+            continue
+        last = con.execute(
+            "SELECT rank, occupation, homecity FROM career WHERE username=? ORDER BY ts DESC LIMIT 1",
+            (uname,),
+        ).fetchone()
+        if last and last["rank"] == rank and last["occupation"] == occ and last["homecity"] == city:
+            continue
         con.execute(
             """INSERT OR IGNORE INTO career (username, ts, rank, occupation, homecity)
                VALUES (?,?,?,?,?)""",
-            (r.get("username", ""), r.get("ts", ""),
-             r.get("rank", ""), r.get("occupation", ""), r.get("homecity", "")),
+            (uname, r.get("ts", ""), rank, occ, city),
         )
 
 
@@ -226,6 +260,20 @@ def push():
         finally:
             con.close()
     return jsonify({"ok": True, "server_time": _utcnow()})
+
+
+@app.route("/sync/groups/full")
+def groups_full():
+    """Return all groups on the server (for full reconciliation on connect)."""
+    with _lock:
+        con = _conn()
+        try:
+            groups = [dict(r) for r in con.execute(
+                "SELECT name, color, type, agg_crimes, case_work, updated_at FROM groups"
+            ).fetchall()]
+        finally:
+            con.close()
+    return jsonify({"groups": groups, "server_time": _utcnow()})
 
 
 @app.route("/sync/pull")
