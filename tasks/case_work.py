@@ -93,7 +93,7 @@ class FireCaseWorkTask(CaseWorkTask):
 class LawyerCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Lawyer"}
     HOME_CITY_ONLY = False
-    USES_CASE_TIMER = False
+    USES_CASE_TIMER = True
 
     def __init__(self, poll_interval: int = 31):
         super().__init__(poll_interval)
