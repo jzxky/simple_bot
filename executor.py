@@ -1007,7 +1007,7 @@ def _parse_lawyer_defend_page(html: str) -> dict:
             crime = cells[1].get_text(strip=True) if len(cells) > 1 else ""
             suspect = cells[2].get_text(strip=True) if len(cells) > 2 else ""
             location = cells[3].get_text(strip=True) if len(cells) > 3 else ""
-            if suspect and location and crime:
+            if suspect and location and crime and suspect.lower() != "suspect" and location.lower() != "location":
                 all_cases.append({"suspect": suspect, "location": location, "crime": crime})
 
     return {"cases_by_city": cases_by_city, "defendable": defendable, "all_cases": all_cases}
@@ -1095,10 +1095,6 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
     law_cfg = c.get("case_work", {}).get("law", {})
     prioritize_friendly = law_cfg.get("prioritize_friendly", False)
 
-    summary_parts = [f"{city}: {count}" for city, count in cases_by_city.items()]
-    queue = len(defendable)
-    state.add_log(f"Lawyer: {total} case(s) [{', '.join(summary_parts)}] — queue: {queue} DEFEND link(s) in {state.current_city}.")
-
     if not defendable:
         best_city = _lawyer_best_travel_city(cases_by_city, state.current_city)
         if best_city:
@@ -1110,6 +1106,9 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
                 state.add_log(f"Lawyer: no cases in {state.current_city}, travelling to {best_city} ({cases_by_city[best_city]} case(s)).")
                 handle_travel(Action("travel", target_city=best_city, method="own_vehicle"), state)
         return
+
+    summary_parts = [f"{city}: {count}" for city, count in cases_by_city.items()]
+    state.add_log(f"Lawyer: {total} case(s) [{', '.join(summary_parts)}] — queue: {len(defendable)} DEFEND link(s) in {state.current_city}.")
 
     if prioritize_friendly:
         defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
