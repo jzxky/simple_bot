@@ -793,6 +793,8 @@ def status():
         "launder_cooldown": __import__("executor").launder_cooldown_remaining(),
         "banking_mature_at": _get_banking_mature_at(),
         "available_skills": sorted(bot.state.available_skills),
+        "lawyer_cases_by_city": bot.state.lawyer_cases_by_city,
+        "lawyer_case_details": bot.state.lawyer_case_details,
     })
 
 

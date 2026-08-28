@@ -996,7 +996,21 @@ def _parse_lawyer_defend_page(html: str) -> dict:
             "defend_url": defend_url,
         })
 
-    return {"cases_by_city": cases_by_city, "defendable": defendable}
+    # Parse ALL case rows (including non-defendable ones in other cities)
+    all_cases = []
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 5:
+                continue
+            crime = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+            suspect = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+            location = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+            if suspect and location and crime:
+                all_cases.append({"suspect": suspect, "location": location, "crime": crime})
+
+    return {"cases_by_city": cases_by_city, "defendable": defendable, "all_cases": all_cases}
 
 
 def _is_friendly_player(username: str) -> bool:
@@ -1070,6 +1084,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
     defendable = parsed["defendable"]
 
     state.lawyer_cases_by_city = cases_by_city
+    state.lawyer_case_details = parsed.get("all_cases", [])
 
     total = sum(cases_by_city.values())
     if total == 0:
@@ -1090,12 +1105,10 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
             auto_travel = law_cfg.get("auto_travel", False)
             smart_enabled = c.get("smart_travel", {}).get("enabled", False)
             if auto_travel and not smart_enabled:
+                if "travel" in state.timers and not state.timer_ready("travel"):
+                    return
                 state.add_log(f"Lawyer: no cases in {state.current_city}, travelling to {best_city} ({cases_by_city[best_city]} case(s)).")
                 handle_travel(Action("travel", target_city=best_city, method="own_vehicle"), state)
-            else:
-                state.add_log(f"Lawyer: no cases in {state.current_city} — {best_city} has {cases_by_city[best_city]} case(s).")
-        else:
-            state.add_log(f"Lawyer: no defendable cases in {state.current_city}.")
         return
 
     if prioritize_friendly:
@@ -1154,6 +1167,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
     _nav(_u("/court/lawyer.asp?display=defend"), state)
     parsed = _lawyer_reparse(state)
     state.lawyer_cases_by_city = parsed["cases_by_city"]
+    state.lawyer_case_details = parsed.get("all_cases", [])
 
     _refresh_state(state)
     state.add_log(f"Lawyer: defended {defended} case(s).")
@@ -1837,7 +1851,11 @@ def handle_community_service(action: Action, state: GameState):
     else:
         options = soup.find_all("input", attrs={"name": "csinothercities", "type": "radio"})
         if not options:
-            state.add_log("No community service options found (away city).")
+            c = cfg.load()
+            c.setdefault("away_action", {})["type"] = ""
+            cfg.save(c)
+            import settings_rev; settings_rev.bump()
+            state.add_log("No community service options found (away city) — away action set to None.")
             return
         last = options[-1]
         page.check(f"input[name='csinothercities'][value='{last['value']}']")
@@ -1876,6 +1894,7 @@ def handle_do_dog_trains(action: Action, state: GameState):
             c.setdefault("action", {})["enabled"] = False
             state.add_log("Dog trains: actions disabled.")
         cfg.save(c)
+        import settings_rev; settings_rev.bump()
         _notify(state, "dog_trains_unavailable", msg)
         return
 
@@ -2495,7 +2514,15 @@ def handle_drug_manufacturing(action: Action, state: GameState):
         return
 
     if _u("/income/income.asp") in browser.current_url():
-        state.add_log("Drug manufacturing redirected to income page — likely missing science degree or not in Gangster career.")
+        context = action.params.get("context", "home")
+        if context == "away":
+            c = cfg.load()
+            c.setdefault("away_action", {})["type"] = ""
+            cfg.save(c)
+            import settings_rev; settings_rev.bump()
+            state.add_log("Drug manufacturing unavailable — away action set to None.")
+        else:
+            state.add_log("Drug manufacturing redirected to income page — likely missing science degree or not in Gangster career.")
         return
 
     select = page.query_selector("select[name='action']")

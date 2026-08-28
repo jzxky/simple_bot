@@ -76,6 +76,7 @@ class GameState:
     notifications: list = field(default_factory=list)
     available_skills: set = field(default_factory=set)
     lawyer_cases_by_city: dict = field(default_factory=dict)
+    lawyer_case_details: list = field(default_factory=list)
 
     def __post_init__(self):
         self.notifications = notifications_store.load()
