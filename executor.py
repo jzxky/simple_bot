@@ -1056,7 +1056,8 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
     local_count = sum(v for k, v in cases_by_city.items() if k.lower() == current_lower)
 
     summary_parts = [f"{city}: {count}" for city, count in cases_by_city.items()]
-    state.add_log(f"Lawyer: {total} case(s) — {', '.join(summary_parts)}.")
+    queue = len(defendable)
+    state.add_log(f"Lawyer: {total} case(s) [{', '.join(summary_parts)}] — queue: {queue} DEFEND link(s) in {state.current_city}.")
 
     # No cases in current city — consider travel
     if not defendable:
