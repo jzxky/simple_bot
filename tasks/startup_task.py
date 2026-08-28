@@ -34,12 +34,8 @@ class StartupTask(Task):
     def run(self, state: GameState, executor):
         self._done = True
 
-        state.add_log("Startup: refreshing earn catalog.")
-        try:
-            executor.execute(Action("refresh_earn_catalog"), state)
-        except Exception as e:
-            state.add_log(f"Startup earn catalog refresh failed: {e}")
-
+        # check_earns re-scrapes the earn catalog itself (via _scrape_earn_catalog),
+        # so a separate refresh_earn_catalog call here would just visit earn.asp twice.
         state.add_log("Startup: checking earn queue.")
         try:
             import config as cfg
