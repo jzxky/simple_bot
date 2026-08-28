@@ -77,7 +77,7 @@ class AwayActionTask(Task):
         if self.action_type == "community_service":
             executor.execute(Action("do_community_service", in_home_city=False), state)
         elif self.action_type == "drug_manufacturing":
-            executor.execute(Action("do_drug_manufacturing"), state)
+            executor.execute(Action("do_drug_manufacturing", context="away"), state)
         elif self.action_type == "dog_trains":
             executor.execute(Action("do_dog_trains", context="away"), state)
         else:

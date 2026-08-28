@@ -957,6 +957,7 @@ function pollStatus() {
   fetch("/status")
     .then(r => r.json())
     .then(d => {
+      window._lastStatus = d;
       updateBotState(d.running, d.paused);
 
       // Cross-tab settings sync: a higher revision than we've seen means a
@@ -1820,8 +1821,44 @@ function updateCaseWorkSection(occupation) {
   document.getElementById("cw-engineering").style.display = isEngineering ? "" : "none";
   document.getElementById("cw-banking").style.display = isBanking ? "" : "none";
   document.getElementById("cw-law").style.display = isLaw ? "" : "none";
+  document.getElementById("cw-law-summary").style.display = isLaw ? "" : "none";
+  if (isLaw) renderLawyerCaseSummary();
   if (isHospital)    renderCwHospitalHistory();
   if (isEngineering) renderCwEngineeringHistory();
+}
+
+function renderLawyerCaseSummary() {
+  const container = document.getElementById("lawyer-case-summary");
+  if (!container) return;
+  const details = window._lastStatus && window._lastStatus.lawyer_case_details;
+  if (!details || details.length === 0) {
+    container.textContent = "No case data yet.";
+    return;
+  }
+  const cities = new Set();
+  const charMap = {};
+  details.forEach(c => {
+    cities.add(c.location);
+    if (!charMap[c.suspect]) charMap[c.suspect] = {};
+    charMap[c.suspect][c.location] = (charMap[c.suspect][c.location] || 0) + 1;
+  });
+  const cityList = Array.from(cities).sort();
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:4px">';
+  html += '<tr><th style="text-align:left;padding:2px 6px;border-bottom:1px solid var(--border)">Character</th>';
+  cityList.forEach(city => {
+    html += '<th style="text-align:center;padding:2px 6px;border-bottom:1px solid var(--border)">' + city + '</th>';
+  });
+  html += '</tr>';
+  Object.keys(charMap).sort().forEach(suspect => {
+    html += '<tr><td style="padding:2px 6px">' + suspect + '</td>';
+    cityList.forEach(city => {
+      const count = charMap[suspect][city] || 0;
+      html += '<td style="text-align:center;padding:2px 6px">' + (count || '-') + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</table>';
+  container.innerHTML = html;
 }
 
 function bulkAddLaunderContacts() {
