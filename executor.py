@@ -951,11 +951,12 @@ def _parse_lawyer_defend_page(html: str) -> dict:
     # Parse the location summary table (Location | No. of Cases)
     cases_by_city = {}
     for table in soup.find_all("table"):
-        headers = [th.get_text(strip=True).lower() for th in table.find_all("th")]
+        header_cells = table.find_all("th") or table.find_all("td", class_="column_title")
+        headers = [c.get_text(strip=True).lower() for c in header_cells]
         if "location" in headers and any("cases" in h for h in headers):
             for row in table.find_all("tr"):
                 cells = row.find_all("td")
-                if len(cells) >= 2:
+                if len(cells) >= 2 and "column_title" not in (cells[0].get("class") or []):
                     city = cells[0].get_text(strip=True)
                     try:
                         count = int(cells[1].get_text(strip=True))
