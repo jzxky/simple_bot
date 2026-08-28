@@ -71,6 +71,20 @@ def launder_cooldown_remaining() -> int:
     return max(0, int(_launder_cooldown_until - time.monotonic()))
 
 
+def reset_all_cooldowns():
+    global _travel_warrant_cooldown_until, _drug_manufacture_cooldown_until
+    global _no_vehicle_cooldown_until, _gym_travel_cooldown_until
+    global _launder_cooldown_until, _launder_cooldown_city
+    _travel_warrant_cooldown_until = 0.0
+    _drug_manufacture_cooldown_until = 0.0
+    _no_vehicle_cooldown_until = 0.0
+    _gym_travel_cooldown_until = 0.0
+    _launder_cooldown_until = 0.0
+    _launder_cooldown_city = ""
+    global _deferred_travel
+    _deferred_travel = None
+
+
 def _u(path: str) -> str:
     return urls.BASE_URL + path
 
