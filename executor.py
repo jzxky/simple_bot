@@ -1108,7 +1108,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
         return
 
     summary_parts = [f"{city}: {count}" for city, count in cases_by_city.items()]
-    state.add_log(f"Lawyer: {total} case(s) [{', '.join(summary_parts)}] — queue: {len(defendable)} DEFEND link(s) in {state.current_city}.")
+    state.add_log(f"Lawyer: {total} case(s) [{', '.join(summary_parts)}] — {len(defendable)} cases to defend.")
 
     if prioritize_friendly:
         defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
