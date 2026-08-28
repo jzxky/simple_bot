@@ -1029,14 +1029,43 @@ def _lawyer_best_travel_city(cases_by_city: dict, current_city: str) -> "str | N
     return max(candidates, key=lambda c: candidates[c])
 
 
+def _lawyer_reparse(state):
+    page = browser.page()
+    return _parse_lawyer_defend_page(page.content())
+
+
+def _lawyer_defend_one(defendable, state):
+    if not defendable:
+        return False
+    target = defendable[0]
+    try:
+        _nav(target["defend_url"], state)
+        page = browser.page()
+        soup = BeautifulSoup(page.content(), "html.parser")
+        success = soup.find("div", id="success")
+        fail = soup.find("div", id="fail")
+        if success:
+            state.add_log(f"Lawyer: defended case #{target['id']} ({target['crime']}) for {target['suspect']} — {success.get_text(strip=True)}")
+            return True
+        elif fail:
+            state.add_log(f"Lawyer: case #{target['id']} failed — {fail.get_text(strip=True)}")
+        else:
+            state.add_log(f"Lawyer: defended case #{target['id']} (no result div).")
+            return True
+    except Exception as e:
+        state.add_log(f"Lawyer: error defending case #{target['id']}: {e}")
+    return False
+
+
 def handle_check_lawyer_cases(action: Action, state: GameState):
-    """Poll the defend cases page and log case counts (dry-run — no defending yet)."""
+    """Poll the defend cases page; defend one case, then auto-weed loop if enabled."""
+    import config as _cfg
+
     _nav(_u("/court/lawyer.asp?display=defend"), state)
     if not _check_session(state):
         return
 
-    page = browser.page()
-    parsed = _parse_lawyer_defend_page(page.content())
+    parsed = _lawyer_reparse(state)
     cases_by_city = parsed["cases_by_city"]
     defendable = parsed["defendable"]
 
@@ -1047,9 +1076,87 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
         state.add_log("Lawyer: no cases to defend.")
         return
 
+    c = _cfg.load()
+    law_cfg = c.get("case_work", {}).get("law", {})
+    prioritize_friendly = law_cfg.get("prioritize_friendly", False)
+
     summary_parts = [f"{city}: {count}" for city, count in cases_by_city.items()]
     queue = len(defendable)
     state.add_log(f"Lawyer: {total} case(s) [{', '.join(summary_parts)}] — queue: {queue} DEFEND link(s) in {state.current_city}.")
+
+    if not defendable:
+        best_city = _lawyer_best_travel_city(cases_by_city, state.current_city)
+        if best_city:
+            auto_travel = law_cfg.get("auto_travel", False)
+            smart_enabled = c.get("smart_travel", {}).get("enabled", False)
+            if auto_travel and not smart_enabled:
+                state.add_log(f"Lawyer: no cases in {state.current_city}, travelling to {best_city} ({cases_by_city[best_city]} case(s)).")
+                handle_travel(Action("travel", target_city=best_city, method="own_vehicle"), state)
+            else:
+                state.add_log(f"Lawyer: no cases in {state.current_city} — {best_city} has {cases_by_city[best_city]} case(s).")
+        else:
+            state.add_log(f"Lawyer: no defendable cases in {state.current_city}.")
+        return
+
+    if prioritize_friendly:
+        defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
+
+    defended = 0
+    if _lawyer_defend_one(defendable, state):
+        defended += 1
+
+    # Auto-weed loop: consume marijuana and repeat while conditions are met
+    auto_weed = law_cfg.get("auto_weed", False)
+    threshold = int(law_cfg.get("weed_queue_threshold", 1))
+
+    if auto_weed and defended:
+        cons_cfg = c.get("consumables", {})
+        cons_limit = int(cons_cfg.get("consumable_limit", 33))
+        buffer_ = int(cons_cfg.get("buffer", 0))
+
+        while True:
+            _nav(_u("/court/lawyer.asp?display=defend"), state)
+            parsed = _lawyer_reparse(state)
+            local_defendable = parsed["defendable"]
+
+            queue_size = len(local_defendable)
+            used_24h = state.consumables_24h or 0
+            effective_limit = cons_limit - buffer_
+            headroom = effective_limit - used_24h
+
+            if queue_size < threshold:
+                state.add_log(f"Lawyer auto-weed: queue {queue_size} < threshold {threshold}, stopping.")
+                break
+            if headroom <= 0:
+                state.add_log(f"Lawyer auto-weed: daily limit reached ({used_24h}/{effective_limit}), stopping.")
+                break
+
+            consume_action = Action(kind="consume", type="marijuana", count=1)
+            handle_consume(consume_action, state)
+            state.add_log(f"Lawyer auto-weed: queue {queue_size}/{threshold}, consumed marijuana ({used_24h + 1}/{effective_limit} daily)")
+
+            _nav(_u("/court/lawyer.asp?display=defend"), state)
+            parsed = _lawyer_reparse(state)
+            local_defendable = parsed["defendable"]
+
+            if prioritize_friendly:
+                local_defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
+
+            if not local_defendable:
+                state.add_log("Lawyer auto-weed: no cases remaining after consume.")
+                break
+            if _lawyer_defend_one(local_defendable, state):
+                defended += 1
+            else:
+                break
+
+    # Final state update
+    _nav(_u("/court/lawyer.asp?display=defend"), state)
+    parsed = _lawyer_reparse(state)
+    state.lawyer_cases_by_city = parsed["cases_by_city"]
+
+    _refresh_state(state)
+    state.add_log(f"Lawyer: defended {defended} case(s).")
 
 
 def _check_cs_punishment(state: GameState) -> bool:
