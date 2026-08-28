@@ -1013,6 +1013,7 @@
                 {% for item in st_order %}
                   {% if item in SMART_TRAVEL_ITEMS %}
                   <tr data-item="{{ item }}" draggable="true">
+                    <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
                     <td class="priority-num">{{ loop.index }}</td>
                     <td>{{ SMART_TRAVEL_ITEMS[item] }}</td>
                   </tr>
@@ -1021,6 +1022,7 @@
                 {% for item, label in SMART_TRAVEL_ITEMS.items() %}
                   {% if item not in st_order %}
                   <tr data-item="{{ item }}" draggable="true">
+                    <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
                     <td class="priority-num">{{ st_order|length + loop.index }}</td>
                     <td>{{ label }}</td>
                   </tr>
