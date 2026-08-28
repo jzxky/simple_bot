@@ -35,6 +35,13 @@ def drug_manufacture_cooldown_active() -> bool:
     return time.monotonic() < _drug_manufacture_cooldown_until
 
 
+_no_vehicle_cooldown_until: float = 0.0
+
+
+def no_vehicle_cooldown_active() -> bool:
+    return time.monotonic() < _no_vehicle_cooldown_until
+
+
 _gym_travel_cooldown_until: float = 0.0
 
 
@@ -3063,7 +3070,10 @@ def handle_bank_invest(action: Action, state: GameState):
     if amount < 1:
         state.add_log("Banking: invest amount must be at least $1.")
         return
-    amount = min(amount, 1500000)
+    amount = min(amount, 1500000, state.bank_balance)
+    if amount < 1:
+        state.add_log(f"Banking: bank balance too low to invest (${state.bank_balance:,}).")
+        return
 
     INVEST_URL = _u("/income/bank.asp?option=invest")
     page = browser.page()
@@ -4623,11 +4633,17 @@ def handle_travel(action: Action, state: GameState) -> int:
         return 0
 
     if method == "own_vehicle":
+        if time.monotonic() < _no_vehicle_cooldown_until:
+            state.add_log("Travel: no-vehicle cooldown active — skipping travel.")
+            return 0
         pct = handle_check_vehicle(Action("check_vehicle"), state)
         if pct == -1:
             # Repairs page redirected to local.asp — attempt travel anyway.
             state.add_log("Travel: repairs page unavailable (local redirect) — attempting travel anyway.")
         elif state.vehicle_health is None:
+            global _no_vehicle_cooldown_until
+            _no_vehicle_cooldown_until = time.monotonic() + 3600
+            state.add_log("Travel: no vehicle available — entering 1 hour cooldown.")
             return 0
         elif pct == 0:
             ok = handle_repair_vehicle(Action("repair_vehicle"), state)
