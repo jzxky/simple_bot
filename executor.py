@@ -4633,6 +4633,7 @@ def handle_travel(action: Action, state: GameState) -> int:
         return 0
 
     if method == "own_vehicle":
+        global _no_vehicle_cooldown_until
         if time.monotonic() < _no_vehicle_cooldown_until:
             state.add_log("Travel: no-vehicle cooldown active — skipping travel.")
             return 0
@@ -4641,7 +4642,6 @@ def handle_travel(action: Action, state: GameState) -> int:
             # Repairs page redirected to local.asp — attempt travel anyway.
             state.add_log("Travel: repairs page unavailable (local redirect) — attempting travel anyway.")
         elif state.vehicle_health is None:
-            global _no_vehicle_cooldown_until
             _no_vehicle_cooldown_until = time.monotonic() + 3600
             state.add_log("Travel: no vehicle available — entering 1 hour cooldown.")
             return 0
