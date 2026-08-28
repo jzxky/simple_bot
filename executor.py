@@ -3082,13 +3082,27 @@ def handle_bank_invest(action: Action, state: GameState):
     if amount < 1:
         state.add_log("Banking: invest amount must be at least $1.")
         return
-    amount = min(amount, 1500000, state.bank_balance)
-    if amount < 1:
-        state.add_log(f"Banking: bank balance too low to invest (${state.bank_balance:,}).")
-        return
-
+    BANK_URL = _u("/income/bank.asp")
     INVEST_URL = _u("/income/bank.asp?option=invest")
     page = browser.page()
+
+    page.goto(BANK_URL, wait_until="domcontentloaded", timeout=15000)
+    soup = BeautifulSoup(page.content(), "html.parser")
+    closing_bal = 0
+    for span in soup.find_all("span"):
+        strong = span.find("strong")
+        if strong and "Closing Balance" in strong.get_text():
+            bal_text = span.get_text().replace("Closing Balance:", "").strip()
+            bal_m = re.search(r"\$([\d,]+)", bal_text)
+            if bal_m:
+                closing_bal = int(bal_m.group(1).replace(",", ""))
+            break
+
+    amount = min(amount, 1500000, closing_bal)
+    if amount < 1:
+        state.add_log(f"Banking: bank balance too low to invest (${closing_bal:,}).")
+        return
+
     page.goto(INVEST_URL, wait_until="domcontentloaded", timeout=15000)
 
     soup = BeautifulSoup(page.content(), "html.parser")
