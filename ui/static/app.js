@@ -1823,6 +1823,8 @@ function updateCaseWorkSection(occupation) {
   document.getElementById("cw-law").style.display = isLaw ? "" : "none";
   document.getElementById("cw-law-summary").style.display = isLaw ? "" : "none";
   if (isLaw) renderLawyerCaseSummary();
+  var lcRow = document.querySelector('#smart-travel-priority-body tr[data-item="lawyer_cases"]');
+  if (lcRow) lcRow.style.display = isLaw ? "" : "none";
   if (isHospital)    renderCwHospitalHistory();
   if (isEngineering) renderCwEngineeringHistory();
 }
