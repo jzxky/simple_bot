@@ -694,6 +694,8 @@ def stop():
     _stop_event.set()
     _pause_event.clear()
     _cancel_snipe_event.set()
+    from executor import reset_all_cooldowns
+    reset_all_cooldowns()
 
 
 def cancel_snipe():
