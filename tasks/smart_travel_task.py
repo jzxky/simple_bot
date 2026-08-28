@@ -49,8 +49,10 @@ class SmartTravelTask(Task):
             return False
         # Don't churn while travel is blocked by an outstanding-warrant cooldown —
         # every attempt would just be rejected and block other tasks.
-        from executor import travel_warrant_cooldown_active
+        from executor import travel_warrant_cooldown_active, no_vehicle_cooldown_active
         if travel_warrant_cooldown_active():
+            return False
+        if no_vehicle_cooldown_active():
             return False
         return time.monotonic() - self._last >= _POLL_INTERVAL
 
@@ -75,9 +77,11 @@ class SmartTravelTask(Task):
                         for city in state.lawyer_cases_by_city
                         if state.lawyer_cases_by_city[city])):
             reasons.append("Lawyer travel guard (cases in city)")
-        from executor import travel_warrant_cooldown_active
+        from executor import travel_warrant_cooldown_active, no_vehicle_cooldown_active
         if travel_warrant_cooldown_active():
             reasons.append("Warrant travel cooldown")
+        if no_vehicle_cooldown_active():
+            reasons.append("No vehicle cooldown")
         remaining = _POLL_INTERVAL - (time.monotonic() - self._last)
         if remaining > 0:
             reasons.append(f"Poll interval ({int(remaining)}s)")
