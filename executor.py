@@ -681,6 +681,48 @@ def handle_manual_earn(action: Action, state: GameState):
             break
 
 
+# Crimes the "young targets only" filter applies to (PvP aggravated crimes).
+YOUNG_FILTER_CRIMES = {"pickpocket", "mugging", "breaking", "hack"}
+
+
+def _young_target_limit(crime: str) -> float:
+    """Character-age cutoff in minutes, or 0 when the filter is off for this crime."""
+    if crime not in YOUNG_FILTER_CRIMES:
+        return 0
+    agg = cfg.load().get("aggravated_crimes", {})
+    if not agg.get("target_young_only", False):
+        return 0
+    try:
+        hours = float(agg.get("young_age_threshold_hours", 24) or 0)
+    except (TypeError, ValueError):
+        return 0
+    return hours * 60 if hours > 0 else 0
+
+
+def _filter_young_targets(crime: str, names: list, state: GameState) -> list:
+    """Drop known players whose character age exceeds the configured threshold.
+
+    Names not in the player database are kept — an unknown age is not a reason
+    to skip a target.
+    """
+    limit = _young_target_limit(crime)
+    if not limit:
+        return names
+    import player_db
+    try:
+        ages = player_db.get_character_ages()
+    except Exception as e:
+        state.add_log(f"Young targets only: could not read player ages ({e}) — filter skipped.")
+        return names
+    kept = [n for n in names if ages.get(n.lower(), 0) <= limit]
+    dropped = len(names) - len(kept)
+    if dropped:
+        state.add_log(
+            f"Young targets only: dropped {dropped} target(s) older than {limit / 60:g}h."
+        )
+    return kept
+
+
 def _get_online_local_players(state: GameState) -> list:
     """Parse the who's online sidebar from the current page HTML."""
     soup = BeautifulSoup(state.page_html, "html.parser")
@@ -1251,12 +1293,30 @@ def handle_breaking_entering(action: Action, state: GameState):
                 state.add_log("Breaking & Entering: dropdown not found after crime selection.")
             return
 
-        options = [o["value"] for o in select.find_all("option") if o.get("value")]
-        if not options:
+        # Option value is what the form submits; the visible text is the owner
+        # name, which is what the player database is keyed by.
+        entries = [
+            (o["value"], o.get_text(strip=True) or o["value"])
+            for o in select.find_all("option") if o.get("value")
+        ]
+        if not entries:
             state.add_log("Breaking & Entering: no targets in dropdown.")
             return
 
-        state.add_log(f"Breaking & Entering: {len(options)} targets found.")
+        state.add_log(f"Breaking & Entering: {len(entries)} targets found.")
+
+        limit = _young_target_limit("breaking")
+        if limit:
+            names = [name for _, name in entries]
+            kept = set(n.lower() for n in _filter_young_targets("breaking", names, state))
+            entries = [(v, n) for v, n in entries if n.lower() in kept]
+            if not entries:
+                state.add_log("Breaking & Entering: no young targets in dropdown.")
+                state._agg_targets_exhausted = True
+                return
+
+        options = [v for v, _ in entries]
+        names_by_value = {v: n for v, n in entries}
 
         fail_counts: dict = {}
 
@@ -1300,14 +1360,15 @@ def handle_breaking_entering(action: Action, state: GameState):
             success_div = result_soup.find("div", id="success")
             if success_div:
                 msg = success_div.get_text(strip=True)
+                victim = names_by_value.get(target, target)
                 _flush_fails()
-                state.add_log(f"B&E success vs {target}: {msg}")
+                state.add_log(f"B&E success vs {victim}: {msg}")
                 amounts = re.findall(r"\$([\d,]+)", msg)
                 stolen = int(amounts[0].replace(",", "")) if amounts else 0
                 if stolen > 0:
-                    state._last_crime_victim = target
+                    state._last_crime_victim = victim
                     state._last_crime_amount = stolen
-                    state.add_log(f"Stolen: ${stolen:,} from {target}")
+                    state.add_log(f"Stolen: ${stolen:,} from {victim}")
                 return
 
             fail_div = result_soup.find("div", id="fail")
@@ -1347,6 +1408,8 @@ def handle_do_crime(action: Action, state: GameState):
     else:
         targets = _get_city_residents(state.current_city, state.own_name)
         state.add_log(f"City resident targets: {len(targets)}")
+
+    targets = _filter_young_targets(crime, targets, state)
 
     if not targets:
         state.add_log(f"No targets found for {crime}, skipping.")

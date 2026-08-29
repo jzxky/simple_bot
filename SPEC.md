@@ -151,6 +151,16 @@ Used by: Community Service, Career Training, Drug Manufacturing (deferred), Dog 
   - **Mugging:** skip if no valid weapon available and none in stash
   - **Armed Robbery (future):** skip if no valid weapon available and none in stash
 
+### Young Target Filter
+
+Optional (`aggravated_crimes.target_young_only`, off by default). When enabled,
+target lists for Pickpocket, Mugging, Breaking & Entering and Hack are filtered
+against the player database: any name whose recorded `character_age` exceeds
+`aggravated_crimes.young_age_threshold_hours` (in hours; stored ages are in
+minutes) is removed. Names not present in the database are kept — an unknown age
+is not a reason to skip a target. Armed Robbery, Torch and manual one-off
+interactions are unaffected.
+
 ### Pre-Crime Weapon Check
 
 **URL:** `https://mafiamatrix.com/profile/default.asp`

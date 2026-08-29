@@ -349,6 +349,17 @@ def get_all_groups() -> list:
             con.close()
 
 
+def get_character_ages() -> dict:
+    """Map lowercased username -> character_age in minutes for every known player."""
+    with _lock:
+        con = _conn()
+        try:
+            rows = con.execute("SELECT username, character_age FROM players").fetchall()
+            return {r["username"].lower(): (r["character_age"] or 0) for r in rows}
+        finally:
+            con.close()
+
+
 def get_last_updated() -> "str | None":
     with _lock:
         con = _conn()
