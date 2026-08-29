@@ -3678,12 +3678,32 @@ def handle_check_drug_store(action: Action, state: GameState):
 
 
 def handle_withdraw(action: Action, state: GameState):
+    import re as _re_w
     amount = int(action.params.get("amount", 0))
     if amount <= 0:
         state.add_log("Withdraw: amount must be greater than zero.")
         return
+    BANK_URL = _u("/income/bank.asp")
     WITHDRAW_URL = _u("/income/bank.asp?option=withdrawal")
     page = browser.page()
+
+    page.goto(BANK_URL, wait_until="domcontentloaded", timeout=15000)
+    soup = BeautifulSoup(page.content(), "html.parser")
+    closing_bal = 0
+    for span in soup.find_all("span"):
+        strong = span.find("strong")
+        if strong and "Closing Balance" in strong.get_text():
+            bal_text = span.get_text().replace("Closing Balance:", "").strip()
+            bal_m = _re_w.search(r"\$([\d,]+)", bal_text)
+            if bal_m:
+                closing_bal = int(bal_m.group(1).replace(",", ""))
+            break
+
+    amount = min(amount, closing_bal)
+    if amount < 1:
+        state.add_log(f"Withdraw: bank balance too low (${closing_bal:,}).")
+        return
+
     page.goto(WITHDRAW_URL, wait_until="domcontentloaded", timeout=15000)
     page.fill("input[name='withdrawal']", str(amount))
     page.click("input[name='B1']")
