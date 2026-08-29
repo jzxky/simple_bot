@@ -1088,7 +1088,6 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
 
     total = sum(cases_by_city.values())
     if total == 0:
-        state.add_log("Lawyer: no cases to defend.")
         return
 
     c = _cfg.load()
