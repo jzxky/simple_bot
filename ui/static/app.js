@@ -286,6 +286,8 @@ function _buildPayload() {
     away_action_enabled: document.getElementById("action_enabled").checked,
     away_action_type: document.getElementById("away_action_type").value,
     fallback_to_away: document.getElementById("fallback_to_away").checked,
+    target_young_only: (document.getElementById("target_young_only")||{checked:false}).checked,
+    young_age_threshold_hours: (document.getElementById("young_age_threshold_hours")||{value:24}).value,
     payback_mode: document.getElementById("payback_mode").value,
     monitor_top_job: document.getElementById("monitor_top_job").checked,
     promo_thread_id: (document.getElementById("promo_thread_id") || {value:""}).value.trim(),

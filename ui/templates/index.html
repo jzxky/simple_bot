@@ -279,6 +279,15 @@
               <label class="inline-toggle setting-row">Fall back to second option if no hacking targets
                 <label class="toggle-label"><input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+              <label class="inline-toggle setting-row" title="Pickpocket, Mugging, Breaking &amp; Entering and Hacking only. Known players older than the threshold are removed from the target list.">Target young chars only
+                <label class="toggle-label"><input type="checkbox" id="target_young_only" {% if config.aggravated_crimes.get('target_young_only') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row">
+                <label for="young_age_threshold_hours">Max age (hours)</label>
+                <input type="number" id="young_age_threshold_hours" class="input-narrow" min="1" step="1" style="width:60px"
+                  value="{{ config.aggravated_crimes.get('young_age_threshold_hours', 24) }}"
+                  oninput="markNumDirty(this)">
+              </div>
             </div>
             <div class="settings-group">
               <h3>PvB</h3>

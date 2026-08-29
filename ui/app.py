@@ -145,6 +145,12 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["aggravated_crimes"]["torch"]["torch_payback_public"] = data.get("torch_payback_public", "everyone")
     c["aggravated_crimes"]["torch"]["torch_payback_private"] = data.get("torch_payback_private", "everyone")
     c["aggravated_crimes"]["fallback_to_away"] = data.get("fallback_to_away", False)
+    c["aggravated_crimes"]["target_young_only"] = data.get("target_young_only", False)
+    try:
+        _young_hours = float(data.get("young_age_threshold_hours", 24) or 24)
+    except (TypeError, ValueError):
+        _young_hours = 24
+    c["aggravated_crimes"]["young_age_threshold_hours"] = max(1, _young_hours)
 
     c["action"]["enabled"] = data.get("action_enabled", False)
     c["action"]["type"] = data.get("action_type", "community_service")

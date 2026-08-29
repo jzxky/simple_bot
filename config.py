@@ -37,7 +37,9 @@ DEFAULT_CONFIG = {
             "torch_payback_public": "everyone",
             "torch_payback_private": "everyone"
         },
-        "fallback_to_away": False
+        "fallback_to_away": False,
+        "target_young_only": False,
+        "young_age_threshold_hours": 24
     },
     "action": {
         "enabled": True,
