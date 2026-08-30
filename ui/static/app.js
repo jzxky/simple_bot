@@ -4684,7 +4684,10 @@ function _plDoEditGroup(originalName) {
     steps.push(fetch("/players/groups/rename", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({old_name: originalName, new_name: newName}),
-    }).then(r => r.json()).then(d => {
+    }).then(r => {
+      if (!r.ok) throw new Error("Rename failed (server " + r.status + ")");
+      return r.json();
+    }).then(d => {
       if (!d.ok) throw new Error(d.error || "Rename failed");
     }));
   }
