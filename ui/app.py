@@ -1602,7 +1602,7 @@ def players_groups_delete():
 
 @app.route("/players/groups/update_color", methods=["POST"])
 def players_groups_update_color():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     pl.update_group_color(data.get("name", ""), data.get("color", "#3498db"))
     return jsonify({"ok": True})
 
@@ -1625,9 +1625,13 @@ def players_groups_update_assignment():
 
 @app.route("/players/groups/rename", methods=["POST"])
 def players_groups_rename():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     import player_db as _db
-    ok = _db.rename_group(data.get("old_name", ""), data.get("new_name", "").strip())
+    old_name = data.get("old_name", "")
+    new_name = data.get("new_name", "").strip()
+    if not old_name or not new_name:
+        return jsonify({"ok": False, "error": "Name cannot be empty."})
+    ok = _db.rename_group(old_name, new_name)
     return jsonify({"ok": ok, "error": "Name already exists." if not ok else None})
 
 
