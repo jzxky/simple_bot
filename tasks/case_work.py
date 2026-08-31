@@ -86,8 +86,12 @@ class FireCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Volunteer Fire Fighter", "Fire Fighter", "Fire Chief"}
     HOME_CITY_ONLY = False
 
+    def __init__(self, poll_interval: int = 31, tasks: list = None):
+        super().__init__(poll_interval)
+        self._tasks = tasks or []
+
     def _action(self) -> Action:
-        return Action("check_fire_cases")
+        return Action("check_fire_cases", tasks=self._tasks)
 
 
 class LawyerCaseWorkTask(CaseWorkTask):

@@ -2798,111 +2798,111 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def _fire_result_log(state: GameState, page, label: str):
+    """Read the success/fail div from the current page and log the outcome."""
+    soup = BeautifulSoup(page.content(), "html.parser")
+    success = soup.find("div", id="success")
+    fail    = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"{label} result: {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"{label} failed: {fail.get_text(strip=True)}")
+    else:
+        state.add_log(f"{label}: submitted (no result div).")
+    _refresh_state(state)
+
+
+# Default priority when no config is present: fires, then police investigations,
+# then inspections. Both fires and investigations live on the display=fires page
+# and are scraped in a single visit, so ordering costs no extra navigation.
+_FIRE_DEFAULT_TASKS = [
+    {"type": "fires",          "enabled": True},
+    {"type": "investigations", "enabled": True},
+    {"type": "inspections",    "enabled": True},
+]
+
+
 def handle_check_fire_cases(action: Action, state: GameState):
     page = browser.page()
 
-    # Step 1 — active fires
-    _nav(_u("/localcity/firestation.asp?display=fires"), state)
-    if not _check_session(state):
+    tasks = getattr(action, "tasks", None) or _FIRE_DEFAULT_TASKS
+    order = [t.get("type") for t in tasks if t.get("enabled", True)]
+    if not order:
         return
 
-    soup = BeautifulSoup(page.content(), "html.parser")
-    table = soup.find("table", style=lambda s: s and "90%" in s)
-    attend_links = []
-    if table:
-        for row in table.find_all("tr"):
-            link = row.find("a", href=lambda h: h and "FightFire" in h)
-            if link:
-                href = link["href"]
-                if not href.startswith("http"):
-                    href = _u("/localcity/") + href
-                victim_td = row.find("td", class_="display_border")
-                victim = victim_td.get_text(strip=True) if victim_td else "?"
-                attend_links.append((victim, href))
+    # ── Scrape the fires page once: it carries BOTH active fires and the
+    # investigations requested by police officers. Scraping them together means
+    # an investigation is never missed just because attending a fire started the
+    # case cooldown before we got around to looking.
+    attend_links, investigate_links = [], []
+    if "fires" in order or "investigations" in order:
+        _nav(_u("/localcity/firestation.asp?display=fires"), state)
+        if not _check_session(state):
+            return
 
-    if attend_links:
-        victim, url = attend_links[-1]
-        state.add_log(f"Fire case work: attending fire for {victim}.")
-        _nav(url, state)
-        result_soup = BeautifulSoup(page.content(), "html.parser")
-        success = result_soup.find("div", id="success")
-        fail    = result_soup.find("div", id="fail")
-        if success:
-            state.add_log(f"Fire case work result: {success.get_text(strip=True)}")
-        elif fail:
-            state.add_log(f"Fire case work failed: {fail.get_text(strip=True)}")
-        else:
-            state.add_log("Fire case work: submitted (no result div).")
-        _refresh_state(state)
+        soup = BeautifulSoup(page.content(), "html.parser")
+        table = soup.find("table", style=lambda s: s and "90%" in s)
+        if table:
+            for row in table.find_all("tr"):
+                link = row.find("a", href=lambda h: h and "FightFire" in h)
+                if link:
+                    href = link["href"]
+                    if not href.startswith("http"):
+                        href = _u("/localcity/") + href
+                    victim_td = row.find("td", class_="display_border")
+                    victim = victim_td.get_text(strip=True) if victim_td else "?"
+                    attend_links.append((victim, href))
 
-    # Step 2 — inspections (only if case timer is still free)
-    if not state.timer_ready("case"):
-        return
+        for link in soup.find_all("a", href=lambda h: h and "display=investigate&id=" in h):
+            href = link["href"]  # BeautifulSoup already decodes &amp; → &
+            if not href.startswith("http"):
+                href = _u("/localcity/") + href.lstrip("/")
+            investigate_links.append(href)
 
-    _nav(_u("/localcity/firestation.asp?display=inspections"), state)
-    if not _check_session(state):
-        return
+    # ── Work the enabled categories in the configured priority order, stopping
+    # as soon as the case timer is spent.
+    for kind in order:
+        if not state.timer_ready("case"):
+            return
 
-    soup = BeautifulSoup(page.content(), "html.parser")
-    table = soup.find("table", style=lambda s: s and "90%" in s)
-    inspect_link = None
-    if table:
-        for row in table.find_all("tr"):
-            link = row.find("a", href=lambda h: h and "inspect" in h)
-            if link:
-                href = link["href"]  # BeautifulSoup already decodes &amp; → &
-                if not href.startswith("http"):
-                    href = _u("/localcity/") + href.lstrip("/")
-                inspect_link = href
-                break
+        if kind == "fires":
+            if not attend_links:
+                continue
+            victim, url = attend_links[-1]
+            state.add_log(f"Fire case work: attending fire for {victim}.")
+            _nav(url, state)
+            _fire_result_log(state, page, "Fire case work")
 
-    if inspect_link:
-        state.add_log("Fire case work: performing inspection.")
-        _nav(inspect_link, state)
-        result_soup = BeautifulSoup(page.content(), "html.parser")
-        success = result_soup.find("div", id="success")
-        fail    = result_soup.find("div", id="fail")
-        if success:
-            state.add_log(f"Fire inspection result: {success.get_text(strip=True)}")
-        elif fail:
-            state.add_log(f"Fire inspection failed: {fail.get_text(strip=True)}")
-        else:
-            state.add_log("Fire inspection: submitted (no result div).")
-        _refresh_state(state)
+        elif kind == "investigations":
+            if not investigate_links:
+                continue
+            state.add_log("Fire case work: performing investigation.")
+            _nav(investigate_links[-1], state)  # last requested investigation
+            _fire_result_log(state, page, "Fire investigation")
 
-    # Step 3 — investigations requested by police officers (only if case timer free).
-    # These are listed on the same display=fires page as active fires.
-    if not state.timer_ready("case"):
-        return
+        elif kind == "inspections":
+            _nav(_u("/localcity/firestation.asp?display=inspections"), state)
+            if not _check_session(state):
+                return
 
-    _nav(_u("/localcity/firestation.asp?display=fires"), state)
-    if not _check_session(state):
-        return
+            soup = BeautifulSoup(page.content(), "html.parser")
+            table = soup.find("table", style=lambda s: s and "90%" in s)
+            inspect_link = None
+            if table:
+                for row in table.find_all("tr"):
+                    link = row.find("a", href=lambda h: h and "inspect" in h)
+                    if link:
+                        href = link["href"]  # BeautifulSoup already decodes &amp; → &
+                        if not href.startswith("http"):
+                            href = _u("/localcity/") + href.lstrip("/")
+                        inspect_link = href
+                        break
 
-    soup = BeautifulSoup(page.content(), "html.parser")
-    investigate_links = []
-    for link in soup.find_all("a", href=lambda h: h and "display=investigate&id=" in h):
-        href = link["href"]  # BeautifulSoup already decodes &amp; → &
-        if not href.startswith("http"):
-            href = _u("/localcity/") + href.lstrip("/")
-        investigate_links.append(href)
-
-    if not investigate_links:
-        return
-
-    target = investigate_links[-1]  # last requested investigation
-    state.add_log("Fire case work: performing investigation.")
-    _nav(target, state)
-    result_soup = BeautifulSoup(page.content(), "html.parser")
-    success = result_soup.find("div", id="success")
-    fail    = result_soup.find("div", id="fail")
-    if success:
-        state.add_log(f"Fire investigation result: {success.get_text(strip=True)}")
-    elif fail:
-        state.add_log(f"Fire investigation failed: {fail.get_text(strip=True)}")
-    else:
-        state.add_log("Fire investigation: submitted (no result div).")
-    _refresh_state(state)
+            if not inspect_link:
+                continue
+            state.add_log("Fire case work: performing inspection.")
+            _nav(inspect_link, state)
+            _fire_result_log(state, page, "Fire inspection")
 
 
 def handle_clear_jail_duty_queue(action: Action, state: GameState):

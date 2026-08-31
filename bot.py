@@ -217,7 +217,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
         eng = cw_cfg.get("engineering", {})
         sched.add(EngineeringCaseWorkTask(poll_interval=eng.get("poll_interval", 31), tasks=eng.get("tasks", [])))
         fire = cw_cfg.get("fire", {})
-        sched.add(FireCaseWorkTask(poll_interval=fire.get("poll_interval", 31)))
+        sched.add(FireCaseWorkTask(poll_interval=fire.get("poll_interval", 31), tasks=fire.get("tasks", [])))
         banking = cw_cfg.get("banking", {})
         sched.add(BankingCaseWorkTask(poll_interval=banking.get("poll_interval", 60)))
         law = cw_cfg.get("law", {})

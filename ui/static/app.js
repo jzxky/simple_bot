@@ -333,6 +333,7 @@ function _buildPayload() {
     law_auto_travel: (document.getElementById("law_auto_travel")||{checked:false}).checked,
     hospital_tasks: _serializePriorityTable("hospital-priority-body"),
     engineering_tasks: _serializePriorityTable("engineering-priority-body"),
+    fire_tasks: _serializePriorityTable("fire-priority-body"),
     player_list_enabled: document.getElementById("player_list_enabled").checked,
     player_refresh_interval: parseInt(document.getElementById("player_refresh_interval").value) || 30,
     player_whitelist_bolds: (document.getElementById("pl-bolds-toggle")||{checked:true}).checked,

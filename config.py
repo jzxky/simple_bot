@@ -93,7 +93,12 @@ DEFAULT_CONFIG = {
             ]
         },
         "fire": {
-            "poll_interval": 31
+            "poll_interval": 31,
+            "tasks": [
+                {"type": "fires",          "enabled": True},
+                {"type": "investigations", "enabled": True},
+                {"type": "inspections",    "enabled": True},
+            ]
         },
         "engineering": {
             "poll_interval": 31,
