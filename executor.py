@@ -1131,12 +1131,15 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
 
     parsed = _lawyer_reparse(state)
     cases_by_city = parsed["cases_by_city"]
-    defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklist]
+    raw_defendable = parsed["defendable"]
+    blacklisted_ids = _lawyer_blacklist & {c["id"] for c in raw_defendable}
+    defendable = [c for c in raw_defendable if c["id"] not in _lawyer_blacklist]
 
     state.lawyer_cases_by_city = cases_by_city
     state.lawyer_case_details = parsed.get("all_cases", [])
 
     total = sum(cases_by_city.values())
+    state.add_log(f"Lawyer: parsed {total} case(s) across cities, {len(raw_defendable)} DEFEND links found, {len(blacklisted_ids)} blacklisted, {len(defendable)} in queue.")
     if total == 0:
         return
 
