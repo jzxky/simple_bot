@@ -1125,6 +1125,8 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
     """Poll the defend cases page; defend one case, then auto-weed loop if enabled."""
     import config as _cfg
 
+    _lawyer_blacklist.clear()
+
     _nav(_u("/court/lawyer.asp?display=defend"), state)
     if not _check_session(state):
         return
