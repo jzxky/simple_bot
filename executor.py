@@ -1109,9 +1109,12 @@ def _lawyer_defend_one(defendable, state):
             elif fail:
                 fail_text = fail.get_text(strip=True)
                 state.add_log(f"Lawyer: case #{target['id']} failed — {fail_text}")
-                _lawyer_blacklist.add(target["id"])
-                state.add_log(f"Lawyer: blacklisted case #{target['id']}, trying next.")
-                continue
+                skip_reasons = ["victim", "can't defend"]
+                if any(r in fail_text.lower() for r in skip_reasons):
+                    _lawyer_blacklist.add(target["id"])
+                    state.add_log(f"Lawyer: blacklisted case #{target['id']} (skip reason), trying next.")
+                    continue
+                return False
             else:
                 state.add_log(f"Lawyer: defended case #{target['id']} (no result div).")
                 return True
