@@ -113,7 +113,8 @@ DEFAULT_CONFIG = {
             "weed_queue_threshold": 1,
             "prioritize_friendly": False,
             "travel_guard": False,
-            "auto_travel": False
+            "auto_travel": False,
+            "blacklisted_cases": []
         }
     },
     "players": {

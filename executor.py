@@ -1085,17 +1085,31 @@ def _lawyer_best_travel_city(cases_by_city: dict, current_city: str) -> "str | N
     return max(candidates, key=lambda c: candidates[c])
 
 
-_lawyer_blacklist: set = set()
-
-
 def _lawyer_reparse(state):
     page = browser.page()
     return _parse_lawyer_defend_page(page.content())
 
 
+def _lawyer_blacklisted_ids() -> set:
+    import config as _cfg
+    cfg = _cfg.load()
+    return set(str(i) for i in cfg.get("case_work", {}).get("law", {}).get("blacklisted_cases", []))
+
+
+def _lawyer_blacklist_add(case_id: str):
+    import config as _cfg
+    cfg = _cfg.load()
+    law = cfg.setdefault("case_work", {}).setdefault("law", {})
+    bl = law.setdefault("blacklisted_cases", [])
+    if case_id not in bl:
+        bl.append(case_id)
+        _cfg.save(cfg)
+
+
 def _lawyer_defend_one(defendable, state):
+    blacklisted = _lawyer_blacklisted_ids()
     for target in defendable:
-        if target["id"] in _lawyer_blacklist:
+        if target["id"] in blacklisted:
             continue
         try:
             _nav(target["defend_url"], state)
@@ -1109,10 +1123,9 @@ def _lawyer_defend_one(defendable, state):
             elif fail:
                 fail_text = fail.get_text(strip=True)
                 state.add_log(f"Lawyer: case #{target['id']} failed — {fail_text}")
-                skip_reasons = ["victim", "can't defend"]
-                if any(r in fail_text.lower() for r in skip_reasons):
-                    _lawyer_blacklist.add(target["id"])
-                    state.add_log(f"Lawyer: blacklisted case #{target['id']} (skip reason), trying next.")
+                if "victim" in fail_text.lower():
+                    _lawyer_blacklist_add(target["id"])
+                    state.add_log(f"Lawyer: blacklisted case #{target['id']} (victim), trying next.")
                     continue
                 return False
             else:
@@ -1128,8 +1141,6 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
     """Poll the defend cases page; defend one case, then auto-weed loop if enabled."""
     import config as _cfg
 
-    _lawyer_blacklist.clear()
-
     _nav(_u("/court/lawyer.asp?display=defend"), state)
     if not _check_session(state):
         return
@@ -1137,8 +1148,9 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
     parsed = _lawyer_reparse(state)
     cases_by_city = parsed["cases_by_city"]
     raw_defendable = parsed["defendable"]
-    blacklisted_ids = _lawyer_blacklist & {c["id"] for c in raw_defendable}
-    defendable = [c for c in raw_defendable if c["id"] not in _lawyer_blacklist]
+    blacklisted = _lawyer_blacklisted_ids()
+    blacklisted_ids = blacklisted & {c["id"] for c in raw_defendable}
+    defendable = [c for c in raw_defendable if c["id"] not in blacklisted]
 
     state.lawyer_cases_by_city = cases_by_city
     state.lawyer_case_details = parsed.get("all_cases", [])
@@ -1186,7 +1198,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
         while True:
             _nav(_u("/court/lawyer.asp?display=defend"), state)
             parsed = _lawyer_reparse(state)
-            local_defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklist]
+            local_defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklisted_ids()]
 
             queue_size = len(local_defendable)
             used_24h = state.consumables_24h or 0
@@ -1206,7 +1218,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
 
             _nav(_u("/court/lawyer.asp?display=defend"), state)
             parsed = _lawyer_reparse(state)
-            local_defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklist]
+            local_defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklisted_ids()]
 
             if prioritize_friendly:
                 local_defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
