@@ -1085,31 +1085,39 @@ def _lawyer_best_travel_city(cases_by_city: dict, current_city: str) -> "str | N
     return max(candidates, key=lambda c: candidates[c])
 
 
+_lawyer_blacklist: set = set()
+
+
 def _lawyer_reparse(state):
     page = browser.page()
     return _parse_lawyer_defend_page(page.content())
 
 
 def _lawyer_defend_one(defendable, state):
-    if not defendable:
-        return False
-    target = defendable[0]
-    try:
-        _nav(target["defend_url"], state)
-        page = browser.page()
-        soup = BeautifulSoup(page.content(), "html.parser")
-        success = soup.find("div", id="success")
-        fail = soup.find("div", id="fail")
-        if success:
-            state.add_log(f"Lawyer: defended case #{target['id']} ({target['crime']}) for {target['suspect']} — {success.get_text(strip=True)}")
-            return True
-        elif fail:
-            state.add_log(f"Lawyer: case #{target['id']} failed — {fail.get_text(strip=True)}")
-        else:
-            state.add_log(f"Lawyer: defended case #{target['id']} (no result div).")
-            return True
-    except Exception as e:
-        state.add_log(f"Lawyer: error defending case #{target['id']}: {e}")
+    for target in defendable:
+        if target["id"] in _lawyer_blacklist:
+            continue
+        try:
+            _nav(target["defend_url"], state)
+            page = browser.page()
+            soup = BeautifulSoup(page.content(), "html.parser")
+            success = soup.find("div", id="success")
+            fail = soup.find("div", id="fail")
+            if success:
+                state.add_log(f"Lawyer: defended case #{target['id']} ({target['crime']}) for {target['suspect']} — {success.get_text(strip=True)}")
+                return True
+            elif fail:
+                fail_text = fail.get_text(strip=True)
+                state.add_log(f"Lawyer: case #{target['id']} failed — {fail_text}")
+                _lawyer_blacklist.add(target["id"])
+                state.add_log(f"Lawyer: blacklisted case #{target['id']}, trying next.")
+                continue
+            else:
+                state.add_log(f"Lawyer: defended case #{target['id']} (no result div).")
+                return True
+        except Exception as e:
+            state.add_log(f"Lawyer: error defending case #{target['id']}: {e}")
+            return False
     return False
 
 
@@ -1123,7 +1131,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
 
     parsed = _lawyer_reparse(state)
     cases_by_city = parsed["cases_by_city"]
-    defendable = parsed["defendable"]
+    defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklist]
 
     state.lawyer_cases_by_city = cases_by_city
     state.lawyer_case_details = parsed.get("all_cases", [])
@@ -1170,7 +1178,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
         while True:
             _nav(_u("/court/lawyer.asp?display=defend"), state)
             parsed = _lawyer_reparse(state)
-            local_defendable = parsed["defendable"]
+            local_defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklist]
 
             queue_size = len(local_defendable)
             used_24h = state.consumables_24h or 0
@@ -1190,7 +1198,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
 
             _nav(_u("/court/lawyer.asp?display=defend"), state)
             parsed = _lawyer_reparse(state)
-            local_defendable = parsed["defendable"]
+            local_defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklist]
 
             if prioritize_friendly:
                 local_defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
