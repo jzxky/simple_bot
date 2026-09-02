@@ -22,6 +22,7 @@
       <span id="status-text">Stopped</span>
       <span id="status-task" class="status-task"></span>
       <button id="cancel-snipe-btn" style="display:none; margin-left:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; padding:2px 10px; cursor:pointer; font-size:12px;" onclick="cancelSnipe()">Cancel Snipe</button>
+      <button id="cancel-agg-btn" style="display:none; margin-left:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; padding:2px 10px; cursor:pointer; font-size:12px;" onclick="cancelAggTab()">Cancel Crime Tab</button>
     </div>
   </header>
 
@@ -278,6 +279,9 @@
               </div>
               <label class="inline-toggle setting-row">Fall back to second option if no hacking targets
                 <label class="toggle-label"><input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <label class="inline-toggle setting-row" title="Runs aggravated crimes in a dedicated second browser tab instead of the main one, so other tasks aren't blocked while a crime run is in progress.">Run in separate tab
+                <label class="toggle-label"><input type="checkbox" id="agg_separate_tab" {% if config.aggravated_crimes.get('separate_tab') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
               <label class="inline-toggle setting-row" title="Pickpocket, Mugging, Breaking &amp; Entering and Hacking only. Known players older than the threshold are removed from the target list.">Target young chars only
                 <label class="toggle-label"><input type="checkbox" id="target_young_only" {% if config.aggravated_crimes.get('target_young_only') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>

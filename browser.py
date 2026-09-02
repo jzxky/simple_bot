@@ -6,6 +6,7 @@ Uses a persistent profile so Cloudflare trusts the session over time.
 
 import json
 import os
+from contextlib import contextmanager
 import paths
 from patchright.sync_api import sync_playwright, Page, BrowserContext
 
@@ -15,6 +16,10 @@ CF_TIMEOUT = 20000
 _playwright = None
 _context: BrowserContext = None
 _page: Page = None
+# Optional override so code written against page()/navigate()/current_url()
+# can be pointed at a second tab (e.g. the aggravated-crimes tab) without
+# threading a `page` argument through every call site. Set via use_page().
+_active_page: "Page | None" = None
 
 
 def _clear_window_placement():
@@ -89,31 +94,54 @@ def stop():
 
 
 def page() -> Page:
-    return _page
+    return _active_page or _page
+
+
+def is_secondary_page_active() -> bool:
+    """True while use_page() has page()/navigate()/current_url() pointed at a
+    tab other than the main one."""
+    return _active_page is not None
+
+
+@contextmanager
+def use_page(pg: Page):
+    """Temporarily point page()/navigate()/current_url() at `pg` instead of the
+    main tab, so existing code that calls browser.page() can be reused unchanged
+    against a second tab (e.g. the aggravated-crimes tab). Not reentrant —
+    nesting overwrites and then restores the previous override, which is fine
+    since only one secondary tab drives at a time."""
+    global _active_page
+    prev = _active_page
+    _active_page = pg
+    try:
+        yield pg
+    finally:
+        _active_page = prev
 
 
 SCREENSHOT_PATH = os.path.join(paths.data_dir(), "last_screenshot.png")
 
 
 def navigate(url: str) -> str:
+    pg = page()
     for attempt in range(2):
         try:
-            _page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            pg.goto(url, wait_until="domcontentloaded", timeout=30000)
             break
         except Exception as e:
             if "ERR_ABORTED" in str(e) and attempt == 0:
                 continue
             raise
-    _wait_for_cloudflare()
+    _wait_for_cloudflare_on(pg)
     try:
-        _page.screenshot(path=SCREENSHOT_PATH, full_page=False)
+        pg.screenshot(path=SCREENSHOT_PATH, full_page=False)
     except Exception:
         pass
-    return _page.content()
+    return pg.content()
 
 
 def current_url() -> str:
-    return _page.url
+    return page().url
 
 
 def is_cloudflare_challenge() -> bool:
@@ -121,10 +149,6 @@ def is_cloudflare_challenge() -> bool:
         return "Just a moment" in _page.title()
     except Exception:
         return False
-
-
-def _wait_for_cloudflare():
-    _wait_for_cloudflare_on(_page)
 
 
 def _wait_for_cloudflare_on(pg: Page):

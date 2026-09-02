@@ -74,6 +74,7 @@ _weapon_store_task = None
 _drug_store_task = None
 _auto_jail_task = None
 _snipe_task = None
+_agg_task = None
 _auto_jail_check_queue: queue.Queue = queue.Queue()
 _scheduler_snapshot: list = []
 _sched: "Scheduler | None" = None
@@ -82,6 +83,7 @@ _stop_event = threading.Event()
 _pause_event = threading.Event()
 _reload_event = threading.Event()
 _cancel_snipe_event = threading.Event()
+_cancel_agg_event = threading.Event()
 _reload_requested_at: float = 0.0
 _RELOAD_DEBOUNCE = 2.0  # seconds
 _consume_queue: queue.Queue = queue.Queue()
@@ -166,6 +168,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             )
             sched.add(_earns_task_ref)
 
+    global _agg_task
+    _agg_task = None
     if c.get("aggravated_crimes", {}).get("enabled", False):
         ac = c["aggravated_crimes"]
         pri = ac.get("primary", {})
@@ -183,10 +187,12 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             torch_private=torch.get("torch_private", False),
             torch_payback_public=torch.get("torch_payback_public", "everyone"),
             torch_payback_private=torch.get("torch_payback_private", "everyone"),
+            separate_tab=ac.get("separate_tab", False),
         )
         agg_task.scheduler = sched
         sched.add(agg_task)
         sched.add(CSPunishmentTask())
+        _agg_task = agg_task
 
     action_cfg = c.get("action", {})
     if action_cfg.get("enabled", False):
@@ -490,10 +496,13 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Turn in warrant error: {e}")
 
-            # Travel requests
+            # Travel requests — a manual travel request always wins; finish the
+            # crime tab first so it isn't left running against a stale city.
             if not _travel_queue.empty():
                 try:
                     params = _travel_queue.get_nowait()
+                    if state.agg_tab_active and _agg_task is not None:
+                        _agg_task.stop_tab(state)
                     executor.execute(Action("travel", **params), state)
                 except Exception as e:
                     state.add_log(f"Travel error: {e}")
@@ -558,9 +567,13 @@ def _run(c: dict):
             if _stop_event.is_set():
                 break
 
-            # Reload config and rebuild scheduler if Save was pressed (debounced)
+            # Reload config and rebuild scheduler if Save was pressed (debounced).
+            # Rebuilding replaces the AggCrimeTask instance, so finish any tab run
+            # first — otherwise its page/generator would be orphaned.
             if _reload_event.is_set() and time.monotonic() - _reload_requested_at >= _RELOAD_DEBOUNCE:
                 _reload_event.clear()
+                if state.agg_tab_active and _agg_task is not None:
+                    _agg_task.stop_tab(state)
                 c = cfg.load()
                 sched = _build_scheduler(c, old_sched=sched)
                 _sched = sched
@@ -570,6 +583,9 @@ def _run(c: dict):
 
             if state.snipe_active and _snipe_task is not None:
                 _snipe_task.tick_snipe(state)
+
+            if state.agg_tab_active and _agg_task is not None:
+                _agg_task.tick_agg(state)
 
             _scheduler_snapshot = sched.snapshot(state)
 
@@ -664,6 +680,8 @@ def _run(c: dict):
         if state.snipe_active and _snipe_task is not None:
             _cancel_snipe_event.set()
             _snipe_task.tick_snipe(state)
+        if state.agg_tab_active and _agg_task is not None:
+            _agg_task.stop_tab(state)
         try:
             if state.logged_in and c.get("misc", {}).get("logout_on_stop", True):
                 state.add_log("Logging out...")
@@ -685,6 +703,7 @@ def start():
     _stop_event.clear()
     _pause_event.clear()
     _cancel_snipe_event.clear()
+    _cancel_agg_event.clear()
     c = cfg.load()
     _thread = threading.Thread(target=_run, args=(c,), daemon=True)
     _thread.start()
@@ -694,12 +713,17 @@ def stop():
     _stop_event.set()
     _pause_event.clear()
     _cancel_snipe_event.set()
+    _cancel_agg_event.set()
     from executor import reset_all_cooldowns
     reset_all_cooldowns()
 
 
 def cancel_snipe():
     _cancel_snipe_event.set()
+
+
+def cancel_agg_tab():
+    _cancel_agg_event.set()
 
 
 def start_snipe():

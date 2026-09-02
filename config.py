@@ -39,7 +39,8 @@ DEFAULT_CONFIG = {
         },
         "fallback_to_away": False,
         "target_young_only": False,
-        "young_age_threshold_hours": 24
+        "young_age_threshold_hours": 24,
+        "separate_tab": False
     },
     "action": {
         "enabled": True,

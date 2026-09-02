@@ -55,6 +55,8 @@ class GameState:
     snipe_top_job_pending: bool = False
     snipe_top_job_promo_url: str = ""
     snipe_active: bool = False
+    agg_tab_active: bool = False
+    agg_tab_crime: str = ""   # crime kind currently running on the agg-crimes tab, else ""
     in_jail: bool = False
     jail_rank: str = ""
     has_new_journals: bool = False

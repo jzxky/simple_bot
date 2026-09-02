@@ -37,6 +37,7 @@ def save_last_gym_use(ts: float):
 class GymTask(Task):
     priority = 55
     label = "Gym"
+    changes_city = True  # auto-travel path (config-gated); paused with the rest of the task while a crime tab is active
 
     def can_run(self, state: GameState) -> bool:
         if not state.logged_in or state.in_jail:
