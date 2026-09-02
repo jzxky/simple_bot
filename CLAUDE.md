@@ -2,9 +2,16 @@
 
 ## Git Push Workflow
 
-Before pushing to the feature branch (`claude/sleepy-pasteur-Beg5S`):
-1. Ask the user whether to bump the version (patch/minor/major/skip)
-2. If not skipping, update the `VERSION` file, commit it, then push
+Start every session by cutting the working branch from a freshly fetched `main`:
+`git fetch origin main && git checkout -B <branch> origin/main`. Reuse an
+existing branch only while its PR is still open — once merged, that branch is
+dead, so start a new one.
+
+Before pushing to the feature branch:
+1. Re-read `VERSION` from the refreshed `main`, not from whatever the branch
+   started at — a stale base leads to bumping to a version `main` already used
+2. Ask the user whether to bump the version (patch/minor/major/skip)
+3. If not skipping, update the `VERSION` file, commit it, then push
 
 After every `git push` to the feature branch, automatically:
 1. Create a pull request from the pushed branch into `main` using `mcp__github__create_pull_request`
