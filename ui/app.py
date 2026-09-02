@@ -312,6 +312,8 @@ def _apply_payload(c: dict, data: dict) -> dict:
         c["case_work"]["hospital"]["tasks"] = data["hospital_tasks"]
     c["case_work"].setdefault("fire", {})
     c["case_work"]["fire"]["poll_interval"] = max(31, int(data.get("fire_poll_interval", 31)))
+    if data.get("fire_tasks"):
+        c["case_work"]["fire"]["tasks"] = data["fire_tasks"]
     c["case_work"].setdefault("engineering", {})
     c["case_work"]["engineering"]["poll_interval"] = max(31, int(data.get("engineering_poll_interval", 31)))
     c["case_work"].setdefault("banking", {})

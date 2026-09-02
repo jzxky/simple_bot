@@ -399,7 +399,37 @@
                 oninput="markNumDirty(this)">
               seconds
             </div>
-            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 0">Attends active fires and performs building inspections automatically when the case timer is ready.</p>
+            <table class="priority-table" id="fire-priority-table">
+              <thead>
+                <tr><th></th><th>#</th><th>Task</th><th>Enabled</th></tr>
+              </thead>
+              <tbody id="fire-priority-body">
+                {% set FIRE_META = {
+                  'fires':          'Attend Fires',
+                  'investigations': 'Police Investigations',
+                  'inspections':    'Building Inspections',
+                } %}
+                {% set fire_tasks = config.get('case_work', {}).get('fire', {}).get('tasks', [
+                  {'type':'fires',          'enabled':true},
+                  {'type':'investigations', 'enabled':true},
+                  {'type':'inspections',    'enabled':true},
+                ]) %}
+                {% for task in fire_tasks %}
+                <tr data-type="{{ task.type }}">
+                  <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
+                  <td class="priority-num">{{ loop.index }}</td>
+                  <td>{{ FIRE_META.get(task.type, task.type) }}</td>
+                  <td>
+                    <label class="toggle-label" style="justify-content:flex-start">
+                      <input type="checkbox" id="cw_fire_{{ task.type }}_enabled" {% if task.get('enabled', true) %}checked{% endif %} onchange="autoSave()">
+                      <span class="toggle"></span>
+                    </label>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 0">Attends active fires, performs police investigations and building inspections when the case timer is ready. Fires and investigations are read from the same page in one visit; the highest enabled priority that has work available is done first.</p>
           </div>
 
           <!-- Engineering -->
