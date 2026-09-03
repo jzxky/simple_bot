@@ -286,6 +286,7 @@ function _buildPayload() {
     away_action_enabled: document.getElementById("action_enabled").checked,
     away_action_type: document.getElementById("away_action_type").value,
     fallback_to_away: document.getElementById("fallback_to_away").checked,
+    agg_separate_tab: (document.getElementById("agg_separate_tab")||{checked:false}).checked,
     target_young_only: (document.getElementById("target_young_only")||{checked:false}).checked,
     young_age_threshold_hours: (document.getElementById("young_age_threshold_hours")||{value:24}).value,
     payback_mode: document.getElementById("payback_mode").value,
@@ -899,6 +900,12 @@ function startSnipe() {
   fetch("/start-snipe", {method: "POST"}).catch(() => {});
 }
 
+function cancelAggTab() {
+  fetch("/cancel-agg-tab", {method: "POST"}).catch(() => {});
+  const btn = document.getElementById("cancel-agg-btn");
+  if (btn) btn.style.display = "none";
+}
+
 function toggleBot() {
   if (_botRunning) {
     // Stop is queued on the bot thread — don't change UI now; let pollStatus
@@ -980,6 +987,12 @@ function pollStatus() {
 
       const cancelBtn = document.getElementById("cancel-snipe-btn");
       if (cancelBtn) cancelBtn.style.display = (d.running && !d.paused && (d.snipe_active || d.current_task === "Snipe Top Job")) ? "inline-block" : "none";
+
+      const cancelAggBtn = document.getElementById("cancel-agg-btn");
+      if (cancelAggBtn) {
+        cancelAggBtn.style.display = (d.running && !d.paused && d.agg_tab_active) ? "inline-block" : "none";
+        cancelAggBtn.title = d.agg_tab_crime ? `Stop the '${d.agg_tab_crime}' crime tab` : "Stop the crime tab";
+      }
 
       // Only uncheck earns if the bot just disabled it (true→false transition)
       if (d.earns_enabled != null) {

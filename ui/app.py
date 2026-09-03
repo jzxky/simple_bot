@@ -145,6 +145,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["aggravated_crimes"]["torch"]["torch_payback_public"] = data.get("torch_payback_public", "everyone")
     c["aggravated_crimes"]["torch"]["torch_payback_private"] = data.get("torch_payback_private", "everyone")
     c["aggravated_crimes"]["fallback_to_away"] = data.get("fallback_to_away", False)
+    c["aggravated_crimes"]["separate_tab"] = data.get("agg_separate_tab", False)
     c["aggravated_crimes"]["target_young_only"] = data.get("target_young_only", False)
     try:
         _young_hours = float(data.get("young_age_threshold_hours", 24) or 24)
@@ -505,6 +506,12 @@ def start_snipe():
     return jsonify({"ok": True})
 
 
+@app.route("/cancel-agg-tab", methods=["POST"])
+def cancel_agg_tab():
+    bot.cancel_agg_tab()
+    return jsonify({"ok": True})
+
+
 @app.route("/banklaunder/bulk_add", methods=["POST"])
 def banklaunder_bulk_add():
     if not bot.is_running():
@@ -759,6 +766,8 @@ def status():
         "earn_mode": cfg.load().get("earns", {}).get("earn_mode", "auto"),
         "current_task": s.current_task,
         "snipe_active": s.snipe_active,
+        "agg_tab_active": s.agg_tab_active,
+        "agg_tab_crime": s.agg_tab_crime,
         "in_jail": s.in_jail,
         "jail_rank": s.jail_rank,
         "jail_consumables": s.jail_consumables,

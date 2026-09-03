@@ -98,6 +98,7 @@ class LawyerCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Lawyer"}
     HOME_CITY_ONLY = False
     USES_CASE_TIMER = True
+    changes_city = True  # auto-travel path (config-gated); paused with the rest of the task while a crime tab is active
 
     def __init__(self, poll_interval: int = 31):
         super().__init__(poll_interval)

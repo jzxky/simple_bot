@@ -186,10 +186,28 @@ def _match_public_business(name: str, public_set) -> "str | None":
     return None
 
 
+def _preserve_timers_if_secondary(state: GameState, fn):
+    """Run `fn()` (a parse_state call), guarding state.timers (and the fields
+    derived from it) against being wiped to empty by a page that doesn't
+    happen to render #user_timers_holder — but only while a secondary tab
+    (e.g. the aggravated-crimes tab) is driving page()/navigate(). Those
+    fields describe an account-wide resource other tasks on the main tab
+    depend on, so a transient miss on the secondary tab's own page shouldn't
+    blank it out from under them; the main tab's own next navigation will
+    naturally refresh it with accurate data regardless."""
+    if not browser.is_secondary_page_active():
+        fn()
+        return
+    prev = (state.timers, state.action_timer_ready, state.action_timer_end, state.agg_pro_end)
+    fn()
+    if not state.timers and prev[0]:
+        state.timers, state.action_timer_ready, state.action_timer_end, state.agg_pro_end = prev
+
+
 def _refresh_state(state: GameState):
     html = browser.page().content()
     url = browser.current_url()
-    parse_state(html, url, state)
+    _preserve_timers_if_secondary(state, lambda: parse_state(html, url, state))
 
 
 def _dbg(state: GameState, msg: str):
@@ -201,7 +219,8 @@ def _dbg(state: GameState, msg: str):
 def _nav(url: str, state: GameState):
     _dbg(state, f"→ {url}")
     html = browser.navigate(url)
-    parse_state(html, browser.current_url(), state)
+    cur_url = browser.current_url()
+    _preserve_timers_if_secondary(state, lambda: parse_state(html, cur_url, state))
 
 
 def _check_session(state: GameState) -> bool:
@@ -1300,7 +1319,15 @@ _MOBILE_UA = (
 
 
 def handle_breaking_entering(action: Action, state: GameState):
-    """Breaking & Entering — uses mobile UA so the dropdown form is served."""
+    """Breaking & Entering — drains _breaking_entering_steps() to completion."""
+    for _ in _breaking_entering_steps(action, state):
+        pass
+
+
+def _breaking_entering_steps(action: Action, state: GameState):
+    """Generator form of Breaking & Entering — yields once per dropdown target so a
+    driver (see tasks/agg_crimes.py) can interleave other work between attempts.
+    Uses mobile UA so the dropdown form is served."""
     threshold = action.params.get("threshold", 0)
     page = browser.page()
 
@@ -1412,7 +1439,10 @@ def handle_breaking_entering(action: Action, state: GameState):
 
                 # Soft fail (no apartment, recently survived, etc.) — go back, next target
                 page.go_back(wait_until="domcontentloaded")
+                yield
                 continue
+
+            yield
 
         _flush_fails()
         state._agg_targets_exhausted = True
@@ -1422,9 +1452,18 @@ def handle_breaking_entering(action: Action, state: GameState):
 
 
 def handle_do_crime(action: Action, state: GameState):
+    """Target-list aggravated crimes (pickpocket/mugging/hack/breaking) — drains
+    _do_crime_steps() to completion."""
+    for _ in _do_crime_steps(action, state):
+        pass
+
+
+def _do_crime_steps(action: Action, state: GameState):
+    """Generator form — yields once per target so a driver (see
+    tasks/agg_crimes.py) can interleave other work between attempts."""
     crime = action.params["crime"]
     if crime == "breaking":
-        handle_breaking_entering(action, state)
+        yield from _breaking_entering_steps(action, state)
         return
 
     threshold = action.params.get("threshold", 0)
@@ -1468,6 +1507,7 @@ def handle_do_crime(action: Action, state: GameState):
 
     for player in targets:
         if player in failed_transfers:
+            yield
             continue
 
         if threshold and state.energy < threshold:
@@ -1508,8 +1548,10 @@ def handle_do_crime(action: Action, state: GameState):
                 state.record_agg_fail()
             fail_counts[fail_msg] = fail_counts.get(fail_msg, 0) + 1
             if "weapon" in fail_msg.lower():
+                yield
                 continue
             if crime == "hack" and "increased security" in fail_msg.lower():
+                yield
                 continue
             if crime == "hack" and "no money in their account" in fail_msg.lower():
                 state.add_log(f"No money in {player}'s account — sending $1 to unlock, then retrying.")
@@ -1525,6 +1567,7 @@ def handle_do_crime(action: Action, state: GameState):
                         _flush_fails()
                         state.add_log("Could not return to crime page. Aborting.")
                         return
+                    yield
                     continue
                 if not _nav_to_target_input(crime, state):
                     _flush_fails()
@@ -1551,14 +1594,19 @@ def handle_do_crime(action: Action, state: GameState):
                 if retry_fail:
                     retry_msg = retry_fail.get_text(strip=True)
                     fail_counts[retry_msg] = fail_counts.get(retry_msg, 0) + 1
+                yield
                 continue
             if crime in ("pickpocket", "mugging", "breaking") and "recently survived" in fail_msg.lower():
+                yield
                 continue
             if "doesn't exist" in fail_msg.lower() or "does not exist" in fail_msg.lower():
+                yield
                 continue
             _flush_fails()
             _nav(_u("/loggedin.asp?display=play"), state)
             return
+
+        yield
 
     _flush_fails()
     state._agg_targets_exhausted = True
@@ -2358,6 +2406,15 @@ def _get_private_business_owner(business_name: str, state: GameState) -> "str | 
 
 
 def handle_armed_robbery(action: Action, state: GameState):
+    """Drains _armed_robbery_steps() to completion — unchanged inline behaviour."""
+    for _ in _armed_robbery_steps(action, state):
+        pass
+
+
+def _armed_robbery_steps(action: Action, state: GameState):
+    """Generator form — yields once per retry attempt so a driver (see
+    tasks/agg_crimes.py) can interleave other work between attempts instead of
+    blocking for the whole run."""
     agg_private = action.params.get("agg_private", False)
     agg_drug_house = action.params.get("agg_drug_house", False)
     threshold = action.params.get("threshold", 0)
@@ -2469,6 +2526,8 @@ def handle_armed_robbery(action: Action, state: GameState):
                 _nav(_u("/loggedin.asp?display=play"), state)
                 return
 
+            yield
+
         # retries exhausted — check if another task needs to run
         state.add_log(f"Armed robbery: no valid target after {ARMED_MAX_RETRIES} attempts (pass {pass_num}). Checking task queue...")
         if check_other_tasks and check_other_tasks():
@@ -2476,9 +2535,19 @@ def handle_armed_robbery(action: Action, state: GameState):
             _nav(_u("/loggedin.asp?display=play"), state)
             return
         state.add_log("No other tasks pending — retrying armed robbery.")
+        yield
 
 
 def handle_torch_business(action: Action, state: GameState):
+    """Drains _torch_business_steps() to completion — unchanged inline behaviour."""
+    for _ in _torch_business_steps(action, state):
+        pass
+
+
+def _torch_business_steps(action: Action, state: GameState):
+    """Generator form — yields once per retry attempt so a driver (see
+    tasks/agg_crimes.py) can interleave other work between attempts instead of
+    blocking for the whole run."""
     torch_private = action.params.get("torch_private", False)
     torch_payback_public = action.params.get("torch_payback_public", "everyone")
     torch_payback_private = action.params.get("torch_payback_private", "everyone")
@@ -2587,12 +2656,15 @@ def handle_torch_business(action: Action, state: GameState):
                 _nav(_u("/loggedin.asp?display=play"), state)
                 return
 
+            yield
+
         state.add_log(f"Torch business: no valid target after {ARMED_MAX_RETRIES} attempts (pass {pass_num}). Checking task queue...")
         if check_other_tasks and check_other_tasks():
             state.add_log("Another task is ready — yielding torch business.")
             _nav(_u("/loggedin.asp?display=play"), state)
             return
         state.add_log("No other tasks pending — retrying torch business.")
+        yield
 
 
 def handle_drug_manufacturing(action: Action, state: GameState):
