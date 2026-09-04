@@ -148,6 +148,23 @@ def _transfer_state(old_sched: Scheduler, new_sched: Scheduler):
                 setattr(new_task, attr, getattr(old, attr))
 
 
+def _restart_browser(state: GameState, c: dict) -> bool:
+    """Tear down and relaunch the browser after the driver or browser died.
+    Returns True if the new browser came up."""
+    state.logged_in = False
+    state.agg_tab_active = False
+    state.snipe_active = False
+    try:
+        browser.stop()
+        browser.start(headless=c.get("misc", {}).get("headless", False))
+        state.add_log("Browser restarted — will re-login on next tick.")
+        return True
+    except Exception as e:
+        state.add_log(f"Browser restart failed: {e}")
+        state.last_error = str(e)
+        return False
+
+
 def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched = Scheduler()
 
@@ -579,13 +596,24 @@ def _run(c: dict):
                 _sched = sched
                 state.add_log("Config reloaded.")
 
-            sched.tick(state, executor)
+            try:
+                sched.tick(state, executor)
 
-            if state.snipe_active and _snipe_task is not None:
-                _snipe_task.tick_snipe(state)
+                if state.snipe_active and _snipe_task is not None:
+                    _snipe_task.tick_snipe(state)
 
-            if state.agg_tab_active and _agg_task is not None:
-                _agg_task.tick_agg(state)
+                if state.agg_tab_active and _agg_task is not None:
+                    _agg_task.tick_agg(state)
+            except Exception as tick_err:
+                # Task code that talks to the browser outside executor.execute()
+                # has no recovery of its own — a dead driver here would otherwise
+                # end the whole run.
+                if not browser.is_lost_error(tick_err):
+                    raise
+                state.add_log(f"Browser lost during tick: {tick_err} — restarting browser.")
+                if not _restart_browser(state, c):
+                    # Don't spin on a machine that can't launch Chrome right now.
+                    time.sleep(30)
 
             _scheduler_snapshot = sched.snapshot(state)
 

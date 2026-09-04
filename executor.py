@@ -6087,14 +6087,16 @@ class ActionExecutor:
                     state.add_log(f"Error executing {action.kind}: {e}")
 
                 # Recovery — get the browser back to a known safe page
-                if "Page crashed" in err or "has been closed" in err or "ERR_INSUFFICIENT_RESOURCES" in err:
+                if browser.is_lost_error(err):
                     state.add_log("Browser/page lost — restarting browser.")
+                    # Whatever the browser was mid-way through is gone with it.
+                    state.logged_in = False
+                    state.agg_tab_active = False
                     try:
                         headless = cfg.load().get("misc", {}).get("headless", False)
                         browser.stop()
                         browser.start(headless=headless)
                         state.add_log("Browser restarted — will re-login on next tick.")
-                        state.logged_in = False
                     except Exception as restart_err:
                         state.add_log(f"Browser restart failed: {restart_err}")
                 elif any(kw in err for kw in ("Timeout", "interrupted by another navigation", "net::", "ERR_")):
@@ -6111,5 +6113,15 @@ class ActionExecutor:
                     except Exception as rec_err:
                         state.add_log(f"Recovery navigation failed: {rec_err} — marking as logged out.")
                         state.logged_in = False
+                        if browser.is_lost_error(rec_err):
+                            state.add_log("Browser lost during recovery — restarting browser.")
+                            state.agg_tab_active = False
+                            try:
+                                headless = cfg.load().get("misc", {}).get("headless", False)
+                                browser.stop()
+                                browser.start(headless=headless)
+                                state.add_log("Browser restarted — will re-login on next tick.")
+                            except Exception as restart_err:
+                                state.add_log(f"Browser restart failed: {restart_err}")
         else:
             state.add_log(f"No handler for action: {action.kind}")

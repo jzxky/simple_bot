@@ -78,19 +78,55 @@ def start(headless: bool = False):
 
 
 def stop():
-    global _playwright, _context, _page
+    """Tear the browser down. Each step is isolated so a dead driver (where
+    closing the page/context raises) still lets us stop playwright itself —
+    otherwise the node driver process leaks and the next start() piles another
+    one on top."""
+    global _playwright, _context, _page, _active_page
+    for label, fn in (
+        ("page.close", lambda: _page and _page.close()),
+        ("context.close", lambda: _context and _context.close()),
+        ("playwright.stop", lambda: _playwright and _playwright.stop()),
+    ):
+        try:
+            fn()
+        except Exception as e:
+            print(f"[browser] Error during stop ({label}): {e}")
+    _page = _context = _playwright = _active_page = None
+    print("[browser] Browser stopped.")
+
+
+# Substrings that mean the browser, its page, or the patchright driver process
+# is gone and nothing short of a full restart will recover it.
+BROWSER_LOST_MARKERS = (
+    "Connection closed while reading from the driver",
+    "Target page, context or browser has been closed",
+    "Browser has been closed",
+    "Page crashed",
+    "Target crashed",
+    "has been closed",
+    "ERR_INSUFFICIENT_RESOURCES",
+)
+
+
+def is_lost_error(err) -> bool:
+    """True when an exception (or its message) indicates a dead browser/driver."""
+    text = err if isinstance(err, str) else str(err)
+    return any(marker in text for marker in BROWSER_LOST_MARKERS)
+
+
+def is_alive() -> bool:
+    """Cheap round-trip to the driver. False when the browser or driver died."""
+    pg = page()
+    if pg is None or _context is None:
+        return False
     try:
-        if _page:
-            _page.close()
-        if _context:
-            _context.close()
-        if _playwright:
-            _playwright.stop()
-    except Exception as e:
-        print(f"[browser] Error during stop: {e}")
-    finally:
-        _page = _context = _playwright = None
-        print("[browser] Browser stopped.")
+        if pg.is_closed():
+            return False
+        _ = pg.url
+        return True
+    except Exception:
+        return False
 
 
 def page() -> Page:
