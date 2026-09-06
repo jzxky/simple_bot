@@ -359,6 +359,15 @@ function _buildPayload() {
     autobuy_qty_heroin:      parseInt((document.getElementById("autobuy_qty_heroin")||{value:0}).value)||0,
     autobuy_price_cocaine:   parseInt((document.getElementById("autobuy_price_cocaine")||{value:0}).value)||0,
     autobuy_qty_cocaine:     parseInt((document.getElementById("autobuy_qty_cocaine")||{value:0}).value)||0,
+    middling_enabled: (document.getElementById("middling_enabled")||{checked:false}).checked,
+    middling_max_on_hand: parseInt((document.getElementById("middling_max_on_hand")||{value:500}).value)||500,
+    middling_price_marijuana: parseInt((document.getElementById("middling_price_marijuana")||{value:0}).value)||0,
+    middling_price_ecstasy:   parseInt((document.getElementById("middling_price_ecstasy")||{value:0}).value)||0,
+    middling_price_acid:      parseInt((document.getElementById("middling_price_acid")||{value:0}).value)||0,
+    middling_price_speed:     parseInt((document.getElementById("middling_price_speed")||{value:0}).value)||0,
+    middling_price_ice:       parseInt((document.getElementById("middling_price_ice")||{value:0}).value)||0,
+    middling_price_heroin:    parseInt((document.getElementById("middling_price_heroin")||{value:0}).value)||0,
+    middling_price_cocaine:   parseInt((document.getElementById("middling_price_cocaine")||{value:0}).value)||0,
     bionics_enabled: (document.getElementById("bionics_enabled")||{checked:false}).checked,
     bionics_wanted_items: ["arms","legs","eyes","brain","heart"].filter(i => (document.getElementById("bionics_want_"+i)||{checked:false}).checked),
     bionics_priority_order: _serializePriorityItems("bionics-priority-body"),
@@ -548,6 +557,83 @@ function markNumDirty(el) {
 
 function autobuyMarkDirty() {
   debouncedSave();
+}
+
+// ── Middling manual trade ────────────────────────────────────────────────────
+
+var _middlingContactId = "";
+
+function middlingLoadStock() {
+  var name = document.getElementById("middling_contact_name").value.trim();
+  if (!name) return;
+  fetch("/middling/load-stock", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({contact: name})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.error) { alert(d.error); return; }
+    _middlingContactId = d.contact_id || "";
+    var tbody = document.querySelector("#middling-stock-table tbody");
+    tbody.innerHTML = "";
+    (d.stock || []).forEach(function(item) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + item.name + "</td><td>$" + (item.price||0).toLocaleString() + "</td>" +
+        "<td>" + (item.available||0) + "</td>" +
+        "<td><input type='number' class='input-narrow' min='0' max='" + (item.available||0) +
+        "' value='0' data-field='" + item.buy_field + "'></td>";
+      tbody.appendChild(tr);
+    });
+    document.getElementById("middling-stock-area").style.display = "";
+    document.getElementById("middling-buy-result").textContent = "";
+  });
+}
+
+function middlingBuy() {
+  if (!_middlingContactId) { alert("Load stock first."); return; }
+  var quantities = {};
+  document.querySelectorAll("#middling-stock-table tbody input[data-field]").forEach(function(inp) {
+    var qty = parseInt(inp.value) || 0;
+    if (qty > 0) quantities[inp.dataset.field] = qty;
+  });
+  if (!Object.keys(quantities).length) { alert("Enter quantities to buy."); return; }
+  fetch("/middling/buy", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({contact_id: _middlingContactId, quantities: quantities})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    document.getElementById("middling-buy-result").textContent = d.message || d.error || "Done";
+  });
+}
+
+function middlingLoadSell() {
+  fetch("/middling/load-sell", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.error) { alert(d.error); return; }
+    var carrying = d.carrying || {};
+    ["marijuana","ecstasy","acid","speed","ice","heroin","cocaine"].forEach(function(k) {
+      var el = document.getElementById("middling-carry-" + k);
+      if (el) el.textContent = carrying[k] || 0;
+    });
+  });
+}
+
+function middlingSell() {
+  var buyer = document.getElementById("middling_sell_to").value.trim();
+  var price = parseInt(document.getElementById("middling_sell_price").value) || 0;
+  if (!buyer) { alert("Enter a buyer name."); return; }
+  if (!price) { alert("Enter a price."); return; }
+  var quantities = {};
+  ["marijuana","ecstasy","acid","speed","ice","heroin","cocaine"].forEach(function(k) {
+    var qty = parseInt((document.getElementById("middling_sell_" + k)||{value:0}).value) || 0;
+    if (qty > 0) quantities[k] = qty;
+  });
+  if (!Object.keys(quantities).length) { alert("Enter quantities to sell."); return; }
+  fetch("/middling/sell", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({buyer: buyer, price: price, quantities: quantities})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    document.getElementById("middling-sell-result").textContent = d.message || d.error || "Done";
+  });
 }
 
 // ── Collapse ──────────────────────────────────────────────────────────────────

@@ -267,6 +267,19 @@ DEFAULT_CONFIG = {
     "communications": {
         "enabled": False
     },
+    "middling": {
+        "enabled": False,
+        "max_on_hand": 500,
+        "prices": {
+            "marijuana": 500,
+            "ecstasy": 6000,
+            "acid": 2000,
+            "speed": 3000,
+            "ice": 3500,
+            "heroin": 5000,
+            "cocaine": 5000,
+        }
+    },
     "notifications": {
         "bionics_in_stock":        True,
         "bionics_purchased":       True,

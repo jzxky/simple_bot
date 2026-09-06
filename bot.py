@@ -46,6 +46,7 @@ from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJail
 from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask, AutoJailConsumablesRestoreTask
 from tasks.journal import JournalCheckTask, ArchiveJournalsTask, JournalActionTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue, set_journal_action_queue
 from tasks.communications import CommsCheckTask, CommsSendTask, CommsArchiveTask, set_comms_send_queue, set_comms_archive_queue
+from tasks.middling import MiddlingTask, set_middling_queue
 from tasks.drug_trade import DrugTradeTask
 from tasks.blind_eye import BlindEyeTask
 from tasks.illness import IllnessTask
@@ -101,6 +102,8 @@ _comms_send_queue: queue.Queue = queue.Queue()
 _comms_archive_queue: queue.Queue = queue.Queue()
 set_comms_send_queue(_comms_send_queue)
 set_comms_archive_queue(_comms_archive_queue)
+_middling_queue: queue.Queue = queue.Queue()
+set_middling_queue(_middling_queue)
 _drug_trade_queue: queue.Queue = queue.Queue()
 set_drug_trade_queue(_drug_trade_queue)
 _illness_queue: queue.Queue = queue.Queue()
@@ -279,6 +282,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(CommsCheckTask())
     sched.add(CommsSendTask(_comms_send_queue))
     sched.add(CommsArchiveTask(_comms_archive_queue))
+    sched.add(MiddlingTask(_middling_queue))
     sched.add(DrugTradeTask(_drug_trade_queue))
     sched.add(BlindEyeTask())
     sched.add(IllnessTask(_illness_queue))
