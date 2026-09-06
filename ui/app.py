@@ -251,6 +251,15 @@ def _apply_payload(c: dict, data: dict) -> dict:
         if f"autobuy_qty_{key}" in data:
             c["autobuy"]["drugs"][key]["max_qty"] = int(data[f"autobuy_qty_{key}"])
 
+    c.setdefault("middling", {})
+    c["middling"]["enabled"] = data.get("middling_enabled", False)
+    c["middling"]["max_on_hand"] = int(data.get("middling_max_on_hand", 500) or 500)
+    c["middling"].setdefault("prices", {})
+    _MID_DRUGS = ["marijuana", "ecstasy", "acid", "speed", "ice", "heroin", "cocaine"]
+    for key in _MID_DRUGS:
+        if f"middling_price_{key}" in data:
+            c["middling"]["prices"][key] = int(data[f"middling_price_{key}"])
+
     c.setdefault("gym", {})
     c["gym"]["enabled"] = data.get("gym_enabled", False)
     c["gym"]["activity"] = data.get("gym_activity", "weights")
@@ -1099,6 +1108,103 @@ def _validate_player(name: str) -> tuple[bool, str]:
     if not row["active"]:
         return False, f"Player '{name}' is not active (dead or inactive)."
     return True, "OK"
+
+
+@app.route("/middling/load-stock", methods=["POST"])
+def middling_load_stock():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    data = request.get_json(silent=True) or {}
+    contact = data.get("contact", "").strip()
+    if not contact:
+        return jsonify({"error": "No contact name provided."}), 400
+    import queue as _q
+    result_q = _q.Queue()
+    bot._middling_queue.put({
+        "action": "middling_load_stock",
+        "contact": contact,
+        "_result_queue": result_q,
+    })
+    try:
+        result = result_q.get(timeout=30)
+    except _q.Empty:
+        return jsonify({"error": "Timed out waiting for stock data."}), 504
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/middling/buy", methods=["POST"])
+def middling_buy():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    data = request.get_json(silent=True) or {}
+    contact_id = data.get("contact_id", "")
+    quantities = data.get("quantities", {})
+    if not contact_id or not quantities:
+        return jsonify({"error": "Missing contact_id or quantities."}), 400
+    import queue as _q
+    result_q = _q.Queue()
+    bot._middling_queue.put({
+        "action": "middling_buy",
+        "contact_id": contact_id,
+        "quantities": quantities,
+        "_result_queue": result_q,
+    })
+    try:
+        result = result_q.get(timeout=30)
+    except _q.Empty:
+        return jsonify({"error": "Timed out waiting for buy result."}), 504
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/middling/load-sell", methods=["POST"])
+def middling_load_sell():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    import queue as _q
+    result_q = _q.Queue()
+    bot._middling_queue.put({
+        "action": "middling_load_sell",
+        "_result_queue": result_q,
+    })
+    try:
+        result = result_q.get(timeout=30)
+    except _q.Empty:
+        return jsonify({"error": "Timed out waiting for sell page data."}), 504
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/middling/sell", methods=["POST"])
+def middling_sell():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    data = request.get_json(silent=True) or {}
+    buyer = data.get("buyer", "").strip()
+    price = data.get("price", 0)
+    quantities = data.get("quantities", {})
+    if not buyer or not price:
+        return jsonify({"error": "Missing buyer or price."}), 400
+    import queue as _q
+    result_q = _q.Queue()
+    bot._middling_queue.put({
+        "action": "middling_sell",
+        "buyer": buyer,
+        "price": int(price),
+        "quantities": quantities,
+        "_result_queue": result_q,
+    })
+    try:
+        result = result_q.get(timeout=30)
+    except _q.Empty:
+        return jsonify({"error": "Timed out waiting for sell result."}), 504
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
 
 
 @app.route("/character_history")

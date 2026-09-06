@@ -170,6 +170,7 @@
           <button class="tab-btn" id="income-tab-banking" onclick="showTab('income-banking', this)">Banking</button>
           <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)">Jail</button>
           <button class="tab-btn" onclick="showTab('income-skills', this)">Skills</button>
+          <button class="tab-btn" onclick="showTab('income-drugs', this)">Drugs</button>
         </div>
         <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
         <div id="income-jail" class="tab-panel">
@@ -761,6 +762,97 @@
               </div>
               <p class="placeholder">Iterates through players in the selected group, checking respect level for the player with the oldest check.</p>
             </div>
+          </div>
+        </div>
+
+        <!-- Drugs (Middling) tab -->
+        <div id="income-drugs" class="tab-panel">
+          {% set mid_cfg = config.get('middling', {}) %}
+          {% set mid_prices = mid_cfg.get('prices', {}) %}
+          <div class="settings-groups">
+
+            <div class="settings-group" style="grid-column:1/-1">
+              <h3>Drug Middling</h3>
+              <label class="inline-toggle setting-row">
+                Enable Middling
+                <label class="toggle-label">
+                  <input type="checkbox" id="middling_enabled"
+                    {% if mid_cfg.get('enabled') %}checked{% endif %}
+                    onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <p class="placeholder">Rank required: Piciotto, Enforcer, Dealer, or Giovane D'Honore. Responds to <code>!middle [runner] [buyer]</code> commands via in-game comms.</p>
+
+              <div class="setting-row">
+                <label for="middling_max_on_hand">Max drugs on hand</label>
+                <input type="number" id="middling_max_on_hand" class="input-narrow" min="0"
+                  value="{{ mid_cfg.get('max_on_hand', 500) }}" oninput="markNumDirty(this)">
+              </div>
+
+              <h4 style="margin-top:12px">Accepted Buy Prices (max price per unit)</h4>
+              <table class="stat-table" style="max-width:340px">
+                <thead><tr><th>Drug</th><th>Max Price</th></tr></thead>
+                <tbody>
+                  <tr><td>Marijuana</td><td><input type="number" id="middling_price_marijuana" class="input-narrow" min="0" value="{{ mid_prices.get('marijuana', 500) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Ecstasy</td><td><input type="number" id="middling_price_ecstasy" class="input-narrow" min="0" value="{{ mid_prices.get('ecstasy', 6000) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Acid</td><td><input type="number" id="middling_price_acid" class="input-narrow" min="0" value="{{ mid_prices.get('acid', 2000) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Speed</td><td><input type="number" id="middling_price_speed" class="input-narrow" min="0" value="{{ mid_prices.get('speed', 3000) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>P / ICE</td><td><input type="number" id="middling_price_ice" class="input-narrow" min="0" value="{{ mid_prices.get('ice', 3500) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Heroin</td><td><input type="number" id="middling_price_heroin" class="input-narrow" min="0" value="{{ mid_prices.get('heroin', 5000) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Cocaine</td><td><input type="number" id="middling_price_cocaine" class="input-narrow" min="0" value="{{ mid_prices.get('cocaine', 5000) }}" oninput="markNumDirty(this)"></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="settings-group" style="grid-column:1/-1">
+              <h3>Manual Drug Trade</h3>
+
+              <h4>Buy from Contact</h4>
+              <div class="setting-row">
+                <label for="middling_contact_name">Contact name</label>
+                <input type="text" id="middling_contact_name" class="input-wide" placeholder="Enter contact name">
+                <button class="btn btn-sm" onclick="middlingLoadStock()">Load Stock</button>
+              </div>
+              <div id="middling-stock-area" style="display:none; margin-top:8px">
+                <table class="stat-table" id="middling-stock-table" style="max-width:500px">
+                  <thead><tr><th>Drug</th><th>Price</th><th>Available</th><th>Buy Qty</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+                <button class="btn btn-sm" style="margin-top:6px" onclick="middlingBuy()">Buy</button>
+                <span id="middling-buy-result" style="margin-left:8px"></span>
+              </div>
+
+              <hr class="stat-divider" style="margin:16px 0">
+
+              <h4>Sell to Player</h4>
+              <button class="btn btn-sm" style="margin-bottom:8px" onclick="middlingLoadSell()">Load Carrying</button>
+              <div class="setting-row">
+                <label for="middling_sell_to">Sell to</label>
+                <input type="text" id="middling_sell_to" class="input-wide" placeholder="Player name">
+              </div>
+              <div class="setting-row">
+                <label for="middling_sell_price">Price</label>
+                <input type="number" id="middling_sell_price" class="input-narrow" min="0" value="0">
+              </div>
+              <div id="middling-sell-area" style="margin-top:8px">
+                <table class="stat-table" id="middling-sell-table" style="max-width:440px">
+                  <thead><tr><th>Drug</th><th>Carrying</th><th>Sell Qty</th></tr></thead>
+                  <tbody>
+                    <tr><td>Marijuana</td><td id="middling-carry-marijuana">0</td><td><input type="number" class="input-narrow" id="middling_sell_marijuana" min="0" value="0"></td></tr>
+                    <tr><td>Ecstasy</td><td id="middling-carry-ecstasy">0</td><td><input type="number" class="input-narrow" id="middling_sell_ecstasy" min="0" value="0"></td></tr>
+                    <tr><td>Acid</td><td id="middling-carry-acid">0</td><td><input type="number" class="input-narrow" id="middling_sell_acid" min="0" value="0"></td></tr>
+                    <tr><td>Speed</td><td id="middling-carry-speed">0</td><td><input type="number" class="input-narrow" id="middling_sell_speed" min="0" value="0"></td></tr>
+                    <tr><td>P / ICE</td><td id="middling-carry-ice">0</td><td><input type="number" class="input-narrow" id="middling_sell_ice" min="0" value="0"></td></tr>
+                    <tr><td>Heroin</td><td id="middling-carry-heroin">0</td><td><input type="number" class="input-narrow" id="middling_sell_heroin" min="0" value="0"></td></tr>
+                    <tr><td>Cocaine</td><td id="middling-carry-cocaine">0</td><td><input type="number" class="input-narrow" id="middling_sell_cocaine" min="0" value="0"></td></tr>
+                  </tbody>
+                </table>
+                <button class="btn btn-sm" style="margin-top:6px" onclick="middlingSell()">Offer Deal</button>
+                <span id="middling-sell-result" style="margin-left:8px"></span>
+              </div>
+            </div>
+
           </div>
         </div>
 

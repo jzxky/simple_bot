@@ -4152,6 +4152,416 @@ def handle_check_drug_trade(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
+# Drug middling handler
+# ---------------------------------------------------------------------------
+
+_MIDDLING_DRUGS = [
+    {"name": "Marijuana",  "buy_field": "qtyMarijuana", "sell_field": "smarijuana",  "key": "marijuana"},
+    {"name": "Ecstasy",    "buy_field": "qtyEcstasy",   "sell_field": "secstasy",    "key": "ecstasy"},
+    {"name": "Acid",       "buy_field": "qtyAcid",       "sell_field": "sacid",       "key": "acid"},
+    {"name": "Speed",      "buy_field": "qtySpeed",      "sell_field": "sspeed",      "key": "speed"},
+    {"name": "P / ICE",    "buy_field": "qtyICE",        "sell_field": "sP",          "key": "ice"},
+    {"name": "Heroin",     "buy_field": "qtyHeroin",     "sell_field": "sheroin",     "key": "heroin"},
+    {"name": "Cocaine",    "buy_field": "qtyCocaine",    "sell_field": "scocaine",    "key": "cocaine"},
+]
+
+
+def _parse_middling_drug_name(raw: str) -> "str | None":
+    """Map a raw drug name from the deals page to our config key."""
+    raw_lower = raw.strip().lower()
+    mapping = {
+        "marijuana": "marijuana",
+        "ecstasy": "ecstasy",
+        "acid": "acid",
+        "speed": "speed",
+        "p / ice": "ice",
+        "p/ ice": "ice",
+        "heroin": "heroin",
+        "cocaine": "cocaine",
+    }
+    for k, v in mapping.items():
+        if k in raw_lower:
+            return v
+    return None
+
+
+def handle_do_middling(action: Action, state: GameState):
+    runner = action.params.get("runner", "")
+    buyer = action.params.get("buyer", "")
+    if not runner or not buyer:
+        state.add_log("Middling: missing runner or buyer name.")
+        return
+
+    c = cfg.load()
+    mid_cfg = c.get("middling", {})
+    max_on_hand = mid_cfg.get("max_on_hand", 500)
+    price_limits = mid_cfg.get("prices", {})
+
+    # Step 2a: check for outstanding trade to buyer
+    _nav(_u("/income/drugtrade.asp"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    for a in soup.find_all("a"):
+        href = a.get("href", "")
+        if "drugtrade.asp" in href and buyer.lower() in a.get_text(strip=True).lower():
+            state.add_log(f"Middling: deal failed — outstanding trade already exists to {buyer}.")
+            return
+
+    # Step 2b: check runner is a contact
+    _nav(_u("/income/deals.asp"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    runner_link = None
+    contacts_table = soup.find("table", attrs={"width": "200", "class": "column_title"})
+    if not contacts_table:
+        for tbl in soup.find_all("table", attrs={"width": "200"}):
+            for td in tbl.find_all("td", class_="column_title"):
+                continue
+            runner_link_candidate = tbl.find("a", string=re.compile(re.escape(runner), re.IGNORECASE))
+            if runner_link_candidate:
+                runner_link = runner_link_candidate
+                break
+    else:
+        runner_link = contacts_table.find("a", string=re.compile(re.escape(runner), re.IGNORECASE))
+
+    if not runner_link:
+        for a in soup.find_all("a", href=re.compile(r"deals\.asp\?action=list")):
+            if a.get_text(strip=True).lower() == runner.lower():
+                runner_link = a
+                break
+
+    if not runner_link:
+        state.add_log(f"Middling: deal failed — {runner} is not a contact.")
+        return
+
+    runner_href = runner_link.get("href", "")
+    runner_id_match = re.search(r"id=(\d+)", runner_href)
+    if not runner_id_match:
+        state.add_log(f"Middling: deal failed — could not parse runner ID from link.")
+        return
+    runner_id = runner_id_match.group(1)
+
+    # Step 2c: check runner's drug stock
+    _nav(_u(f"/income/deals.asp?action=list&id={runner_id}"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    drug_stock = []
+    rows = soup.find_all("tr")
+    for row in rows:
+        tds = row.find_all("td")
+        if len(tds) < 6:
+            continue
+        drug_td = tds[1]
+        raw_name = drug_td.get_text(strip=True).split("(")[0].strip() if drug_td else ""
+        drug_key = _parse_middling_drug_name(raw_name)
+        if not drug_key:
+            continue
+
+        price_text = tds[2].get_text(strip=True)
+        try:
+            price = int(re.sub(r"[^0-9]", "", price_text))
+        except ValueError:
+            price = 0
+
+        qty_text = tds[3].get_text(strip=True)
+        try:
+            qty_available = int(re.sub(r"[^0-9]", "", qty_text))
+        except ValueError:
+            qty_available = 0
+
+        owned_text = tds[4].get_text(strip=True)
+        try:
+            qty_owned = int(re.sub(r"[^0-9]", "", owned_text))
+        except ValueError:
+            qty_owned = 0
+
+        input_el = tds[5].find("input")
+        buy_field = input_el.get("name", "") if input_el else ""
+
+        drug_stock.append({
+            "key": drug_key,
+            "name": raw_name,
+            "price": price,
+            "available": qty_available,
+            "owned": qty_owned,
+            "buy_field": buy_field,
+        })
+
+    total_available = sum(d["available"] for d in drug_stock)
+    if total_available == 0:
+        state.add_log(f"Middling: deal failed — {runner} has no drugs in stock.")
+        return
+
+    # Check prices against tolerance
+    for d in drug_stock:
+        if d["available"] > 0:
+            max_price = price_limits.get(d["key"], 0)
+            if max_price > 0 and d["price"] > max_price:
+                state.add_log(
+                    f"Middling: deal failed — {d['name']} price ${d['price']:,} "
+                    f"exceeds max ${max_price:,}."
+                )
+                return
+
+    # Check on-hand capacity
+    total_held = sum(d["owned"] for d in drug_stock)
+    if total_held + 100 > max_on_hand:
+        state.add_log(
+            f"Middling: deal failed — too many drugs on hand "
+            f"({total_held} held + 100 = {total_held + 100} > {max_on_hand} max)."
+        )
+        return
+
+    # Step 3a: buy 100 drugs, starting from bottom of list
+    buy_plan = {}
+    remaining = 100
+    for d in reversed(drug_stock):
+        if remaining <= 0:
+            break
+        if d["available"] <= 0:
+            continue
+        buy_qty = min(d["available"], remaining)
+        buy_plan[d["key"]] = {"qty": buy_qty, "price": d["price"], "field": d["buy_field"]}
+        remaining -= buy_qty
+
+    if remaining > 0:
+        state.add_log(
+            f"Middling: deal failed — only {100 - remaining} drugs available, need 100."
+        )
+        return
+
+    total_sell_price = sum(v["qty"] * v["price"] for v in buy_plan.values())
+    buy_summary = ", ".join(f"{v['qty']}x {k}" for k, v in buy_plan.items())
+    state.add_log(f"Middling: buying from {runner}: {buy_summary} (total ${total_sell_price:,})")
+
+    page = browser.page()
+    for d_key, info in buy_plan.items():
+        page.fill(f"input[name='{info['field']}']", str(info["qty"]))
+    page.click("input[type='submit'][value='Buy']")
+    time.sleep(1)
+
+    if not _check_session(state):
+        return
+
+    # Step 3b: sell to buyer
+    _nav(_u("/income/drugtrade.asp?display=sell"), state)
+    if not _check_session(state):
+        return
+
+    page = browser.page()
+    page.fill("input[name='username']", buyer)
+    page.fill("input[name='price']", str(total_sell_price))
+
+    sell_field_map = {d["key"]: d["sell_field"] for d in _MIDDLING_DRUGS}
+    for d_key, info in buy_plan.items():
+        sell_field = sell_field_map.get(d_key, "")
+        if sell_field:
+            page.fill(f"input[name='{sell_field}']", str(info["qty"]))
+
+    page.click("input[type='submit'][value='Sell']")
+    time.sleep(1)
+
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    result_div = soup.find("div", class_="successmsg") or soup.find("div", class_="errormsg")
+    if result_div:
+        msg = result_div.get_text(strip=True)
+        state.add_log(f"Middling: sell to {buyer} result — {msg}")
+    else:
+        html_text = soup.get_text(" ", strip=True)[:200]
+        state.add_log(f"Middling: sell to {buyer} — {html_text}")
+
+
+def handle_middling_load_stock(action: Action, state: GameState):
+    """Navigate to a contact's deals page and return parsed stock data."""
+    contact = action.params.get("contact", "")
+    result_queue = action.params.get("_result_queue")
+    if not contact:
+        if result_queue:
+            result_queue.put({"error": "No contact name provided"})
+        return
+
+    _nav(_u("/income/deals.asp"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    contact_link = None
+    for a in soup.find_all("a", href=re.compile(r"deals\.asp\?action=list")):
+        if a.get_text(strip=True).lower() == contact.lower():
+            contact_link = a
+            break
+
+    if not contact_link:
+        if result_queue:
+            result_queue.put({"error": f"{contact} is not a contact"})
+        return
+
+    href = contact_link.get("href", "")
+    id_match = re.search(r"id=(\d+)", href)
+    if not id_match:
+        if result_queue:
+            result_queue.put({"error": "Could not parse contact ID"})
+        return
+
+    _nav(_u(f"/income/deals.asp?action=list&id={id_match.group(1)}"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    stock = []
+    for row in soup.find_all("tr"):
+        tds = row.find_all("td")
+        if len(tds) < 6:
+            continue
+        raw_name = tds[1].get_text(strip=True).split("(")[0].strip() if tds[1] else ""
+        drug_key = _parse_middling_drug_name(raw_name)
+        if not drug_key:
+            continue
+        price_text = tds[2].get_text(strip=True)
+        try:
+            price = int(re.sub(r"[^0-9]", "", price_text))
+        except ValueError:
+            price = 0
+        qty_text = tds[3].get_text(strip=True)
+        try:
+            available = int(re.sub(r"[^0-9]", "", qty_text))
+        except ValueError:
+            available = 0
+        input_el = tds[5].find("input")
+        buy_field = input_el.get("name", "") if input_el else ""
+        stock.append({"key": drug_key, "name": raw_name, "price": price,
+                       "available": available, "buy_field": buy_field})
+
+    if result_queue:
+        result_queue.put({"stock": stock, "contact_id": id_match.group(1)})
+
+
+def handle_middling_buy(action: Action, state: GameState):
+    """Buy specified quantities of drugs from a contact."""
+    contact_id = action.params.get("contact_id", "")
+    quantities = action.params.get("quantities", {})
+    result_queue = action.params.get("_result_queue")
+
+    if not contact_id or not quantities:
+        if result_queue:
+            result_queue.put({"error": "Missing contact_id or quantities"})
+        return
+
+    _nav(_u(f"/income/deals.asp?action=list&id={contact_id}"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+
+    page = browser.page()
+    for field_name, qty in quantities.items():
+        if qty > 0:
+            page.fill(f"input[name='{field_name}']", str(qty))
+
+    page.click("input[type='submit'][value='Buy']")
+    time.sleep(1)
+
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired after buy"})
+        return
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    result_div = soup.find("div", class_="successmsg") or soup.find("div", class_="errormsg")
+    msg = result_div.get_text(strip=True) if result_div else "Purchase submitted"
+    state.add_log(f"Middling manual buy: {msg}")
+    if result_queue:
+        result_queue.put({"success": True, "message": msg})
+
+
+def handle_middling_load_sell(action: Action, state: GameState):
+    """Navigate to the sell page and return carrying amounts."""
+    result_queue = action.params.get("_result_queue")
+
+    _nav(_u("/income/drugtrade.asp?display=sell"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    carrying = {}
+    for d in _MIDDLING_DRUGS:
+        inp = soup.find("input", attrs={"name": d["sell_field"]})
+        if inp:
+            row = inp.find_parent("tr")
+            if row:
+                tds = row.find_all("td")
+                if len(tds) >= 3:
+                    carry_text = tds[2].get_text(strip=True)
+                    try:
+                        carrying[d["key"]] = int(re.sub(r"[^0-9]", "", carry_text))
+                    except ValueError:
+                        carrying[d["key"]] = 0
+                    continue
+        carrying[d["key"]] = 0
+
+    if result_queue:
+        result_queue.put({"carrying": carrying})
+
+
+def handle_middling_sell(action: Action, state: GameState):
+    """Sell drugs to a player."""
+    buyer = action.params.get("buyer", "")
+    price = action.params.get("price", 0)
+    quantities = action.params.get("quantities", {})
+    result_queue = action.params.get("_result_queue")
+
+    if not buyer or not price:
+        if result_queue:
+            result_queue.put({"error": "Missing buyer or price"})
+        return
+
+    _nav(_u("/income/drugtrade.asp?display=sell"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+
+    page = browser.page()
+    page.fill("input[name='username']", buyer)
+    page.fill("input[name='price']", str(price))
+
+    sell_field_map = {d["key"]: d["sell_field"] for d in _MIDDLING_DRUGS}
+    for d_key, qty in quantities.items():
+        field = sell_field_map.get(d_key, "")
+        if field and qty > 0:
+            page.fill(f"input[name='{field}']", str(qty))
+
+    page.click("input[type='submit'][value='Sell']")
+    time.sleep(1)
+
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired after sell"})
+        return
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    result_div = soup.find("div", class_="successmsg") or soup.find("div", class_="errormsg")
+    msg = result_div.get_text(strip=True) if result_div else "Sell submitted"
+    state.add_log(f"Middling manual sell to {buyer}: {msg}")
+    if result_queue:
+        result_queue.put({"success": True, "message": msg})
+
+
+# ---------------------------------------------------------------------------
 # Blind eye handler
 # ---------------------------------------------------------------------------
 
@@ -4426,9 +4836,27 @@ def handle_check_comms(action: Action, state: GameState):
 
                 if cid not in existing or new_count > old_count:
                     import config as cfg
-                    if cfg.load().get("notifications", {}).get("new_message", False):
+                    c_snap = cfg.load()
+                    if c_snap.get("notifications", {}).get("new_message", False):
                         sender = conv.get("other_player", "Unknown")
                         state.push_notification("new_message", f"New message from {sender}: {conv.get('subject', '')}")
+
+                    if c_snap.get("middling", {}).get("enabled", False):
+                        from tasks.middling import parse_middle_command, validate_middle_players, _middling_queue
+                        msgs = conv.get("messages", [])
+                        if msgs:
+                            latest_msg = msgs[-1]
+                            body_text = latest_msg.get("body", "")
+                            parsed = parse_middle_command(body_text)
+                            if parsed and _middling_queue is not None:
+                                m_runner, m_buyer = parsed
+                                m_sender = latest_msg.get("from", "Unknown")
+                                err = validate_middle_players(m_runner, m_buyer)
+                                if err:
+                                    state.add_log(f"Middling command from {m_sender} rejected: {err}")
+                                else:
+                                    _middling_queue.put({"action": "do_middling", "runner": m_runner, "buyer": m_buyer})
+                                    state.add_log(f"Middling command received from {m_sender}: !middle {m_runner} {m_buyer}")
             else:
                 for k, v in conv.items():
                     if k != "messages":
@@ -6036,6 +6464,11 @@ HANDLERS = {
     "reply_comms": handle_reply_comms,
     "archive_comms": handle_archive_comms,
     "check_drug_trade": handle_check_drug_trade,
+    "do_middling": handle_do_middling,
+    "middling_load_stock": handle_middling_load_stock,
+    "middling_buy": handle_middling_buy,
+    "middling_load_sell": handle_middling_load_sell,
+    "middling_sell": handle_middling_sell,
     "do_blind_eye": handle_blind_eye,
     "check_warrants": handle_check_warrants,
     "turn_in_warrant": handle_turn_in_warrant,
