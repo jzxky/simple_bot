@@ -4846,17 +4846,23 @@ def handle_check_comms(action: Action, state: GameState):
                         msgs = conv.get("messages", [])
                         if msgs:
                             latest_msg = msgs[-1]
+                            m_sender = latest_msg.get("from", "Unknown")
                             body_text = latest_msg.get("body", "")
+                            first_line = body_text.split("\n", 1)[0].strip() if body_text else ""
+                            state.add_log(f"Middling parser: new msg from {m_sender} — first line: {first_line!r}")
                             parsed = parse_middle_command(body_text)
-                            if parsed and _middling_queue is not None:
+                            if parsed:
                                 m_runner, m_buyer = parsed
-                                m_sender = latest_msg.get("from", "Unknown")
-                                err = validate_middle_players(m_runner, m_buyer)
-                                if err:
-                                    state.add_log(f"Middling command from {m_sender} rejected: {err}")
-                                else:
-                                    _middling_queue.put({"action": "do_middling", "runner": m_runner, "buyer": m_buyer})
-                                    state.add_log(f"Middling command received from {m_sender}: !middle {m_runner} {m_buyer}")
+                                state.add_log(f"Middling parser: matched !middle runner={m_runner} buyer={m_buyer}")
+                                if _middling_queue is not None:
+                                    err = validate_middle_players(m_runner, m_buyer)
+                                    if err:
+                                        state.add_log(f"Middling command from {m_sender} rejected: {err}")
+                                    else:
+                                        _middling_queue.put({"action": "do_middling", "runner": m_runner, "buyer": m_buyer})
+                                        state.add_log(f"Middling command queued from {m_sender}: !middle {m_runner} {m_buyer}")
+                            else:
+                                state.add_log(f"Middling parser: no !middle command found in message")
             else:
                 for k, v in conv.items():
                     if k != "messages":
