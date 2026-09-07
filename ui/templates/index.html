@@ -1972,16 +1972,20 @@
       </h2>
       <div class="card-body">
         <div class="tab-bar">
-          <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Player List</button>
+          <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Players</button>
           <button class="tab-btn" onclick="showTab('pl-tab-active', this); plRenderActive()">Active</button>
           <button class="tab-btn" onclick="showTab('pl-tab-groups', this)">Groups</button>
-          <button class="tab-btn" onclick="showTab('pl-tab-dead', this); plRenderRecentDead()">Obituaries</button>
-          <button class="tab-btn" onclick="showTab('pl-tab-born', this); plRenderRecentBorn()">Births</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-births-deaths', this); plRenderBirthsDeaths()">Births and Deaths</button>
           <button class="tab-btn" onclick="showTab('pl-tab-topjobs', this); plLoadTopJobs()">Top Jobs</button>
         </div>
 
         <!-- Player List tab -->
         <div id="pl-tab-list" class="tab-panel active">
+          <div id="pl-summary" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:0.85rem">
+            <span title="Active characters in Auckland, Beirut, Chicago">Total Characters: <strong id="pl-summary-total">--</strong></span>
+            <span title="New players in the last 3 days">New Players (3d): <strong id="pl-summary-new">--</strong></span>
+            <span title="Dead characters in the last 3 days">Deaths (3d): <strong id="pl-summary-dead" style="color:#f87171">--</strong></span>
+          </div>
           <div class="pl-toolbar" style="flex-direction:column;align-items:stretch">
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
             <div style="position:relative">
@@ -2140,58 +2144,33 @@
           </div>
         </div>
 
-        <!-- Obituaries tab -->
-        <div id="pl-tab-dead" class="tab-panel">
+        <!-- Births and Deaths tab -->
+        <div id="pl-tab-births-deaths" class="tab-panel">
           <div style="overflow-x:auto;margin-top:8px">
-            <table class="pl-table" id="pl-dead-table">
+            <table class="pl-table" id="pl-bd-table">
               <thead>
                 <tr>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-dead-icon-username">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-dead-icon-rank">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-dead-icon-occupation">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-dead-icon-homecity">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-dead-icon-character_age">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('died_at')" data-col="died_at">Died <span class="pl-sort-icon" id="pl-dead-icon-died_at">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-bd-icon-username">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-bd-icon-rank">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-bd-icon-occupation">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-bd-icon-homecity">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-bd-icon-character_age">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('event_date')" data-col="event_date">Date <span class="pl-sort-icon" id="pl-bd-icon-event_date">↕</span></th>
                 </tr>
                 <tr>
-                  <th class="pl-filter-cell"><input type="text" id="pl-dead-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderRecentDead()"></th>
-                  <th class="pl-filter-cell"><select id="pl-dead-filter-rank" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-dead-filter-occupation" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-dead-filter-homecity" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><input type="text" id="pl-bd-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderBirthsDeaths()"></th>
+                  <th class="pl-filter-cell"><select id="pl-bd-filter-rank" class="pl-filter-input" onchange="plRenderBirthsDeaths()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-bd-filter-occupation" class="pl-filter-input" onchange="plRenderBirthsDeaths()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-bd-filter-homecity" class="pl-filter-input" onchange="plRenderBirthsDeaths()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"></th>
-                  <th class="pl-filter-cell"></th>
+                  <th class="pl-filter-cell"><select id="pl-bd-filter-type" class="pl-filter-input" onchange="plRenderBirthsDeaths()">
+                    <option value="">All</option>
+                    <option value="birth">Births</option>
+                    <option value="death">Deaths</option>
+                  </select></th>
                 </tr>
               </thead>
-              <tbody id="pl-dead-tbody">
-                <tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Births tab -->
-        <div id="pl-tab-born" class="tab-panel">
-          <div style="overflow-x:auto;margin-top:8px">
-            <table class="pl-table" id="pl-born-table">
-              <thead>
-                <tr>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-born-icon-username">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-born-icon-rank">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-born-icon-occupation">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-born-icon-homecity">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-born-icon-character_age">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('born_at')" data-col="born_at">First Seen <span class="pl-sort-icon" id="pl-born-icon-born_at">↕</span></th>
-                </tr>
-                <tr>
-                  <th class="pl-filter-cell"><input type="text" id="pl-born-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderRecentBorn()"></th>
-                  <th class="pl-filter-cell"><select id="pl-born-filter-rank" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-born-filter-occupation" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-born-filter-homecity" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"></th>
-                  <th class="pl-filter-cell"></th>
-                </tr>
-              </thead>
-              <tbody id="pl-born-tbody">
+              <tbody id="pl-bd-tbody">
                 <tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
               </tbody>
             </table>
