@@ -1146,6 +1146,18 @@ def _lawyer_defend_one(defendable, state):
                     _lawyer_blacklist_add(target["id"])
                     state.add_log(f"Lawyer: blacklisted case #{target['id']} (victim), trying next.")
                     continue
+                if "enough money" in fail_text.lower() and target.get("suspect"):
+                    state.add_log(f"Lawyer: transferring $1,000 to {target['suspect']} and retrying.")
+                    if _do_transfer(target["suspect"], 1000, state):
+                        _nav(target["defend_url"], state)
+                        soup2 = BeautifulSoup(browser.page().content(), "html.parser")
+                        success2 = soup2.find("div", id="success")
+                        if success2:
+                            state.add_log(f"Lawyer: defended case #{target['id']} after transfer — {success2.get_text(strip=True)}")
+                            return True
+                        fail2 = soup2.find("div", id="fail")
+                        state.add_log(f"Lawyer: retry failed — {fail2.get_text(strip=True) if fail2 else 'unknown'}")
+                    return False
                 return False
             else:
                 state.add_log(f"Lawyer: defended case #{target['id']} (no result div).")
