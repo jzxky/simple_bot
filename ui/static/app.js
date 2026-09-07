@@ -3808,6 +3808,7 @@ function loadPlayers() {
       plFilter();
       _plRenderGroupsTab(_plGroups);
       _updatePlayerPills();
+      _plUpdateSummary();
       // Keep the auto-jail partner list current with the player DB.
       loadAutoJailPartners();
       populateLaunderContactSelect();
@@ -3836,6 +3837,19 @@ function _plRebuildFilters() {
       vals.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join("");
     if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
   });
+}
+
+function _plUpdateSummary() {
+  const MAIN_CITIES = new Set(["Auckland", "Beirut", "Chicago"]);
+  const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
+  const data = _plData || [];
+  const total = data.filter(p => p.active && MAIN_CITIES.has(p.homecity)).length;
+  const newPlayers = data.filter(p => p.born_at && new Date(p.born_at).getTime() >= cutoff).length;
+  const deadPlayers = data.filter(p => !p.active && p.died_at && new Date(p.died_at).getTime() >= cutoff).length;
+  const el = id => document.getElementById(id);
+  if (el("pl-summary-total")) el("pl-summary-total").textContent = total;
+  if (el("pl-summary-new")) el("pl-summary-new").textContent = newPlayers;
+  if (el("pl-summary-dead")) el("pl-summary-dead").textContent = deadPlayers;
 }
 
 // ── Filter & sort ─────────────────────────────────────────────────────────────
@@ -4125,89 +4139,102 @@ function plLoadHistory(username, containerId, toggleEl) {
     .catch(() => { container.innerHTML = '<p style="color:var(--muted);padding:8px">Failed to load.</p>'; });
 }
 
-// ── Obituaries ────────────────────────────────────────────────────────────────
+// ── Births and Deaths ─────────────────────────────────────────────────────────
 
-let _plDeadSort = { col: "died_at", asc: false };
-let _plDeadExpanded = {};
+let _plBDSort = { col: "event_date", asc: false };
+let _plBDExpanded = {};
 
-function plDeadSort(col) {
-  if (_plDeadSort.col === col) _plDeadSort.asc = !_plDeadSort.asc;
-  else { _plDeadSort.col = col; _plDeadSort.asc = true; }
-  plRenderRecentDead();
+function plBDSort(col) {
+  if (_plBDSort.col === col) _plBDSort.asc = !_plBDSort.asc;
+  else { _plBDSort.col = col; _plBDSort.asc = true; }
+  plRenderBirthsDeaths();
 }
 
-function plRenderRecentDead() {
-  const tbody = document.getElementById("pl-dead-tbody");
+function plRenderBirthsDeaths() {
+  const tbody = document.getElementById("pl-bd-tbody");
   if (!tbody) return;
   const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
 
-  const search = (document.getElementById("pl-dead-search")?.value || "").toLowerCase();
-  const rankF  = document.getElementById("pl-dead-filter-rank")?.value || "";
-  const occF   = document.getElementById("pl-dead-filter-occupation")?.value || "";
-  const cityF  = document.getElementById("pl-dead-filter-homecity")?.value || "";
+  const search = (document.getElementById("pl-bd-search")?.value || "").toLowerCase();
+  const rankF  = document.getElementById("pl-bd-filter-rank")?.value || "";
+  const occF   = document.getElementById("pl-bd-filter-occupation")?.value || "";
+  const cityF  = document.getElementById("pl-bd-filter-homecity")?.value || "";
+  const typeF  = document.getElementById("pl-bd-filter-type")?.value || "";
 
-  let rows = (_plData || []).filter(p => {
-    if (p.active) return false;
-    if (!p.died_at) return false;
-    if (new Date(p.died_at).getTime() < cutoff) return false;
-    if (search && !p.username.toLowerCase().includes(search)) return false;
-    if (rankF && p.rank !== rankF) return false;
-    if (occF  && p.occupation !== occF) return false;
-    if (cityF && p.homecity !== cityF) return false;
-    return true;
+  let rows = [];
+  (_plData || []).forEach(p => {
+    if (search && !p.username.toLowerCase().includes(search)) return;
+    if (rankF && p.rank !== rankF) return;
+    if (occF  && p.occupation !== occF) return;
+    if (cityF && p.homecity !== cityF) return;
+
+    const isDead = !p.active && p.died_at && new Date(p.died_at).getTime() >= cutoff;
+    const isBorn = p.born_at && new Date(p.born_at).getTime() >= cutoff;
+
+    if (isDead && typeF !== "birth") {
+      rows.push({ ...p, _type: "death", _event_date: p.died_at });
+    }
+    if (isBorn && typeF !== "death") {
+      rows.push({ ...p, _type: "birth", _event_date: p.born_at });
+    }
   });
 
-  // Populate filter dropdowns on first call
-  _plPopulateDeadFilters((_plData || []).filter(p => !p.active && p.died_at && new Date(p.died_at).getTime() >= cutoff));
+  _plPopulateBDFilters(rows);
 
-  const { col, asc } = _plDeadSort;
+  const { col, asc } = _plBDSort;
   rows.sort((a, b) => {
-    const av = col === "died_at" ? (new Date(a.died_at).getTime()) : col === "character_age" ? (a.character_age || 0) : (a[col] || "").toLowerCase();
-    const bv = col === "died_at" ? (new Date(b.died_at).getTime()) : col === "character_age" ? (b.character_age || 0) : (b[col] || "").toLowerCase();
+    let av, bv;
+    if (col === "event_date") { av = new Date(a._event_date).getTime(); bv = new Date(b._event_date).getTime(); }
+    else if (col === "character_age") { av = a.character_age || 0; bv = b.character_age || 0; }
+    else { av = (a[col] || "").toLowerCase(); bv = (b[col] || "").toLowerCase(); }
     if (typeof av === "number") return asc ? av - bv : bv - av;
     return asc ? av.localeCompare(bv) : bv.localeCompare(av);
   });
 
-  document.querySelectorAll("#pl-dead-table .pl-sort-icon").forEach(el => { el.textContent = "↕"; el.classList.remove("pl-th-sorted"); });
-  const icon = document.getElementById(`pl-dead-icon-${col}`);
+  document.querySelectorAll("#pl-bd-table .pl-sort-icon").forEach(el => { el.textContent = "↕"; el.classList.remove("pl-th-sorted"); });
+  const icon = document.getElementById(`pl-bd-icon-${col}`);
   if (icon) { icon.textContent = asc ? "▲" : "▼"; icon.classList.add("pl-th-sorted"); }
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">No deaths in the last 3 days.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">No births or deaths in the last 3 days.</td></tr>`;
     return;
   }
 
   const colorMap = _plGroupColorMap();
   tbody.innerHTML = rows.map(p => {
-    const diedDate = new Date(p.died_at).toLocaleString();
-    const expanded = _plDeadExpanded[p.username];
+    const isDeath = p._type === "death";
+    const eventDate = new Date(p._event_date).toLocaleString();
+    const eventLabel = isDeath ? "Died" : "Born";
+    const rowKey = p.username + "_" + p._type;
+    const expanded = _plBDExpanded[rowKey];
     const groupCell = p.group
       ? `<span class="pl-group-badge" style="background:${colorMap[p.group]||'#888'}">${escHtml(p.group)}</span>`
       : "";
-    const rows2 = [`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="_plDeadToggle(${escJsStr(p.username)})" style="cursor:pointer">
+    const rowStyle = isDeath ? 'color:#f87171' : '';
+    const rows2 = [`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="_plBDToggle(${escJsStr(rowKey)})" style="cursor:pointer;${rowStyle}">
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)} ${groupCell}</td>
       <td>${escHtml(p.rank||"—")}</td>
       <td>${escHtml(p.occupation||"—")}</td>
       <td>${escHtml(p.homecity||"—")}</td>
-      <td style="white-space:nowrap;font-size:11px;color:var(--text-muted)">${p.character_age ? _fmtAge(p.character_age) : "—"}</td>
-      <td style="white-space:nowrap">${escHtml(diedDate)}</td>
+      <td style="white-space:nowrap;font-size:11px">${p.character_age ? _fmtAge(p.character_age) : "—"}</td>
+      <td style="white-space:nowrap">${escHtml(eventLabel)}: ${escHtml(eventDate)}</td>
     </tr>`];
     if (expanded) rows2.push(`<tr class="pl-detail-row"><td colspan="6"><div class="pl-detail">${_plDetailHtml(p)}</div></td></tr>`);
     return rows2.join("");
   }).join("");
 }
 
-function _plDeadToggle(username) {
-  _plDeadExpanded[username] = !_plDeadExpanded[username];
-  plRenderRecentDead();
+function _plBDToggle(key) {
+  _plBDExpanded[key] = !_plBDExpanded[key];
+  plRenderBirthsDeaths();
 }
 
-function _plPopulateDeadFilters(source) {
+function _plPopulateBDFilters(source) {
   const uniq = col => [...new Set(source.map(p => p[col] || "").filter(Boolean))].sort();
   [
-    { id: "pl-dead-filter-rank",       col: "rank" },
-    { id: "pl-dead-filter-occupation", col: "occupation" },
-    { id: "pl-dead-filter-homecity",   col: "homecity" },
+    { id: "pl-bd-filter-rank",       col: "rank" },
+    { id: "pl-bd-filter-occupation", col: "occupation" },
+    { id: "pl-bd-filter-homecity",   col: "homecity" },
   ].forEach(({ id, col }) => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -4217,95 +4244,8 @@ function _plPopulateDeadFilters(source) {
   });
 }
 
-// ── Births ────────────────────────────────────────────────────────────────────
-
-let _plBornSort = { col: "born_at", asc: false };
-let _plBornExpanded = {};
-
-function plBornSort(col) {
-  if (_plBornSort.col === col) _plBornSort.asc = !_plBornSort.asc;
-  else { _plBornSort.col = col; _plBornSort.asc = true; }
-  plRenderRecentBorn();
-}
-
-function plRenderRecentBorn() {
-  const tbody = document.getElementById("pl-born-tbody");
-  if (!tbody) return;
-  const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
-
-  const search = (document.getElementById("pl-born-search")?.value || "").toLowerCase();
-  const rankF  = document.getElementById("pl-born-filter-rank")?.value || "";
-  const occF   = document.getElementById("pl-born-filter-occupation")?.value || "";
-  const cityF  = document.getElementById("pl-born-filter-homecity")?.value || "";
-
-  let rows = (_plData || []).filter(p => {
-    if (!p.born_at) return false;
-    if (new Date(p.born_at).getTime() < cutoff) return false;
-    if (search && !p.username.toLowerCase().includes(search)) return false;
-    if (rankF && p.rank !== rankF) return false;
-    if (occF  && p.occupation !== occF) return false;
-    if (cityF && p.homecity !== cityF) return false;
-    return true;
-  });
-
-  _plPopulateBornFilters((_plData || []).filter(p => p.born_at && new Date(p.born_at).getTime() >= cutoff));
-
-  const { col, asc } = _plBornSort;
-  rows.sort((a, b) => {
-    const av = col === "born_at" ? (new Date(a.born_at).getTime()) : col === "character_age" ? (a.character_age || 0) : (a[col] || "").toLowerCase();
-    const bv = col === "born_at" ? (new Date(b.born_at).getTime()) : col === "character_age" ? (b.character_age || 0) : (b[col] || "").toLowerCase();
-    if (typeof av === "number") return asc ? av - bv : bv - av;
-    return asc ? av.localeCompare(bv) : bv.localeCompare(av);
-  });
-
-  document.querySelectorAll("#pl-born-table .pl-sort-icon").forEach(el => { el.textContent = "↕"; el.classList.remove("pl-th-sorted"); });
-  const icon = document.getElementById(`pl-born-icon-${col}`);
-  if (icon) { icon.textContent = asc ? "▲" : "▼"; icon.classList.add("pl-th-sorted"); }
-
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">No new players in the last 3 days.</td></tr>`;
-    return;
-  }
-
-  const colorMap = _plGroupColorMap();
-  tbody.innerHTML = rows.map(p => {
-    const bornDate = new Date(p.born_at).toLocaleString();
-    const expanded = _plBornExpanded[p.username];
-    const groupCell = p.group
-      ? `<span class="pl-group-badge" style="background:${colorMap[p.group]||'#888'}">${escHtml(p.group)}</span>`
-      : "";
-    const rows2 = [`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="_plBornToggle(${escJsStr(p.username)})" style="cursor:pointer">
-      <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)} ${groupCell}</td>
-      <td>${escHtml(p.rank||"—")}</td>
-      <td>${escHtml(p.occupation||"—")}</td>
-      <td>${escHtml(p.homecity||"—")}</td>
-      <td style="white-space:nowrap;font-size:11px;color:var(--text-muted)">${p.character_age ? _fmtAge(p.character_age) : "—"}</td>
-      <td style="white-space:nowrap">${escHtml(bornDate)}</td>
-    </tr>`];
-    if (expanded) rows2.push(`<tr class="pl-detail-row"><td colspan="6"><div class="pl-detail">${_plDetailHtml(p)}</div></td></tr>`);
-    return rows2.join("");
-  }).join("");
-}
-
-function _plBornToggle(username) {
-  _plBornExpanded[username] = !_plBornExpanded[username];
-  plRenderRecentBorn();
-}
-
-function _plPopulateBornFilters(source) {
-  const uniq = col => [...new Set(source.map(p => p[col] || "").filter(Boolean))].sort();
-  [
-    { id: "pl-born-filter-rank",       col: "rank" },
-    { id: "pl-born-filter-occupation", col: "occupation" },
-    { id: "pl-born-filter-homecity",   col: "homecity" },
-  ].forEach(({ id, col }) => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    const cur = sel.value;
-    sel.innerHTML = `<option value="">All</option>` + uniq(col).map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join("");
-    if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
-  });
-}
+function plRenderRecentDead() { plRenderBirthsDeaths(); }
+function plRenderRecentBorn() { plRenderBirthsDeaths(); }
 
 // ── Top Jobs tab ─────────────────────────────────────────────────────────────
 
