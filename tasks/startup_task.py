@@ -36,13 +36,16 @@ class StartupTask(Task):
 
         # check_earns re-scrapes the earn catalog itself (via _scrape_earn_catalog),
         # so a separate refresh_earn_catalog call here would just visit earn.asp twice.
-        state.add_log("Startup: checking earn queue.")
-        try:
-            import config as cfg
-            earn_type = cfg.load().get("earns", {}).get("earn_type", "surgeon")
-            executor.execute(Action("check_earns", earn_type=earn_type), state)
-        except Exception as e:
-            state.add_log(f"Startup earn queue check failed: {e}")
+        # _earns_task is only set when earns is enabled in auto mode (see bot.py),
+        # so this also skips the catalog refresh/queue-fill when earns is disabled.
+        if self._earns_task is not None:
+            state.add_log("Startup: checking earn queue.")
+            try:
+                import config as cfg
+                earn_type = cfg.load().get("earns", {}).get("earn_type", "surgeon")
+                executor.execute(Action("check_earns", earn_type=earn_type), state)
+            except Exception as e:
+                state.add_log(f"Startup earn queue check failed: {e}")
 
         state.add_log("Startup: refreshing player list.")
         try:
