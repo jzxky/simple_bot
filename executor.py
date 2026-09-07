@@ -4844,7 +4844,8 @@ def handle_check_comms(action: Action, state: GameState):
                     if c_snap.get("middling", {}).get("enabled", False):
                         from tasks.middling import parse_middle_command, validate_middle_players, _middling_queue
                         msgs = conv.get("messages", [])
-                        if msgs:
+                        old_msg_count = existing.get("_middling_parsed_count", 0)
+                        if msgs and len(msgs) > old_msg_count:
                             latest_msg = msgs[-1]
                             m_sender = latest_msg.get("from", "Unknown")
                             body_text = latest_msg.get("body", "")
@@ -4863,6 +4864,7 @@ def handle_check_comms(action: Action, state: GameState):
                                         state.add_log(f"Middling command queued from {m_sender}: !middle {m_runner} {m_buyer}")
                             else:
                                 state.add_log(f"Middling parser: no !middle command found in message")
+                            conv["_middling_parsed_count"] = len(msgs)
             else:
                 for k, v in conv.items():
                     if k != "messages":

@@ -32,15 +32,15 @@ def parse_middle_command(text: str):
 
 
 def validate_middle_players(runner: str, buyer: str) -> "str | None":
-    """Check both runner and buyer are active players.
-    Returns an error string or None on success."""
+    """Check both runner and buyer are active (alive) players.
+    Case-insensitive lookup. Returns an error string or None on success."""
     import player_db
     all_players = player_db.get_all_players()
-    active_names = {p["username"] for p in all_players if p.get("active")}
+    active_lower = {p["username"].lower(): p["username"] for p in all_players if p.get("active")}
     missing = []
-    if runner not in active_names:
+    if runner.lower() not in active_lower:
         missing.append(runner)
-    if buyer not in active_names:
+    if buyer.lower() not in active_lower:
         missing.append(buyer)
     if missing:
         return f"player(s) not found in active list: {', '.join(missing)}"
