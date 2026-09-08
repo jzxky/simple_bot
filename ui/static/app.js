@@ -1466,7 +1466,7 @@ function pollStatus() {
               const btn = document.createElement("button");
               btn.type = "button";
               btn.className = "action-btn";
-              btn.style.cssText = "width:110px;text-align:left;padding:8px 12px";
+              btn.style.cssText = "width:auto;white-space:nowrap;text-align:left;padding:8px 12px";
               btn.textContent = name;
               btn.onclick = () => openSkillOverlay(sid, name);
               listEl.appendChild(btn);
@@ -1476,6 +1476,16 @@ function pollStatus() {
           if (listWrap) listWrap.style.display = "none";
           if (skillMsg) skillMsg.style.display = "";
         }
+        const hasTravel = d.available_skills.includes("skill_jetsetter");
+        const hasEye = d.available_skills.includes("skill_allseeingeye");
+        const travelSec = document.getElementById("auto-travel-expert-section");
+        const eyeSec = document.getElementById("auto-respect-check-section");
+        const autoGroup = document.getElementById("auto-settings-group");
+        const autoDivider = document.getElementById("auto-skills-divider");
+        if (travelSec) travelSec.style.display = hasTravel ? "" : "none";
+        if (eyeSec) eyeSec.style.display = hasEye ? "" : "none";
+        if (autoDivider) autoDivider.style.display = (hasTravel && hasEye) ? "" : "none";
+        if (autoGroup) autoGroup.style.display = (hasTravel || hasEye) ? "" : "none";
       }
 
       if (schedBody) {
