@@ -56,6 +56,10 @@ def should_skip_action_for_armed_robbery(state, action_cooldown_mins: int) -> bo
         return False
     if "gangster" in state.occupation.lower():
         return False
+    # An armed-robbery run is already in flight on the crime tab — hold the
+    # action timer for it rather than estimating time-to-threshold below.
+    if getattr(state, "agg_tab_active", False) and state.agg_tab_crime == "armed":
+        return True
     threshold = float(crimes_cfg.get("primary", {}).get("energy_threshold", 100))
     time_to_threshold = energy_pct_to_mins(threshold) - energy_pct_to_mins(state.energy)
     return action_cooldown_mins > time_to_threshold

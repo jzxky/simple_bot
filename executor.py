@@ -186,10 +186,28 @@ def _match_public_business(name: str, public_set) -> "str | None":
     return None
 
 
+def _preserve_timers_if_secondary(state: GameState, fn):
+    """Run `fn()` (a parse_state call), guarding state.timers (and the fields
+    derived from it) against being wiped to empty by a page that doesn't
+    happen to render #user_timers_holder — but only while a secondary tab
+    (e.g. the aggravated-crimes tab) is driving page()/navigate(). Those
+    fields describe an account-wide resource other tasks on the main tab
+    depend on, so a transient miss on the secondary tab's own page shouldn't
+    blank it out from under them; the main tab's own next navigation will
+    naturally refresh it with accurate data regardless."""
+    if not browser.is_secondary_page_active():
+        fn()
+        return
+    prev = (state.timers, state.action_timer_ready, state.action_timer_end, state.agg_pro_end)
+    fn()
+    if not state.timers and prev[0]:
+        state.timers, state.action_timer_ready, state.action_timer_end, state.agg_pro_end = prev
+
+
 def _refresh_state(state: GameState):
     html = browser.page().content()
     url = browser.current_url()
-    parse_state(html, url, state)
+    _preserve_timers_if_secondary(state, lambda: parse_state(html, url, state))
 
 
 def _dbg(state: GameState, msg: str):
@@ -201,7 +219,8 @@ def _dbg(state: GameState, msg: str):
 def _nav(url: str, state: GameState):
     _dbg(state, f"→ {url}")
     html = browser.navigate(url)
-    parse_state(html, browser.current_url(), state)
+    cur_url = browser.current_url()
+    _preserve_timers_if_secondary(state, lambda: parse_state(html, cur_url, state))
 
 
 def _check_session(state: GameState) -> bool:
@@ -681,6 +700,48 @@ def handle_manual_earn(action: Action, state: GameState):
             break
 
 
+# Crimes the "young targets only" filter applies to (PvP aggravated crimes).
+YOUNG_FILTER_CRIMES = {"pickpocket", "mugging", "breaking", "hack"}
+
+
+def _young_target_limit(crime: str) -> float:
+    """Character-age cutoff in minutes, or 0 when the filter is off for this crime."""
+    if crime not in YOUNG_FILTER_CRIMES:
+        return 0
+    agg = cfg.load().get("aggravated_crimes", {})
+    if not agg.get("target_young_only", False):
+        return 0
+    try:
+        hours = float(agg.get("young_age_threshold_hours", 24) or 0)
+    except (TypeError, ValueError):
+        return 0
+    return hours * 60 if hours > 0 else 0
+
+
+def _filter_young_targets(crime: str, names: list, state: GameState) -> list:
+    """Drop known players whose character age exceeds the configured threshold.
+
+    Names not in the player database are kept — an unknown age is not a reason
+    to skip a target.
+    """
+    limit = _young_target_limit(crime)
+    if not limit:
+        return names
+    import player_db
+    try:
+        ages = player_db.get_character_ages()
+    except Exception as e:
+        state.add_log(f"Young targets only: could not read player ages ({e}) — filter skipped.")
+        return names
+    kept = [n for n in names if ages.get(n.lower(), 0) <= limit]
+    dropped = len(names) - len(kept)
+    if dropped:
+        state.add_log(
+            f"Young targets only: dropped {dropped} target(s) older than {limit / 60:g}h."
+        )
+    return kept
+
+
 def _get_online_local_players(state: GameState) -> list:
     """Parse the who's online sidebar from the current page HTML."""
     soup = BeautifulSoup(state.page_html, "html.parser")
@@ -996,7 +1057,21 @@ def _parse_lawyer_defend_page(html: str) -> dict:
             "defend_url": defend_url,
         })
 
-    return {"cases_by_city": cases_by_city, "defendable": defendable}
+    # Parse ALL case rows (including non-defendable ones in other cities)
+    all_cases = []
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 5:
+                continue
+            crime = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+            suspect = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+            location = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+            if suspect and location and crime and suspect.lower() != "suspect" and location.lower() != "location":
+                all_cases.append({"suspect": suspect, "location": location, "crime": crime})
+
+    return {"cases_by_city": cases_by_city, "defendable": defendable, "all_cases": all_cases}
 
 
 def _is_friendly_player(username: str) -> bool:
@@ -1034,26 +1109,62 @@ def _lawyer_reparse(state):
     return _parse_lawyer_defend_page(page.content())
 
 
+def _lawyer_blacklisted_ids() -> set:
+    import config as _cfg
+    cfg = _cfg.load()
+    return set(str(i) for i in cfg.get("case_work", {}).get("law", {}).get("blacklisted_cases", []))
+
+
+def _lawyer_blacklist_add(case_id: str):
+    import config as _cfg
+    cfg = _cfg.load()
+    law = cfg.setdefault("case_work", {}).setdefault("law", {})
+    bl = law.setdefault("blacklisted_cases", [])
+    if case_id not in bl:
+        bl.append(case_id)
+        _cfg.save(cfg)
+
+
 def _lawyer_defend_one(defendable, state):
-    if not defendable:
-        return False
-    target = defendable[0]
-    try:
-        _nav(target["defend_url"], state)
-        page = browser.page()
-        soup = BeautifulSoup(page.content(), "html.parser")
-        success = soup.find("div", id="success")
-        fail = soup.find("div", id="fail")
-        if success:
-            state.add_log(f"Lawyer: defended case #{target['id']} ({target['crime']}) for {target['suspect']} — {success.get_text(strip=True)}")
-            return True
-        elif fail:
-            state.add_log(f"Lawyer: case #{target['id']} failed — {fail.get_text(strip=True)}")
-        else:
-            state.add_log(f"Lawyer: defended case #{target['id']} (no result div).")
-            return True
-    except Exception as e:
-        state.add_log(f"Lawyer: error defending case #{target['id']}: {e}")
+    blacklisted = _lawyer_blacklisted_ids()
+    for target in defendable:
+        if target["id"] in blacklisted:
+            continue
+        try:
+            _nav(target["defend_url"], state)
+            page = browser.page()
+            soup = BeautifulSoup(page.content(), "html.parser")
+            success = soup.find("div", id="success")
+            fail = soup.find("div", id="fail")
+            if success:
+                state.add_log(f"Lawyer: defended case #{target['id']} ({target['crime']}) for {target['suspect']} — {success.get_text(strip=True)}")
+                return True
+            elif fail:
+                fail_text = fail.get_text(strip=True)
+                state.add_log(f"Lawyer: case #{target['id']} failed — {fail_text}")
+                if "victim" in fail_text.lower():
+                    _lawyer_blacklist_add(target["id"])
+                    state.add_log(f"Lawyer: blacklisted case #{target['id']} (victim), trying next.")
+                    continue
+                if "enough money" in fail_text.lower() and target.get("suspect"):
+                    state.add_log(f"Lawyer: transferring $1,000 to {target['suspect']} and retrying.")
+                    if _do_transfer(target["suspect"], 1000, state):
+                        _nav(target["defend_url"], state)
+                        soup2 = BeautifulSoup(browser.page().content(), "html.parser")
+                        success2 = soup2.find("div", id="success")
+                        if success2:
+                            state.add_log(f"Lawyer: defended case #{target['id']} after transfer — {success2.get_text(strip=True)}")
+                            return True
+                        fail2 = soup2.find("div", id="fail")
+                        state.add_log(f"Lawyer: retry failed — {fail2.get_text(strip=True) if fail2 else 'unknown'}")
+                    return False
+                return False
+            else:
+                state.add_log(f"Lawyer: defended case #{target['id']} (no result div).")
+                return True
+        except Exception as e:
+            state.add_log(f"Lawyer: error defending case #{target['id']}: {e}")
+            return False
     return False
 
 
@@ -1067,22 +1178,19 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
 
     parsed = _lawyer_reparse(state)
     cases_by_city = parsed["cases_by_city"]
-    defendable = parsed["defendable"]
+    blacklisted = _lawyer_blacklisted_ids()
+    defendable = [c for c in parsed["defendable"] if c["id"] not in blacklisted]
 
     state.lawyer_cases_by_city = cases_by_city
+    state.lawyer_case_details = parsed.get("all_cases", [])
 
     total = sum(cases_by_city.values())
     if total == 0:
-        state.add_log("Lawyer: no cases to defend.")
         return
 
     c = _cfg.load()
     law_cfg = c.get("case_work", {}).get("law", {})
     prioritize_friendly = law_cfg.get("prioritize_friendly", False)
-
-    summary_parts = [f"{city}: {count}" for city, count in cases_by_city.items()]
-    queue = len(defendable)
-    state.add_log(f"Lawyer: {total} case(s) [{', '.join(summary_parts)}] — queue: {queue} DEFEND link(s) in {state.current_city}.")
 
     if not defendable:
         best_city = _lawyer_best_travel_city(cases_by_city, state.current_city)
@@ -1090,13 +1198,14 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
             auto_travel = law_cfg.get("auto_travel", False)
             smart_enabled = c.get("smart_travel", {}).get("enabled", False)
             if auto_travel and not smart_enabled:
+                if "travel" in state.timers and not state.timer_ready("travel"):
+                    return
                 state.add_log(f"Lawyer: no cases in {state.current_city}, travelling to {best_city} ({cases_by_city[best_city]} case(s)).")
                 handle_travel(Action("travel", target_city=best_city, method="own_vehicle"), state)
-            else:
-                state.add_log(f"Lawyer: no cases in {state.current_city} — {best_city} has {cases_by_city[best_city]} case(s).")
-        else:
-            state.add_log(f"Lawyer: no defendable cases in {state.current_city}.")
         return
+
+    summary_parts = [f"{city}: {count}" for city, count in cases_by_city.items()]
+    state.add_log(f"Lawyer: {total} case(s) [{', '.join(summary_parts)}] — {len(defendable)} cases to defend.")
 
     if prioritize_friendly:
         defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
@@ -1117,7 +1226,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
         while True:
             _nav(_u("/court/lawyer.asp?display=defend"), state)
             parsed = _lawyer_reparse(state)
-            local_defendable = parsed["defendable"]
+            local_defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklisted_ids()]
 
             queue_size = len(local_defendable)
             used_24h = state.consumables_24h or 0
@@ -1137,7 +1246,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
 
             _nav(_u("/court/lawyer.asp?display=defend"), state)
             parsed = _lawyer_reparse(state)
-            local_defendable = parsed["defendable"]
+            local_defendable = [c for c in parsed["defendable"] if c["id"] not in _lawyer_blacklisted_ids()]
 
             if prioritize_friendly:
                 local_defendable.sort(key=lambda cs: (0 if _is_friendly_player(cs["suspect"]) else 1))
@@ -1154,6 +1263,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
     _nav(_u("/court/lawyer.asp?display=defend"), state)
     parsed = _lawyer_reparse(state)
     state.lawyer_cases_by_city = parsed["cases_by_city"]
+    state.lawyer_case_details = parsed.get("all_cases", [])
 
     _refresh_state(state)
     state.add_log(f"Lawyer: defended {defended} case(s).")
@@ -1218,7 +1328,15 @@ _MOBILE_UA = (
 
 
 def handle_breaking_entering(action: Action, state: GameState):
-    """Breaking & Entering — uses mobile UA so the dropdown form is served."""
+    """Breaking & Entering — drains _breaking_entering_steps() to completion."""
+    for _ in _breaking_entering_steps(action, state):
+        pass
+
+
+def _breaking_entering_steps(action: Action, state: GameState):
+    """Generator form of Breaking & Entering — yields once per dropdown target so a
+    driver (see tasks/agg_crimes.py) can interleave other work between attempts.
+    Uses mobile UA so the dropdown form is served."""
     threshold = action.params.get("threshold", 0)
     page = browser.page()
 
@@ -1239,12 +1357,30 @@ def handle_breaking_entering(action: Action, state: GameState):
                 state.add_log("Breaking & Entering: dropdown not found after crime selection.")
             return
 
-        options = [o["value"] for o in select.find_all("option") if o.get("value")]
-        if not options:
+        # Option value is what the form submits; the visible text is the owner
+        # name, which is what the player database is keyed by.
+        entries = [
+            (o["value"], o.get_text(strip=True) or o["value"])
+            for o in select.find_all("option") if o.get("value")
+        ]
+        if not entries:
             state.add_log("Breaking & Entering: no targets in dropdown.")
             return
 
-        state.add_log(f"Breaking & Entering: {len(options)} targets found.")
+        state.add_log(f"Breaking & Entering: {len(entries)} targets found.")
+
+        limit = _young_target_limit("breaking")
+        if limit:
+            names = [name for _, name in entries]
+            kept = set(n.lower() for n in _filter_young_targets("breaking", names, state))
+            entries = [(v, n) for v, n in entries if n.lower() in kept]
+            if not entries:
+                state.add_log("Breaking & Entering: no young targets in dropdown.")
+                state._agg_targets_exhausted = True
+                return
+
+        options = [v for v, _ in entries]
+        names_by_value = {v: n for v, n in entries}
 
         fail_counts: dict = {}
 
@@ -1288,14 +1424,15 @@ def handle_breaking_entering(action: Action, state: GameState):
             success_div = result_soup.find("div", id="success")
             if success_div:
                 msg = success_div.get_text(strip=True)
+                victim = names_by_value.get(target, target)
                 _flush_fails()
-                state.add_log(f"B&E success vs {target}: {msg}")
+                state.add_log(f"B&E success vs {victim}: {msg}")
                 amounts = re.findall(r"\$([\d,]+)", msg)
                 stolen = int(amounts[0].replace(",", "")) if amounts else 0
                 if stolen > 0:
-                    state._last_crime_victim = target
+                    state._last_crime_victim = victim
                     state._last_crime_amount = stolen
-                    state.add_log(f"Stolen: ${stolen:,} from {target}")
+                    state.add_log(f"Stolen: ${stolen:,} from {victim}")
                 return
 
             fail_div = result_soup.find("div", id="fail")
@@ -1311,7 +1448,10 @@ def handle_breaking_entering(action: Action, state: GameState):
 
                 # Soft fail (no apartment, recently survived, etc.) — go back, next target
                 page.go_back(wait_until="domcontentloaded")
+                yield
                 continue
+
+            yield
 
         _flush_fails()
         state._agg_targets_exhausted = True
@@ -1321,9 +1461,18 @@ def handle_breaking_entering(action: Action, state: GameState):
 
 
 def handle_do_crime(action: Action, state: GameState):
+    """Target-list aggravated crimes (pickpocket/mugging/hack/breaking) — drains
+    _do_crime_steps() to completion."""
+    for _ in _do_crime_steps(action, state):
+        pass
+
+
+def _do_crime_steps(action: Action, state: GameState):
+    """Generator form — yields once per target so a driver (see
+    tasks/agg_crimes.py) can interleave other work between attempts."""
     crime = action.params["crime"]
     if crime == "breaking":
-        handle_breaking_entering(action, state)
+        yield from _breaking_entering_steps(action, state)
         return
 
     threshold = action.params.get("threshold", 0)
@@ -1335,6 +1484,8 @@ def handle_do_crime(action: Action, state: GameState):
     else:
         targets = _get_city_residents(state.current_city, state.own_name)
         state.add_log(f"City resident targets: {len(targets)}")
+
+    targets = _filter_young_targets(crime, targets, state)
 
     if not targets:
         state.add_log(f"No targets found for {crime}, skipping.")
@@ -1365,6 +1516,7 @@ def handle_do_crime(action: Action, state: GameState):
 
     for player in targets:
         if player in failed_transfers:
+            yield
             continue
 
         if threshold and state.energy < threshold:
@@ -1405,8 +1557,10 @@ def handle_do_crime(action: Action, state: GameState):
                 state.record_agg_fail()
             fail_counts[fail_msg] = fail_counts.get(fail_msg, 0) + 1
             if "weapon" in fail_msg.lower():
+                yield
                 continue
             if crime == "hack" and "increased security" in fail_msg.lower():
+                yield
                 continue
             if crime == "hack" and "no money in their account" in fail_msg.lower():
                 state.add_log(f"No money in {player}'s account — sending $1 to unlock, then retrying.")
@@ -1422,6 +1576,7 @@ def handle_do_crime(action: Action, state: GameState):
                         _flush_fails()
                         state.add_log("Could not return to crime page. Aborting.")
                         return
+                    yield
                     continue
                 if not _nav_to_target_input(crime, state):
                     _flush_fails()
@@ -1448,14 +1603,19 @@ def handle_do_crime(action: Action, state: GameState):
                 if retry_fail:
                     retry_msg = retry_fail.get_text(strip=True)
                     fail_counts[retry_msg] = fail_counts.get(retry_msg, 0) + 1
+                yield
                 continue
             if crime in ("pickpocket", "mugging", "breaking") and "recently survived" in fail_msg.lower():
+                yield
                 continue
             if "doesn't exist" in fail_msg.lower() or "does not exist" in fail_msg.lower():
+                yield
                 continue
             _flush_fails()
             _nav(_u("/loggedin.asp?display=play"), state)
             return
+
+        yield
 
     _flush_fails()
     state._agg_targets_exhausted = True
@@ -1837,7 +1997,11 @@ def handle_community_service(action: Action, state: GameState):
     else:
         options = soup.find_all("input", attrs={"name": "csinothercities", "type": "radio"})
         if not options:
-            state.add_log("No community service options found (away city).")
+            c = cfg.load()
+            c.setdefault("away_action", {})["type"] = ""
+            cfg.save(c)
+            import settings_rev; settings_rev.bump()
+            state.add_log("No community service options found (away city) — away action set to None.")
             return
         last = options[-1]
         page.check(f"input[name='csinothercities'][value='{last['value']}']")
@@ -1876,6 +2040,7 @@ def handle_do_dog_trains(action: Action, state: GameState):
             c.setdefault("action", {})["enabled"] = False
             state.add_log("Dog trains: actions disabled.")
         cfg.save(c)
+        import settings_rev; settings_rev.bump()
         _notify(state, "dog_trains_unavailable", msg)
         return
 
@@ -2250,6 +2415,15 @@ def _get_private_business_owner(business_name: str, state: GameState) -> "str | 
 
 
 def handle_armed_robbery(action: Action, state: GameState):
+    """Drains _armed_robbery_steps() to completion — unchanged inline behaviour."""
+    for _ in _armed_robbery_steps(action, state):
+        pass
+
+
+def _armed_robbery_steps(action: Action, state: GameState):
+    """Generator form — yields once per retry attempt so a driver (see
+    tasks/agg_crimes.py) can interleave other work between attempts instead of
+    blocking for the whole run."""
     agg_private = action.params.get("agg_private", False)
     agg_drug_house = action.params.get("agg_drug_house", False)
     threshold = action.params.get("threshold", 0)
@@ -2361,6 +2535,8 @@ def handle_armed_robbery(action: Action, state: GameState):
                 _nav(_u("/loggedin.asp?display=play"), state)
                 return
 
+            yield
+
         # retries exhausted — check if another task needs to run
         state.add_log(f"Armed robbery: no valid target after {ARMED_MAX_RETRIES} attempts (pass {pass_num}). Checking task queue...")
         if check_other_tasks and check_other_tasks():
@@ -2368,9 +2544,19 @@ def handle_armed_robbery(action: Action, state: GameState):
             _nav(_u("/loggedin.asp?display=play"), state)
             return
         state.add_log("No other tasks pending — retrying armed robbery.")
+        yield
 
 
 def handle_torch_business(action: Action, state: GameState):
+    """Drains _torch_business_steps() to completion — unchanged inline behaviour."""
+    for _ in _torch_business_steps(action, state):
+        pass
+
+
+def _torch_business_steps(action: Action, state: GameState):
+    """Generator form — yields once per retry attempt so a driver (see
+    tasks/agg_crimes.py) can interleave other work between attempts instead of
+    blocking for the whole run."""
     torch_private = action.params.get("torch_private", False)
     torch_payback_public = action.params.get("torch_payback_public", "everyone")
     torch_payback_private = action.params.get("torch_payback_private", "everyone")
@@ -2479,12 +2665,15 @@ def handle_torch_business(action: Action, state: GameState):
                 _nav(_u("/loggedin.asp?display=play"), state)
                 return
 
+            yield
+
         state.add_log(f"Torch business: no valid target after {ARMED_MAX_RETRIES} attempts (pass {pass_num}). Checking task queue...")
         if check_other_tasks and check_other_tasks():
             state.add_log("Another task is ready — yielding torch business.")
             _nav(_u("/loggedin.asp?display=play"), state)
             return
         state.add_log("No other tasks pending — retrying torch business.")
+        yield
 
 
 def handle_drug_manufacturing(action: Action, state: GameState):
@@ -2495,7 +2684,15 @@ def handle_drug_manufacturing(action: Action, state: GameState):
         return
 
     if _u("/income/income.asp") in browser.current_url():
-        state.add_log("Drug manufacturing redirected to income page — likely missing science degree or not in Gangster career.")
+        context = action.params.get("context", "home")
+        if context == "away":
+            c = cfg.load()
+            c.setdefault("away_action", {})["type"] = ""
+            cfg.save(c)
+            import settings_rev; settings_rev.bump()
+            state.add_log("Drug manufacturing unavailable — away action set to None.")
+        else:
+            state.add_log("Drug manufacturing redirected to income page — likely missing science degree or not in Gangster career.")
         return
 
     select = page.query_selector("select[name='action']")
@@ -2710,111 +2907,111 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     _refresh_state(state)
 
 
+def _fire_result_log(state: GameState, page, label: str):
+    """Read the success/fail div from the current page and log the outcome."""
+    soup = BeautifulSoup(page.content(), "html.parser")
+    success = soup.find("div", id="success")
+    fail    = soup.find("div", id="fail")
+    if success:
+        state.add_log(f"{label} result: {success.get_text(strip=True)}")
+    elif fail:
+        state.add_log(f"{label} failed: {fail.get_text(strip=True)}")
+    else:
+        state.add_log(f"{label}: submitted (no result div).")
+    _refresh_state(state)
+
+
+# Default priority when no config is present: fires, then police investigations,
+# then inspections. Both fires and investigations live on the display=fires page
+# and are scraped in a single visit, so ordering costs no extra navigation.
+_FIRE_DEFAULT_TASKS = [
+    {"type": "fires",          "enabled": True},
+    {"type": "investigations", "enabled": True},
+    {"type": "inspections",    "enabled": True},
+]
+
+
 def handle_check_fire_cases(action: Action, state: GameState):
     page = browser.page()
 
-    # Step 1 — active fires
-    _nav(_u("/localcity/firestation.asp?display=fires"), state)
-    if not _check_session(state):
+    tasks = getattr(action, "tasks", None) or _FIRE_DEFAULT_TASKS
+    order = [t.get("type") for t in tasks if t.get("enabled", True)]
+    if not order:
         return
 
-    soup = BeautifulSoup(page.content(), "html.parser")
-    table = soup.find("table", style=lambda s: s and "90%" in s)
-    attend_links = []
-    if table:
-        for row in table.find_all("tr"):
-            link = row.find("a", href=lambda h: h and "FightFire" in h)
-            if link:
-                href = link["href"]
-                if not href.startswith("http"):
-                    href = _u("/localcity/") + href
-                victim_td = row.find("td", class_="display_border")
-                victim = victim_td.get_text(strip=True) if victim_td else "?"
-                attend_links.append((victim, href))
+    # ── Scrape the fires page once: it carries BOTH active fires and the
+    # investigations requested by police officers. Scraping them together means
+    # an investigation is never missed just because attending a fire started the
+    # case cooldown before we got around to looking.
+    attend_links, investigate_links = [], []
+    if "fires" in order or "investigations" in order:
+        _nav(_u("/localcity/firestation.asp?display=fires"), state)
+        if not _check_session(state):
+            return
 
-    if attend_links:
-        victim, url = attend_links[-1]
-        state.add_log(f"Fire case work: attending fire for {victim}.")
-        _nav(url, state)
-        result_soup = BeautifulSoup(page.content(), "html.parser")
-        success = result_soup.find("div", id="success")
-        fail    = result_soup.find("div", id="fail")
-        if success:
-            state.add_log(f"Fire case work result: {success.get_text(strip=True)}")
-        elif fail:
-            state.add_log(f"Fire case work failed: {fail.get_text(strip=True)}")
-        else:
-            state.add_log("Fire case work: submitted (no result div).")
-        _refresh_state(state)
+        soup = BeautifulSoup(page.content(), "html.parser")
+        table = soup.find("table", style=lambda s: s and "90%" in s)
+        if table:
+            for row in table.find_all("tr"):
+                link = row.find("a", href=lambda h: h and "FightFire" in h)
+                if link:
+                    href = link["href"]
+                    if not href.startswith("http"):
+                        href = _u("/localcity/") + href
+                    victim_td = row.find("td", class_="display_border")
+                    victim = victim_td.get_text(strip=True) if victim_td else "?"
+                    attend_links.append((victim, href))
 
-    # Step 2 — inspections (only if case timer is still free)
-    if not state.timer_ready("case"):
-        return
+        for link in soup.find_all("a", href=lambda h: h and "display=investigate&id=" in h):
+            href = link["href"]  # BeautifulSoup already decodes &amp; → &
+            if not href.startswith("http"):
+                href = _u("/localcity/") + href.lstrip("/")
+            investigate_links.append(href)
 
-    _nav(_u("/localcity/firestation.asp?display=inspections"), state)
-    if not _check_session(state):
-        return
+    # ── Work the enabled categories in the configured priority order, stopping
+    # as soon as the case timer is spent.
+    for kind in order:
+        if not state.timer_ready("case"):
+            return
 
-    soup = BeautifulSoup(page.content(), "html.parser")
-    table = soup.find("table", style=lambda s: s and "90%" in s)
-    inspect_link = None
-    if table:
-        for row in table.find_all("tr"):
-            link = row.find("a", href=lambda h: h and "inspect" in h)
-            if link:
-                href = link["href"]  # BeautifulSoup already decodes &amp; → &
-                if not href.startswith("http"):
-                    href = _u("/localcity/") + href.lstrip("/")
-                inspect_link = href
-                break
+        if kind == "fires":
+            if not attend_links:
+                continue
+            victim, url = attend_links[-1]
+            state.add_log(f"Fire case work: attending fire for {victim}.")
+            _nav(url, state)
+            _fire_result_log(state, page, "Fire case work")
 
-    if inspect_link:
-        state.add_log("Fire case work: performing inspection.")
-        _nav(inspect_link, state)
-        result_soup = BeautifulSoup(page.content(), "html.parser")
-        success = result_soup.find("div", id="success")
-        fail    = result_soup.find("div", id="fail")
-        if success:
-            state.add_log(f"Fire inspection result: {success.get_text(strip=True)}")
-        elif fail:
-            state.add_log(f"Fire inspection failed: {fail.get_text(strip=True)}")
-        else:
-            state.add_log("Fire inspection: submitted (no result div).")
-        _refresh_state(state)
+        elif kind == "investigations":
+            if not investigate_links:
+                continue
+            state.add_log("Fire case work: performing investigation.")
+            _nav(investigate_links[-1], state)  # last requested investigation
+            _fire_result_log(state, page, "Fire investigation")
 
-    # Step 3 — investigations requested by police officers (only if case timer free).
-    # These are listed on the same display=fires page as active fires.
-    if not state.timer_ready("case"):
-        return
+        elif kind == "inspections":
+            _nav(_u("/localcity/firestation.asp?display=inspections"), state)
+            if not _check_session(state):
+                return
 
-    _nav(_u("/localcity/firestation.asp?display=fires"), state)
-    if not _check_session(state):
-        return
+            soup = BeautifulSoup(page.content(), "html.parser")
+            table = soup.find("table", style=lambda s: s and "90%" in s)
+            inspect_link = None
+            if table:
+                for row in table.find_all("tr"):
+                    link = row.find("a", href=lambda h: h and "inspect" in h)
+                    if link:
+                        href = link["href"]  # BeautifulSoup already decodes &amp; → &
+                        if not href.startswith("http"):
+                            href = _u("/localcity/") + href.lstrip("/")
+                        inspect_link = href
+                        break
 
-    soup = BeautifulSoup(page.content(), "html.parser")
-    investigate_links = []
-    for link in soup.find_all("a", href=lambda h: h and "display=investigate&id=" in h):
-        href = link["href"]  # BeautifulSoup already decodes &amp; → &
-        if not href.startswith("http"):
-            href = _u("/localcity/") + href.lstrip("/")
-        investigate_links.append(href)
-
-    if not investigate_links:
-        return
-
-    target = investigate_links[-1]  # last requested investigation
-    state.add_log("Fire case work: performing investigation.")
-    _nav(target, state)
-    result_soup = BeautifulSoup(page.content(), "html.parser")
-    success = result_soup.find("div", id="success")
-    fail    = result_soup.find("div", id="fail")
-    if success:
-        state.add_log(f"Fire investigation result: {success.get_text(strip=True)}")
-    elif fail:
-        state.add_log(f"Fire investigation failed: {fail.get_text(strip=True)}")
-    else:
-        state.add_log("Fire investigation: submitted (no result div).")
-    _refresh_state(state)
+            if not inspect_link:
+                continue
+            state.add_log("Fire case work: performing inspection.")
+            _nav(inspect_link, state)
+            _fire_result_log(state, page, "Fire inspection")
 
 
 def handle_clear_jail_duty_queue(action: Action, state: GameState):
@@ -3082,13 +3279,27 @@ def handle_bank_invest(action: Action, state: GameState):
     if amount < 1:
         state.add_log("Banking: invest amount must be at least $1.")
         return
-    amount = min(amount, 1500000, state.bank_balance)
-    if amount < 1:
-        state.add_log(f"Banking: bank balance too low to invest (${state.bank_balance:,}).")
-        return
-
+    BANK_URL = _u("/income/bank.asp")
     INVEST_URL = _u("/income/bank.asp?option=invest")
     page = browser.page()
+
+    page.goto(BANK_URL, wait_until="domcontentloaded", timeout=15000)
+    soup = BeautifulSoup(page.content(), "html.parser")
+    closing_bal = 0
+    for span in soup.find_all("span"):
+        strong = span.find("strong")
+        if strong and "Closing Balance" in strong.get_text():
+            bal_text = span.get_text().replace("Closing Balance:", "").strip()
+            bal_m = re.search(r"\$([\d,]+)", bal_text)
+            if bal_m:
+                closing_bal = int(bal_m.group(1).replace(",", ""))
+            break
+
+    amount = min(amount, 1500000, closing_bal)
+    if amount < 1:
+        state.add_log(f"Banking: bank balance too low to invest (${closing_bal:,}).")
+        return
+
     page.goto(INVEST_URL, wait_until="domcontentloaded", timeout=15000)
 
     soup = BeautifulSoup(page.content(), "html.parser")
@@ -3639,12 +3850,32 @@ def handle_check_drug_store(action: Action, state: GameState):
 
 
 def handle_withdraw(action: Action, state: GameState):
+    import re as _re_w
     amount = int(action.params.get("amount", 0))
     if amount <= 0:
         state.add_log("Withdraw: amount must be greater than zero.")
         return
+    BANK_URL = _u("/income/bank.asp")
     WITHDRAW_URL = _u("/income/bank.asp?option=withdrawal")
     page = browser.page()
+
+    page.goto(BANK_URL, wait_until="domcontentloaded", timeout=15000)
+    soup = BeautifulSoup(page.content(), "html.parser")
+    closing_bal = 0
+    for span in soup.find_all("span"):
+        strong = span.find("strong")
+        if strong and "Closing Balance" in strong.get_text():
+            bal_text = span.get_text().replace("Closing Balance:", "").strip()
+            bal_m = _re_w.search(r"\$([\d,]+)", bal_text)
+            if bal_m:
+                closing_bal = int(bal_m.group(1).replace(",", ""))
+            break
+
+    amount = min(amount, closing_bal)
+    if amount < 1:
+        state.add_log(f"Withdraw: bank balance too low (${closing_bal:,}).")
+        return
+
     page.goto(WITHDRAW_URL, wait_until="domcontentloaded", timeout=15000)
     page.fill("input[name='withdrawal']", str(amount))
     page.click("input[name='B1']")
@@ -3933,6 +4164,416 @@ def handle_check_drug_trade(action: Action, state: GameState):
 
 
 # ---------------------------------------------------------------------------
+# Drug middling handler
+# ---------------------------------------------------------------------------
+
+_MIDDLING_DRUGS = [
+    {"name": "Marijuana",  "buy_field": "qtyMarijuana", "sell_field": "smarijuana",  "key": "marijuana"},
+    {"name": "Ecstasy",    "buy_field": "qtyEcstasy",   "sell_field": "secstasy",    "key": "ecstasy"},
+    {"name": "Acid",       "buy_field": "qtyAcid",       "sell_field": "sacid",       "key": "acid"},
+    {"name": "Speed",      "buy_field": "qtySpeed",      "sell_field": "sspeed",      "key": "speed"},
+    {"name": "P / ICE",    "buy_field": "qtyICE",        "sell_field": "sP",          "key": "ice"},
+    {"name": "Heroin",     "buy_field": "qtyHeroin",     "sell_field": "sheroin",     "key": "heroin"},
+    {"name": "Cocaine",    "buy_field": "qtyCocaine",    "sell_field": "scocaine",    "key": "cocaine"},
+]
+
+
+def _parse_middling_drug_name(raw: str) -> "str | None":
+    """Map a raw drug name from the deals page to our config key."""
+    raw_lower = raw.strip().lower()
+    mapping = {
+        "marijuana": "marijuana",
+        "ecstasy": "ecstasy",
+        "acid": "acid",
+        "speed": "speed",
+        "p / ice": "ice",
+        "p/ ice": "ice",
+        "heroin": "heroin",
+        "cocaine": "cocaine",
+    }
+    for k, v in mapping.items():
+        if k in raw_lower:
+            return v
+    return None
+
+
+def handle_do_middling(action: Action, state: GameState):
+    runner = action.params.get("runner", "")
+    buyer = action.params.get("buyer", "")
+    if not runner or not buyer:
+        state.add_log("Middling: missing runner or buyer name.")
+        return
+
+    c = cfg.load()
+    mid_cfg = c.get("middling", {})
+    max_on_hand = mid_cfg.get("max_on_hand", 500)
+    price_limits = mid_cfg.get("prices", {})
+
+    # Step 2a: check for outstanding trade to buyer
+    _nav(_u("/income/drugtrade.asp"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    for a in soup.find_all("a"):
+        href = a.get("href", "")
+        if "drugtrade.asp" in href and buyer.lower() in a.get_text(strip=True).lower():
+            state.add_log(f"Middling: deal failed — outstanding trade already exists to {buyer}.")
+            return
+
+    # Step 2b: check runner is a contact
+    _nav(_u("/income/deals.asp"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    runner_link = None
+    contacts_table = soup.find("table", attrs={"width": "200", "class": "column_title"})
+    if not contacts_table:
+        for tbl in soup.find_all("table", attrs={"width": "200"}):
+            for td in tbl.find_all("td", class_="column_title"):
+                continue
+            runner_link_candidate = tbl.find("a", string=re.compile(re.escape(runner), re.IGNORECASE))
+            if runner_link_candidate:
+                runner_link = runner_link_candidate
+                break
+    else:
+        runner_link = contacts_table.find("a", string=re.compile(re.escape(runner), re.IGNORECASE))
+
+    if not runner_link:
+        for a in soup.find_all("a", href=re.compile(r"deals\.asp\?action=list")):
+            if a.get_text(strip=True).lower() == runner.lower():
+                runner_link = a
+                break
+
+    if not runner_link:
+        state.add_log(f"Middling: deal failed — {runner} is not a contact.")
+        return
+
+    runner_href = runner_link.get("href", "")
+    runner_id_match = re.search(r"id=(\d+)", runner_href)
+    if not runner_id_match:
+        state.add_log(f"Middling: deal failed — could not parse runner ID from link.")
+        return
+    runner_id = runner_id_match.group(1)
+
+    # Step 2c: check runner's drug stock
+    _nav(_u(f"/income/deals.asp?action=list&id={runner_id}"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    drug_stock = []
+    rows = soup.find_all("tr")
+    for row in rows:
+        tds = row.find_all("td")
+        if len(tds) < 6:
+            continue
+        drug_td = tds[1]
+        raw_name = drug_td.get_text(strip=True).split("(")[0].strip() if drug_td else ""
+        drug_key = _parse_middling_drug_name(raw_name)
+        if not drug_key:
+            continue
+
+        price_text = tds[2].get_text(strip=True)
+        try:
+            price = int(re.sub(r"[^0-9]", "", price_text))
+        except ValueError:
+            price = 0
+
+        qty_text = tds[3].get_text(strip=True)
+        try:
+            qty_available = int(re.sub(r"[^0-9]", "", qty_text))
+        except ValueError:
+            qty_available = 0
+
+        owned_text = tds[4].get_text(strip=True)
+        try:
+            qty_owned = int(re.sub(r"[^0-9]", "", owned_text))
+        except ValueError:
+            qty_owned = 0
+
+        input_el = tds[5].find("input")
+        buy_field = input_el.get("name", "") if input_el else ""
+
+        drug_stock.append({
+            "key": drug_key,
+            "name": raw_name,
+            "price": price,
+            "available": qty_available,
+            "owned": qty_owned,
+            "buy_field": buy_field,
+        })
+
+    total_available = sum(d["available"] for d in drug_stock)
+    if total_available == 0:
+        state.add_log(f"Middling: deal failed — {runner} has no drugs in stock.")
+        return
+
+    # Check prices against tolerance
+    for d in drug_stock:
+        if d["available"] > 0:
+            max_price = price_limits.get(d["key"], 0)
+            if max_price > 0 and d["price"] > max_price:
+                state.add_log(
+                    f"Middling: deal failed — {d['name']} price ${d['price']:,} "
+                    f"exceeds max ${max_price:,}."
+                )
+                return
+
+    # Check on-hand capacity
+    total_held = sum(d["owned"] for d in drug_stock)
+    if total_held + 100 > max_on_hand:
+        state.add_log(
+            f"Middling: deal failed — too many drugs on hand "
+            f"({total_held} held + 100 = {total_held + 100} > {max_on_hand} max)."
+        )
+        return
+
+    # Step 3a: buy 100 drugs, starting from bottom of list
+    buy_plan = {}
+    remaining = 100
+    for d in reversed(drug_stock):
+        if remaining <= 0:
+            break
+        if d["available"] <= 0:
+            continue
+        buy_qty = min(d["available"], remaining)
+        buy_plan[d["key"]] = {"qty": buy_qty, "price": d["price"], "field": d["buy_field"]}
+        remaining -= buy_qty
+
+    if remaining > 0:
+        state.add_log(
+            f"Middling: deal failed — only {100 - remaining} drugs available, need 100."
+        )
+        return
+
+    total_sell_price = sum(v["qty"] * v["price"] for v in buy_plan.values())
+    buy_summary = ", ".join(f"{v['qty']}x {k}" for k, v in buy_plan.items())
+    state.add_log(f"Middling: buying from {runner}: {buy_summary} (total ${total_sell_price:,})")
+
+    page = browser.page()
+    for d_key, info in buy_plan.items():
+        page.fill(f"input[name='{info['field']}']", str(info["qty"]))
+    page.click("input[type='submit'][value='Buy']")
+    time.sleep(1)
+
+    if not _check_session(state):
+        return
+
+    # Step 3b: sell to buyer
+    _nav(_u("/income/drugtrade.asp?display=sell"), state)
+    if not _check_session(state):
+        return
+
+    page = browser.page()
+    page.fill("input[name='username']", buyer)
+    page.fill("input[name='price']", str(total_sell_price))
+
+    sell_field_map = {d["key"]: d["sell_field"] for d in _MIDDLING_DRUGS}
+    for d_key, info in buy_plan.items():
+        sell_field = sell_field_map.get(d_key, "")
+        if sell_field:
+            page.fill(f"input[name='{sell_field}']", str(info["qty"]))
+
+    page.click("input[type='submit'][value='Sell']")
+    time.sleep(1)
+
+    if not _check_session(state):
+        return
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    result_div = soup.find("div", class_="successmsg") or soup.find("div", class_="errormsg")
+    if result_div:
+        msg = result_div.get_text(strip=True)
+        state.add_log(f"Middling: sell to {buyer} result — {msg}")
+    else:
+        html_text = soup.get_text(" ", strip=True)[:200]
+        state.add_log(f"Middling: sell to {buyer} — {html_text}")
+
+
+def handle_middling_load_stock(action: Action, state: GameState):
+    """Navigate to a contact's deals page and return parsed stock data."""
+    contact = action.params.get("contact", "")
+    result_queue = action.params.get("_result_queue")
+    if not contact:
+        if result_queue:
+            result_queue.put({"error": "No contact name provided"})
+        return
+
+    _nav(_u("/income/deals.asp"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    contact_link = None
+    for a in soup.find_all("a", href=re.compile(r"deals\.asp\?action=list")):
+        if a.get_text(strip=True).lower() == contact.lower():
+            contact_link = a
+            break
+
+    if not contact_link:
+        if result_queue:
+            result_queue.put({"error": f"{contact} is not a contact"})
+        return
+
+    href = contact_link.get("href", "")
+    id_match = re.search(r"id=(\d+)", href)
+    if not id_match:
+        if result_queue:
+            result_queue.put({"error": "Could not parse contact ID"})
+        return
+
+    _nav(_u(f"/income/deals.asp?action=list&id={id_match.group(1)}"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    stock = []
+    for row in soup.find_all("tr"):
+        tds = row.find_all("td")
+        if len(tds) < 6:
+            continue
+        raw_name = tds[1].get_text(strip=True).split("(")[0].strip() if tds[1] else ""
+        drug_key = _parse_middling_drug_name(raw_name)
+        if not drug_key:
+            continue
+        price_text = tds[2].get_text(strip=True)
+        try:
+            price = int(re.sub(r"[^0-9]", "", price_text))
+        except ValueError:
+            price = 0
+        qty_text = tds[3].get_text(strip=True)
+        try:
+            available = int(re.sub(r"[^0-9]", "", qty_text))
+        except ValueError:
+            available = 0
+        input_el = tds[5].find("input")
+        buy_field = input_el.get("name", "") if input_el else ""
+        stock.append({"key": drug_key, "name": raw_name, "price": price,
+                       "available": available, "buy_field": buy_field})
+
+    if result_queue:
+        result_queue.put({"stock": stock, "contact_id": id_match.group(1)})
+
+
+def handle_middling_buy(action: Action, state: GameState):
+    """Buy specified quantities of drugs from a contact."""
+    contact_id = action.params.get("contact_id", "")
+    quantities = action.params.get("quantities", {})
+    result_queue = action.params.get("_result_queue")
+
+    if not contact_id or not quantities:
+        if result_queue:
+            result_queue.put({"error": "Missing contact_id or quantities"})
+        return
+
+    _nav(_u(f"/income/deals.asp?action=list&id={contact_id}"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+
+    page = browser.page()
+    for field_name, qty in quantities.items():
+        if qty > 0:
+            page.fill(f"input[name='{field_name}']", str(qty))
+
+    page.click("input[type='submit'][value='Buy']")
+    time.sleep(1)
+
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired after buy"})
+        return
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    result_div = soup.find("div", class_="successmsg") or soup.find("div", class_="errormsg")
+    msg = result_div.get_text(strip=True) if result_div else "Purchase submitted"
+    state.add_log(f"Middling manual buy: {msg}")
+    if result_queue:
+        result_queue.put({"success": True, "message": msg})
+
+
+def handle_middling_load_sell(action: Action, state: GameState):
+    """Navigate to the sell page and return carrying amounts."""
+    result_queue = action.params.get("_result_queue")
+
+    _nav(_u("/income/drugtrade.asp?display=sell"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+
+    carrying = {}
+    for d in _MIDDLING_DRUGS:
+        inp = soup.find("input", attrs={"name": d["sell_field"]})
+        if inp:
+            row = inp.find_parent("tr")
+            if row:
+                tds = row.find_all("td")
+                if len(tds) >= 3:
+                    carry_text = tds[2].get_text(strip=True)
+                    try:
+                        carrying[d["key"]] = int(re.sub(r"[^0-9]", "", carry_text))
+                    except ValueError:
+                        carrying[d["key"]] = 0
+                    continue
+        carrying[d["key"]] = 0
+
+    if result_queue:
+        result_queue.put({"carrying": carrying})
+
+
+def handle_middling_sell(action: Action, state: GameState):
+    """Sell drugs to a player."""
+    buyer = action.params.get("buyer", "")
+    price = action.params.get("price", 0)
+    quantities = action.params.get("quantities", {})
+    result_queue = action.params.get("_result_queue")
+
+    if not buyer or not price:
+        if result_queue:
+            result_queue.put({"error": "Missing buyer or price"})
+        return
+
+    _nav(_u("/income/drugtrade.asp?display=sell"), state)
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired"})
+        return
+
+    page = browser.page()
+    page.fill("input[name='username']", buyer)
+    page.fill("input[name='price']", str(price))
+
+    sell_field_map = {d["key"]: d["sell_field"] for d in _MIDDLING_DRUGS}
+    for d_key, qty in quantities.items():
+        field = sell_field_map.get(d_key, "")
+        if field and qty > 0:
+            page.fill(f"input[name='{field}']", str(qty))
+
+    page.click("input[type='submit'][value='Sell']")
+    time.sleep(1)
+
+    if not _check_session(state):
+        if result_queue:
+            result_queue.put({"error": "Session expired after sell"})
+        return
+
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    result_div = soup.find("div", class_="successmsg") or soup.find("div", class_="errormsg")
+    msg = result_div.get_text(strip=True) if result_div else "Sell submitted"
+    state.add_log(f"Middling manual sell to {buyer}: {msg}")
+    if result_queue:
+        result_queue.put({"success": True, "message": msg})
+
+
+# ---------------------------------------------------------------------------
 # Blind eye handler
 # ---------------------------------------------------------------------------
 
@@ -4207,9 +4848,35 @@ def handle_check_comms(action: Action, state: GameState):
 
                 if cid not in existing or new_count > old_count:
                     import config as cfg
-                    if cfg.load().get("notifications", {}).get("new_message", False):
+                    c_snap = cfg.load()
+                    if c_snap.get("notifications", {}).get("new_message", False):
                         sender = conv.get("other_player", "Unknown")
                         state.push_notification("new_message", f"New message from {sender}: {conv.get('subject', '')}")
+
+                    if c_snap.get("middling", {}).get("enabled", False):
+                        from tasks.middling import parse_middle_command, validate_middle_players, _middling_queue
+                        msgs = conv.get("messages", [])
+                        old_msg_count = existing.get("_middling_parsed_count", 0)
+                        if msgs and len(msgs) > old_msg_count:
+                            latest_msg = msgs[-1]
+                            m_sender = latest_msg.get("from", "Unknown")
+                            body_text = latest_msg.get("body", "")
+                            first_line = body_text.split("\n", 1)[0].strip() if body_text else ""
+                            state.add_log(f"Middling parser: new msg from {m_sender} — first line: {first_line!r}")
+                            parsed = parse_middle_command(body_text)
+                            if parsed:
+                                m_runner, m_buyer = parsed
+                                state.add_log(f"Middling parser: matched !middle runner={m_runner} buyer={m_buyer}")
+                                if _middling_queue is not None:
+                                    err = validate_middle_players(m_runner, m_buyer)
+                                    if err:
+                                        state.add_log(f"Middling command from {m_sender} rejected: {err}")
+                                    else:
+                                        _middling_queue.put({"action": "do_middling", "runner": m_runner, "buyer": m_buyer})
+                                        state.add_log(f"Middling command queued from {m_sender}: !middle {m_runner} {m_buyer}")
+                            else:
+                                state.add_log(f"Middling parser: no !middle command found in message")
+                            conv["_middling_parsed_count"] = len(msgs)
             else:
                 for k, v in conv.items():
                     if k != "messages":
@@ -5817,6 +6484,11 @@ HANDLERS = {
     "reply_comms": handle_reply_comms,
     "archive_comms": handle_archive_comms,
     "check_drug_trade": handle_check_drug_trade,
+    "do_middling": handle_do_middling,
+    "middling_load_stock": handle_middling_load_stock,
+    "middling_buy": handle_middling_buy,
+    "middling_load_sell": handle_middling_load_sell,
+    "middling_sell": handle_middling_sell,
     "do_blind_eye": handle_blind_eye,
     "check_warrants": handle_check_warrants,
     "turn_in_warrant": handle_turn_in_warrant,
@@ -5868,14 +6540,16 @@ class ActionExecutor:
                     state.add_log(f"Error executing {action.kind}: {e}")
 
                 # Recovery — get the browser back to a known safe page
-                if "Page crashed" in err or "has been closed" in err or "ERR_INSUFFICIENT_RESOURCES" in err:
+                if browser.is_lost_error(err):
                     state.add_log("Browser/page lost — restarting browser.")
+                    # Whatever the browser was mid-way through is gone with it.
+                    state.logged_in = False
+                    state.agg_tab_active = False
                     try:
                         headless = cfg.load().get("misc", {}).get("headless", False)
                         browser.stop()
                         browser.start(headless=headless)
                         state.add_log("Browser restarted — will re-login on next tick.")
-                        state.logged_in = False
                     except Exception as restart_err:
                         state.add_log(f"Browser restart failed: {restart_err}")
                 elif any(kw in err for kw in ("Timeout", "interrupted by another navigation", "net::", "ERR_")):
@@ -5892,5 +6566,15 @@ class ActionExecutor:
                     except Exception as rec_err:
                         state.add_log(f"Recovery navigation failed: {rec_err} — marking as logged out.")
                         state.logged_in = False
+                        if browser.is_lost_error(rec_err):
+                            state.add_log("Browser lost during recovery — restarting browser.")
+                            state.agg_tab_active = False
+                            try:
+                                headless = cfg.load().get("misc", {}).get("headless", False)
+                                browser.stop()
+                                browser.start(headless=headless)
+                                state.add_log("Browser restarted — will re-login on next tick.")
+                            except Exception as restart_err:
+                                state.add_log(f"Browser restart failed: {restart_err}")
         else:
             state.add_log(f"No handler for action: {action.kind}")

@@ -145,6 +145,13 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["aggravated_crimes"]["torch"]["torch_payback_public"] = data.get("torch_payback_public", "everyone")
     c["aggravated_crimes"]["torch"]["torch_payback_private"] = data.get("torch_payback_private", "everyone")
     c["aggravated_crimes"]["fallback_to_away"] = data.get("fallback_to_away", False)
+    c["aggravated_crimes"]["separate_tab"] = data.get("agg_separate_tab", False)
+    c["aggravated_crimes"]["target_young_only"] = data.get("target_young_only", False)
+    try:
+        _young_hours = float(data.get("young_age_threshold_hours", 24) or 24)
+    except (TypeError, ValueError):
+        _young_hours = 24
+    c["aggravated_crimes"]["young_age_threshold_hours"] = max(1, _young_hours)
 
     c["action"]["enabled"] = data.get("action_enabled", False)
     c["action"]["type"] = data.get("action_type", "community_service")
@@ -244,6 +251,15 @@ def _apply_payload(c: dict, data: dict) -> dict:
         if f"autobuy_qty_{key}" in data:
             c["autobuy"]["drugs"][key]["max_qty"] = int(data[f"autobuy_qty_{key}"])
 
+    c.setdefault("middling", {})
+    c["middling"]["enabled"] = data.get("middling_enabled", False)
+    c["middling"]["max_on_hand"] = int(data.get("middling_max_on_hand", 500) or 500)
+    c["middling"].setdefault("prices", {})
+    _MID_DRUGS = ["marijuana", "ecstasy", "acid", "speed", "ice", "heroin", "cocaine"]
+    for key in _MID_DRUGS:
+        if f"middling_price_{key}" in data:
+            c["middling"]["prices"][key] = int(data[f"middling_price_{key}"])
+
     c.setdefault("gym", {})
     c["gym"]["enabled"] = data.get("gym_enabled", False)
     c["gym"]["activity"] = data.get("gym_activity", "weights")
@@ -306,6 +322,8 @@ def _apply_payload(c: dict, data: dict) -> dict:
         c["case_work"]["hospital"]["tasks"] = data["hospital_tasks"]
     c["case_work"].setdefault("fire", {})
     c["case_work"]["fire"]["poll_interval"] = max(31, int(data.get("fire_poll_interval", 31)))
+    if data.get("fire_tasks"):
+        c["case_work"]["fire"]["tasks"] = data["fire_tasks"]
     c["case_work"].setdefault("engineering", {})
     c["case_work"]["engineering"]["poll_interval"] = max(31, int(data.get("engineering_poll_interval", 31)))
     c["case_work"].setdefault("banking", {})
@@ -494,6 +512,12 @@ def cancel_snipe():
 @app.route("/start-snipe", methods=["POST"])
 def start_snipe():
     bot.start_snipe()
+    return jsonify({"ok": True})
+
+
+@app.route("/cancel-agg-tab", methods=["POST"])
+def cancel_agg_tab():
+    bot.cancel_agg_tab()
     return jsonify({"ok": True})
 
 
@@ -751,6 +775,8 @@ def status():
         "earn_mode": cfg.load().get("earns", {}).get("earn_mode", "auto"),
         "current_task": s.current_task,
         "snipe_active": s.snipe_active,
+        "agg_tab_active": s.agg_tab_active,
+        "agg_tab_crime": s.agg_tab_crime,
         "in_jail": s.in_jail,
         "jail_rank": s.jail_rank,
         "jail_consumables": s.jail_consumables,
@@ -793,6 +819,8 @@ def status():
         "launder_cooldown": __import__("executor").launder_cooldown_remaining(),
         "banking_mature_at": _get_banking_mature_at(),
         "available_skills": sorted(bot.state.available_skills),
+        "lawyer_cases_by_city": bot.state.lawyer_cases_by_city,
+        "lawyer_case_details": bot.state.lawyer_case_details,
     })
 
 
@@ -1080,6 +1108,103 @@ def _validate_player(name: str) -> tuple[bool, str]:
     if not row["active"]:
         return False, f"Player '{name}' is not active (dead or inactive)."
     return True, "OK"
+
+
+@app.route("/middling/load-stock", methods=["POST"])
+def middling_load_stock():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    data = request.get_json(silent=True) or {}
+    contact = data.get("contact", "").strip()
+    if not contact:
+        return jsonify({"error": "No contact name provided."}), 400
+    import queue as _q
+    result_q = _q.Queue()
+    bot._middling_queue.put({
+        "action": "middling_load_stock",
+        "contact": contact,
+        "_result_queue": result_q,
+    })
+    try:
+        result = result_q.get(timeout=30)
+    except _q.Empty:
+        return jsonify({"error": "Timed out waiting for stock data."}), 504
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/middling/buy", methods=["POST"])
+def middling_buy():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    data = request.get_json(silent=True) or {}
+    contact_id = data.get("contact_id", "")
+    quantities = data.get("quantities", {})
+    if not contact_id or not quantities:
+        return jsonify({"error": "Missing contact_id or quantities."}), 400
+    import queue as _q
+    result_q = _q.Queue()
+    bot._middling_queue.put({
+        "action": "middling_buy",
+        "contact_id": contact_id,
+        "quantities": quantities,
+        "_result_queue": result_q,
+    })
+    try:
+        result = result_q.get(timeout=30)
+    except _q.Empty:
+        return jsonify({"error": "Timed out waiting for buy result."}), 504
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/middling/load-sell", methods=["POST"])
+def middling_load_sell():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    import queue as _q
+    result_q = _q.Queue()
+    bot._middling_queue.put({
+        "action": "middling_load_sell",
+        "_result_queue": result_q,
+    })
+    try:
+        result = result_q.get(timeout=30)
+    except _q.Empty:
+        return jsonify({"error": "Timed out waiting for sell page data."}), 504
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/middling/sell", methods=["POST"])
+def middling_sell():
+    if not bot.is_running():
+        return jsonify({"error": "Bot is not running."}), 400
+    data = request.get_json(silent=True) or {}
+    buyer = data.get("buyer", "").strip()
+    price = data.get("price", 0)
+    quantities = data.get("quantities", {})
+    if not buyer or not price:
+        return jsonify({"error": "Missing buyer or price."}), 400
+    import queue as _q
+    result_q = _q.Queue()
+    bot._middling_queue.put({
+        "action": "middling_sell",
+        "buyer": buyer,
+        "price": int(price),
+        "quantities": quantities,
+        "_result_queue": result_q,
+    })
+    try:
+        result = result_q.get(timeout=30)
+    except _q.Empty:
+        return jsonify({"error": "Timed out waiting for sell result."}), 504
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
 
 
 @app.route("/character_history")
@@ -1594,7 +1719,7 @@ def players_groups_delete():
 
 @app.route("/players/groups/update_color", methods=["POST"])
 def players_groups_update_color():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     pl.update_group_color(data.get("name", ""), data.get("color", "#3498db"))
     return jsonify({"ok": True})
 
@@ -1617,9 +1742,13 @@ def players_groups_update_assignment():
 
 @app.route("/players/groups/rename", methods=["POST"])
 def players_groups_rename():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     import player_db as _db
-    ok = _db.rename_group(data.get("old_name", ""), data.get("new_name", "").strip())
+    old_name = data.get("old_name", "")
+    new_name = data.get("new_name", "").strip()
+    if not old_name or not new_name:
+        return jsonify({"ok": False, "error": "Name cannot be empty."})
+    ok = _db.rename_group(old_name, new_name)
     return jsonify({"ok": ok, "error": "Name already exists." if not ok else None})
 
 

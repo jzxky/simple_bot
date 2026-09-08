@@ -86,14 +86,19 @@ class FireCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Volunteer Fire Fighter", "Fire Fighter", "Fire Chief"}
     HOME_CITY_ONLY = False
 
+    def __init__(self, poll_interval: int = 31, tasks: list = None):
+        super().__init__(poll_interval)
+        self._tasks = tasks or []
+
     def _action(self) -> Action:
-        return Action("check_fire_cases")
+        return Action("check_fire_cases", tasks=self._tasks)
 
 
 class LawyerCaseWorkTask(CaseWorkTask):
     ELIGIBLE_OCCUPATIONS = {"Lawyer"}
     HOME_CITY_ONLY = False
     USES_CASE_TIMER = True
+    changes_city = True  # auto-travel path (config-gated); paused with the rest of the task while a crime tab is active
 
     def __init__(self, poll_interval: int = 31):
         super().__init__(poll_interval)

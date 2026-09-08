@@ -37,7 +37,10 @@ DEFAULT_CONFIG = {
             "torch_payback_public": "everyone",
             "torch_payback_private": "everyone"
         },
-        "fallback_to_away": False
+        "fallback_to_away": False,
+        "target_young_only": False,
+        "young_age_threshold_hours": 24,
+        "separate_tab": False
     },
     "action": {
         "enabled": True,
@@ -91,7 +94,12 @@ DEFAULT_CONFIG = {
             ]
         },
         "fire": {
-            "poll_interval": 31
+            "poll_interval": 31,
+            "tasks": [
+                {"type": "fires",          "enabled": True},
+                {"type": "investigations", "enabled": True},
+                {"type": "inspections",    "enabled": True},
+            ]
         },
         "engineering": {
             "poll_interval": 31,
@@ -111,7 +119,8 @@ DEFAULT_CONFIG = {
             "weed_queue_threshold": 1,
             "prioritize_friendly": False,
             "travel_guard": False,
-            "auto_travel": False
+            "auto_travel": False,
+            "blacklisted_cases": []
         }
     },
     "players": {
@@ -257,6 +266,19 @@ DEFAULT_CONFIG = {
     },
     "communications": {
         "enabled": False
+    },
+    "middling": {
+        "enabled": False,
+        "max_on_hand": 500,
+        "prices": {
+            "marijuana": 500,
+            "ecstasy": 6000,
+            "acid": 2000,
+            "speed": 3000,
+            "ice": 3500,
+            "heroin": 5000,
+            "cocaine": 5000,
+        }
     },
     "notifications": {
         "bionics_in_stock":        True,

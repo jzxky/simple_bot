@@ -55,6 +55,8 @@ class GameState:
     snipe_top_job_pending: bool = False
     snipe_top_job_promo_url: str = ""
     snipe_active: bool = False
+    agg_tab_active: bool = False
+    agg_tab_crime: str = ""   # crime kind currently running on the agg-crimes tab, else ""
     in_jail: bool = False
     jail_rank: str = ""
     has_new_journals: bool = False
@@ -76,6 +78,7 @@ class GameState:
     notifications: list = field(default_factory=list)
     available_skills: set = field(default_factory=set)
     lawyer_cases_by_city: dict = field(default_factory=dict)
+    lawyer_case_details: list = field(default_factory=list)
 
     def __post_init__(self):
         self.notifications = notifications_store.load()

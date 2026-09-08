@@ -23,6 +23,10 @@ class Scheduler:
                 if debug:
                     state.add_log(f"[DEBUG] {label}: skip (in hospital)")
                 continue
+            if state.agg_tab_active and task.changes_city:
+                if debug:
+                    state.add_log(f"[DEBUG] {label}: skip (crime tab active)")
+                continue
             if task.can_run(state):
                 if debug:
                     state.add_log(f"[DEBUG] {label}: running")
@@ -43,6 +47,8 @@ class Scheduler:
             reasons = []
             if state.in_hospital and not task.run_in_hospital:
                 reasons.append("In hospital")
+            if state.agg_tab_active and task.changes_city:
+                reasons.append("Crime tab active")
             try:
                 reasons.extend(task.blocked_reasons(state))
             except Exception:

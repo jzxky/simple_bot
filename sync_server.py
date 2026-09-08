@@ -106,10 +106,20 @@ def _migrate_career_ts_format(con):
     for row in rows:
         old_ts = row[1]
         new_ts = old_ts[:10] + "T" + old_ts[11:] + "Z"
-        con.execute(
-            "UPDATE career SET ts = ? WHERE username = ? AND ts = ?",
-            (new_ts, row[0], old_ts),
-        )
+        existing = con.execute(
+            "SELECT 1 FROM career WHERE username = ? AND ts = ?",
+            (row[0], new_ts),
+        ).fetchone()
+        if existing:
+            con.execute(
+                "DELETE FROM career WHERE username = ? AND ts = ?",
+                (row[0], old_ts),
+            )
+        else:
+            con.execute(
+                "UPDATE career SET ts = ? WHERE username = ? AND ts = ?",
+                (new_ts, row[0], old_ts),
+            )
     con.commit()
 
 

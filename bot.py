@@ -46,6 +46,7 @@ from tasks.jailbreak import PlanJailBreakTask, ExecuteJailBreakTask, CallOffJail
 from tasks.auto_jail_time import AutoJailTimeTask, AutoJailTimeExecuteTask, AutoJailConsumablesRestoreTask
 from tasks.journal import JournalCheckTask, ArchiveJournalsTask, JournalActionTask, set_drug_trade_queue, set_illness_queue, set_repair_complete_queue, set_journal_action_queue
 from tasks.communications import CommsCheckTask, CommsSendTask, CommsArchiveTask, set_comms_send_queue, set_comms_archive_queue
+from tasks.middling import MiddlingTask, set_middling_queue
 from tasks.drug_trade import DrugTradeTask
 from tasks.blind_eye import BlindEyeTask
 from tasks.illness import IllnessTask
@@ -74,6 +75,7 @@ _weapon_store_task = None
 _drug_store_task = None
 _auto_jail_task = None
 _snipe_task = None
+_agg_task = None
 _auto_jail_check_queue: queue.Queue = queue.Queue()
 _scheduler_snapshot: list = []
 _sched: "Scheduler | None" = None
@@ -82,6 +84,7 @@ _stop_event = threading.Event()
 _pause_event = threading.Event()
 _reload_event = threading.Event()
 _cancel_snipe_event = threading.Event()
+_cancel_agg_event = threading.Event()
 _reload_requested_at: float = 0.0
 _RELOAD_DEBOUNCE = 2.0  # seconds
 _consume_queue: queue.Queue = queue.Queue()
@@ -99,6 +102,8 @@ _comms_send_queue: queue.Queue = queue.Queue()
 _comms_archive_queue: queue.Queue = queue.Queue()
 set_comms_send_queue(_comms_send_queue)
 set_comms_archive_queue(_comms_archive_queue)
+_middling_queue: queue.Queue = queue.Queue()
+set_middling_queue(_middling_queue)
 _drug_trade_queue: queue.Queue = queue.Queue()
 set_drug_trade_queue(_drug_trade_queue)
 _illness_queue: queue.Queue = queue.Queue()
@@ -146,6 +151,23 @@ def _transfer_state(old_sched: Scheduler, new_sched: Scheduler):
                 setattr(new_task, attr, getattr(old, attr))
 
 
+def _restart_browser(state: GameState, c: dict) -> bool:
+    """Tear down and relaunch the browser after the driver or browser died.
+    Returns True if the new browser came up."""
+    state.logged_in = False
+    state.agg_tab_active = False
+    state.snipe_active = False
+    try:
+        browser.stop()
+        browser.start(headless=c.get("misc", {}).get("headless", False))
+        state.add_log("Browser restarted — will re-login on next tick.")
+        return True
+    except Exception as e:
+        state.add_log(f"Browser restart failed: {e}")
+        state.last_error = str(e)
+        return False
+
+
 def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched = Scheduler()
 
@@ -166,6 +188,8 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             )
             sched.add(_earns_task_ref)
 
+    global _agg_task
+    _agg_task = None
     if c.get("aggravated_crimes", {}).get("enabled", False):
         ac = c["aggravated_crimes"]
         pri = ac.get("primary", {})
@@ -183,10 +207,12 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             torch_private=torch.get("torch_private", False),
             torch_payback_public=torch.get("torch_payback_public", "everyone"),
             torch_payback_private=torch.get("torch_payback_private", "everyone"),
+            separate_tab=ac.get("separate_tab", False),
         )
         agg_task.scheduler = sched
         sched.add(agg_task)
         sched.add(CSPunishmentTask())
+        _agg_task = agg_task
 
     action_cfg = c.get("action", {})
     if action_cfg.get("enabled", False):
@@ -217,7 +243,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
         eng = cw_cfg.get("engineering", {})
         sched.add(EngineeringCaseWorkTask(poll_interval=eng.get("poll_interval", 31), tasks=eng.get("tasks", [])))
         fire = cw_cfg.get("fire", {})
-        sched.add(FireCaseWorkTask(poll_interval=fire.get("poll_interval", 31)))
+        sched.add(FireCaseWorkTask(poll_interval=fire.get("poll_interval", 31), tasks=fire.get("tasks", [])))
         banking = cw_cfg.get("banking", {})
         sched.add(BankingCaseWorkTask(poll_interval=banking.get("poll_interval", 60)))
         law = cw_cfg.get("law", {})
@@ -256,6 +282,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(CommsCheckTask())
     sched.add(CommsSendTask(_comms_send_queue))
     sched.add(CommsArchiveTask(_comms_archive_queue))
+    sched.add(MiddlingTask(_middling_queue))
     sched.add(DrugTradeTask(_drug_trade_queue))
     sched.add(BlindEyeTask())
     sched.add(IllnessTask(_illness_queue))
@@ -490,10 +517,13 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Turn in warrant error: {e}")
 
-            # Travel requests
+            # Travel requests — a manual travel request always wins; finish the
+            # crime tab first so it isn't left running against a stale city.
             if not _travel_queue.empty():
                 try:
                     params = _travel_queue.get_nowait()
+                    if state.agg_tab_active and _agg_task is not None:
+                        _agg_task.stop_tab(state)
                     executor.execute(Action("travel", **params), state)
                 except Exception as e:
                     state.add_log(f"Travel error: {e}")
@@ -558,18 +588,36 @@ def _run(c: dict):
             if _stop_event.is_set():
                 break
 
-            # Reload config and rebuild scheduler if Save was pressed (debounced)
+            # Reload config and rebuild scheduler if Save was pressed (debounced).
+            # Rebuilding replaces the AggCrimeTask instance, so finish any tab run
+            # first — otherwise its page/generator would be orphaned.
             if _reload_event.is_set() and time.monotonic() - _reload_requested_at >= _RELOAD_DEBOUNCE:
                 _reload_event.clear()
+                if state.agg_tab_active and _agg_task is not None:
+                    _agg_task.stop_tab(state)
                 c = cfg.load()
                 sched = _build_scheduler(c, old_sched=sched)
                 _sched = sched
                 state.add_log("Config reloaded.")
 
-            sched.tick(state, executor)
+            try:
+                sched.tick(state, executor)
 
-            if state.snipe_active and _snipe_task is not None:
-                _snipe_task.tick_snipe(state)
+                if state.snipe_active and _snipe_task is not None:
+                    _snipe_task.tick_snipe(state)
+
+                if state.agg_tab_active and _agg_task is not None:
+                    _agg_task.tick_agg(state)
+            except Exception as tick_err:
+                # Task code that talks to the browser outside executor.execute()
+                # has no recovery of its own — a dead driver here would otherwise
+                # end the whole run.
+                if not browser.is_lost_error(tick_err):
+                    raise
+                state.add_log(f"Browser lost during tick: {tick_err} — restarting browser.")
+                if not _restart_browser(state, c):
+                    # Don't spin on a machine that can't launch Chrome right now.
+                    time.sleep(30)
 
             _scheduler_snapshot = sched.snapshot(state)
 
@@ -664,6 +712,8 @@ def _run(c: dict):
         if state.snipe_active and _snipe_task is not None:
             _cancel_snipe_event.set()
             _snipe_task.tick_snipe(state)
+        if state.agg_tab_active and _agg_task is not None:
+            _agg_task.stop_tab(state)
         try:
             if state.logged_in and c.get("misc", {}).get("logout_on_stop", True):
                 state.add_log("Logging out...")
@@ -685,6 +735,7 @@ def start():
     _stop_event.clear()
     _pause_event.clear()
     _cancel_snipe_event.clear()
+    _cancel_agg_event.clear()
     c = cfg.load()
     _thread = threading.Thread(target=_run, args=(c,), daemon=True)
     _thread.start()
@@ -694,12 +745,17 @@ def stop():
     _stop_event.set()
     _pause_event.clear()
     _cancel_snipe_event.set()
+    _cancel_agg_event.set()
     from executor import reset_all_cooldowns
     reset_all_cooldowns()
 
 
 def cancel_snipe():
     _cancel_snipe_event.set()
+
+
+def cancel_agg_tab():
+    _cancel_agg_event.set()
 
 
 def start_snipe():

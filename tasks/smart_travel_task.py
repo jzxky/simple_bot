@@ -24,6 +24,7 @@ def _travel_free(state: GameState) -> bool:
 class SmartTravelTask(Task):
     priority = 45  # below gym (55)/casino (50) so activities run first when in-city
     label = "Smart Travel"
+    changes_city = True
 
     def __init__(self):
         self._last: float = 0.0

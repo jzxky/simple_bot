@@ -22,6 +22,7 @@
       <span id="status-text">Stopped</span>
       <span id="status-task" class="status-task"></span>
       <button id="cancel-snipe-btn" style="display:none; margin-left:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; padding:2px 10px; cursor:pointer; font-size:12px;" onclick="cancelSnipe()">Cancel Snipe</button>
+      <button id="cancel-agg-btn" style="display:none; margin-left:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; padding:2px 10px; cursor:pointer; font-size:12px;" onclick="cancelAggTab()">Cancel Crime Tab</button>
     </div>
   </header>
 
@@ -169,6 +170,7 @@
           <button class="tab-btn" id="income-tab-banking" onclick="showTab('income-banking', this)">Banking</button>
           <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)">Jail</button>
           <button class="tab-btn" onclick="showTab('income-skills', this)">Skills</button>
+          <button class="tab-btn" onclick="showTab('income-drugs', this)">Drugs</button>
         </div>
         <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
         <div id="income-jail" class="tab-panel">
@@ -279,6 +281,18 @@
               <label class="inline-toggle setting-row">Fall back to second option if no hacking targets
                 <label class="toggle-label"><input type="checkbox" id="fallback_to_away" {% if config.aggravated_crimes.get('fallback_to_away') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+              <label class="inline-toggle setting-row" title="Runs aggravated crimes in a dedicated second browser tab instead of the main one, so other tasks aren't blocked while a crime run is in progress.">Run in separate tab
+                <label class="toggle-label"><input type="checkbox" id="agg_separate_tab" {% if config.aggravated_crimes.get('separate_tab') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <label class="inline-toggle setting-row" title="Pickpocket, Mugging, Breaking &amp; Entering and Hacking only. Known players older than the threshold are removed from the target list.">Target young chars only
+                <label class="toggle-label"><input type="checkbox" id="target_young_only" {% if config.aggravated_crimes.get('target_young_only') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row">
+                <label for="young_age_threshold_hours">Max age (hours)</label>
+                <input type="number" id="young_age_threshold_hours" class="input-narrow" min="1" step="1" style="width:60px"
+                  value="{{ config.aggravated_crimes.get('young_age_threshold_hours', 24) }}"
+                  oninput="markNumDirty(this)">
+              </div>
             </div>
             <div class="settings-group">
               <h3>PvB</h3>
@@ -390,7 +404,37 @@
                 oninput="markNumDirty(this)">
               seconds
             </div>
-            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 0">Attends active fires and performs building inspections automatically when the case timer is ready.</p>
+            <table class="priority-table" id="fire-priority-table">
+              <thead>
+                <tr><th></th><th>#</th><th>Task</th><th>Enabled</th></tr>
+              </thead>
+              <tbody id="fire-priority-body">
+                {% set FIRE_META = {
+                  'fires':          'Attend Fires',
+                  'investigations': 'Police Investigations',
+                  'inspections':    'Building Inspections',
+                } %}
+                {% set fire_tasks = config.get('case_work', {}).get('fire', {}).get('tasks', [
+                  {'type':'fires',          'enabled':true},
+                  {'type':'investigations', 'enabled':true},
+                  {'type':'inspections',    'enabled':true},
+                ]) %}
+                {% for task in fire_tasks %}
+                <tr data-type="{{ task.type }}">
+                  <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
+                  <td class="priority-num">{{ loop.index }}</td>
+                  <td>{{ FIRE_META.get(task.type, task.type) }}</td>
+                  <td>
+                    <label class="toggle-label" style="justify-content:flex-start">
+                      <input type="checkbox" id="cw_fire_{{ task.type }}_enabled" {% if task.get('enabled', true) %}checked{% endif %} onchange="autoSave()">
+                      <span class="toggle"></span>
+                    </label>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 0">Attends active fires, performs police investigations and building inspections when the case timer is ready. Fires and investigations are read from the same page in one visit; the highest enabled priority that has work available is done first.</p>
           </div>
 
           <!-- Engineering -->
@@ -489,6 +533,15 @@
                 onchange="autoSave()"><span class="toggle"></span></label>
               <span>Auto-Travel</span>
               <span style="font-size:0.8rem;color:var(--muted)">(travel to cities with pending cases)</span>
+            </div>
+          </div>
+
+          <!-- Lawyer Case Summary -->
+          <div id="cw-law-summary" style="display:none;margin-top:12px">
+            <hr class="stat-divider">
+            <strong style="font-size:0.9rem">Case Summary</strong>
+            <div id="lawyer-case-summary" style="margin-top:6px;font-size:0.85rem;color:var(--muted)">
+              No case data yet.
             </div>
           </div>
 
@@ -709,6 +762,97 @@
               </div>
               <p class="placeholder">Iterates through players in the selected group, checking respect level for the player with the oldest check.</p>
             </div>
+          </div>
+        </div>
+
+        <!-- Drugs (Middling) tab -->
+        <div id="income-drugs" class="tab-panel">
+          {% set mid_cfg = config.get('middling', {}) %}
+          {% set mid_prices = mid_cfg.get('prices', {}) %}
+          <div class="settings-groups">
+
+            <div class="settings-group" style="grid-column:1/-1">
+              <h3>Drug Middling</h3>
+              <label class="inline-toggle setting-row">
+                Enable Middling
+                <label class="toggle-label">
+                  <input type="checkbox" id="middling_enabled"
+                    {% if mid_cfg.get('enabled') %}checked{% endif %}
+                    onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <p class="placeholder">Rank required: Piciotto, Enforcer, Dealer, or Giovane D'Honore. Responds to <code>!middle [runner] [buyer]</code> commands via in-game comms.</p>
+
+              <div class="setting-row">
+                <label for="middling_max_on_hand">Max drugs on hand</label>
+                <input type="number" id="middling_max_on_hand" class="input-narrow" min="0"
+                  value="{{ mid_cfg.get('max_on_hand', 500) }}" oninput="markNumDirty(this)">
+              </div>
+
+              <h4 style="margin-top:12px">Accepted Buy Prices (max price per unit)</h4>
+              <table class="stat-table" style="max-width:340px">
+                <thead><tr><th>Drug</th><th>Max Price</th></tr></thead>
+                <tbody>
+                  <tr><td>Marijuana</td><td><input type="number" id="middling_price_marijuana" class="input-narrow" min="0" value="{{ mid_prices.get('marijuana', 500) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Ecstasy</td><td><input type="number" id="middling_price_ecstasy" class="input-narrow" min="0" value="{{ mid_prices.get('ecstasy', 6000) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Acid</td><td><input type="number" id="middling_price_acid" class="input-narrow" min="0" value="{{ mid_prices.get('acid', 2000) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Speed</td><td><input type="number" id="middling_price_speed" class="input-narrow" min="0" value="{{ mid_prices.get('speed', 3000) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>P / ICE</td><td><input type="number" id="middling_price_ice" class="input-narrow" min="0" value="{{ mid_prices.get('ice', 3500) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Heroin</td><td><input type="number" id="middling_price_heroin" class="input-narrow" min="0" value="{{ mid_prices.get('heroin', 5000) }}" oninput="markNumDirty(this)"></td></tr>
+                  <tr><td>Cocaine</td><td><input type="number" id="middling_price_cocaine" class="input-narrow" min="0" value="{{ mid_prices.get('cocaine', 5000) }}" oninput="markNumDirty(this)"></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="settings-group" style="grid-column:1/-1">
+              <h3>Manual Drug Trade</h3>
+
+              <h4>Buy from Contact</h4>
+              <div class="setting-row">
+                <label for="middling_contact_name">Contact name</label>
+                <input type="text" id="middling_contact_name" class="input-wide" placeholder="Enter contact name">
+                <button class="btn btn-sm" onclick="middlingLoadStock()">Load Stock</button>
+              </div>
+              <div id="middling-stock-area" style="display:none; margin-top:8px">
+                <table class="stat-table" id="middling-stock-table" style="max-width:500px">
+                  <thead><tr><th>Drug</th><th>Price</th><th>Available</th><th>Buy Qty</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+                <button class="btn btn-sm" style="margin-top:6px" onclick="middlingBuy()">Buy</button>
+                <span id="middling-buy-result" style="margin-left:8px"></span>
+              </div>
+
+              <hr class="stat-divider" style="margin:16px 0">
+
+              <h4>Sell to Player</h4>
+              <button class="btn btn-sm" style="margin-bottom:8px" onclick="middlingLoadSell()">Load Carrying</button>
+              <div class="setting-row">
+                <label for="middling_sell_to">Sell to</label>
+                <input type="text" id="middling_sell_to" class="input-wide" placeholder="Player name">
+              </div>
+              <div class="setting-row">
+                <label for="middling_sell_price">Price</label>
+                <input type="number" id="middling_sell_price" class="input-narrow" min="0" value="0">
+              </div>
+              <div id="middling-sell-area" style="margin-top:8px">
+                <table class="stat-table" id="middling-sell-table" style="max-width:440px">
+                  <thead><tr><th>Drug</th><th>Carrying</th><th>Sell Qty</th></tr></thead>
+                  <tbody>
+                    <tr><td>Marijuana</td><td id="middling-carry-marijuana">0</td><td><input type="number" class="input-narrow" id="middling_sell_marijuana" min="0" value="0"></td></tr>
+                    <tr><td>Ecstasy</td><td id="middling-carry-ecstasy">0</td><td><input type="number" class="input-narrow" id="middling_sell_ecstasy" min="0" value="0"></td></tr>
+                    <tr><td>Acid</td><td id="middling-carry-acid">0</td><td><input type="number" class="input-narrow" id="middling_sell_acid" min="0" value="0"></td></tr>
+                    <tr><td>Speed</td><td id="middling-carry-speed">0</td><td><input type="number" class="input-narrow" id="middling_sell_speed" min="0" value="0"></td></tr>
+                    <tr><td>P / ICE</td><td id="middling-carry-ice">0</td><td><input type="number" class="input-narrow" id="middling_sell_ice" min="0" value="0"></td></tr>
+                    <tr><td>Heroin</td><td id="middling-carry-heroin">0</td><td><input type="number" class="input-narrow" id="middling_sell_heroin" min="0" value="0"></td></tr>
+                    <tr><td>Cocaine</td><td id="middling-carry-cocaine">0</td><td><input type="number" class="input-narrow" id="middling_sell_cocaine" min="0" value="0"></td></tr>
+                  </tbody>
+                </table>
+                <button class="btn btn-sm" style="margin-top:6px" onclick="middlingSell()">Offer Deal</button>
+                <span id="middling-sell-result" style="margin-left:8px"></span>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -1004,6 +1148,7 @@
                 {% for item in st_order %}
                   {% if item in SMART_TRAVEL_ITEMS %}
                   <tr data-item="{{ item }}" draggable="true">
+                    <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
                     <td class="priority-num">{{ loop.index }}</td>
                     <td>{{ SMART_TRAVEL_ITEMS[item] }}</td>
                   </tr>
@@ -1012,6 +1157,7 @@
                 {% for item, label in SMART_TRAVEL_ITEMS.items() %}
                   {% if item not in st_order %}
                   <tr data-item="{{ item }}" draggable="true">
+                    <td><div class="priority-move"><button onclick="_moveRow(this,-1)">▲</button><button onclick="_moveRow(this,1)">▼</button></div></td>
                     <td class="priority-num">{{ st_order|length + loop.index }}</td>
                     <td>{{ label }}</td>
                   </tr>
@@ -1826,16 +1972,20 @@
       </h2>
       <div class="card-body">
         <div class="tab-bar">
-          <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Player List</button>
+          <button class="tab-btn active" onclick="showTab('pl-tab-list', this)">Players</button>
           <button class="tab-btn" onclick="showTab('pl-tab-active', this); plRenderActive()">Active</button>
           <button class="tab-btn" onclick="showTab('pl-tab-groups', this)">Groups</button>
-          <button class="tab-btn" onclick="showTab('pl-tab-dead', this); plRenderRecentDead()">Obituaries</button>
-          <button class="tab-btn" onclick="showTab('pl-tab-born', this); plRenderRecentBorn()">Births</button>
+          <button class="tab-btn" onclick="showTab('pl-tab-births-deaths', this); plRenderBirthsDeaths()">Births and Deaths</button>
           <button class="tab-btn" onclick="showTab('pl-tab-topjobs', this); plLoadTopJobs()">Top Jobs</button>
         </div>
 
         <!-- Player List tab -->
         <div id="pl-tab-list" class="tab-panel active">
+          <div id="pl-summary" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:0.85rem">
+            <span title="Active characters in Auckland, Beirut, Chicago">Total Characters: <strong id="pl-summary-total">--</strong></span>
+            <span title="New players in the last 3 days">New Players (3d): <strong id="pl-summary-new">--</strong></span>
+            <span title="Dead characters in the last 3 days">Deaths (3d): <strong id="pl-summary-dead" style="color:#f87171">--</strong></span>
+          </div>
           <div class="pl-toolbar" style="flex-direction:column;align-items:stretch">
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
             <div style="position:relative">
@@ -1994,58 +2144,33 @@
           </div>
         </div>
 
-        <!-- Obituaries tab -->
-        <div id="pl-tab-dead" class="tab-panel">
+        <!-- Births and Deaths tab -->
+        <div id="pl-tab-births-deaths" class="tab-panel">
           <div style="overflow-x:auto;margin-top:8px">
-            <table class="pl-table" id="pl-dead-table">
+            <table class="pl-table" id="pl-bd-table">
               <thead>
                 <tr>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-dead-icon-username">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-dead-icon-rank">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-dead-icon-occupation">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-dead-icon-homecity">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-dead-icon-character_age">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plDeadSort('died_at')" data-col="died_at">Died <span class="pl-sort-icon" id="pl-dead-icon-died_at">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-bd-icon-username">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-bd-icon-rank">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-bd-icon-occupation">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-bd-icon-homecity">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-bd-icon-character_age">↕</span></th>
+                  <th class="pl-th pl-th-filter" onclick="plBDSort('event_date')" data-col="event_date">Date <span class="pl-sort-icon" id="pl-bd-icon-event_date">↕</span></th>
                 </tr>
                 <tr>
-                  <th class="pl-filter-cell"><input type="text" id="pl-dead-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderRecentDead()"></th>
-                  <th class="pl-filter-cell"><select id="pl-dead-filter-rank" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-dead-filter-occupation" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-dead-filter-homecity" class="pl-filter-input" onchange="plRenderRecentDead()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><input type="text" id="pl-bd-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderBirthsDeaths()"></th>
+                  <th class="pl-filter-cell"><select id="pl-bd-filter-rank" class="pl-filter-input" onchange="plRenderBirthsDeaths()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-bd-filter-occupation" class="pl-filter-input" onchange="plRenderBirthsDeaths()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell"><select id="pl-bd-filter-homecity" class="pl-filter-input" onchange="plRenderBirthsDeaths()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"></th>
-                  <th class="pl-filter-cell"></th>
+                  <th class="pl-filter-cell"><select id="pl-bd-filter-type" class="pl-filter-input" onchange="plRenderBirthsDeaths()">
+                    <option value="">All</option>
+                    <option value="birth">Births</option>
+                    <option value="death">Deaths</option>
+                  </select></th>
                 </tr>
               </thead>
-              <tbody id="pl-dead-tbody">
-                <tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Births tab -->
-        <div id="pl-tab-born" class="tab-panel">
-          <div style="overflow-x:auto;margin-top:8px">
-            <table class="pl-table" id="pl-born-table">
-              <thead>
-                <tr>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('username')" data-col="username">Name <span class="pl-sort-icon" id="pl-born-icon-username">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('rank')" data-col="rank">Rank <span class="pl-sort-icon" id="pl-born-icon-rank">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon" id="pl-born-icon-occupation">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('homecity')" data-col="homecity">City <span class="pl-sort-icon" id="pl-born-icon-homecity">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon" id="pl-born-icon-character_age">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plBornSort('born_at')" data-col="born_at">First Seen <span class="pl-sort-icon" id="pl-born-icon-born_at">↕</span></th>
-                </tr>
-                <tr>
-                  <th class="pl-filter-cell"><input type="text" id="pl-born-search" class="pl-filter-input" placeholder="Name…" oninput="plRenderRecentBorn()"></th>
-                  <th class="pl-filter-cell"><select id="pl-born-filter-rank" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-born-filter-occupation" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-born-filter-homecity" class="pl-filter-input" onchange="plRenderRecentBorn()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"></th>
-                  <th class="pl-filter-cell"></th>
-                </tr>
-              </thead>
-              <tbody id="pl-born-tbody">
+              <tbody id="pl-bd-tbody">
                 <tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">Loading…</td></tr>
               </tbody>
             </table>

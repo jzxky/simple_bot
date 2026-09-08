@@ -36,6 +36,7 @@ def save_casino_release_at(ts: float):
 class CasinoTask(Task):
     priority = 50
     label = "Casino"
+    changes_city = True  # auto-travel path (config-gated); paused with the rest of the task while a crime tab is active
 
     def can_run(self, state: GameState) -> bool:
         if not state.logged_in or state.in_jail or state.in_hospital:

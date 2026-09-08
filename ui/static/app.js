@@ -286,6 +286,9 @@ function _buildPayload() {
     away_action_enabled: document.getElementById("action_enabled").checked,
     away_action_type: document.getElementById("away_action_type").value,
     fallback_to_away: document.getElementById("fallback_to_away").checked,
+    agg_separate_tab: (document.getElementById("agg_separate_tab")||{checked:false}).checked,
+    target_young_only: (document.getElementById("target_young_only")||{checked:false}).checked,
+    young_age_threshold_hours: (document.getElementById("young_age_threshold_hours")||{value:24}).value,
     payback_mode: document.getElementById("payback_mode").value,
     monitor_top_job: document.getElementById("monitor_top_job").checked,
     promo_thread_id: (document.getElementById("promo_thread_id") || {value:""}).value.trim(),
@@ -331,6 +334,7 @@ function _buildPayload() {
     law_auto_travel: (document.getElementById("law_auto_travel")||{checked:false}).checked,
     hospital_tasks: _serializePriorityTable("hospital-priority-body"),
     engineering_tasks: _serializePriorityTable("engineering-priority-body"),
+    fire_tasks: _serializePriorityTable("fire-priority-body"),
     player_list_enabled: document.getElementById("player_list_enabled").checked,
     player_refresh_interval: parseInt(document.getElementById("player_refresh_interval").value) || 30,
     player_whitelist_bolds: (document.getElementById("pl-bolds-toggle")||{checked:true}).checked,
@@ -355,6 +359,15 @@ function _buildPayload() {
     autobuy_qty_heroin:      parseInt((document.getElementById("autobuy_qty_heroin")||{value:0}).value)||0,
     autobuy_price_cocaine:   parseInt((document.getElementById("autobuy_price_cocaine")||{value:0}).value)||0,
     autobuy_qty_cocaine:     parseInt((document.getElementById("autobuy_qty_cocaine")||{value:0}).value)||0,
+    middling_enabled: (document.getElementById("middling_enabled")||{checked:false}).checked,
+    middling_max_on_hand: parseInt((document.getElementById("middling_max_on_hand")||{value:500}).value)||500,
+    middling_price_marijuana: parseInt((document.getElementById("middling_price_marijuana")||{value:0}).value)||0,
+    middling_price_ecstasy:   parseInt((document.getElementById("middling_price_ecstasy")||{value:0}).value)||0,
+    middling_price_acid:      parseInt((document.getElementById("middling_price_acid")||{value:0}).value)||0,
+    middling_price_speed:     parseInt((document.getElementById("middling_price_speed")||{value:0}).value)||0,
+    middling_price_ice:       parseInt((document.getElementById("middling_price_ice")||{value:0}).value)||0,
+    middling_price_heroin:    parseInt((document.getElementById("middling_price_heroin")||{value:0}).value)||0,
+    middling_price_cocaine:   parseInt((document.getElementById("middling_price_cocaine")||{value:0}).value)||0,
     bionics_enabled: (document.getElementById("bionics_enabled")||{checked:false}).checked,
     bionics_wanted_items: ["arms","legs","eyes","brain","heart"].filter(i => (document.getElementById("bionics_want_"+i)||{checked:false}).checked),
     bionics_priority_order: _serializePriorityItems("bionics-priority-body"),
@@ -544,6 +557,83 @@ function markNumDirty(el) {
 
 function autobuyMarkDirty() {
   debouncedSave();
+}
+
+// ── Middling manual trade ────────────────────────────────────────────────────
+
+var _middlingContactId = "";
+
+function middlingLoadStock() {
+  var name = document.getElementById("middling_contact_name").value.trim();
+  if (!name) return;
+  fetch("/middling/load-stock", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({contact: name})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.error) { alert(d.error); return; }
+    _middlingContactId = d.contact_id || "";
+    var tbody = document.querySelector("#middling-stock-table tbody");
+    tbody.innerHTML = "";
+    (d.stock || []).forEach(function(item) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + item.name + "</td><td>$" + (item.price||0).toLocaleString() + "</td>" +
+        "<td>" + (item.available||0) + "</td>" +
+        "<td><input type='number' class='input-narrow' min='0' max='" + (item.available||0) +
+        "' value='0' data-field='" + item.buy_field + "'></td>";
+      tbody.appendChild(tr);
+    });
+    document.getElementById("middling-stock-area").style.display = "";
+    document.getElementById("middling-buy-result").textContent = "";
+  });
+}
+
+function middlingBuy() {
+  if (!_middlingContactId) { alert("Load stock first."); return; }
+  var quantities = {};
+  document.querySelectorAll("#middling-stock-table tbody input[data-field]").forEach(function(inp) {
+    var qty = parseInt(inp.value) || 0;
+    if (qty > 0) quantities[inp.dataset.field] = qty;
+  });
+  if (!Object.keys(quantities).length) { alert("Enter quantities to buy."); return; }
+  fetch("/middling/buy", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({contact_id: _middlingContactId, quantities: quantities})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    document.getElementById("middling-buy-result").textContent = d.message || d.error || "Done";
+  });
+}
+
+function middlingLoadSell() {
+  fetch("/middling/load-sell", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.error) { alert(d.error); return; }
+    var carrying = d.carrying || {};
+    ["marijuana","ecstasy","acid","speed","ice","heroin","cocaine"].forEach(function(k) {
+      var el = document.getElementById("middling-carry-" + k);
+      if (el) el.textContent = carrying[k] || 0;
+    });
+  });
+}
+
+function middlingSell() {
+  var buyer = document.getElementById("middling_sell_to").value.trim();
+  var price = parseInt(document.getElementById("middling_sell_price").value) || 0;
+  if (!buyer) { alert("Enter a buyer name."); return; }
+  if (!price) { alert("Enter a price."); return; }
+  var quantities = {};
+  ["marijuana","ecstasy","acid","speed","ice","heroin","cocaine"].forEach(function(k) {
+    var qty = parseInt((document.getElementById("middling_sell_" + k)||{value:0}).value) || 0;
+    if (qty > 0) quantities[k] = qty;
+  });
+  if (!Object.keys(quantities).length) { alert("Enter quantities to sell."); return; }
+  fetch("/middling/sell", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({buyer: buyer, price: price, quantities: quantities})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    document.getElementById("middling-sell-result").textContent = d.message || d.error || "Done";
+  });
 }
 
 // ── Collapse ──────────────────────────────────────────────────────────────────
@@ -896,6 +986,12 @@ function startSnipe() {
   fetch("/start-snipe", {method: "POST"}).catch(() => {});
 }
 
+function cancelAggTab() {
+  fetch("/cancel-agg-tab", {method: "POST"}).catch(() => {});
+  const btn = document.getElementById("cancel-agg-btn");
+  if (btn) btn.style.display = "none";
+}
+
 function toggleBot() {
   if (_botRunning) {
     // Stop is queued on the bot thread — don't change UI now; let pollStatus
@@ -957,6 +1053,7 @@ function pollStatus() {
   fetch("/status")
     .then(r => r.json())
     .then(d => {
+      window._lastStatus = d;
       updateBotState(d.running, d.paused);
 
       // Cross-tab settings sync: a higher revision than we've seen means a
@@ -976,6 +1073,12 @@ function pollStatus() {
 
       const cancelBtn = document.getElementById("cancel-snipe-btn");
       if (cancelBtn) cancelBtn.style.display = (d.running && !d.paused && (d.snipe_active || d.current_task === "Snipe Top Job")) ? "inline-block" : "none";
+
+      const cancelAggBtn = document.getElementById("cancel-agg-btn");
+      if (cancelAggBtn) {
+        cancelAggBtn.style.display = (d.running && !d.paused && d.agg_tab_active) ? "inline-block" : "none";
+        cancelAggBtn.title = d.agg_tab_crime ? `Stop the '${d.agg_tab_crime}' crime tab` : "Stop the crime tab";
+      }
 
       // Only uncheck earns if the bot just disabled it (true→false transition)
       if (d.earns_enabled != null) {
@@ -1820,8 +1923,46 @@ function updateCaseWorkSection(occupation) {
   document.getElementById("cw-engineering").style.display = isEngineering ? "" : "none";
   document.getElementById("cw-banking").style.display = isBanking ? "" : "none";
   document.getElementById("cw-law").style.display = isLaw ? "" : "none";
+  document.getElementById("cw-law-summary").style.display = isLaw ? "" : "none";
+  if (isLaw) renderLawyerCaseSummary();
+  var lcRow = document.querySelector('#smart-travel-priority-body tr[data-item="lawyer_cases"]');
+  if (lcRow) lcRow.style.display = isLaw ? "" : "none";
   if (isHospital)    renderCwHospitalHistory();
   if (isEngineering) renderCwEngineeringHistory();
+}
+
+function renderLawyerCaseSummary() {
+  const container = document.getElementById("lawyer-case-summary");
+  if (!container) return;
+  const details = window._lastStatus && window._lastStatus.lawyer_case_details;
+  if (!details || details.length === 0) {
+    container.textContent = "No case data yet.";
+    return;
+  }
+  const cities = new Set();
+  const charMap = {};
+  details.forEach(c => {
+    cities.add(c.location);
+    if (!charMap[c.suspect]) charMap[c.suspect] = {};
+    charMap[c.suspect][c.location] = (charMap[c.suspect][c.location] || 0) + 1;
+  });
+  const cityList = Array.from(cities).sort();
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:4px">';
+  html += '<tr><th style="text-align:left;padding:2px 6px;border-bottom:1px solid var(--border)">Character</th>';
+  cityList.forEach(city => {
+    html += '<th style="text-align:center;padding:2px 6px;border-bottom:1px solid var(--border)">' + city + '</th>';
+  });
+  html += '</tr>';
+  Object.keys(charMap).sort().forEach(suspect => {
+    html += '<tr><td style="padding:2px 6px">' + suspect + '</td>';
+    cityList.forEach(city => {
+      const count = charMap[suspect][city] || 0;
+      html += '<td style="text-align:center;padding:2px 6px">' + (count || '-') + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</table>';
+  container.innerHTML = html;
 }
 
 function bulkAddLaunderContacts() {
@@ -3667,6 +3808,7 @@ function loadPlayers() {
       plFilter();
       _plRenderGroupsTab(_plGroups);
       _updatePlayerPills();
+      _plUpdateSummary();
       // Keep the auto-jail partner list current with the player DB.
       loadAutoJailPartners();
       populateLaunderContactSelect();
@@ -3695,6 +3837,19 @@ function _plRebuildFilters() {
       vals.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join("");
     if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
   });
+}
+
+function _plUpdateSummary() {
+  const MAIN_CITIES = new Set(["Auckland", "Beirut", "Chicago"]);
+  const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
+  const data = _plData || [];
+  const total = data.filter(p => p.active && MAIN_CITIES.has(p.homecity)).length;
+  const newPlayers = data.filter(p => p.born_at && new Date(p.born_at).getTime() >= cutoff).length;
+  const deadPlayers = data.filter(p => !p.active && p.died_at && new Date(p.died_at).getTime() >= cutoff).length;
+  const el = id => document.getElementById(id);
+  if (el("pl-summary-total")) el("pl-summary-total").textContent = total;
+  if (el("pl-summary-new")) el("pl-summary-new").textContent = newPlayers;
+  if (el("pl-summary-dead")) el("pl-summary-dead").textContent = deadPlayers;
 }
 
 // ── Filter & sort ─────────────────────────────────────────────────────────────
@@ -3984,89 +4139,102 @@ function plLoadHistory(username, containerId, toggleEl) {
     .catch(() => { container.innerHTML = '<p style="color:var(--muted);padding:8px">Failed to load.</p>'; });
 }
 
-// ── Obituaries ────────────────────────────────────────────────────────────────
+// ── Births and Deaths ─────────────────────────────────────────────────────────
 
-let _plDeadSort = { col: "died_at", asc: false };
-let _plDeadExpanded = {};
+let _plBDSort = { col: "event_date", asc: false };
+let _plBDExpanded = {};
 
-function plDeadSort(col) {
-  if (_plDeadSort.col === col) _plDeadSort.asc = !_plDeadSort.asc;
-  else { _plDeadSort.col = col; _plDeadSort.asc = true; }
-  plRenderRecentDead();
+function plBDSort(col) {
+  if (_plBDSort.col === col) _plBDSort.asc = !_plBDSort.asc;
+  else { _plBDSort.col = col; _plBDSort.asc = true; }
+  plRenderBirthsDeaths();
 }
 
-function plRenderRecentDead() {
-  const tbody = document.getElementById("pl-dead-tbody");
+function plRenderBirthsDeaths() {
+  const tbody = document.getElementById("pl-bd-tbody");
   if (!tbody) return;
   const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
 
-  const search = (document.getElementById("pl-dead-search")?.value || "").toLowerCase();
-  const rankF  = document.getElementById("pl-dead-filter-rank")?.value || "";
-  const occF   = document.getElementById("pl-dead-filter-occupation")?.value || "";
-  const cityF  = document.getElementById("pl-dead-filter-homecity")?.value || "";
+  const search = (document.getElementById("pl-bd-search")?.value || "").toLowerCase();
+  const rankF  = document.getElementById("pl-bd-filter-rank")?.value || "";
+  const occF   = document.getElementById("pl-bd-filter-occupation")?.value || "";
+  const cityF  = document.getElementById("pl-bd-filter-homecity")?.value || "";
+  const typeF  = document.getElementById("pl-bd-filter-type")?.value || "";
 
-  let rows = (_plData || []).filter(p => {
-    if (p.active) return false;
-    if (!p.died_at) return false;
-    if (new Date(p.died_at).getTime() < cutoff) return false;
-    if (search && !p.username.toLowerCase().includes(search)) return false;
-    if (rankF && p.rank !== rankF) return false;
-    if (occF  && p.occupation !== occF) return false;
-    if (cityF && p.homecity !== cityF) return false;
-    return true;
+  let rows = [];
+  (_plData || []).forEach(p => {
+    if (search && !p.username.toLowerCase().includes(search)) return;
+    if (rankF && p.rank !== rankF) return;
+    if (occF  && p.occupation !== occF) return;
+    if (cityF && p.homecity !== cityF) return;
+
+    const isDead = !p.active && p.died_at && new Date(p.died_at).getTime() >= cutoff;
+    const isBorn = p.born_at && new Date(p.born_at).getTime() >= cutoff;
+
+    if (isDead && typeF !== "birth") {
+      rows.push({ ...p, _type: "death", _event_date: p.died_at });
+    }
+    if (isBorn && typeF !== "death") {
+      rows.push({ ...p, _type: "birth", _event_date: p.born_at });
+    }
   });
 
-  // Populate filter dropdowns on first call
-  _plPopulateDeadFilters((_plData || []).filter(p => !p.active && p.died_at && new Date(p.died_at).getTime() >= cutoff));
+  _plPopulateBDFilters(rows);
 
-  const { col, asc } = _plDeadSort;
+  const { col, asc } = _plBDSort;
   rows.sort((a, b) => {
-    const av = col === "died_at" ? (new Date(a.died_at).getTime()) : col === "character_age" ? (a.character_age || 0) : (a[col] || "").toLowerCase();
-    const bv = col === "died_at" ? (new Date(b.died_at).getTime()) : col === "character_age" ? (b.character_age || 0) : (b[col] || "").toLowerCase();
+    let av, bv;
+    if (col === "event_date") { av = new Date(a._event_date).getTime(); bv = new Date(b._event_date).getTime(); }
+    else if (col === "character_age") { av = a.character_age || 0; bv = b.character_age || 0; }
+    else { av = (a[col] || "").toLowerCase(); bv = (b[col] || "").toLowerCase(); }
     if (typeof av === "number") return asc ? av - bv : bv - av;
     return asc ? av.localeCompare(bv) : bv.localeCompare(av);
   });
 
-  document.querySelectorAll("#pl-dead-table .pl-sort-icon").forEach(el => { el.textContent = "↕"; el.classList.remove("pl-th-sorted"); });
-  const icon = document.getElementById(`pl-dead-icon-${col}`);
+  document.querySelectorAll("#pl-bd-table .pl-sort-icon").forEach(el => { el.textContent = "↕"; el.classList.remove("pl-th-sorted"); });
+  const icon = document.getElementById(`pl-bd-icon-${col}`);
   if (icon) { icon.textContent = asc ? "▲" : "▼"; icon.classList.add("pl-th-sorted"); }
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">No deaths in the last 3 days.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">No births or deaths in the last 3 days.</td></tr>`;
     return;
   }
 
   const colorMap = _plGroupColorMap();
   tbody.innerHTML = rows.map(p => {
-    const diedDate = new Date(p.died_at).toLocaleString();
-    const expanded = _plDeadExpanded[p.username];
+    const isDeath = p._type === "death";
+    const eventDate = new Date(p._event_date).toLocaleString();
+    const eventLabel = isDeath ? "Died" : "Born";
+    const rowKey = p.username + "_" + p._type;
+    const expanded = _plBDExpanded[rowKey];
     const groupCell = p.group
       ? `<span class="pl-group-badge" style="background:${colorMap[p.group]||'#888'}">${escHtml(p.group)}</span>`
       : "";
-    const rows2 = [`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="_plDeadToggle(${escJsStr(p.username)})" style="cursor:pointer">
+    const rowStyle = isDeath ? 'color:#f87171' : '';
+    const rows2 = [`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="_plBDToggle(${escJsStr(rowKey)})" style="cursor:pointer;${rowStyle}">
       <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)} ${groupCell}</td>
       <td>${escHtml(p.rank||"—")}</td>
       <td>${escHtml(p.occupation||"—")}</td>
       <td>${escHtml(p.homecity||"—")}</td>
-      <td style="white-space:nowrap;font-size:11px;color:var(--text-muted)">${p.character_age ? _fmtAge(p.character_age) : "—"}</td>
-      <td style="white-space:nowrap">${escHtml(diedDate)}</td>
+      <td style="white-space:nowrap;font-size:11px">${p.character_age ? _fmtAge(p.character_age) : "—"}</td>
+      <td style="white-space:nowrap">${escHtml(eventLabel)}: ${escHtml(eventDate)}</td>
     </tr>`];
     if (expanded) rows2.push(`<tr class="pl-detail-row"><td colspan="6"><div class="pl-detail">${_plDetailHtml(p)}</div></td></tr>`);
     return rows2.join("");
   }).join("");
 }
 
-function _plDeadToggle(username) {
-  _plDeadExpanded[username] = !_plDeadExpanded[username];
-  plRenderRecentDead();
+function _plBDToggle(key) {
+  _plBDExpanded[key] = !_plBDExpanded[key];
+  plRenderBirthsDeaths();
 }
 
-function _plPopulateDeadFilters(source) {
+function _plPopulateBDFilters(source) {
   const uniq = col => [...new Set(source.map(p => p[col] || "").filter(Boolean))].sort();
   [
-    { id: "pl-dead-filter-rank",       col: "rank" },
-    { id: "pl-dead-filter-occupation", col: "occupation" },
-    { id: "pl-dead-filter-homecity",   col: "homecity" },
+    { id: "pl-bd-filter-rank",       col: "rank" },
+    { id: "pl-bd-filter-occupation", col: "occupation" },
+    { id: "pl-bd-filter-homecity",   col: "homecity" },
   ].forEach(({ id, col }) => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -4076,95 +4244,8 @@ function _plPopulateDeadFilters(source) {
   });
 }
 
-// ── Births ────────────────────────────────────────────────────────────────────
-
-let _plBornSort = { col: "born_at", asc: false };
-let _plBornExpanded = {};
-
-function plBornSort(col) {
-  if (_plBornSort.col === col) _plBornSort.asc = !_plBornSort.asc;
-  else { _plBornSort.col = col; _plBornSort.asc = true; }
-  plRenderRecentBorn();
-}
-
-function plRenderRecentBorn() {
-  const tbody = document.getElementById("pl-born-tbody");
-  if (!tbody) return;
-  const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
-
-  const search = (document.getElementById("pl-born-search")?.value || "").toLowerCase();
-  const rankF  = document.getElementById("pl-born-filter-rank")?.value || "";
-  const occF   = document.getElementById("pl-born-filter-occupation")?.value || "";
-  const cityF  = document.getElementById("pl-born-filter-homecity")?.value || "";
-
-  let rows = (_plData || []).filter(p => {
-    if (!p.born_at) return false;
-    if (new Date(p.born_at).getTime() < cutoff) return false;
-    if (search && !p.username.toLowerCase().includes(search)) return false;
-    if (rankF && p.rank !== rankF) return false;
-    if (occF  && p.occupation !== occF) return false;
-    if (cityF && p.homecity !== cityF) return false;
-    return true;
-  });
-
-  _plPopulateBornFilters((_plData || []).filter(p => p.born_at && new Date(p.born_at).getTime() >= cutoff));
-
-  const { col, asc } = _plBornSort;
-  rows.sort((a, b) => {
-    const av = col === "born_at" ? (new Date(a.born_at).getTime()) : col === "character_age" ? (a.character_age || 0) : (a[col] || "").toLowerCase();
-    const bv = col === "born_at" ? (new Date(b.born_at).getTime()) : col === "character_age" ? (b.character_age || 0) : (b[col] || "").toLowerCase();
-    if (typeof av === "number") return asc ? av - bv : bv - av;
-    return asc ? av.localeCompare(bv) : bv.localeCompare(av);
-  });
-
-  document.querySelectorAll("#pl-born-table .pl-sort-icon").forEach(el => { el.textContent = "↕"; el.classList.remove("pl-th-sorted"); });
-  const icon = document.getElementById(`pl-born-icon-${col}`);
-  if (icon) { icon.textContent = asc ? "▲" : "▼"; icon.classList.add("pl-th-sorted"); }
-
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">No new players in the last 3 days.</td></tr>`;
-    return;
-  }
-
-  const colorMap = _plGroupColorMap();
-  tbody.innerHTML = rows.map(p => {
-    const bornDate = new Date(p.born_at).toLocaleString();
-    const expanded = _plBornExpanded[p.username];
-    const groupCell = p.group
-      ? `<span class="pl-group-badge" style="background:${colorMap[p.group]||'#888'}">${escHtml(p.group)}</span>`
-      : "";
-    const rows2 = [`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="_plBornToggle(${escJsStr(p.username)})" style="cursor:pointer">
-      <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)} ${groupCell}</td>
-      <td>${escHtml(p.rank||"—")}</td>
-      <td>${escHtml(p.occupation||"—")}</td>
-      <td>${escHtml(p.homecity||"—")}</td>
-      <td style="white-space:nowrap;font-size:11px;color:var(--text-muted)">${p.character_age ? _fmtAge(p.character_age) : "—"}</td>
-      <td style="white-space:nowrap">${escHtml(bornDate)}</td>
-    </tr>`];
-    if (expanded) rows2.push(`<tr class="pl-detail-row"><td colspan="6"><div class="pl-detail">${_plDetailHtml(p)}</div></td></tr>`);
-    return rows2.join("");
-  }).join("");
-}
-
-function _plBornToggle(username) {
-  _plBornExpanded[username] = !_plBornExpanded[username];
-  plRenderRecentBorn();
-}
-
-function _plPopulateBornFilters(source) {
-  const uniq = col => [...new Set(source.map(p => p[col] || "").filter(Boolean))].sort();
-  [
-    { id: "pl-born-filter-rank",       col: "rank" },
-    { id: "pl-born-filter-occupation", col: "occupation" },
-    { id: "pl-born-filter-homecity",   col: "homecity" },
-  ].forEach(({ id, col }) => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    const cur = sel.value;
-    sel.innerHTML = `<option value="">All</option>` + uniq(col).map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join("");
-    if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
-  });
-}
+function plRenderRecentDead() { plRenderBirthsDeaths(); }
+function plRenderRecentBorn() { plRenderBirthsDeaths(); }
 
 // ── Top Jobs tab ─────────────────────────────────────────────────────────────
 
@@ -4643,7 +4724,10 @@ function _plDoEditGroup(originalName) {
     steps.push(fetch("/players/groups/rename", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({old_name: originalName, new_name: newName}),
-    }).then(r => r.json()).then(d => {
+    }).then(r => {
+      if (!r.ok) throw new Error("Rename failed (server " + r.status + ")");
+      return r.json();
+    }).then(d => {
       if (!d.ok) throw new Error(d.error || "Rename failed");
     }));
   }
