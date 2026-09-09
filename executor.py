@@ -4360,6 +4360,18 @@ def handle_do_middling(action: Action, state: GameState):
     if not _check_session(state):
         return
 
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    err_div = soup.find("div", class_="errormsg")
+    if err_div:
+        err_msg = err_div.get_text(strip=True)
+        state.add_log(f"Middling: buy from {runner} failed — {err_msg}")
+        return
+    success_div = soup.find("div", class_="successmsg")
+    if success_div:
+        state.add_log(f"Middling: buy from {runner} — {success_div.get_text(strip=True)}")
+    else:
+        state.add_log(f"Middling: buy from {runner} — no success/error message detected, proceeding cautiously")
+
     # Step 3b: sell to buyer
     _nav(_u("/income/drugtrade.asp?display=sell"), state)
     if not _check_session(state):
