@@ -295,7 +295,7 @@ def _scrape_earn_catalog(page, state: GameState):
     if auto_div:
         style = auto_div.get_attribute("style") or ""
         if "display: none" in style or "display:none" in style:
-            page.click("span.mm-earn-toggle-knob")
+            page.evaluate("document.querySelector('#mm_earn_mode_toggle').click()")
             page.wait_for_function(
                 "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
                 "return el && !el.style.display.includes('none'); }",
@@ -380,7 +380,7 @@ def _ensure_auto_earn_mode(page):
         return
     style = auto_div.get_attribute("style") or ""
     if "display: none" in style or "display:none" in style:
-        page.click("span.mm-earn-toggle-knob")
+        page.evaluate("document.querySelector('#mm_earn_mode_toggle').click()")
         page.wait_for_function(
             "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
             "return el && !el.style.display.includes('none'); }",
@@ -613,7 +613,7 @@ def _ensure_manual_earn_mode(page, state: GameState):
         btn.click()
         page.wait_for_load_state("domcontentloaded")
         state.add_log("Earn queue cleared before switching to manual.")
-    page.click("span.mm-earn-toggle-knob")
+    page.evaluate("document.querySelector('#mm_earn_mode_toggle').click()")
     page.wait_for_function(
         "() => { const el = document.querySelector('div.mm-earn-mode-manual'); "
         "return el && !el.style.display.includes('none'); }",
@@ -3090,18 +3090,16 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
     style = manual.get_attribute("style") or ""
     if "display: none" in style or "display:none" in style:
         # Toggle to manual mode.
-        knob = page.query_selector("span.mm-earn-toggle-knob")
-        if knob:
-            knob.click()
-            try:
-                page.wait_for_function(
-                    "() => { const el = document.querySelector('div.mm-earn-mode-manual'); "
-                    "return el && !el.style.display.includes('none'); }",
-                    timeout=5000,
-                )
-            except Exception:
-                pass
-            state.add_log("Jail duties: switched to MANUAL mode.")
+        page.evaluate("document.querySelector('#mm_earn_mode_toggle').click()")
+        try:
+            page.wait_for_function(
+                "() => { const el = document.querySelector('div.mm-earn-mode-manual'); "
+                "return el && !el.style.display.includes('none'); }",
+                timeout=5000,
+            )
+        except Exception:
+            pass
+        state.add_log("Jail duties: switched to MANUAL mode.")
 
     radio = page.query_selector(f"input[name='job'][value='{duty}']")
     if not radio:
