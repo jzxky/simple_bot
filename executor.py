@@ -1218,7 +1218,7 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
     auto_weed = law_cfg.get("auto_weed", False)
     threshold = int(law_cfg.get("weed_queue_threshold", 1))
 
-    if auto_weed and defended:
+    if auto_weed:
         cons_cfg = c.get("consumables", {})
         cons_limit = int(cons_cfg.get("consumable_limit", 33))
         buffer_ = int(cons_cfg.get("buffer", 0))
@@ -1256,8 +1256,6 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
                 break
             if _lawyer_defend_one(local_defendable, state):
                 defended += 1
-            else:
-                break
 
     # Final state update
     _nav(_u("/court/lawyer.asp?display=defend"), state)
