@@ -49,7 +49,7 @@ PROMOS = [
     ("Police",       "Detective",            "/promotion/detective.asp"),
     ("Police",       "Commissioner",         "/promotion/commissioner.asp"),
     ("Gangster",     "Dealer",               "/promotion/dealer.asp"),
-    ("Gangster",     "Giovane D'Honore",     "/promotion/giovaneDhonore.asp"),
+    ("Gangster",     "Giovane D'Honore",     "/promotion/Giovane%20D%60Honore.asp"),
     ("Gangster",     "Enforcer",             "/promotion/enforcer.asp"),
     ("Gangster",     "Piciotto",             "/promotion/piciotto.asp"),
     ("Gangster",     "Sgarrista",            "/promotion/sgarrista.asp"),
