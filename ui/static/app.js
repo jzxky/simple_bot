@@ -1139,7 +1139,8 @@ function pollStatus() {
       document.getElementById("stat-energy").textContent = ePct != null ? ePct + "%" + eThr : "--";
       _applyProgress(document.getElementById("stat-energy-bg"), document.getElementById("stat-energy-pct"), ePct);
       document.getElementById("stat-earns").textContent = d.earns_24h != null ? d.earns_24h : "--";
-      document.getElementById("stat-cons-24h").textContent = d.consumables_24h != null ? d.consumables_24h : "--";
+      const consLim = d.consumable_limit != null ? ` [${d.consumable_limit}]` : "";
+      document.getElementById("stat-cons-24h").textContent = d.consumables_24h != null ? d.consumables_24h + consLim : "--";
 
       const fmt = n => "$" + (n ?? 0).toLocaleString();
       document.getElementById("stat-clean").textContent = d.clean_money != null ? fmt(d.clean_money) : "--";
