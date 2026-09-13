@@ -1093,6 +1093,8 @@ function pollStatus() {
       _commsOwnName = d.own_name || "";
       document.getElementById("stat-next-rank").textContent = d.next_rank || "--";
       document.getElementById("stat-rank-progress").textContent = d.rank_progress != null ? d.rank_progress + "%" : "--";
+      const progBg = document.getElementById("stat-progress-bg");
+      if (progBg) progBg.style.width = (d.rank_progress != null ? d.rank_progress : 0) + "%";
       document.getElementById("stat-city").textContent = d.city || "--";
       document.getElementById("stat-home-city").textContent = d.home_city || "--";
 
@@ -1110,7 +1112,8 @@ function pollStatus() {
         if (occupationItem) occupationItem.style.display = "";
       }
       document.getElementById("stat-health").textContent = d.health != null ? d.health + "%" : "--";
-      document.getElementById("stat-energy").textContent = d.energy != null ? d.energy + "%" : "--";
+      _currentEnergy = d.energy;
+      _energyThreshold = d.energy_threshold;
       document.getElementById("stat-earns").textContent = d.earns_24h != null ? d.earns_24h : "--";
       document.getElementById("stat-cons-24h").textContent = d.consumables_24h != null ? d.consumables_24h : "--";
 
@@ -1176,7 +1179,7 @@ function pollStatus() {
       _lastEnergy = d.energy;
       if (d.respect_pct !== undefined) {
         _respectPct = d.respect_pct;
-        const respectItem = document.getElementById("stat-respect-item");
+        const respectItem = document.getElementById("stat-respect-cell");
         const respectVal  = document.getElementById("stat-respect");
         if (respectItem && respectVal) {
           if (_respectPct != null) {
@@ -1546,6 +1549,8 @@ function _fmtCountdown(secs) {
 
 // _aggProActive tracks latest agg_pro_active from status for always-visible tile
 let _aggProActive = false;
+let _currentEnergy = null;
+let _energyThreshold = null;
 let _jailReleaseEndMs = null;
 let _flightDepartsAtMs = null;
 let _hospitalReleaseAtMs = null;
@@ -1681,6 +1686,12 @@ function _renderTimers() {
   if (_hospitalReleaseAtMs != null) {
     const secs = Math.max(0, Math.floor((_hospitalReleaseAtMs - now) / 1000));
     tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">Hospital</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
+  }
+
+  // Energy with target threshold
+  if (_currentEnergy != null) {
+    const thr = _energyThreshold != null ? ` [${Math.round(_energyThreshold)}%]` : "";
+    tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">Energy</span><span class="stat-value stat-timer-value">${Math.round(_currentEnergy)}%${thr}</span></div>`);
   }
 
   // AggPro always shown
