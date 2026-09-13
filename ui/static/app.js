@@ -1179,15 +1179,9 @@ function pollStatus() {
       _lastEnergy = d.energy;
       if (d.respect_pct !== undefined) {
         _respectPct = d.respect_pct;
-        const respectItem = document.getElementById("stat-respect-cell");
-        const respectVal  = document.getElementById("stat-respect");
-        if (respectItem && respectVal) {
-          if (_respectPct != null) {
-            respectVal.textContent = _respectPct;
-            respectItem.style.display = "";
-          } else {
-            respectItem.style.display = "none";
-          }
+        const respectVal = document.getElementById("stat-respect");
+        if (respectVal) {
+          respectVal.textContent = _respectPct != null ? _respectPct : "--";
         }
       }
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null, d.flight_departs_at || null, d.hospital_release_at || null);
