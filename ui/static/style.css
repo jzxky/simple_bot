@@ -279,29 +279,38 @@ button {
   border-radius: var(--radius);
   padding: 7px 10px;
 }
-/* Status table */
-.stat-table {
+/* Status groups grid — 2 columns on desktop */
+.stat-groups-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+@media (min-width: 560px) {
+  .stat-groups-grid { grid-template-columns: 1fr 1fr; }
+  .stat-groups-grid .stat-group-full { grid-column: 1 / -1; }
+}
+/* Individual group table */
+.stat-group-table {
   border-collapse: separate;
   border-spacing: 0;
-  margin-bottom: 10px;
   font-variant-numeric: tabular-nums;
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
+  width: 100%;
 }
-.stat-table td {
+.stat-group-table td {
   position: relative;
   padding: 6px 10px;
   padding-right: 50px;
   border: 1px solid var(--border);
   background: var(--surface2);
   vertical-align: top;
-  width: 33.33%;
 }
-.stat-table td .stat-label { display: block; }
-.stat-table td .stat-value { display: block; white-space: nowrap; }
-.stat-table .stat-empty-cell { background: var(--surface2); }
-.stat-table .stat-sect-hdr td {
+.stat-group-table td .stat-label { display: block; }
+.stat-group-table td .stat-value { display: block; white-space: nowrap; }
+.stat-group-table .stat-sect-hdr td {
   background: #3a4d6a;
   font-size: 0.82rem;
   font-weight: 600;
@@ -310,6 +319,14 @@ button {
   color: #d8e2ee;
   padding: 4px 10px;
 }
+.stat-row-2 td { width: 50%; }
+.stat-row-3 td { width: 33.33%; }
+.stat-row-full td { width: 100%; }
+/* Vitals — thicker vertical borders between cells */
+.stat-vitals-table .stat-row-3 td + td {
+  border-left: 3px solid var(--surface);
+}
+/* Progress cell with % shading */
 .stat-progress-cell {
   position: relative;
   overflow: hidden;
@@ -320,18 +337,25 @@ button {
 .stat-progress-bg {
   position: absolute;
   inset: 0;
-  background: rgba(200,168,75,0.15);
   width: 0%;
   transition: width 0.4s ease;
   pointer-events: none;
 }
+/* Color steps: red < 25%, orange 25-49%, yellow 50-74%, green 75%+ */
+.stat-progress-bg.pct-low  { background: rgba(220,60,60,0.22); }
+.stat-progress-bg.pct-mid  { background: rgba(220,150,40,0.22); }
+.stat-progress-bg.pct-high { background: rgba(200,168,75,0.20); }
+.stat-progress-bg.pct-full { background: rgba(60,180,80,0.22); }
 .stat-pct {
   display: none;
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent);
 }
-@media (min-width: 600px) {
+.stat-pct.pct-low  { color: #dc3c3c; }
+.stat-pct.pct-mid  { color: #dc9628; }
+.stat-pct.pct-high { color: var(--accent); }
+.stat-pct.pct-full { color: #3cb450; }
+@media (min-width: 560px) {
   .stat-pct {
     display: block;
     position: absolute;
@@ -340,9 +364,9 @@ button {
     transform: translateY(-50%);
   }
 }
-@media (max-width: 599px) {
+@media (max-width: 559px) {
   .stat-progress-cell.show-pct .stat-pct { display: block; margin-top: 2px; }
-  .stat-table td { padding: 5px 8px; }
+  .stat-group-table td { padding: 5px 8px; padding-right: 40px; }
 }
 .in-jail .stat-progress-bg { background: rgba(255,255,255,0.08); }
 .in-jail .stat-sect-hdr td { background: #666; color: #e0e0e0; }
