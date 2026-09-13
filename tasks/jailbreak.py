@@ -11,7 +11,8 @@ class PlanJailBreakTask(Task):
         self._queue = plan_queue
 
     def can_run(self, state: GameState) -> bool:
-        return state.logged_in and not state.in_jail and not self._queue.empty()
+        return (state.logged_in and not state.in_jail
+                and state.action_available() and not self._queue.empty())
 
     def blocked_reasons(self, state):
         reasons = []
@@ -19,6 +20,8 @@ class PlanJailBreakTask(Task):
             reasons.append("Not logged in")
         if state.in_jail:
             reasons.append("In jail")
+        if not state.action_available():
+            reasons.append("Action timer busy")
         if self._queue.empty():
             reasons.append("Queue empty")
         return reasons
