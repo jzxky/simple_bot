@@ -274,20 +274,35 @@ button {
 }
 /* Status table */
 .stat-table {
-  width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
 }
 .stat-table td {
   position: relative;
   padding: 6px 10px;
+  padding-right: 50px;
   border: 1px solid var(--border);
   background: var(--surface2);
   vertical-align: top;
+  width: 33.33%;
 }
 .stat-table td .stat-label { display: block; }
-.stat-table td .stat-value { display: block; }
+.stat-table td .stat-value { display: block; white-space: nowrap; }
+.stat-table .stat-empty-cell { background: var(--surface2); }
+.stat-table .stat-sect-hdr td {
+  background: #3a4d6a;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #d8e2ee;
+  padding: 4px 10px;
+}
 .stat-progress-cell {
   position: relative;
   overflow: hidden;
@@ -321,11 +336,11 @@ button {
 @media (max-width: 599px) {
   .stat-progress-cell.show-pct .stat-pct { display: block; margin-top: 2px; }
   .stat-table td { padding: 5px 8px; }
-  .stat-table tr { display: flex; flex-wrap: wrap; }
-  .stat-table td { flex: 1 1 30%; min-width: 90px; }
 }
 .in-jail .stat-progress-bg { background: rgba(255,255,255,0.08); }
+.in-jail .stat-sect-hdr td { background: #666; color: #e0e0e0; }
 .in-hospital .stat-progress-bg { background: rgba(255,200,200,0.15); }
+.in-hospital .stat-sect-hdr td { background: #b01212; color: #f8e8e8; }
 .stat-label {
   font-size: 10px;
   text-transform: uppercase;
