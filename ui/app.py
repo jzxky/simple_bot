@@ -1624,7 +1624,7 @@ _CAREER_GROUPS = {
     "Hospital":     ["Nurse", "Doctor", "Surgeon", "Hospital Director"],
     "Fire":         ["Fire Fighter", "Fire Chief"],
     "Bank":         ["Bank Teller", "Loan Officer", "Bank Manager"],
-    "Funeral":      ["Mortician Assistant", "Mortician", "Funeral Director"],
+    "Funeral":      ["Mortician Assistant", "Undertaker", "Mortician", "Funeral Director"],
     "Construction": ["Mechanic", "Technician", "Engineer", "Chief Engineer"],
     "Customs":      ["Inspector", "Supervisor", "Superintendent", "Commissioner-General"],
 }
