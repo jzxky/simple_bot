@@ -27,6 +27,7 @@ PROMOS = [
     ("Fire",         "Fire Fighter",         "/promotion/firefighter.asp"),
     ("Fire",         "Fire Chief",           "/promotion/firechief.asp"),
     ("Funeral",      "Mortician Assistant",  "/promotion/mortassistant.asp"),
+    ("Funeral",      "Undertaker",           "/promotion/undertaker.asp"),
     ("Funeral",      "Mortician",            "/promotion/mort.asp"),
     ("Funeral",      "Funeral Director",     "/promotion/funeraldirector.asp"),
     ("Hospital",     "Nurse",                "/promotion/nurse.asp"),
