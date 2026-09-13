@@ -3251,29 +3251,21 @@ function renderCharHistory(data, reqs) {
   if (data.earn_history && data.earn_history.length) {
     const hideZeros = _isHideZeros("earn_history");
 
-    // Find max formatted count length across all entries for uniform pill width
-    let maxCountLen = 1;
-    for (const cat of data.earn_history) {
-      for (const e of cat.entries) {
-        maxCountLen = Math.max(maxCountLen, e.count.toLocaleString().length);
-      }
-    }
-    const pillW = `${maxCountLen + 0.4}ch`;
-
     html += `<div class="ch-section ch-section-full">
       <div class="ch-section-head">
         <span class="ch-section-title">Earn History</span>
         ${_hzToggle("earn_history", hideZeros)}
       </div>
-      <table class="ch-table ch-earn-table">`;
+      <table class="ch-earn-table">`;
     for (const cat of data.earn_history) {
       const entries = hideZeros ? cat.entries.filter(e => e.count > 0) : cat.entries;
       if (!entries.length) continue;
+      const isSummary = cat.category.toLowerCase() === "summary";
       html += `<tr>
         <td class="ch-earn-cat">${cat.category}</td>
         <td class="ch-earn-entries">`;
       for (const e of entries) {
-        html += `<span class="ch-earn-item"><span class="ch-earn-label">${e.type}</span><span class="ch-earn-count" style="min-width:${pillW}">${e.count.toLocaleString()}</span></span>`;
+        html += `<div class="ch-earn-entry${isSummary ? " ch-earn-summary" : ""}"><span class="ch-earn-label">${e.type}</span><span class="ch-earn-count">${e.count.toLocaleString()}</span></div>`;
       }
       html += `</td></tr>`;
     }

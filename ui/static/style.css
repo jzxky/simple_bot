@@ -922,28 +922,36 @@ input.input-unsaved { color: var(--red) !important; }
 .ch-empty-note { padding: 6px 10px; font-size: 0.75rem; color: var(--muted); }
 
 /* Earn History table */
-.ch-earn-table td { vertical-align: top; padding: 5px 10px; }
-.ch-earn-table td.ch-earn-cat { vertical-align: middle; }
+.ch-earn-table {
+  border-collapse: separate; border-spacing: 0;
+  border-radius: var(--radius); overflow: hidden;
+  border: 1px solid var(--border); width: 100%;
+}
+.ch-earn-table td {
+  border-bottom: 1px solid var(--border); vertical-align: top;
+}
+.ch-earn-table tr:last-child td { border-bottom: none; }
 .ch-earn-cat {
-  font-size: 0.68rem; font-weight: 700; color: var(--accent);
+  background: #3a4d6a;
+  font-size: 0.68rem; font-weight: 700; color: #d8e2ee;
   text-transform: uppercase; letter-spacing: 0.05em;
-  white-space: nowrap; width: 90px;
+  white-space: nowrap; padding: 6px 10px; width: 90px;
+  vertical-align: middle; border-right: 1px solid var(--border);
 }
-.ch-earn-entries { line-height: 2; }
-.ch-earn-item {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-right: 8px; margin-bottom: 2px;
-  font-size: 0.8rem;
-  background: var(--card-bg, #1e1e2e);
-  border: 1px solid var(--border, #333);
-  border-radius: 5px;
-  padding: 1px 8px 1px 8px;
+.ch-earn-entries {
+  padding: 0; background: var(--surface2);
 }
-.ch-earn-label { color: var(--muted); }
+.ch-earn-entry {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 10px; border-bottom: 1px solid var(--border);
+}
+.ch-earn-entry:last-child { border-bottom: none; }
+.ch-earn-label { font-size: 0.8rem; color: var(--muted); }
 .ch-earn-count {
-  color: var(--text); font-weight: 600;
-  display: inline-block; text-align: right;
+  font-size: 0.8rem; font-weight: 600; color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
+.ch-earn-entry.ch-earn-summary .ch-earn-count { color: var(--accent); }
 
 /* Promotion choices */
 .promo-row {
