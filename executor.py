@@ -964,7 +964,12 @@ def handle_check_banking_cases(action: Action, state: GameState):
 
     if auto_weed and laundered:
         cons_cfg = c.get("consumables", {})
-        cons_limit = int(cons_cfg.get("consumable_limit", 33))
+        import consumable_limit_detector as _cld
+        if cons_cfg.get("auto_detect_consumable_limit", False):
+            _det = _cld.detect(state.rank)
+            cons_limit = _det["limit"] if _det.get("limit") is not None else int(cons_cfg.get("consumable_limit", 33))
+        else:
+            cons_limit = int(cons_cfg.get("consumable_limit", 33))
         buffer_ = int(cons_cfg.get("buffer", 0))
 
         while True:
@@ -1220,7 +1225,12 @@ def handle_check_lawyer_cases(action: Action, state: GameState):
 
     if auto_weed:
         cons_cfg = c.get("consumables", {})
-        cons_limit = int(cons_cfg.get("consumable_limit", 33))
+        import consumable_limit_detector as _cld2
+        if cons_cfg.get("auto_detect_consumable_limit", False):
+            _det2 = _cld2.detect(state.rank)
+            cons_limit = _det2["limit"] if _det2.get("limit") is not None else int(cons_cfg.get("consumable_limit", 33))
+        else:
+            cons_limit = int(cons_cfg.get("consumable_limit", 33))
         buffer_ = int(cons_cfg.get("buffer", 0))
 
         while True:

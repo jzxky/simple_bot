@@ -362,6 +362,7 @@ function _buildPayload() {
     consumable_limit: parseInt(document.getElementById("consumable_limit").value) || 33,
     consumable_buffer: parseInt(document.getElementById("consumable_buffer").value) || 0,
     smart_consumables: document.getElementById("smart_consumables").checked,
+    auto_detect_consumable_limit: document.getElementById("auto_detect_consumable_limit").checked,
     autobuy_enabled: (document.getElementById("autobuy_enabled") || {checked:false}).checked,
     autobuy_price_marijuana: parseInt((document.getElementById("autobuy_price_marijuana")||{value:0}).value)||0,
     autobuy_qty_marijuana:   parseInt((document.getElementById("autobuy_qty_marijuana")||{value:0}).value)||0,
@@ -2286,6 +2287,7 @@ document.addEventListener("DOMContentLoaded", () => {
   _renderBuyListSummary("drug-store-priority-body", "drug-store-buylist-summary");
   toggleEventConsumeSettings();
   toggleWarModeLink();
+  syncAutoDetectLimitState();
   loadEarnPlanner();
   _loadSkillsGroupDropdown();
   commsInit();
@@ -2922,6 +2924,58 @@ function toggleCharHistoryTab() {
     const statsBtn = document.querySelector("#s-character .tab-bar .tab-btn");
     if (statsBtn) statsBtn.click();
   }
+  syncAutoDetectLimitState();
+}
+
+function syncAutoDetectLimitState() {
+  const chEnabled = document.getElementById("char_history_enabled").checked;
+  const adToggle = document.getElementById("auto_detect_consumable_limit");
+  const limitSel = document.getElementById("consumable_limit");
+  const infoRow = document.getElementById("auto_detect_limit_info");
+  if (!chEnabled) {
+    adToggle.checked = false;
+    adToggle.disabled = true;
+    limitSel.disabled = false;
+    if (infoRow) infoRow.style.display = "none";
+  } else {
+    adToggle.disabled = false;
+    if (adToggle.checked) {
+      limitSel.disabled = true;
+      if (infoRow) infoRow.style.display = "";
+      fetchDetectedLimit();
+    } else {
+      limitSel.disabled = false;
+      if (infoRow) infoRow.style.display = "none";
+    }
+  }
+}
+
+function onAutoDetectLimitToggle() {
+  syncAutoDetectLimitState();
+}
+
+function fetchDetectedLimit() {
+  fetch("/consumable_limit/detect")
+    .then(r => r.json())
+    .then(d => {
+      const span = document.getElementById("detected_limit_value");
+      if (span) span.textContent = d.limit != null ? d.limit : "—";
+      if (d.limit != null) {
+        const sel = document.getElementById("consumable_limit");
+        let found = false;
+        for (const opt of sel.options) {
+          if (parseInt(opt.value) === d.limit) { found = true; break; }
+        }
+        if (!found) {
+          const opt = document.createElement("option");
+          opt.value = d.limit;
+          opt.textContent = d.limit;
+          sel.appendChild(opt);
+        }
+        sel.value = d.limit;
+      }
+    })
+    .catch(() => {});
 }
 
 function refreshCharHistory() {

@@ -14,6 +14,7 @@ import bot
 import paths
 import players as pl
 import character_history as ch
+import consumable_limit_detector as cld
 import trait_requirements as tr
 import notifications_store
 import pathlib
@@ -40,6 +41,17 @@ NOTIFICATION_EVENTS = [
     ("agg_not_available",   "Agg crime not available"),
     ("dog_trains_unavailable", "Dog trains unavailable"),
 ]
+
+def _effective_consumable_limit():
+    c = cfg.load()
+    cons = c.get("consumables", {})
+    if cons.get("auto_detect_consumable_limit", False):
+        rank = bot.state.rank if bot.state else ""
+        result = cld.detect(rank)
+        if result.get("limit") is not None:
+            return result["limit"]
+    return int(cons.get("consumable_limit", 33))
+
 
 _ui_root = os.path.join(paths.resource_dir(), "ui")
 app = Flask(__name__,
@@ -182,6 +194,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["consumables"]["consumable_limit"] = int(data.get("consumable_limit", 33))
     c["consumables"]["buffer"] = int(data.get("consumable_buffer", 0))
     c["consumables"]["smart_consumables"] = data.get("smart_consumables", False)
+    c["consumables"]["auto_detect_consumable_limit"] = data.get("auto_detect_consumable_limit", False)
 
     c.setdefault("promo", {})
     c["promo"]["monitor_top_job"] = data.get("monitor_top_job", False)
@@ -758,7 +771,7 @@ def status():
         "rank_progress": s.rank_progress,
         "earns_24h": s.earns_24h,
         "consumables_24h": s.consumables_24h,
-        "consumable_limit": cfg.load().get("consumables", {}).get("consumable_limit", 33),
+        "consumable_limit": _effective_consumable_limit(),
         "energy_threshold": cfg.load().get("aggravated_crimes", {}).get("primary", {}).get("energy_threshold", 50),
         "agg_pro_active": s.agg_pro_active,
         "server_time": s.server_time.strftime("%m/%d/%Y %I:%M:%S %p") if s.server_time else None,
@@ -1242,6 +1255,13 @@ def character_history_refresh():
         return jsonify({"error": "Bot must be running to refresh character history."}), 400
     bot.request_char_history_refresh()
     return jsonify({"ok": True})
+
+
+@app.route("/consumable_limit/detect")
+def consumable_limit_detect():
+    rank = bot.state.rank if bot.state else ""
+    result = cld.detect(rank)
+    return jsonify(result)
 
 
 @app.route("/api/interact", methods=["POST"])
