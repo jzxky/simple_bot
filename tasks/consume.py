@@ -1,6 +1,7 @@
 import math
 import queue
 import config as cfg
+import consumable_limit_detector as cld
 from tasks.base import Task, Action
 from state import GameState
 
@@ -30,6 +31,14 @@ def _energy_to_mins(pct: float) -> int:
         if pct <= threshold:
             return mins
     return 30
+
+
+def _effective_limit(cfg_cons: dict, rank: str) -> int:
+    if cfg_cons.get("auto_detect_consumable_limit", False):
+        result = cld.detect(rank)
+        if result.get("limit") is not None:
+            return result["limit"]
+    return int(cfg_cons.get("consumable_limit", 33))
 
 
 def _timer_limit_secs(cfg_cons: dict) -> int:
@@ -117,7 +126,7 @@ def _passes_timer_gate(consume_type: str, state: GameState, cfg_cons: dict) -> b
 
 def _smart_count(consume_type: str, state: GameState, cfg_cons: dict, agg_cfg: dict, respect_buffer: bool = True) -> int:
     """Return how many units to consume in one batch (floor(available_mins / 3)), capped by stock and headroom."""
-    limit = int(cfg_cons.get("consumable_limit", 33))
+    limit = _effective_limit(cfg_cons, state.rank)
     buffer_ = int(cfg_cons.get("buffer", 0)) if respect_buffer else 0
     headroom = max(0, (limit - buffer_) - (state.consumables_24h or 0))
     stock = state.consumables.get(consume_type, 0)
@@ -238,7 +247,7 @@ class ConsumeTask(Task):
             return False
         if state.consumables.get(auto_type, 0) <= 0:
             return False
-        limit = int(cons_cfg.get("consumable_limit", 33))
+        limit = _effective_limit(cons_cfg, state.rank)
         buffer_ = int(cons_cfg.get("buffer", 0))
         if (state.consumables_24h or 0) >= (limit - buffer_):
             return False
@@ -264,7 +273,7 @@ class ConsumeTask(Task):
         threshold_pct = _ecstasy_target_threshold(state, agg_cfg)
         gap_mins = _energy_to_mins(threshold_pct) - _energy_to_mins(state.energy or 0.0)
         raw = math.ceil(gap_mins / 3)
-        limit = int(cons_cfg.get("consumable_limit", 33))
+        limit = _effective_limit(cons_cfg, state.rank)
         buffer_ = int(cons_cfg.get("buffer", 0)) if respect_buffer else 0
         headroom = max(0, (limit - buffer_) - (state.consumables_24h or 0))
         stock = state.consumables.get("ecstasy", 0)
@@ -284,7 +293,7 @@ class ConsumeTask(Task):
         executor.execute(Action("refresh_state"), state)
 
         # Hard limit check — never consume if at or past daily cap
-        limit = int(cons_cfg.get("consumable_limit", 33))
+        limit = _effective_limit(cons_cfg, state.rank)
         if (state.consumables_24h or 0) >= limit:
             return
 

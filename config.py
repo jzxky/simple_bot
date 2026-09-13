@@ -188,7 +188,8 @@ DEFAULT_CONFIG = {
         "auto_consumable": "",
         "consumable_limit": 33,
         "buffer": 0,
-        "smart_consumables": False
+        "smart_consumables": False,
+        "auto_detect_consumable_limit": False
     },
     "jail": {
         "enabled": False,
