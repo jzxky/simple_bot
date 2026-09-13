@@ -34,6 +34,7 @@ from tasks.consume import ConsumeTask
 from tasks.check_top_job import CheckTopJobTask
 from tasks.snipe_top_job import SnipeTopJobTask
 from tasks.auto_promo import AutoPromoTask
+from tasks.promo_page import PromoPageTask
 from tasks.jail_duties import JailDutiesTask
 from tasks.jail_action import JailActionTask
 from tasks.jail_consume import JailConsumeTask
@@ -333,6 +334,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     _snipe_task = SnipeTopJobTask()
     sched.add(_snipe_task)
     sched.add(AutoPromoTask())
+    sched.add(PromoPageTask())
     sched.add(JailDutiesTask())
     sched.add(JailActionTask())
     sched.add(JailConsumeTask())
