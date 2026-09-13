@@ -2632,8 +2632,9 @@
         <input type="text" id="earn-cat-new-name" placeholder="New category name…" style="flex:1" onkeydown="if(event.key==='Enter')addEarnCategory()">
         <button class="btn-primary" onclick="addEarnCategory()">Add</button>
       </div>
-      <div style="margin-top:16px;display:flex;justify-content:flex-end">
-        <button class="btn-secondary" onclick="closeEarnCatalog()">Done</button>
+      <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
+        <button class="btn-secondary" onclick="closeEarnCatalog()">Cancel</button>
+        <button class="btn-primary" onclick="saveEarnCatalog()">Save</button>
       </div>
     </div>
   </div>
