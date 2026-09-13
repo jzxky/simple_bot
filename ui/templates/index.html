@@ -93,8 +93,8 @@
         </div>
         <div id="status-stats" class="tab-panel active">
           <div class="stat-groups-grid">
-            <!-- Career -->
-            <div class="stat-group-full">
+            <!-- Career (left col, row 1) -->
+            <div>
               <table class="stat-group-table">
                 <tbody>
                   <tr class="stat-sect-hdr"><td colspan="2">Career</td></tr>
@@ -108,7 +108,22 @@
                 </tbody>
               </table>
             </div>
-            <!-- Location -->
+            <!-- Money (right col, row 1) -->
+            <div>
+              <table class="stat-group-table">
+                <tbody>
+                  <tr class="stat-sect-hdr"><td colspan="2">Money</td></tr>
+                  <tr class="stat-row-2">
+                    <td id="stat-clean-item" title="Click for bank actions" style="cursor:pointer;" onclick="openCashOverlay()"><span class="stat-label">Clean</span><span class="stat-value" id="stat-clean">--</span></td>
+                    <td><span class="stat-label">Dirty</span><span class="stat-value" id="stat-dirty">--</span></td>
+                  </tr>
+                  <tr class="stat-row-full">
+                    <td colspan="2" title="Click to withdraw" style="cursor:pointer;" onclick="requestWithdraw()"><span class="stat-label">Bank</span><span class="stat-value" id="stat-bank">--</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <!-- Location (left col, row 2) -->
             <div>
               <table class="stat-group-table">
                 <tbody>
@@ -120,7 +135,7 @@
                 </tbody>
               </table>
             </div>
-            <!-- Per 24 Hour -->
+            <!-- Per 24 Hour (right col, row 2) -->
             <div>
               <table class="stat-group-table">
                 <tbody>
@@ -132,7 +147,7 @@
                 </tbody>
               </table>
             </div>
-            <!-- Vitals -->
+            <!-- Vitals (full width) -->
             <div class="stat-group-full">
               <table class="stat-group-table stat-vitals-table">
                 <tbody>
@@ -141,21 +156,6 @@
                     <td id="stat-hp-cell" class="stat-progress-cell" onclick="this.classList.toggle('show-pct')"><div class="stat-progress-bg" id="stat-hp-bg"></div><span class="stat-label">HP</span><span class="stat-value" id="stat-health">--</span><span class="stat-pct" id="stat-hp-pct">--</span></td>
                     <td id="stat-respect-cell" class="stat-progress-cell" style="cursor:pointer;" onclick="openRespectOverlay()" title="Click to view/refresh"><div class="stat-progress-bg" id="stat-respect-bg"></div><span class="stat-label">Respect</span><span class="stat-value" id="stat-respect">--</span><span class="stat-pct" id="stat-respect-pct">--</span></td>
                     <td id="stat-energy-cell" class="stat-progress-cell" onclick="this.classList.toggle('show-pct')"><div class="stat-progress-bg" id="stat-energy-bg"></div><span class="stat-label">Energy</span><span class="stat-value" id="stat-energy">--</span><span class="stat-pct" id="stat-energy-pct">--</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <!-- Money -->
-            <div class="stat-group-full">
-              <table class="stat-group-table">
-                <tbody>
-                  <tr class="stat-sect-hdr"><td colspan="2">Money</td></tr>
-                  <tr class="stat-row-2">
-                    <td id="stat-clean-item" title="Click for bank actions" style="cursor:pointer;" onclick="openCashOverlay()"><span class="stat-label">Clean</span><span class="stat-value" id="stat-clean">--</span></td>
-                    <td><span class="stat-label">Dirty</span><span class="stat-value" id="stat-dirty">--</span></td>
-                  </tr>
-                  <tr class="stat-row-full">
-                    <td colspan="2" title="Click to withdraw" style="cursor:pointer;" onclick="requestWithdraw()"><span class="stat-label">Bank</span><span class="stat-value" id="stat-bank">--</span></td>
                   </tr>
                 </tbody>
               </table>

@@ -758,6 +758,7 @@ def status():
         "rank_progress": s.rank_progress,
         "earns_24h": s.earns_24h,
         "consumables_24h": s.consumables_24h,
+        "consumable_limit": cfg.load().get("consumables", {}).get("consumable_limit", 33),
         "energy_threshold": cfg.load().get("aggravated_crimes", {}).get("primary", {}).get("energy_threshold", 50),
         "agg_pro_active": s.agg_pro_active,
         "server_time": s.server_time.strftime("%m/%d/%Y %I:%M:%S %p") if s.server_time else None,
