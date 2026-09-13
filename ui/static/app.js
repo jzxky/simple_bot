@@ -1,3 +1,21 @@
+function _pctClass(pct) {
+  if (pct == null) return "pct-high";
+  if (pct < 25) return "pct-low";
+  if (pct < 50) return "pct-mid";
+  if (pct < 75) return "pct-high";
+  return "pct-full";
+}
+function _applyProgress(bgEl, pctEl, pct) {
+  if (!bgEl) return;
+  const cls = _pctClass(pct);
+  bgEl.className = "stat-progress-bg " + cls;
+  bgEl.style.width = (pct != null ? pct : 0) + "%";
+  if (pctEl) {
+    pctEl.className = "stat-pct " + cls;
+    pctEl.textContent = pct != null ? pct + "%" : "--";
+  }
+}
+
 let _earnCatalog = [];
 let _earnsLastUpdated = 0;
 
@@ -1092,9 +1110,7 @@ function pollStatus() {
       document.getElementById("stat-name").textContent = d.own_name || "--";
       _commsOwnName = d.own_name || "";
       document.getElementById("stat-next-rank").textContent = d.next_rank || "--";
-      document.getElementById("stat-rank-progress").textContent = d.rank_progress != null ? d.rank_progress + "%" : "--";
-      const progBg = document.getElementById("stat-progress-bg");
-      if (progBg) progBg.style.width = (d.rank_progress != null ? d.rank_progress : 0) + "%";
+      _applyProgress(document.getElementById("stat-progress-bg"), document.getElementById("stat-rank-progress"), d.rank_progress);
       document.getElementById("stat-city").textContent = d.city || "--";
       document.getElementById("stat-home-city").textContent = d.home_city || "--";
 
@@ -1111,9 +1127,17 @@ function pollStatus() {
         if (rankLabel) rankLabel.textContent = "Rank";
         if (occupationItem) occupationItem.style.display = "";
       }
-      document.getElementById("stat-health").textContent = d.health != null ? d.health + "%" : "--";
+      // Vitals — HP, Respect, Energy with progress fills
+      const hp = d.health;
+      document.getElementById("stat-health").textContent = hp != null ? hp + "%" : "--";
+      _applyProgress(document.getElementById("stat-hp-bg"), document.getElementById("stat-hp-pct"), hp);
+
       _currentEnergy = d.energy;
       _energyThreshold = d.energy_threshold;
+      const ePct = d.energy != null ? Math.round(d.energy) : null;
+      const eThr = d.energy_threshold != null ? ` [${Math.round(d.energy_threshold)}%]` : "";
+      document.getElementById("stat-energy").textContent = ePct != null ? ePct + "%" + eThr : "--";
+      _applyProgress(document.getElementById("stat-energy-bg"), document.getElementById("stat-energy-pct"), ePct);
       document.getElementById("stat-earns").textContent = d.earns_24h != null ? d.earns_24h : "--";
       document.getElementById("stat-cons-24h").textContent = d.consumables_24h != null ? d.consumables_24h : "--";
 
@@ -1183,6 +1207,8 @@ function pollStatus() {
         if (respectVal) {
           respectVal.textContent = _respectPct != null ? _respectPct : "--";
         }
+        const rPct = typeof _respectPct === "string" ? parseInt(_respectPct) : _respectPct;
+        _applyProgress(document.getElementById("stat-respect-bg"), document.getElementById("stat-respect-pct"), isNaN(rPct) ? null : rPct);
       }
       updateTimers(d.timers || {}, d.server_time, d.agg_pro_active, d.in_jail ? d.jail_release_secs : null, d.flight_departs_at || null, d.hospital_release_at || null);
       // On login (transition to logged_in), refresh the auto-jail partner list
@@ -1680,12 +1706,6 @@ function _renderTimers() {
   if (_hospitalReleaseAtMs != null) {
     const secs = Math.max(0, Math.floor((_hospitalReleaseAtMs - now) / 1000));
     tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">Hospital</span><span class="stat-value stat-timer-value">${_fmtCountdown(secs)}</span></div>`);
-  }
-
-  // Energy with target threshold
-  if (_currentEnergy != null) {
-    const thr = _energyThreshold != null ? ` [${Math.round(_energyThreshold)}%]` : "";
-    tiles.push(`<div class="stat-item stat-item-timer"><span class="stat-label">Energy</span><span class="stat-value stat-timer-value">${Math.round(_currentEnergy)}%${thr}</span></div>`);
   }
 
   // AggPro always shown
