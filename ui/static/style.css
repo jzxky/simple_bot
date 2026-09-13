@@ -65,8 +65,8 @@ header h1 {
 }
 
 .card h2 {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--accent);
