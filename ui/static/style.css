@@ -65,8 +65,8 @@ header h1 {
 }
 
 .card h2 {
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--accent);
@@ -76,6 +76,12 @@ header h1 {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+#s-character > h2 {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .card h3 {
