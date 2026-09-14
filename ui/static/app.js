@@ -142,25 +142,24 @@ function _renderEarnPlanner() {
   if (!_earnPlannerData) return;
   const d = _earnPlannerData;
 
-  // Populate add-dropdown with mappable earns not already listed
+  // Populate add-dropdown with catalog earns not already listed, grouped by category
   const addSel = document.getElementById("earn-planner-add-select");
   if (addSel) {
-    const mappable = d.mappable || {};
+    const catalog = d.catalog || {};
     const listed = new Set(Object.keys(_earnPlannerLimits));
-    const opts = Object.keys(mappable)
-      .filter(v => !listed.has(v))
-      .map(v => `<option value="${v}">${mappable[v]}</option>`)
-      .join("");
-    addSel.innerHTML = opts || '<option value="">— all earns listed —</option>';
+    const groups = Object.keys(catalog).sort().map(cat => {
+      const opts = catalog[cat]
+        .filter(e => !listed.has(e.value))
+        .map(e => `<option value="${e.value}">${e.label}</option>`)
+        .join("");
+      return opts ? `<optgroup label="${cat}">${opts}</optgroup>` : "";
+    }).filter(Boolean).join("");
+    addSel.innerHTML = groups || '<option value="">— all earns listed —</option>';
   }
 
   // Render listed earns. Merge live completed + queued counts from last fetch.
-  const completedByValue = {};
-  const queuedByValue = {};
-  (d.earns || []).forEach(e => {
-    completedByValue[e.value] = e.completed;
-    queuedByValue[e.value] = e.queued || 0;
-  });
+  const earnsByValue = {};
+  (d.earns || []).forEach(e => { earnsByValue[e.value] = e; });
 
   const listEl = document.getElementById("earn-planner-list");
   if (!listEl) return;
@@ -171,12 +170,12 @@ function _renderEarnPlanner() {
     return;
   }
 
-  const mappable = d.mappable || {};
   let html = values.map(value => {
-    const name = mappable[value] || value;
+    const info = earnsByValue[value] || {};
+    const name = info.label || value;
     const limit = _earnPlannerLimits[value];
-    const completed = completedByValue[value] || 0;
-    const queued = queuedByValue[value] || 0;
+    const completed = info.completed || 0;
+    const queued = info.queued || 0;
     const progress = completed + queued;
     const isActive = value === d.active;
     const donePct = limit > 0 ? Math.min(100, Math.round((completed / limit) * 100)) : 0;

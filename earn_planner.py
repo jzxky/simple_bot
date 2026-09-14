@@ -121,18 +121,22 @@ def completed_count(schedule_value: str, history: dict | None = None) -> int:
     return _completed_counts(history).get(name, 0)
 
 
-def _catalog_labels() -> dict:
-    """Return {schedule_value: label} from the earn catalog JSON."""
+def _load_catalog() -> list:
+    """Return the full earn catalog list from available_earns.json."""
     import os, json, paths
     path = os.path.join(paths.data_dir(), "available_earns.json")
     if not os.path.exists(path):
-        return {}
+        return []
     try:
         with open(path, encoding="utf-8") as f:
-            entries = json.load(f)
+            return json.load(f)
     except Exception:
-        return {}
-    return {e["schedule_value"]: e["label"] for e in entries if e.get("schedule_value")}
+        return []
+
+
+def _catalog_labels() -> dict:
+    """Return {schedule_value: label} from the earn catalog JSON."""
+    return {e["schedule_value"]: e["label"] for e in _load_catalog() if e.get("schedule_value")}
 
 
 def _load_queue_cache() -> dict:
@@ -152,8 +156,15 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
     """Build the data the UI needs: availability + per-listed-earn completed counts."""
     data = history if history is not None else ch.load()
     counts = _completed_counts(data)
-    catalog = _catalog_labels()
-    mappable = {v: catalog.get(v, name) for v, name in HISTORY_NAME.items()}
+    catalog_entries = _load_catalog()
+    catalog_labels = {e["schedule_value"]: e["label"] for e in catalog_entries if e.get("schedule_value")}
+    catalog_by_cat = {}
+    for e in catalog_entries:
+        sv = e.get("schedule_value")
+        if not sv:
+            continue
+        cat = e.get("category") or "Uncategorized"
+        catalog_by_cat.setdefault(cat, []).append({"value": sv, "label": e.get("label", sv)})
 
     cache = _load_queue_cache()
     queue_rows = [(r["name"], r["completed"], r["total"]) for r in cache.get("rows", [])]
@@ -161,12 +172,10 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
     earns = []
     for value, limit in (limits or {}).items():
         history_name = HISTORY_NAME.get(value)
-        if not history_name:
-            continue
         earns.append({
             "value": value,
-            "history_name": history_name,
-            "completed": counts.get(history_name, 0),
+            "label": catalog_labels.get(value, history_name or value),
+            "completed": counts.get(history_name, 0) if history_name else 0,
             "queued": queued_remaining(value, queue_rows),
             "limit": limit,
         })
@@ -174,6 +183,6 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
         "available": is_available(data),
         "earns": earns,
         "active": active_earn,
-        "mappable": mappable,
+        "catalog": catalog_by_cat,
         "queue_cached_at": cache.get("cached_at"),
     }
