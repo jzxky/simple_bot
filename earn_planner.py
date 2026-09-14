@@ -135,12 +135,29 @@ def _catalog_labels() -> dict:
     return {e["schedule_value"]: e["label"] for e in entries if e.get("schedule_value")}
 
 
+def _load_queue_cache() -> dict:
+    """Read earn_queue_cache.json written by executor during earn checks."""
+    import os, json, paths
+    path = os.path.join(paths.data_dir(), "earn_queue_cache.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
 def planner_view(limits: dict, active_earn: str = "", history: dict | None = None) -> dict:
     """Build the data the UI needs: availability + per-listed-earn completed counts."""
     data = history if history is not None else ch.load()
     counts = _completed_counts(data)
     catalog = _catalog_labels()
     mappable = {v: catalog.get(v, name) for v, name in HISTORY_NAME.items()}
+
+    cache = _load_queue_cache()
+    queue_rows = [(r["name"], r["completed"], r["total"]) for r in cache.get("rows", [])]
+
     earns = []
     for value, limit in (limits or {}).items():
         history_name = HISTORY_NAME.get(value)
@@ -150,6 +167,7 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
             "value": value,
             "history_name": history_name,
             "completed": counts.get(history_name, 0),
+            "queued": queued_remaining(value, queue_rows),
             "limit": limit,
         })
     return {
@@ -157,4 +175,5 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
         "earns": earns,
         "active": active_earn,
         "mappable": mappable,
+        "queue_cached_at": cache.get("cached_at"),
     }
