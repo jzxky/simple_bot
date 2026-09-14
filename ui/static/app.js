@@ -2931,21 +2931,17 @@ function syncAutoDetectLimitState() {
   const chEnabled = document.getElementById("char_history_enabled").checked;
   const adToggle = document.getElementById("auto_detect_consumable_limit");
   const limitSel = document.getElementById("consumable_limit");
-  const infoRow = document.getElementById("auto_detect_limit_info");
   if (!chEnabled) {
     adToggle.checked = false;
     adToggle.disabled = true;
     limitSel.disabled = false;
-    if (infoRow) infoRow.style.display = "none";
   } else {
     adToggle.disabled = false;
     if (adToggle.checked) {
       limitSel.disabled = true;
-      if (infoRow) infoRow.style.display = "";
       fetchDetectedLimit();
     } else {
       limitSel.disabled = false;
-      if (infoRow) infoRow.style.display = "none";
     }
   }
 }
@@ -2958,8 +2954,6 @@ function fetchDetectedLimit() {
   fetch("/consumable_limit/detect")
     .then(r => r.json())
     .then(d => {
-      const span = document.getElementById("detected_limit_value");
-      if (span) span.textContent = d.limit != null ? d.limit : "—";
       if (d.limit != null) {
         const sel = document.getElementById("consumable_limit");
         let found = false;
