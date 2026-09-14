@@ -268,16 +268,16 @@
               Cap how many of each earn the bot will ever complete (lifetime).
               Earns not listed here have no limit.
             </p>
-            <div class="row" style="align-items:flex-end;gap:8px">
+            <div class="row" style="align-items:flex-end;gap:8px;max-width:520px">
               <label style="flex:1">Earn
-                <select id="earn-planner-add-select"></select>
+                <select id="earn-planner-add-select" style="height:32px"></select>
               </label>
-              <label style="width:110px">Limit
-                <input type="number" id="earn-planner-add-limit" min="1" step="1" placeholder="e.g. 500">
+              <label style="width:80px">Limit
+                <input type="number" id="earn-planner-add-limit" min="1" max="99999" step="1" style="height:32px;width:80px" placeholder="e.g. 500">
               </label>
-              <button type="button" class="action-btn" onclick="earnPlannerAdd()">Add</button>
+              <button type="button" class="action-btn" style="height:32px" onclick="earnPlannerAdd()">Add</button>
             </div>
-            <table class="priority-table" style="margin-top:12px"><tbody id="earn-planner-tbody"></tbody></table>
+            <table class="priority-table" style="margin-top:12px;max-width:520px"><tbody id="earn-planner-tbody"></tbody></table>
             <div id="earn-planner-empty" style="margin-top:12px"></div>
           </div>
         </div>

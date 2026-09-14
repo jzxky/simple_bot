@@ -199,7 +199,7 @@ function _renderEarnPlanner() {
       <td style="font-weight:${isActive ? "600" : "400"}">${name}${isActive ? ' <span style="color:var(--accent);font-size:0.75rem">(active)</span>' : ""}</td>
       <td style="font-size:0.8rem;color:var(--muted);white-space:nowrap">${completed} done</td>
       <td style="color:var(--muted)">/</td>
-      <td><input type="number" min="1" step="1" value="${limit}" style="width:70px"
+      <td><input type="number" min="1" max="99999" step="1" value="${limit}" style="width:70px"
         onchange="earnPlannerSetLimit('${value}', this.value)"></td>
       <td style="width:60px">
         <div style="height:6px;background:var(--surface2,#1e2a3a);border-radius:3px;overflow:hidden">
