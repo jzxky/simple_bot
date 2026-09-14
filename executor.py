@@ -2238,7 +2238,12 @@ def handle_university(action: Action, state: GameState):
                 _action_fallback(state, f"University: '{canonical}' already completed")
                 return
         else:
-            canonical = next((d for d in _DEGREES if d not in completed), None)
+            # Selector page only shows uncompleted degrees — pick the first one in our order
+            canonical = next(
+                (d for d in _DEGREES
+                 if any(v.lower() == d.lower() or options[v].lower() == d.lower() for v in options)),
+                None,
+            )
             if canonical is None:
                 _action_fallback(state, "University: all degrees completed")
                 return
