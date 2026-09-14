@@ -273,7 +273,7 @@
                 <select id="earn-planner-add-select" style="height:32px"></select>
               </label>
               <label style="width:80px">Limit
-                <input type="number" id="earn-planner-add-limit" min="1" max="99999" step="1" style="height:32px;width:80px" placeholder="e.g. 500">
+                <input type="number" id="earn-planner-add-limit" min="1" max="99999" step="1" style="height:32px;width:80px" placeholder="e.g. 500" onkeydown="if(event.key==='Enter'){event.preventDefault();earnPlannerAdd()}">
               </label>
               <button type="button" class="action-btn" style="height:32px" onclick="earnPlannerAdd()">Add</button>
             </div>
