@@ -155,14 +155,15 @@ def is_available(history: dict | None = None) -> bool:
 
 
 def _completed_counts(history: dict | None = None) -> dict:
-    """Return {history_type_name: count} flattened across all earn-history categories."""
+    """Return {lowercase_type_name: count} flattened across all earn-history categories.
+    Keys are lowercased so lookups are case-insensitive."""
     data = history if history is not None else ch.load()
     counts = {}
     for cat in data.get("earn_history", []):
         for entry in cat.get("entries", []):
             name = entry.get("type", "")
             if name:
-                counts[name] = entry.get("count", 0)
+                counts[name.lower()] = entry.get("count", 0)
     return counts
 
 
@@ -172,7 +173,7 @@ def completed_count(schedule_value: str, history: dict | None = None) -> int:
     name = HISTORY_NAME.get(schedule_value)
     if not name:
         return 0
-    return _completed_counts(history).get(name, 0)
+    return _completed_counts(history).get(name.lower(), 0)
 
 
 def _load_catalog() -> list:
@@ -226,7 +227,7 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
         earns.append({
             "value": value,
             "label": catalog_labels.get(value, history_name or value),
-            "completed": counts.get(history_name, 0) if history_name else 0,
+            "completed": counts.get(history_name.lower(), 0) if history_name else 0,
             "limit": limit,
         })
     return {
