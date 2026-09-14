@@ -1818,3 +1818,57 @@ main > section.main-section.main-active { display: block; }
   .war-time-input { width:auto; flex:1; min-width:0; }
   .war-table select { width:auto; max-width:60%; }
 }
+
+/* ── Earn Category Manager ──────────────────────────────────────────────── */
+.earn-cat-modal {
+  background: #1e1e2e; border: 1px solid #444; border-radius: 8px;
+  padding: 24px; width: 100%; max-width: 680px;
+}
+.earn-cat-add-row {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 16px;
+}
+.earn-cat-group { margin-bottom: 2px; }
+.earn-cat-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: #252536; border-radius: 6px;
+  cursor: pointer; user-select: none;
+}
+.earn-cat-header:hover { background: #2a2a40; }
+.earn-cat-arrow {
+  font-size: 0.7rem; color: var(--muted); transition: transform 0.15s;
+  width: 12px; text-align: center; flex-shrink: 0;
+}
+.earn-cat-group.open > .earn-cat-header > .earn-cat-arrow { transform: rotate(90deg); }
+.earn-cat-name {
+  flex: 1; font-weight: 600; font-size: 0.88rem; color: #cdd6f4;
+}
+.earn-cat-count {
+  font-size: 0.78rem; color: var(--muted); margin-right: 4px;
+}
+.earn-cat-actions { display: flex; gap: 4px; }
+.earn-cat-actions button {
+  background: none; border: 1px solid transparent; color: var(--muted);
+  border-radius: 4px; padding: 2px 8px; font-size: 0.78rem; cursor: pointer;
+}
+.earn-cat-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.earn-cat-actions .ec-del:hover { border-color: #ef4444; color: #ef4444; }
+.earn-cat-items {
+  display: none; padding: 4px 0 4px 24px;
+}
+.earn-cat-group.open > .earn-cat-items { display: block; }
+.earn-cat-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-bottom: 1px solid #2a2a3a; font-size: 0.84rem;
+}
+.earn-cat-row-label { flex: 1; color: #cdd6f4; }
+.earn-cat-row select {
+  background: #2a2a3a; color: #cdd6f4; border: 1px solid #444;
+  border-radius: 4px; padding: 3px 6px; font-size: 0.82rem;
+}
+.earn-cat-rename-input {
+  background: #2a2a3a; color: #cdd6f4; border: 1px solid var(--accent);
+  border-radius: 4px; padding: 4px 8px; font-size: 0.85rem; width: 100%;
+}
+.earn-cat-loading {
+  text-align: center; color: var(--muted); padding: 32px 0; font-size: 0.9rem;
+}

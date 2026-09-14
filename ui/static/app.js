@@ -849,25 +849,30 @@ function submitRepair() {
 }
 
 // ---------------------------------------------------------------------------
-// Earn catalog overlay
+// Earn catalog overlay — collapsible category groups
 // ---------------------------------------------------------------------------
 
-const _EARN_CATEGORIES = [
-  "Crime", "Hospital", "Engineering", "Bank", "Mortician", "Law",
-  "Fire", "Police", "Gangster", "General", "Secret", "Uncategorized",
-];
+let _ecCollapsed = {};
+let _ecEmptyCategories = new Set();
+let _ecRenamingCat = null;
 
-async function openEarnCatalog() {
+function openEarnCatalog() {
   const ov = document.getElementById("earn-catalog-overlay");
   if (!ov) return;
-  try {
-    const res = await fetch("/earn_catalog");
-    _earnCatalog = await res.json();
-  } catch (e) {
-    _earnCatalog = [];
-  }
-  _renderEarnCatalogRows();
   ov.style.display = "flex";
+  const groups = document.getElementById("earn-cat-groups");
+  if (groups) groups.innerHTML = '<div class="earn-cat-loading">Loading…</div>';
+  fetch("/earn_catalog")
+    .then(r => r.json())
+    .then(data => {
+      _earnCatalog = data;
+      _ecEmptyCategories = new Set();
+      _ecRenamingCat = null;
+      _renderEarnCatGroups();
+    })
+    .catch(() => {
+      if (groups) groups.innerHTML = '<div class="earn-cat-loading">Failed to load earn catalog.</div>';
+    });
 }
 
 function closeEarnCatalog() {
@@ -875,104 +880,164 @@ function closeEarnCatalog() {
   if (ov) ov.style.display = "none";
 }
 
-function showEarnCatalogTab(tab) {
-  document.getElementById("earn-cat-panel-assign").style.display = tab === "assign" ? "" : "none";
-  document.getElementById("earn-cat-panel-edit").style.display   = tab === "edit"   ? "" : "none";
-  document.getElementById("earn-cat-tab-assign").classList.toggle("active", tab === "assign");
-  document.getElementById("earn-cat-tab-edit").classList.toggle("active",   tab === "edit");
-  if (tab === "edit") _renderEarnCategoryEditor();
-}
-
 function _earnCategoryList() {
   const seen = new Set(), cats = [];
-  _earnCatalog.forEach(e => { const c = e.category || "Uncategorized"; if (!seen.has(c)) { seen.add(c); cats.push(c); } });
+  _earnCatalog.forEach(e => {
+    if (e.label === "__placeholder__") return;
+    const c = e.category || "Uncategorized";
+    if (!seen.has(c)) { seen.add(c); cats.push(c); }
+  });
+  _ecEmptyCategories.forEach(c => { if (!seen.has(c)) { seen.add(c); cats.push(c); } });
   return cats;
 }
 
-function _renderEarnCategoryEditor() {
-  const container = document.getElementById("earn-cat-edit-list");
+function _renderEarnCatGroups() {
+  const container = document.getElementById("earn-cat-groups");
   if (!container) return;
-  const cats = _earnCategoryList();
-  container.innerHTML = cats.map(cat => `
-    <div style="display:flex;gap:8px;align-items:center">
-      <input type="text" value="${escHtml(cat)}" data-orig="${escHtml(cat)}" style="flex:1" oninput="this.dataset.dirty='1'">
-      <button class="btn-secondary" onclick="applyEarnCategoryRename(this)">Rename</button>
-      <button class="btn-danger" onclick="deleteEarnCategory('${escHtml(cat)}')" title="Delete">✕</button>
-    </div>`).join("");
+  container.innerHTML = "";
+
+  const allCats = _earnCategoryList();
+  const realEarns = _earnCatalog.filter(e => e.label !== "__placeholder__");
+  const grouped = {};
+  allCats.forEach(c => { grouped[c] = []; });
+  realEarns.forEach(e => {
+    const c = e.category || "Uncategorized";
+    if (!grouped[c]) grouped[c] = [];
+    grouped[c].push(e);
+  });
+  for (const c of allCats) {
+    grouped[c].sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  const catOptions = allCats.map(c => escHtml(c));
+
+  for (const cat of allCats) {
+    const earns = grouped[cat];
+    const isOpen = !_ecCollapsed[cat];
+    const group = document.createElement("div");
+    group.className = "earn-cat-group" + (isOpen ? " open" : "");
+    group.dataset.cat = cat;
+
+    const header = document.createElement("div");
+    header.className = "earn-cat-header";
+
+    if (_ecRenamingCat === cat) {
+      header.innerHTML = `
+        <span class="earn-cat-arrow">▶</span>
+        <input class="earn-cat-rename-input" value="${escHtml(cat)}" data-orig="${escHtml(cat)}"
+               onkeydown="if(event.key==='Enter')_ecFinishRename(this);if(event.key==='Escape')_ecCancelRename()">
+        <button class="action-btn" onclick="_ecFinishRename(this.previousElementSibling)">OK</button>
+        <button class="action-btn" onclick="_ecCancelRename()">Cancel</button>`;
+      header.querySelector(".earn-cat-arrow").onclick = function(ev) {
+        ev.stopPropagation(); _ecToggleGroup(cat);
+      };
+    } else {
+      header.innerHTML = `
+        <span class="earn-cat-arrow">▶</span>
+        <span class="earn-cat-name">${escHtml(cat)}</span>
+        <span class="earn-cat-count">(${earns.length})</span>
+        <span class="earn-cat-actions">
+          <button onclick="event.stopPropagation();_ecStartRename(${escJsStr(cat)})">Rename</button>
+          <button class="ec-del" onclick="event.stopPropagation();_ecDeleteCategory(${escJsStr(cat)})">Delete</button>
+        </span>`;
+      header.onclick = function() { _ecToggleGroup(cat); };
+    }
+
+    const items = document.createElement("div");
+    items.className = "earn-cat-items";
+    if (!earns.length) {
+      items.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;padding:6px 8px;">No earns in this category</div>';
+    } else {
+      for (const e of earns) {
+        const opts = catOptions.map(c =>
+          `<option value="${c}"${c === escHtml(e.category || "Uncategorized") ? " selected" : ""}>${c}</option>`
+        ).join("");
+        const row = document.createElement("div");
+        row.className = "earn-cat-row";
+        row.innerHTML = `
+          <span class="earn-cat-row-label">${escHtml(e.label)}</span>
+          <select class="earn-cat-row-select" onchange="_ecSetCategory(${escJsStr(e.label)}, this.value)">${opts}</select>`;
+        items.appendChild(row);
+      }
+    }
+
+    group.appendChild(header);
+    group.appendChild(items);
+    container.appendChild(group);
+  }
 }
 
-function applyEarnCategoryRename(btn) {
-  const input = btn.parentElement.querySelector("input");
-  const orig  = input.dataset.orig;
-  const next  = input.value.trim();
-  if (!next || next === orig) return;
-  _earnCatalog = _earnCatalog.map(e => e.category === orig ? {...e, category: next} : e);
-  input.dataset.orig = next;
-  input.dataset.dirty = "";
-  _renderEarnCategoryEditor();
-  _renderEarnCatalogRows();
+function _ecToggleGroup(cat) {
+  _ecCollapsed[cat] = !_ecCollapsed[cat];
+  const g = document.querySelector(`.earn-cat-group[data-cat="${CSS.escape(cat)}"]`);
+  if (g) g.classList.toggle("open");
 }
 
-function deleteEarnCategory(cat) {
-  if (!confirm(`Delete category "${cat}"? Its earns will move to Uncategorized.`)) return;
-  _earnCatalog = _earnCatalog.map(e => e.category === cat ? {...e, category: "Uncategorized"} : e);
-  _renderEarnCategoryEditor();
-  _renderEarnCatalogRows();
+function _ecSetCategory(label, newCat) {
+  const entry = _earnCatalog.find(e => e.label === label);
+  if (entry) entry.category = newCat;
+}
+
+function _ecStartRename(cat) {
+  _ecRenamingCat = cat;
+  _renderEarnCatGroups();
+  const input = document.querySelector(".earn-cat-rename-input");
+  if (input) { input.focus(); input.select(); }
+}
+
+function _ecCancelRename() {
+  _ecRenamingCat = null;
+  _renderEarnCatGroups();
+}
+
+function _ecFinishRename(input) {
+  const orig = input.dataset.orig;
+  const next = input.value.trim();
+  if (!next || next === orig) { _ecCancelRename(); return; }
+  if (_earnCategoryList().includes(next)) { _ecCancelRename(); return; }
+  _earnCatalog.forEach(e => { if (e.category === orig) e.category = next; });
+  if (_ecEmptyCategories.has(orig)) {
+    _ecEmptyCategories.delete(orig);
+    _ecEmptyCategories.add(next);
+  }
+  if (_ecCollapsed[orig] !== undefined) {
+    _ecCollapsed[next] = _ecCollapsed[orig];
+    delete _ecCollapsed[orig];
+  }
+  _ecRenamingCat = null;
+  _renderEarnCatGroups();
+}
+
+function _ecDeleteCategory(cat) {
+  if (cat === "Uncategorized") return;
+  const count = _earnCatalog.filter(e => e.label !== "__placeholder__" && e.category === cat).length;
+  const msg = count
+    ? `Delete "${cat}"? Its ${count} earn(s) will move to Uncategorized.`
+    : `Delete empty category "${cat}"?`;
+  if (!confirm(msg)) return;
+  _earnCatalog.forEach(e => { if (e.category === cat) e.category = "Uncategorized"; });
+  _ecEmptyCategories.delete(cat);
+  _renderEarnCatGroups();
 }
 
 function addEarnCategory() {
   const input = document.getElementById("earn-cat-new-name");
-  const name  = input.value.trim();
+  const name = input.value.trim();
   if (!name) return;
   if (_earnCategoryList().includes(name)) { input.value = ""; return; }
-  _earnCatalog = _earnCatalog.map(e => e);
-  _earnCatalog.push({ label: "__placeholder__", schedule_value: "", category: name, available: false });
+  _ecEmptyCategories.add(name);
+  _ecCollapsed[name] = false;
   input.value = "";
-  _renderEarnCategoryEditor();
-  _renderEarnCatalogRows();
-}
-
-function _renderEarnCatalogRows() {
-  const tbody = document.getElementById("earn-catalog-rows");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-  const sorted = [..._earnCatalog].sort((a, b) => a.label.localeCompare(b.label));
-  for (const entry of sorted) {
-    const avail = entry.available === true ? "✓" : entry.available === false ? "✗" : "—";
-    const availColor = entry.available === true ? "#a6e3a1" : entry.available === false ? "#f38ba8" : "var(--muted)";
-    const allCats = [...new Set([..._EARN_CATEGORIES, ..._earnCategoryList()])];
-    const catOptions = allCats.map(c =>
-      `<option value="${c}" ${entry.category === c ? "selected" : ""}>${c}</option>`
-    ).join("");
-    const tr = document.createElement("tr");
-    tr.style.borderBottom = "1px solid #2a2a3a";
-    tr.dataset.label = entry.label;
-    tr.innerHTML = `
-      <td style="padding:6px 8px;">${entry.label}</td>
-      <td style="padding:6px 8px;color:${availColor};font-weight:600;">${avail}</td>
-      <td style="padding:6px 8px;">
-        <select class="earn-cat-select" onchange="setEarnRowCategory(${escJsStr(entry.label)}, this.value)" style="background:#2a2a3a;color:#cdd6f4;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:0.82rem;">
-          ${catOptions}
-        </select>
-      </td>`;
-    tbody.appendChild(tr);
-  }
-}
-
-function setEarnRowCategory(label, category) {
-  const entry = _earnCatalog.find(e => e.label === label);
-  if (entry) entry.category = category;
+  _renderEarnCatGroups();
 }
 
 async function saveEarnCatalog() {
-  const rows = document.querySelectorAll("#earn-catalog-rows tr[data-label]");
-  const byLabel = Object.fromEntries(_earnCatalog.map(e => [e.label, e]));
-  rows.forEach(row => {
-    const label = row.dataset.label;
-    const sel = row.querySelector(".earn-cat-select");
-    if (byLabel[label] && sel) byLabel[label].category = sel.value;
+  const updated = _earnCatalog.filter(e => e.label !== "__placeholder__");
+  _ecEmptyCategories.forEach(cat => {
+    if (!updated.some(e => e.category === cat)) {
+      updated.push({ label: "__placeholder__", schedule_value: "", category: cat, available: false });
+    }
   });
-  const updated = Object.values(byLabel);
   try {
     await fetch("/earn_catalog", {
       method: "POST",
@@ -981,7 +1046,7 @@ async function saveEarnCatalog() {
     });
     _earnCatalog = updated;
     closeEarnCatalog();
-    _renderEarnSelect();
+    _populateEarnCategories();
   } catch (e) {
     alert("Failed to save earn categories.");
   }
