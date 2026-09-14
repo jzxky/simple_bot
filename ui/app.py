@@ -128,6 +128,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["earns"]["enabled"] = data.get("earns_enabled", False)
     c["earns"]["earn_type"] = data.get("earn_type", "surgeon")
     c["earns"]["earn_mode"] = data.get("earn_mode", "auto")
+    c["earns"]["show_all"] = data.get("earn_show_all", False)
 
     if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
         import earn_planner as _ep
