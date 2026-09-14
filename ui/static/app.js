@@ -127,6 +127,7 @@ function loadEarnPlanner() {
       _earnPlannerLimits = {};
       (d.earns || []).forEach(e => { _earnPlannerLimits[e.value] = e.limit; });
       _renderEarnPlanner();
+      _syncEarnPlannerLock();
     })
     .catch(() => {});
 }
@@ -136,13 +137,22 @@ function toggleEarnPlanner() {
   const toggle = document.getElementById("earn-planner-toggle");
   if (!body || !toggle) return;
   body.style.display = toggle.checked ? "" : "none";
+  _syncEarnPlannerLock();
+}
+
+function _syncEarnPlannerLock() {
+  const toggle = document.getElementById("earn-planner-toggle");
+  const hasEntries = toggle && toggle.checked && Object.keys(_earnPlannerLimits).length > 0;
+  const catSel = document.getElementById("earn_category");
+  const earnSel = document.getElementById("earn_type");
+  if (catSel) catSel.disabled = hasEntries;
+  if (earnSel) earnSel.disabled = hasEntries;
 }
 
 function _renderEarnPlanner() {
   if (!_earnPlannerData) return;
   const d = _earnPlannerData;
 
-  // Populate add-dropdown with catalog earns not already listed, grouped by category
   const addSel = document.getElementById("earn-planner-add-select");
   if (addSel) {
     const catalog = d.catalog || {};
@@ -157,57 +167,57 @@ function _renderEarnPlanner() {
     addSel.innerHTML = groups || '<option value="">— all earns listed —</option>';
   }
 
-  // Render listed earns. Merge live completed + queued counts from last fetch.
   const earnsByValue = {};
   (d.earns || []).forEach(e => { earnsByValue[e.value] = e; });
 
-  const listEl = document.getElementById("earn-planner-list");
-  if (!listEl) return;
+  const tbody = document.getElementById("earn-planner-tbody");
+  const emptyEl = document.getElementById("earn-planner-empty");
+  if (!tbody) return;
 
   const values = Object.keys(_earnPlannerLimits);
   if (!values.length) {
-    listEl.innerHTML = '<p style="color:var(--muted);font-size:0.82rem">No limits set — every earn is unlimited.</p>';
+    tbody.innerHTML = "";
+    if (emptyEl) emptyEl.innerHTML = '<p style="color:var(--muted);font-size:0.82rem">No limits set — every earn is unlimited.</p>';
+    _syncEarnPlannerLock();
     return;
   }
+  if (emptyEl) emptyEl.innerHTML = "";
 
-  let html = values.map(value => {
+  tbody.innerHTML = values.map((value, idx) => {
     const info = earnsByValue[value] || {};
     const name = info.label || value;
     const limit = _earnPlannerLimits[value];
     const completed = info.completed || 0;
-    const queued = info.queued || 0;
-    const progress = completed + queued;
     const isActive = value === d.active;
-    const donePct = limit > 0 ? Math.min(100, Math.round((completed / limit) * 100)) : 0;
-    const queuedPct = limit > 0 ? Math.min(100 - donePct, Math.round((queued / limit) * 100)) : 0;
+    const pct = limit > 0 ? Math.min(100, Math.round((completed / limit) * 100)) : 0;
     let barColor = "var(--accent,#89b4fa)";
     let warn = "";
-    if (progress >= limit) { barColor = "var(--error,#f87171)"; warn = " — at cap"; }
-    else if (limit > 0 && progress / limit >= 0.9) { barColor = "var(--warn,#f59e0b)"; warn = " — near cap"; }
-    const statusParts = [completed + " done"];
-    if (queued > 0) statusParts.push(queued + " queued");
-    return `<div class="earn-planner-row" style="padding:8px 0;border-top:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="flex:1;font-weight:${isActive ? "600" : "400"}">${name}${isActive ? ' <span style="color:var(--accent);font-size:0.75rem">(active)</span>' : ""}</span>
-        <span style="font-size:0.8rem;color:var(--muted)">${statusParts.join(" + ")}</span>
-        <span style="color:var(--muted)">/</span>
-        <input type="number" min="1" step="1" value="${limit}" style="width:80px"
-          onchange="earnPlannerSetLimit('${value}', this.value)">
-        <button type="button" class="pl-icon-btn pl-icon-btn-danger" title="Remove limit"
-          onclick="earnPlannerRemove('${value}')">✕</button>
-      </div>
-      <div style="height:6px;background:var(--surface2,#1e2a3a);border-radius:3px;margin-top:5px;overflow:hidden;position:relative">
-        <div style="height:100%;width:${donePct + queuedPct}%;background:${barColor};opacity:0.35;position:absolute;left:0;top:0"></div>
-        <div style="height:100%;width:${donePct}%;background:${barColor};position:relative"></div>
-      </div>
-      <div style="font-size:0.75rem;color:var(--muted);margin-top:2px">${Math.min(100, Math.round((progress / limit) * 100))}%${warn}</div>
-    </div>`;
+    if (completed >= limit) { barColor = "var(--error,#f87171)"; warn = " — at cap"; }
+    else if (limit > 0 && completed / limit >= 0.9) { barColor = "var(--warn,#f59e0b)"; warn = " — near cap"; }
+    return `<tr draggable="true" data-item="${value}">
+      <td class="priority-num">${idx + 1}</td>
+      <td style="font-weight:${isActive ? "600" : "400"}">${name}${isActive ? ' <span style="color:var(--accent);font-size:0.75rem">(active)</span>' : ""}</td>
+      <td style="font-size:0.8rem;color:var(--muted);white-space:nowrap">${completed} done</td>
+      <td style="color:var(--muted)">/</td>
+      <td><input type="number" min="1" step="1" value="${limit}" style="width:70px"
+        onchange="earnPlannerSetLimit('${value}', this.value)"></td>
+      <td style="width:60px">
+        <div style="height:6px;background:var(--surface2,#1e2a3a);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barColor}"></div>
+        </div>
+        <div style="font-size:0.7rem;color:var(--muted)">${pct}%${warn}</div>
+      </td>
+      <td><div class="priority-move">
+        <button type="button" onclick="_moveRow(this,-1)">▲</button>
+        <button type="button" onclick="_moveRow(this,1)">▼</button>
+      </div></td>
+      <td><button type="button" class="pl-icon-btn pl-icon-btn-danger" title="Remove"
+        onclick="earnPlannerRemove('${value}')">✕</button></td>
+    </tr>`;
   }).join("");
 
-  if (d.queue_cached_at) {
-    html += `<p style="color:var(--muted);font-size:0.75rem;margin-top:6px">Queue data from ${d.queue_cached_at}</p>`;
-  }
-  listEl.innerHTML = html;
+  _initPriorityDrag("earn-planner-tbody");
+  _syncEarnPlannerLock();
 }
 
 function earnPlannerAdd() {
@@ -220,7 +230,7 @@ function earnPlannerAdd() {
   _earnPlannerLimits[value] = limit;
   limitEl.value = "";
   _renderEarnPlanner();
-  autoSave();
+  _doSave().then(() => loadEarnPlanner());
 }
 
 function earnPlannerSetLimit(value, raw) {
@@ -234,6 +244,7 @@ function earnPlannerSetLimit(value, raw) {
 function earnPlannerRemove(value) {
   delete _earnPlannerLimits[value];
   _renderEarnPlanner();
+  _syncEarnPlannerLock();
   autoSave();
 }
 
@@ -319,7 +330,17 @@ function _buildPayload() {
     earn_mode: document.getElementById("earn_mode").value,
     earn_show_all: document.getElementById("earn_show_all").checked,
     earn_type: document.getElementById("earn_type").value,
-    earn_planner_limits: {..._earnPlannerLimits},
+    earn_planner_enabled: document.getElementById("earn-planner-toggle").checked,
+    earn_planner_limits: (() => {
+      const tbody = document.getElementById("earn-planner-tbody");
+      if (!tbody || !tbody.rows.length) return {..._earnPlannerLimits};
+      const ordered = {};
+      tbody.querySelectorAll("tr").forEach(tr => {
+        const v = tr.dataset.item;
+        if (v && _earnPlannerLimits[v] != null) ordered[v] = _earnPlannerLimits[v];
+      });
+      return ordered;
+    })(),
     crimes_enabled: document.getElementById("crimes_enabled").checked,
     primary_crime: document.getElementById("primary_crime").value,
     primary_threshold: document.getElementById("primary_threshold").value,
@@ -2422,6 +2443,18 @@ function _renumberTable(tbodyId) {
     if (num) num.textContent = i + 1;
   });
   if (_BUYLIST_SUMMARY[tbodyId]) _renderBuyListSummary(tbodyId, _BUYLIST_SUMMARY[tbodyId]);
+  if (tbodyId === "earn-planner-tbody") _syncEarnPlannerOrder();
+}
+
+function _syncEarnPlannerOrder() {
+  const tbody = document.getElementById("earn-planner-tbody");
+  if (!tbody) return;
+  const ordered = {};
+  tbody.querySelectorAll("tr").forEach(tr => {
+    const v = tr.dataset.item;
+    if (v && _earnPlannerLimits[v] != null) ordered[v] = _earnPlannerLimits[v];
+  });
+  _earnPlannerLimits = ordered;
 }
 
 function _loadSkillsGroupDropdown() {

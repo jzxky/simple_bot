@@ -166,9 +166,6 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
         cat = e.get("category") or "Uncategorized"
         catalog_by_cat.setdefault(cat, []).append({"value": sv, "label": e.get("label", sv)})
 
-    cache = _load_queue_cache()
-    queue_rows = [(r["name"], r["completed"], r["total"]) for r in cache.get("rows", [])]
-
     earns = []
     for value, limit in (limits or {}).items():
         history_name = HISTORY_NAME.get(value)
@@ -176,7 +173,6 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
             "value": value,
             "label": catalog_labels.get(value, history_name or value),
             "completed": counts.get(history_name, 0) if history_name else 0,
-            "queued": queued_remaining(value, queue_rows),
             "limit": limit,
         })
     return {
@@ -184,5 +180,4 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
         "earns": earns,
         "active": active_earn,
         "catalog": catalog_by_cat,
-        "queue_cached_at": cache.get("cached_at"),
     }
