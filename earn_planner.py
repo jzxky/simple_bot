@@ -163,7 +163,7 @@ def _completed_counts(history: dict | None = None) -> dict:
         for entry in cat.get("entries", []):
             name = entry.get("type", "")
             if name:
-                counts[name.lower()] = entry.get("count", 0)
+                counts[name.replace(" ", " ").lower()] = entry.get("count", 0)
     return counts
 
 
