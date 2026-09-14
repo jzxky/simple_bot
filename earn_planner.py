@@ -169,11 +169,17 @@ def _completed_counts(history: dict | None = None) -> dict:
 
 def completed_count(schedule_value: str, history: dict | None = None) -> int:
     """Lifetime completed count for an auto-earn, via the history-name mapping.
-    Returns 0 if the earn is unmapped or absent from history."""
+    Falls back to matching the catalog label against history if unmapped."""
+    counts = _completed_counts(history)
     name = HISTORY_NAME.get(schedule_value)
-    if not name:
-        return 0
-    return _completed_counts(history).get(name.lower(), 0)
+    if name:
+        result = counts.get(name.lower(), 0)
+        if result:
+            return result
+    label = _catalog_labels().get(schedule_value)
+    if label:
+        return counts.get(label.lower(), 0)
+    return 0
 
 
 def _load_catalog() -> list:
@@ -224,10 +230,16 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
     earns = []
     for value, limit in (limits or {}).items():
         history_name = HISTORY_NAME.get(value)
+        label = catalog_labels.get(value, history_name or value)
+        completed = 0
+        if history_name:
+            completed = counts.get(history_name.lower(), 0)
+        if not completed and label:
+            completed = counts.get(label.lower(), 0)
         earns.append({
             "value": value,
-            "label": catalog_labels.get(value, history_name or value),
-            "completed": counts.get(history_name.lower(), 0) if history_name else 0,
+            "label": label,
+            "completed": completed,
             "limit": limit,
         })
     return {
