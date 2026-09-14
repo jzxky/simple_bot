@@ -261,9 +261,9 @@
           <hr class="stat-divider">
           <label class="inline-toggle setting-row">
             Earn Planner
-            <label class="toggle-label"><input type="checkbox" id="earn-planner-toggle" onchange="toggleEarnPlanner()"><span class="toggle"></span></label>
+            <label class="toggle-label"><input type="checkbox" id="earn-planner-toggle" {% if config.earn_planner.get('enabled') %}checked{% endif %} onchange="toggleEarnPlanner(); autoSave()"><span class="toggle"></span></label>
           </label>
-          <div id="earn-planner-body" style="display:none">
+          <div id="earn-planner-body" style="display:{% if config.earn_planner.get('enabled') %}block{% else %}none{% endif %}">
             <p style="font-size:0.82rem;color:var(--muted);margin:0 0 12px;">
               Cap how many of each earn the bot will ever complete (lifetime).
               Earns not listed here have no limit.
@@ -277,7 +277,8 @@
               </label>
               <button type="button" class="action-btn" onclick="earnPlannerAdd()">Add</button>
             </div>
-            <div id="earn-planner-list" style="margin-top:12px"></div>
+            <table class="priority-table" style="margin-top:12px"><tbody id="earn-planner-tbody"></tbody></table>
+            <div id="earn-planner-empty" style="margin-top:12px"></div>
           </div>
         </div>
 

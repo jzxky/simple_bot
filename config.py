@@ -15,6 +15,7 @@ DEFAULT_CONFIG = {
         "check_interval_minutes": 30
     },
     "earn_planner": {
+        "enabled": False,
         "limits": {}
     },
     "aggravated_crimes": {

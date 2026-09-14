@@ -132,9 +132,10 @@ def _apply_payload(c: dict, data: dict) -> dict:
 
     if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
         import earn_planner as _ep
+        valid_values = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
         clean = {}
         for k, v in data["earn_planner_limits"].items():
-            if k not in _ep.HISTORY_NAME:
+            if k not in valid_values:
                 continue
             try:
                 n = int(v)
@@ -143,6 +144,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
             if n > 0:
                 clean[k] = n
         c.setdefault("earn_planner", {})["limits"] = clean
+    c.setdefault("earn_planner", {})["enabled"] = bool(data.get("earn_planner_enabled", False))
 
     c["aggravated_crimes"]["enabled"] = data.get("crimes_enabled", False)
     c["aggravated_crimes"]["primary"]["crime"] = data.get("primary_crime", "pickpocket")
@@ -390,9 +392,10 @@ def save():
         # to avoid diff-merge issues with mutable object references.
         if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
             import earn_planner as _ep
+            valid_values = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
             clean = {}
             for k, v in data["earn_planner_limits"].items():
-                if k not in _ep.HISTORY_NAME:
+                if k not in valid_values:
                     continue
                 try:
                     n = int(v)
