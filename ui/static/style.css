@@ -216,7 +216,6 @@ label.setting-row.inline-toggle {
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .placeholder { color: var(--muted); font-style: italic; padding: 10px 0; }
-#earn-planner-group { display: none !important; }
 .muted { color: var(--muted); font-weight: normal; }
 
 /* Controls */
