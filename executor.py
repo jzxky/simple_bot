@@ -369,6 +369,19 @@ def _parse_earn_queue_rows(soup) -> list:
     return rows
 
 
+def _save_earn_queue_cache(rows):
+    """Persist parsed queue rows so planner_view() can include queued counts."""
+    import os, json, paths
+    from datetime import datetime
+    cache = {
+        "cached_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "rows": [{"name": n, "completed": c, "total": t} for n, c, t in rows],
+    }
+    path = os.path.join(paths.data_dir(), "earn_queue_cache.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(cache, f)
+
+
 def _ensure_auto_earn_mode(page):
     """Make sure the AUTO earn panel is visible (it can collapse after a page reload)."""
     try:
@@ -445,13 +458,14 @@ def handle_check_earns(action: Action, state: GameState):
         except (ValueError, IndexError):
             pass
 
+    queue_rows = _parse_earn_queue_rows(earn_soup)
+    _save_earn_queue_cache(queue_rows)
+
     if current_count >= QUEUE_MIN:
         state.add_log(f"Earn queue at {current_count}/200, no top-up needed.")
         return
 
     available_capacity = QUEUE_MAX - current_count
-
-    queue_rows = _parse_earn_queue_rows(earn_soup)
     limits = cfg.load().get("earn_planner", {}).get("limits", {})
 
     # Queue order: the active earn first, then any other planner earns (those with

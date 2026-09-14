@@ -142,9 +142,13 @@ function _renderEarnPlanner() {
     addSel.innerHTML = opts || '<option value="">— all earns listed —</option>';
   }
 
-  // Render listed earns. Merge live completed counts from last fetch.
+  // Render listed earns. Merge live completed + queued counts from last fetch.
   const completedByValue = {};
-  (d.earns || []).forEach(e => { completedByValue[e.value] = e.completed; });
+  const queuedByValue = {};
+  (d.earns || []).forEach(e => {
+    completedByValue[e.value] = e.completed;
+    queuedByValue[e.value] = e.queued || 0;
+  });
 
   const listEl = document.getElementById("earn-planner-list");
   if (!listEl) return;
@@ -156,32 +160,43 @@ function _renderEarnPlanner() {
   }
 
   const mappable = d.mappable || {};
-  listEl.innerHTML = values.map(value => {
+  let html = values.map(value => {
     const name = mappable[value] || value;
     const limit = _earnPlannerLimits[value];
     const completed = completedByValue[value] || 0;
+    const queued = queuedByValue[value] || 0;
+    const progress = completed + queued;
     const isActive = value === d.active;
-    const pct = limit > 0 ? Math.min(100, Math.round((completed / limit) * 100)) : 0;
+    const donePct = limit > 0 ? Math.min(100, Math.round((completed / limit) * 100)) : 0;
+    const queuedPct = limit > 0 ? Math.min(100 - donePct, Math.round((queued / limit) * 100)) : 0;
     let barColor = "var(--accent,#89b4fa)";
     let warn = "";
-    if (completed >= limit) { barColor = "var(--error,#f87171)"; warn = " ⛔ at cap"; }
-    else if (pct >= 90)     { barColor = "var(--warn,#f59e0b)"; warn = " ⚠ near cap"; }
+    if (progress >= limit) { barColor = "var(--error,#f87171)"; warn = " — at cap"; }
+    else if (limit > 0 && progress / limit >= 0.9) { barColor = "var(--warn,#f59e0b)"; warn = " — near cap"; }
+    const statusParts = [completed + " done"];
+    if (queued > 0) statusParts.push(queued + " queued");
     return `<div class="earn-planner-row" style="padding:8px 0;border-top:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:8px">
         <span style="flex:1;font-weight:${isActive ? "600" : "400"}">${name}${isActive ? ' <span style="color:var(--accent);font-size:0.75rem">(active)</span>' : ""}</span>
-        <span style="font-size:0.8rem;color:var(--muted)">${completed} done</span>
+        <span style="font-size:0.8rem;color:var(--muted)">${statusParts.join(" + ")}</span>
         <span style="color:var(--muted)">/</span>
         <input type="number" min="1" step="1" value="${limit}" style="width:80px"
           onchange="earnPlannerSetLimit('${value}', this.value)">
         <button type="button" class="pl-icon-btn pl-icon-btn-danger" title="Remove limit"
           onclick="earnPlannerRemove('${value}')">✕</button>
       </div>
-      <div style="height:6px;background:var(--surface2,#1e2a3a);border-radius:3px;margin-top:5px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${barColor}"></div>
+      <div style="height:6px;background:var(--surface2,#1e2a3a);border-radius:3px;margin-top:5px;overflow:hidden;position:relative">
+        <div style="height:100%;width:${donePct + queuedPct}%;background:${barColor};opacity:0.35;position:absolute;left:0;top:0"></div>
+        <div style="height:100%;width:${donePct}%;background:${barColor};position:relative"></div>
       </div>
-      <div style="font-size:0.75rem;color:var(--muted);margin-top:2px">${pct}%${warn}</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-top:2px">${Math.min(100, Math.round((progress / limit) * 100))}%${warn}</div>
     </div>`;
   }).join("");
+
+  if (d.queue_cached_at) {
+    html += `<p style="color:var(--muted);font-size:0.75rem;margin-top:6px">Queue data from ${d.queue_cached_at}</p>`;
+  }
+  listEl.innerHTML = html;
 }
 
 function earnPlannerAdd() {
