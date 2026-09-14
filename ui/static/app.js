@@ -64,6 +64,13 @@ function _populateEarnCategories(selectedEarnType) {
   const catSel = document.getElementById("earn_category");
   if (!catSel) return;
 
+  // When called without an argument (e.g. from Show All toggle), preserve
+  // the currently selected earn so the dropdown doesn't reset.
+  if (selectedEarnType === undefined) {
+    const sel = document.getElementById("earn_type");
+    selectedEarnType = sel ? (sel.value || sel.dataset.current || "") : "";
+  }
+
   const showAll = _showAllEarns();
   const seen = new Set();
   const cats = [];
@@ -119,11 +126,16 @@ function loadEarnPlanner() {
       _earnPlannerData = d;
       _earnPlannerLimits = {};
       (d.earns || []).forEach(e => { _earnPlannerLimits[e.value] = e.limit; });
-      const group = document.getElementById("earn-planner-group");
-      if (group) group.style.display = d.available ? "" : "none";
       _renderEarnPlanner();
     })
     .catch(() => {});
+}
+
+function toggleEarnPlanner() {
+  const body = document.getElementById("earn-planner-body");
+  const toggle = document.getElementById("earn-planner-toggle");
+  if (!body || !toggle) return;
+  body.style.display = toggle.checked ? "" : "none";
 }
 
 function _renderEarnPlanner() {

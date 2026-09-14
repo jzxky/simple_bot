@@ -250,14 +250,20 @@
             <label for="earn_type">Earn</label>
             <select id="earn_type" style="width:160px" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
           </div>
-          <div class="row">
-            <button type="button" id="clear-earn-btn" class="btn-secondary" onclick="clearEarnQueue()">Clear Queue</button>
-            <button type="button" class="btn-secondary" onclick="openEarnCatalog()">Manage Categories</button>
+          <div class="setting-row">
+            <button type="button" id="clear-earn-btn" class="btn-secondary" style="width:100%" onclick="clearEarnQueue()">Clear Queue</button>
+          </div>
+          <div class="setting-row">
+            <button type="button" class="btn-secondary" style="width:100%" onclick="openEarnCatalog()">Manage Categories</button>
           </div>
 
-          <!-- Earn Planner (only shown when character history earn data is available) -->
-          <div id="earn-planner-group" class="settings-group" style="display:none;margin-top:18px">
-            <h3>Earn Planner</h3>
+          <!-- Earn Planner -->
+          <hr class="stat-divider">
+          <label class="inline-toggle setting-row">
+            Earn Planner
+            <label class="toggle-label"><input type="checkbox" id="earn-planner-toggle" onchange="toggleEarnPlanner()"><span class="toggle"></span></label>
+          </label>
+          <div id="earn-planner-body" style="display:none">
             <p style="font-size:0.82rem;color:var(--muted);margin:0 0 12px;">
               Cap how many of each earn the bot will ever complete (lifetime).
               Earns not listed here have no limit.
