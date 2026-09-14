@@ -238,6 +238,10 @@
               <option value="manual" {% if config.earns.earn_mode == 'manual' %}selected{% endif %}>Manual</option>
             </select>
           </div>
+          <label class="inline-toggle setting-row">
+            Show All Earns
+            <label class="toggle-label"><input type="checkbox" id="earn_show_all" {% if config.earns.get('show_all') %}checked{% endif %} onchange="_populateEarnCategories(); autoSave()"><span class="toggle"></span></label>
+          </label>
           <div class="setting-row">
             <label for="earn_category">Category</label>
             <select id="earn_category" style="width:160px" onchange="_renderEarnSelect(); autoSave()"></select>

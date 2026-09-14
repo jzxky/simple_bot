@@ -55,15 +55,21 @@ function loadAvailableEarns() {
     .catch(() => {});
 }
 
+function _showAllEarns() {
+  const cb = document.getElementById("earn_show_all");
+  return cb && cb.checked;
+}
+
 function _populateEarnCategories(selectedEarnType) {
   const catSel = document.getElementById("earn_category");
   if (!catSel) return;
 
-  // Build ordered unique category list — only include categories with enabled earns
+  const showAll = _showAllEarns();
   const seen = new Set();
   const cats = [];
   _earnCatalog.forEach(e => {
     if (e.enabled === false) return;
+    if (!showAll && e.available !== true) return;
     const cat = e.category || "Uncategorized";
     if (!seen.has(cat)) { seen.add(cat); cats.push(cat); }
   });
@@ -84,7 +90,8 @@ function _renderEarnSelect(selectedValue) {
   const sel = document.getElementById("earn_type");
   if (!sel) return;
   const cat = catSel ? catSel.value : "";
-  const items = _earnCatalog.filter(e => e.schedule_value && e.enabled !== false && (e.category || "Uncategorized") === cat);
+  const showAll = _showAllEarns();
+  const items = _earnCatalog.filter(e => e.schedule_value && e.enabled !== false && (showAll || e.available === true) && (e.category || "Uncategorized") === cat);
   if (!items.length) {
     // Preserve current value so a failed/empty catalog load doesn't overwrite config
     const preserved = sel.dataset.current || sel.value || "";
@@ -284,6 +291,7 @@ function _buildPayload() {
     ui_pin: document.getElementById("ui_pin").value,
     earns_enabled: document.getElementById("earns_enabled").checked,
     earn_mode: document.getElementById("earn_mode").value,
+    earn_show_all: document.getElementById("earn_show_all").checked,
     earn_type: document.getElementById("earn_type").value,
     earn_planner_limits: {..._earnPlannerLimits},
     crimes_enabled: document.getElementById("crimes_enabled").checked,
