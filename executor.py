@@ -1161,9 +1161,9 @@ def _lawyer_defend_one(defendable, state):
             elif fail:
                 fail_text = fail.get_text(strip=True)
                 state.add_log(f"Lawyer: case #{target['id']} failed — {fail_text}")
-                if "victim" in fail_text.lower():
+                if "victim" in fail_text.lower() or "another lawyer" in fail_text.lower():
                     _lawyer_blacklist_add(target["id"])
-                    state.add_log(f"Lawyer: blacklisted case #{target['id']} (victim), trying next.")
+                    state.add_log(f"Lawyer: blacklisted case #{target['id']}, trying next.")
                     continue
                 if "enough money" in fail_text.lower() and target.get("suspect"):
                     state.add_log(f"Lawyer: transferring $1,000 to {target['suspect']} and retrying.")
