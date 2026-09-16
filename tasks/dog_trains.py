@@ -1,6 +1,6 @@
 """
-Dog Trains as a home action — runs through the community service page when the
-action timer is ready and the bot is in its home city.
+Dog Trains — runs through the community service page when the action timer is
+ready.
 """
 
 from tasks.base import Task, Action
@@ -14,7 +14,7 @@ class DogTrainsTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         if not (state.logged_in and not state.in_jail and state.action_available()
-                and state.in_home_city() and not state.hold_action_timer):
+                and not state.hold_action_timer):
             return False
         return not should_skip_action_for_armed_robbery(state, ACTION_COOLDOWNS.get("dog_trains", 5))
 
@@ -26,8 +26,6 @@ class DogTrainsTask(Task):
             reasons.append("In jail")
         if not state.action_available():
             reasons.append("Action timer busy")
-        if not state.in_home_city():
-            reasons.append("Not in home city")
         if state.hold_action_timer:
             reasons.append("Action timer held")
         if should_skip_action_for_armed_robbery(state, ACTION_COOLDOWNS.get("dog_trains", 5)):
