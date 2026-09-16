@@ -466,6 +466,17 @@ def upsert_players(player_list: list):
                            cur["occupation"] != occupation or
                            cur["rank"] != rank)
 
+                if cur is None and changed:
+                    last_ch = con.execute(
+                        "SELECT rank, occupation, homecity FROM career_history WHERE username=? ORDER BY id DESC LIMIT 1",
+                        (name,),
+                    ).fetchone()
+                    if (last_ch and
+                            last_ch["rank"] == rank and
+                            last_ch["occupation"] == occupation and
+                            last_ch["homecity"] == homecity):
+                        changed = False
+
                 con.execute(
                     """INSERT INTO players (username, homecity, occupation, rank, active, pic_url, scraped_at, born_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
