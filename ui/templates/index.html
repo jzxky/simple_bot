@@ -1744,6 +1744,9 @@
               <label class="inline-toggle setting-row">Debug Logging
                 <label class="toggle-label"><input type="checkbox" id="debug_logging" {% if config.get('misc', {}).get('debug_logging', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+              <label class="inline-toggle setting-row">Screenshot on Error
+                <label class="toggle-label"><input type="checkbox" id="screenshot_errors" {% if config.get('misc', {}).get('screenshot_errors', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Character History</h3>

@@ -236,6 +236,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["communications"]["enabled"] = data.get("comms_enabled", False)
     c["misc"]["show_scheduler"] = data.get("show_scheduler", False)
     c["misc"]["debug_logging"] = data.get("debug_logging", False)
+    c["misc"]["screenshot_errors"] = data.get("screenshot_errors", False)
     c["misc"]["show_timers_row"] = data.get("show_timers_row", True)
     c.setdefault("event_boss", {})
     c["event_boss"]["enabled"] = data.get("event_boss_enabled", False)

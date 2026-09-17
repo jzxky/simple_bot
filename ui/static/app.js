@@ -383,6 +383,7 @@ function _buildPayload() {
     auto_jail_partner: document.getElementById("auto_jail_partner")?.value ?? "",
     show_scheduler: (document.getElementById("show_scheduler")||{checked:false}).checked,
     debug_logging: (document.getElementById("debug_logging")||{checked:false}).checked,
+    screenshot_errors: (document.getElementById("screenshot_errors")||{checked:false}).checked,
     show_timers_row: (document.getElementById("show_timers_row")||{checked:true}).checked,
     headless: document.getElementById("headless").checked,
     comms_enabled: (document.getElementById("comms_enabled")||{checked:false}).checked,
