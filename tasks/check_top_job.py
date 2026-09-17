@@ -4,12 +4,17 @@ Sets snipe_top_job_pending to trigger SnipeTopJobTask when the position is open.
 """
 
 import json
+import os
 import time
+from datetime import datetime
 import config as cfg
 import browser
+import paths
 import urls
 from state import GameState, parse_state
 from tasks.base import Task
+
+_SCREENSHOT_DIR = os.path.join(paths.data_dir(), "screenshot_errors")
 
 _CHECK_INTERVAL = 4 * 60  # seconds
 
@@ -76,6 +81,16 @@ class CheckTopJobTask(Task):
             parse_state(browser.page().content(), browser.current_url(), state)
         except Exception as e:
             state.add_log(f"CheckTopJob: fetch error: {e}")
+            if cfg.load().get("misc", {}).get("screenshot_errors", False):
+                try:
+                    os.makedirs(_SCREENSHOT_DIR, exist_ok=True)
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    browser.page().screenshot(
+                        path=os.path.join(_SCREENSHOT_DIR, f"check_top_job_{ts}.png"),
+                        full_page=True,
+                    )
+                except Exception:
+                    pass
             return
 
         # The incumbent's top-job title appears in userOccupation for most careers,

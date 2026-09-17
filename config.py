@@ -74,7 +74,8 @@ DEFAULT_CONFIG = {
         "headless": False,
         "show_scheduler": False,
         "debug_logging": False,
-        "show_timers_row": True
+        "show_timers_row": True,
+        "screenshot_errors": False
     },
     "event_boss": {
         "enabled": False,
