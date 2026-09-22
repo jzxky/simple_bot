@@ -23,10 +23,11 @@ class WSMonitorTask(Task):
 
     def _interval(self) -> int:
         wm = cfg.load().get("war_mode", {})
-        m = int(wm.get("monitor_interval_minutes", 5) or 5)
-        s = int(wm.get("monitor_interval_seconds", 0) or 0)
-        total = max(m, 0) * 60 + max(s, 0)
-        return max(30, total)
+        if self._is_server_mode():
+            m = wm.get("server_check_interval_minutes", 5)
+        else:
+            m = wm.get("monitor_interval_minutes", 5)
+        return max(1, int(m or 5)) * 60
 
     def _is_server_mode(self) -> bool:
         c = cfg.load()
@@ -65,8 +66,7 @@ class WSMonitorTask(Task):
             reasons.append("No watch names")
         remaining = self._interval() - (time.monotonic() - self._last)
         if remaining > 0:
-            m, s = divmod(int(remaining), 60)
-            reasons.append(f"Interval ({m}m {s}s)" if s else f"Interval ({m}m)")
+            reasons.append(f"Interval ({int(remaining // 60)}m)")
         return reasons
 
     def run(self, state: GameState, executor):

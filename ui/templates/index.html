@@ -1691,6 +1691,20 @@
                 <label class="toggle-label"><input type="checkbox" id="war_mode_checking_enabled" {% if config.get('war_mode', {}).get('checking_enabled', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
               <p class="setting-note">When off, War Mode stays accessible but the bot won't run automatic WS checks.</p>
+              <div id="war-server-settings" style="display:{% if config.get('war_mode', {}).get('mode', 'local') == 'server' %}block{% else %}none{% endif %}">
+                <div class="setting-row" style="display:flex;align-items:center;gap:8px">
+                  <label for="war_mode_server_check_interval" style="flex:none">WS Record Check Frequency</label>
+                  <select id="war_mode_server_check_interval" onchange="autoSave()" style="flex:0 0 auto">
+                    <option value="1" {% if config.get('war_mode', {}).get('server_check_interval_minutes', 5) == 1 %}selected{% endif %}>1 min</option>
+                    <option value="2" {% if config.get('war_mode', {}).get('server_check_interval_minutes', 5) == 2 %}selected{% endif %}>2 min</option>
+                    <option value="5" {% if config.get('war_mode', {}).get('server_check_interval_minutes', 5) == 5 %}selected{% endif %}>5 min</option>
+                    <option value="10" {% if config.get('war_mode', {}).get('server_check_interval_minutes', 5) == 10 %}selected{% endif %}>10 min</option>
+                    <option value="20" {% if config.get('war_mode', {}).get('server_check_interval_minutes', 5) == 20 %}selected{% endif %}>20 min</option>
+                    <option value="30" {% if config.get('war_mode', {}).get('server_check_interval_minutes', 5) == 30 %}selected{% endif %}>30 min</option>
+                  </select>
+                </div>
+                <p class="setting-note">How often the bot checks the server for target lists and reports back.</p>
+              </div>
               <div id="war-local-settings">
                 <label class="inline-toggle setting-row">Skip PIN for War Mode page
                   <label class="toggle-label"><input type="checkbox" id="war_mode_skip_pin" {% if config.get('war_mode', {}).get('skip_pin', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
