@@ -688,7 +688,8 @@ _EPOCH = "1970-01-01T00:00:00Z"
 
 
 def get_players_since(ts: str) -> list:
-    """Return player rows modified (scraped or assignment-changed) since ts."""
+    """Return player rows modified (scraped or assignment-changed) since ts.
+    Includes all fields expected by Player Hub's /api/sync/push endpoint."""
     since = ts or _EPOCH
     with _lock:
         con = _conn()
@@ -697,7 +698,10 @@ def get_players_since(ts: str) -> list:
                 """SELECT username, homecity, occupation, rank, active,
                           group_name, agg_crimes, case_work,
                           character_age, jail_age,
-                          assignments_updated_at, scraped_at
+                          assignments_updated_at, scraped_at,
+                          pic_url, sex, wealth, scripting, godfather,
+                          crew_name, capos, alias, notes, monitoring,
+                          born_at, died_at, respect, respect_last_checked
                    FROM players
                    WHERE COALESCE(assignments_updated_at, '') > ?
                       OR COALESCE(scraped_at, '') > ?""",
@@ -739,10 +743,17 @@ def get_career_since(ts: str) -> list:
             con.close()
 
 
+_EXTRA_PLAYER_FIELDS = [
+    "pic_url", "sex", "wealth", "scripting", "godfather",
+    "crew_name", "capos", "alias", "notes", "monitoring",
+    "born_at", "died_at", "respect", "respect_last_checked",
+]
+
+
 def apply_synced_players(rows: list):
     """Merge pulled player rows without re-stamping timestamps (prevents echo loops).
     Ages use MAX; scrape fields use scraped_at gating; assignment fields use
-    assignments_updated_at gating."""
+    assignments_updated_at gating. Extra profile fields follow scraped_at gating."""
     with _lock:
         con = _conn()
         try:
@@ -763,39 +774,48 @@ def apply_synced_players(rows: list):
                 incoming_assign  = r.get("assignments_updated_at") or ""
 
                 if cur is None:
-                    # New player — insert everything as-is
+                    cols = ["username", "homecity", "occupation", "rank", "active",
+                            "group_name", "agg_crimes", "case_work",
+                            "character_age", "jail_age",
+                            "assignments_updated_at", "scraped_at"]
+                    vals = [name,
+                            r.get("homecity", ""), r.get("occupation", ""),
+                            r.get("rank", ""), r.get("active", 1),
+                            r.get("group_name", ""), r.get("agg_crimes", ""),
+                            r.get("case_work", ""),
+                            r.get("character_age", 0), r.get("jail_age", 0),
+                            incoming_assign, incoming_scraped]
+                    for field in _EXTRA_PLAYER_FIELDS:
+                        if field in r:
+                            cols.append(field)
+                            vals.append(r[field])
+                    placeholders = ",".join("?" * len(cols))
                     con.execute(
-                        """INSERT INTO players
-                           (username, homecity, occupation, rank, active,
-                            group_name, agg_crimes, case_work,
-                            character_age, jail_age,
-                            assignments_updated_at, scraped_at)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (name,
-                         r.get("homecity", ""), r.get("occupation", ""),
-                         r.get("rank", ""), r.get("active", 1),
-                         r.get("group_name", ""), r.get("agg_crimes", ""),
-                         r.get("case_work", ""),
-                         r.get("character_age", 0), r.get("jail_age", 0),
-                         incoming_assign, incoming_scraped),
+                        f"INSERT INTO players ({','.join(cols)}) VALUES ({placeholders})",
+                        vals,
                     )
                 else:
                     local_scraped = cur["scraped_at"] or ""
                     local_assign  = cur["assignments_updated_at"] or ""
 
-                    # Scrape fields: only overwrite if incoming scraped_at is newer
                     if incoming_scraped > local_scraped:
+                        sets = ["homecity=?", "occupation=?", "rank=?", "active=?",
+                                "scraped_at=?"]
+                        vals = [r.get("homecity", cur["homecity"]),
+                                r.get("occupation", cur["occupation"]),
+                                r.get("rank", cur["rank"]),
+                                r.get("active", cur["active"]),
+                                incoming_scraped]
+                        for field in _EXTRA_PLAYER_FIELDS:
+                            if field in r:
+                                sets.append(f"{field}=?")
+                                vals.append(r[field])
+                        vals.append(name)
                         con.execute(
-                            """UPDATE players SET homecity=?, occupation=?, rank=?, active=?,
-                               scraped_at=? WHERE username=?""",
-                            (r.get("homecity", cur["homecity"]),
-                             r.get("occupation", cur["occupation"]),
-                             r.get("rank", cur["rank"]),
-                             r.get("active", cur["active"]),
-                             incoming_scraped, name),
+                            f"UPDATE players SET {', '.join(sets)} WHERE username=?",
+                            vals,
                         )
 
-                    # Assignment fields: only overwrite if incoming is newer
                     if incoming_assign > local_assign:
                         con.execute(
                             """UPDATE players SET group_name=?, agg_crimes=?, case_work=?,
@@ -806,7 +826,6 @@ def apply_synced_players(rows: list):
                              incoming_assign, name),
                         )
 
-                    # Ages: always take MAX
                     new_char = max(cur["character_age"] or 0, r.get("character_age") or 0)
                     new_jail = max(cur["jail_age"] or 0, r.get("jail_age") or 0)
                     if new_char != cur["character_age"] or new_jail != cur["jail_age"]:

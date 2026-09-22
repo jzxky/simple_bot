@@ -5939,6 +5939,10 @@ def handle_fetch_respect(action: Action, state: GameState):
         pct = bar.get_text(strip=True)
         save_respect_data(pct, _time.time())
         state.add_log(f"Respect: {pct}")
+        import sync_client
+        sc = cfg.load().get("sync", {})
+        if sc.get("enabled") and sc.get("server_url") and sc.get("api_key"):
+            sync_client.update_respect(sc["server_url"], state.own_name, pct)
     else:
         save_respect_data(None, _time.time())
     _nav(_u("/main.asp"), state)
