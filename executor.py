@@ -757,9 +757,9 @@ def _filter_young_targets(crime: str, names: list, state: GameState) -> list:
 
 
 def _get_online_local_players(state: GameState) -> list:
-    """Parse the who's online sidebar from the current page HTML."""
+    """Parse the local who's online sidebar from the current page HTML."""
     soup = BeautifulSoup(state.page_html, "html.parser")
-    cell = soup.find("div", id="whosonlinecell")
+    cell = soup.find("div", id="whosonlinecell", class_=lambda c: c and "local" in c)
     if not cell:
         return []
     players = []
