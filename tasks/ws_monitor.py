@@ -25,6 +25,18 @@ class WSMonitorTask(Task):
         m = cfg.load().get("war_mode", {}).get("monitor_interval_minutes", 5)
         return max(1, int(m or 5)) * 60
 
+    def _is_server_mode(self) -> bool:
+        c = cfg.load()
+        wm = c.get("war_mode", {})
+        sc = c.get("sync", {})
+        return (wm.get("mode") == "server"
+                and sc.get("enabled") and sc.get("server_url") and sc.get("api_key"))
+
+    def _get_names(self):
+        if self._is_server_mode():
+            return war_mode.all_names_from_hub()
+        return war_mode.all_names()
+
     def can_run(self, state: GameState) -> bool:
         wm = cfg.load().get("war_mode", {})
         if not wm.get("enabled", False):
@@ -33,7 +45,7 @@ class WSMonitorTask(Task):
             return False
         if not state.logged_in:
             return False
-        if not war_mode.all_names():
+        if not self._get_names():
             return False
         return time.monotonic() - self._last >= self._interval()
 
@@ -46,7 +58,7 @@ class WSMonitorTask(Task):
             reasons.append("Checking disabled")
         if not state.logged_in:
             reasons.append("Not logged in")
-        if not war_mode.all_names():
+        if not self._get_names():
             reasons.append("No watch names")
         remaining = self._interval() - (time.monotonic() - self._last)
         if remaining > 0:
@@ -55,12 +67,13 @@ class WSMonitorTask(Task):
 
     def run(self, state: GameState, executor):
         self._last = time.monotonic()
-        try:
-            result = war_mode.sync_from_hub()
-            if result is not None:
-                added, total = result
-                if added:
-                    state.add_log(f"War hub: synced {added} new name(s) ({total} total).")
-        except Exception as e:
-            state.add_log(f"War hub sync error: {e}")
+        if not self._is_server_mode():
+            try:
+                result = war_mode.sync_from_hub()
+                if result is not None:
+                    added, total = result
+                    if added:
+                        state.add_log(f"War hub: synced {added} new name(s) ({total} total).")
+            except Exception as e:
+                state.add_log(f"War hub sync error: {e}")
         executor.execute(Action("ws_monitor"), state)

@@ -6179,16 +6179,29 @@ def _parse_last_activity(soup) -> str:
     return ""
 
 
+def _war_mode_is_server() -> bool:
+    c = cfg.load()
+    wm = c.get("war_mode", {})
+    sc = c.get("sync", {})
+    return (wm.get("mode") == "server"
+            and sc.get("enabled") and sc.get("server_url") and sc.get("api_key"))
+
+
 def handle_ws_monitor(action: Action, state: GameState):
     """Sweep the War Mode watch lists, parsing whacks-survived from each
-    profile. war_mode.record_ws stamps a whack + logs an event on an increase.
+    profile. In local mode, war_mode.record_ws stamps a whack + logs an event.
+    In server mode, only reports to Player Hub (no local storage).
     Reports results to Player Hub if configured."""
     import war_mode
     import war_hub_client
+    server_mode = _war_mode_is_server()
     if state.server_time is not None:
         war_mode.set_server_now(state.server_time)
     target = (action.params.get("target") or "").strip()
-    pairs = war_mode.all_names()
+    if server_mode:
+        pairs = war_mode.all_names_from_hub()
+    else:
+        pairs = war_mode.all_names()
     if target:
         pairs = [(s, n) for (s, n) in pairs if n.lower() == target.lower()]
     if not pairs:
@@ -6204,7 +6217,7 @@ def handle_ws_monitor(action: Action, state: GameState):
             ws = _parse_whacks_survived(soup)
             if ws is None:
                 continue
-            if war_mode.record_ws(name, side, ws):
+            if not server_mode and war_mode.record_ws(name, side, ws):
                 whacked += 1
             checked += 1
             record = {"name": name, "ws": ws}

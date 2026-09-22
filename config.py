@@ -180,6 +180,7 @@ DEFAULT_CONFIG = {
     },
     "war_mode": {
         "enabled": False,
+        "mode": "local",
         "checking_enabled": False,
         "monitor_interval_minutes": 5,
         "skip_pin": False,
