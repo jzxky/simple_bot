@@ -78,9 +78,13 @@ class CheckTopJobTask(Task):
             browser.page().goto(urls.BASE_URL + "/skin/updateusers.php?q=1", wait_until="domcontentloaded", timeout=15000)
             raw = json.loads(browser.page().inner_text("body"))
             browser.page().goto(urls.BASE_URL + "/main.asp", wait_until="domcontentloaded", timeout=15000)
+            browser.record_nav_success()
             parse_state(browser.page().content(), browser.current_url(), state)
         except Exception as e:
             state.add_log(f"CheckTopJob: fetch error: {e}")
+            err = str(e)
+            if any(kw in err for kw in ("Timeout", "net::", "ERR_")):
+                browser.record_nav_failure()
             if cfg.load().get("misc", {}).get("screenshot_errors", False):
                 try:
                     os.makedirs(_SCREENSHOT_DIR, exist_ok=True)

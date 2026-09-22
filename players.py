@@ -66,7 +66,11 @@ def _refresh_impl() -> "tuple[int, int]":
         )
         raw = json.loads(browser.page().inner_text("body"))
         browser.page().goto(urls.BASE_URL + "/main.asp", wait_until="domcontentloaded", timeout=15000)
-    except Exception:
+        browser.record_nav_success()
+    except Exception as e:
+        err = str(e)
+        if any(kw in err for kw in ("Timeout", "net::", "ERR_")):
+            browser.record_nav_failure()
         return 0, 0
 
     seen = set()

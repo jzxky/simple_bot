@@ -21,6 +21,9 @@ _page: Page = None
 # threading a `page` argument through every call site. Set via use_page().
 _active_page: "Page | None" = None
 
+_NAV_FAIL_THRESHOLD = 3
+_nav_fail_count = 0
+
 
 def _clear_window_placement():
     """Remove saved window bounds from Chrome profile so --start-maximized takes effect."""
@@ -74,6 +77,8 @@ def start(headless: bool = False):
             args=args,
         )
     _page = _context.pages[0] if _context.pages else _context.new_page()
+    global _nav_fail_count
+    _nav_fail_count = 0
     print("[browser] Browser launched.")
 
 
@@ -129,6 +134,20 @@ def is_alive() -> bool:
         return False
 
 
+def record_nav_failure():
+    global _nav_fail_count
+    _nav_fail_count += 1
+
+
+def record_nav_success():
+    global _nav_fail_count
+    _nav_fail_count = 0
+
+
+def should_restart_for_nav_failures() -> bool:
+    return _nav_fail_count >= _NAV_FAIL_THRESHOLD
+
+
 def page() -> Page:
     return _active_page or _page
 
@@ -168,6 +187,7 @@ def navigate(url: str) -> str:
             if "ERR_ABORTED" in str(e) and attempt == 0:
                 continue
             raise
+    record_nav_success()
     _wait_for_cloudflare_on(pg)
     try:
         pg.screenshot(path=SCREENSHOT_PATH, full_page=False)
@@ -219,5 +239,6 @@ def navigate_page(pg: Page, url: str) -> str:
             if "ERR_ABORTED" in str(e) and attempt == 0:
                 continue
             raise
+    record_nav_success()
     _wait_for_cloudflare_on(pg)
     return pg.content()
