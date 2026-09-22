@@ -272,6 +272,15 @@ def sync_from_hub():
     return added, total
 
 
+def all_names_from_hub() -> list:
+    """[(side, name), …] fetched from the hub for server mode."""
+    import war_hub_client
+    data = war_hub_client.fetch_war_lists()
+    if data is None:
+        return []
+    return [(s, e.get("name", "")) for s in SIDES for e in data.get(s, []) if e.get("name")]
+
+
 def all_names() -> list:
     """[(side, name), …] for the monitor sweep."""
     d = _load()

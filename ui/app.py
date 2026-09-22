@@ -213,6 +213,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
 
     c.setdefault("war_mode", {})
     c["war_mode"]["enabled"] = data.get("war_mode_enabled", False)
+    c["war_mode"]["mode"] = data.get("war_mode_mode", "local")
     c["war_mode"]["checking_enabled"] = data.get("war_mode_checking_enabled", False)
     c["war_mode"]["skip_pin"] = data.get("war_mode_skip_pin", False)
     c["war_mode"]["discord_webhook_url"] = data.get("war_mode_discord_webhook_url", "")
@@ -1499,6 +1500,10 @@ def players_page():
 
 @app.route("/war")
 def war_page():
+    wm = cfg.load().get("war_mode", {})
+    sc = cfg.load().get("sync", {})
+    if wm.get("mode") == "server" and sc.get("server_url"):
+        return redirect(sc["server_url"].rstrip("/") + "/war")
     return render_template("war.html")
 
 

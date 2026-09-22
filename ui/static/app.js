@@ -370,6 +370,7 @@ function _buildPayload() {
     crossroads_enabled: (document.getElementById("crossroads_enabled")||{checked:false}).checked,
     crossroads_selection: (document.getElementById("crossroads_selection")||{value:"current"}).value,
     war_mode_enabled: (document.getElementById("war_mode_enabled")||{checked:false}).checked,
+    war_mode_mode: (document.getElementById("war_mode_mode")||{value:"local"}).value,
     war_mode_checking_enabled: (document.getElementById("war_mode_checking_enabled")||{checked:false}).checked,
     war_mode_skip_pin: (document.getElementById("war_mode_skip_pin")||{checked:false}).checked,
     war_mode_discord_webhook_url: (document.getElementById("war_mode_discord_webhook_url")||{value:""}).value.trim(),
@@ -518,6 +519,28 @@ function toggleWarModeLink() {
   const on = (document.getElementById("war_mode_enabled") || {checked:false}).checked;
   const el = document.getElementById("war-mode-link-row");
   if (el) el.style.display = on ? "" : "none";
+  toggleWarModeFields();
+}
+
+function toggleWarModeFields() {
+  const mode = (document.getElementById("war_mode_mode") || {value:"local"}).value;
+  const local = document.getElementById("war-local-settings");
+  if (local) local.style.display = mode === "local" ? "" : "none";
+  const note = document.getElementById("war-mode-note");
+  if (note) note.textContent = mode === "server"
+    ? "Server mode: bot scrapes and reports to the hub. Visit the hub to view war data."
+    : "Local mode: war data is stored and displayed locally.";
+  const linkBtn = document.getElementById("war-mode-link-btn");
+  if (linkBtn) {
+    if (mode === "server") {
+      const syncUrl = (document.getElementById("sync_server_url") || {value:""}).value.trim().replace(/\/+$/, "");
+      linkBtn.textContent = "Open Hub War Page ↗";
+      linkBtn.onclick = function() { window.open(syncUrl + "/war", "_blank"); };
+    } else {
+      linkBtn.textContent = "Open War Mode ↗";
+      linkBtn.onclick = function() { window.open("/war", "_blank"); };
+    }
+  }
 }
 
 function warTestWebhook() {
