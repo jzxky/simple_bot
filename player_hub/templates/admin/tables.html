@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Tables — Player Hub{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Table Viewer</h1>
+  <div class="header-controls">
+    <select id="tb-select" onchange="loadTable()">
+      <option value="">Select a table...</option>
+    </select>
+  </div>
+</div>
+
+<div id="tb-info" style="display:none" class="card">
+  <h2><span id="tb-title"></span> <span class="muted" id="tb-count"></span></h2>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr id="tb-thead"></tr></thead>
+      <tbody id="tb-tbody"></tbody>
+    </table>
+  </div>
+  <div class="pagination" id="tb-pagination"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var USER_ROLE = "{{ user.role }}";
+</script>
+<script src="{{ url_for('static', filename='admin.js') }}"></script>
+{% endblock %}

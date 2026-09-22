@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Groups — Player Hub{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Groups</h1>
+</div>
+
+<div class="card">
+  <h2>Create Group</h2>
+  <form id="grp-create" class="inline-form" onsubmit="createGroup(event)">
+    <input type="text" id="grp-name" placeholder="Group name" required>
+    <select id="grp-type">
+      <option value="neutral">Neutral</option>
+      <option value="friendly">Friendly</option>
+      <option value="enemy">Enemy</option>
+    </select>
+    <input type="color" id="grp-color" value="#3498db">
+    <button type="submit" class="btn-primary">Create</button>
+  </form>
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th><th>Type</th><th>Color</th><th>Agg Crimes</th>
+        <th>Case Work</th><th>Members</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="grp-tbody"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var USER_ROLE = "{{ user.role }}";
+</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Players — Player Hub{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Players</h1>
+  <div class="header-controls">
+    <input type="text" id="pl-search" placeholder="Search username / alias..." class="search-input">
+    <div class="dropdown">
+      <button class="btn-secondary" onclick="toggleDropdown('filter-dd')">Filters ▾</button>
+      <div id="filter-dd" class="dropdown-menu filter-panel" style="display:none">
+        <div class="filter-row">
+          <label>City</label>
+          <select id="f-city"><option value="">All</option></select>
+        </div>
+        <div class="filter-row">
+          <label>Occupation</label>
+          <select id="f-occupation"><option value="">All</option></select>
+        </div>
+        <div class="filter-row">
+          <label>Rank</label>
+          <select id="f-rank"><option value="">All</option></select>
+        </div>
+        <div class="filter-row">
+          <label>Group</label>
+          <select id="f-group"><option value="">All</option></select>
+        </div>
+        <div class="filter-row">
+          <label>Status</label>
+          <select id="f-active">
+            <option value="">All</option>
+            <option value="1" selected>Active</option>
+            <option value="0">Dead</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="dropdown">
+      <button class="btn-secondary" onclick="toggleDropdown('col-dd')">Columns ▾</button>
+      <div id="col-dd" class="dropdown-menu col-panel" style="display:none">
+        <div id="col-checkboxes"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table id="pl-table" class="data-table">
+    <thead><tr id="pl-thead"></tr></thead>
+    <tbody id="pl-tbody"></tbody>
+  </table>
+</div>
+<div class="pagination" id="pl-pagination"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var USER_ROLE = "{{ user.role }}";
+</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}
