@@ -263,6 +263,8 @@ DEFAULT_CONFIG = {
     "sync": {
         "enabled": False,
         "server_url": "",
+        "api_key": "",
+        "client_id": "",
         "interval_minutes": 2,
         "sync_online_time": True,
         "sync_lists": True,

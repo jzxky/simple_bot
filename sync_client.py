@@ -22,11 +22,20 @@ def _sync_cfg() -> dict:
     return cfg.load().get("sync", {})
 
 
+def _auth_headers() -> dict:
+    sc = _sync_cfg()
+    headers = {"Content-Type": "application/json"}
+    api_key = sc.get("api_key", "")
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    return headers
+
+
 def _post(url: str, payload: dict) -> dict:
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
         url, data=data,
-        headers={"Content-Type": "application/json"},
+        headers=_auth_headers(),
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
@@ -34,7 +43,7 @@ def _post(url: str, payload: dict) -> dict:
 
 
 def _get(url: str) -> dict:
-    req = urllib.request.Request(url, method="GET")
+    req = urllib.request.Request(url, headers=_auth_headers(), method="GET")
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read())
 

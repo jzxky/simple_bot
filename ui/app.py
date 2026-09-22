@@ -248,6 +248,8 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c.setdefault("sync", {})
     c["sync"]["enabled"]          = data.get("sync_enabled", False)
     c["sync"]["server_url"]       = data.get("sync_server_url", "").strip()
+    c["sync"]["api_key"]          = data.get("sync_api_key", "").strip()
+    c["sync"]["client_id"]        = data.get("sync_client_id", "").strip()
     c["sync"]["interval_minutes"] = int(data.get("sync_interval", 2))
     c["sync"]["sync_online_time"] = data.get("sync_online_time", True)
     c["sync"]["sync_lists"]       = data.get("sync_lists", True)
