@@ -6247,6 +6247,42 @@ def handle_ws_monitor(action: Action, state: GameState):
     state.add_log(msg)
 
 
+def handle_scrape_businesses(action: Action, state: GameState):
+    _nav(_u("/business/business.asp"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    businesses = []
+    rows = soup.find_all("tr", class_="nohover")
+    for row in rows:
+        cells = row.find_all("td", class_="display_border")
+        if len(cells) < 2:
+            continue
+        biz_name = cells[0].get_text(strip=True)
+        if not biz_name:
+            continue
+        owner_cell = cells[1]
+        owner_link = owner_cell.find("a")
+        if owner_link:
+            owner = owner_link.get_text(strip=True)
+        else:
+            owner = owner_cell.get_text(strip=True)
+        status_span = row.find("span", class_=["sell_no", "sell_yes"])
+        status = status_span.get_text(strip=True) if status_span else ""
+        available = status != "Not For Sale" and status != ""
+        businesses.append({
+            "city": state.current_city or "",
+            "business_name": biz_name,
+            "owner": owner,
+            "available": available,
+            "status": status,
+        })
+    if businesses and state.current_city:
+        war_hub_client.report_businesses(businesses)
+        state.add_log(f"Business scrape: {len(businesses)} businesses in {state.current_city}.")
+    _nav(_u("/main.asp"), state)
+
+
 def handle_refresh_event_inventory(action: Action, state: GameState):
     """Visit bossevent.asp once to capture the current event-consumable stock
     (used on login so the inventory is known before any attack cycle)."""
@@ -6545,6 +6581,7 @@ HANDLERS = {
     "event_consume": handle_event_consume,
     "refresh_event_inventory": handle_refresh_event_inventory,
     "ws_monitor": handle_ws_monitor,
+    "scrape_businesses": handle_scrape_businesses,
     "crossroad": handle_crossroad,
     "interact": handle_interact,
     "check_weapon": handle_check_weapon,
