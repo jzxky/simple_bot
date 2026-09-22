@@ -6235,6 +6235,12 @@ def handle_ws_monitor(action: Action, state: GameState):
             state.add_log(f"WS monitor: error checking {name}: {e}")
     if hub_records:
         war_hub_client.report_ws(hub_records)
+    if checked and state.current_city:
+        try:
+            online = _get_online_local_players(state)
+            war_hub_client.report_online(state.current_city, online)
+        except Exception:
+            pass
     msg = f"WS monitor: checked {checked} name(s)."
     if whacked:
         msg += f" {whacked} newly whacked."
