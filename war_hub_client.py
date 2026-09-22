@@ -95,6 +95,18 @@ def report_check(name: str) -> bool:
         return False
 
 
+def report_online(city: str, names: list) -> bool:
+    """Report the list of online players in a city."""
+    if not is_configured() or not city:
+        return False
+    try:
+        result = _post("/api/sync/war/online", {"city": city, "names": names})
+        return result.get("ok", False)
+    except Exception as e:
+        log.warning("war_hub: report_online failed: %s", e)
+        return False
+
+
 def report_businesses(businesses: list) -> bool:
     """Report business ownership data.
 
