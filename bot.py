@@ -65,6 +65,7 @@ from tasks.event_consume import EventConsumeTask, ManualEventConsumeTask
 from tasks.scrape_players import ScrapePlayersTask
 from tasks.crossroad import CrossroadTask
 from tasks.ws_monitor import WSMonitorTask
+from tasks.business_scrape import BusinessScrapeTask
 from tasks.skills_task import DiscoverSkillsTask, CombatMedicTask, BiometricVirusTask, AllSeeingEyeTask, NewsEditorTask
 from tasks.drug_store import DrugStoreTask
 from tasks.startup_task import StartupTask
@@ -315,6 +316,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(AllSeeingEyeTask())
     sched.add(NewsEditorTask())
     sched.add(WSMonitorTask())
+    sched.add(BusinessScrapeTask())
     _player_refresh_task_ref = PlayerRefreshTask()
     sched.add(_player_refresh_task_ref)
     if old_sched:
