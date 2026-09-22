@@ -15,11 +15,10 @@
         <button class="btn-secondary" onclick="warAdd()">Add</button>
         <span style="flex:1"></span>
         <label style="flex:none;color:var(--muted);font-size:0.8rem">Check every
-          <select id="war-interval" onchange="warSetInterval()" style="width:90px">
-            <option value="1">1 min</option><option value="2">2 min</option>
-            <option value="5">5 min</option><option value="10">10 min</option>
-            <option value="30">30 min</option><option value="60">60 min</option>
-          </select>
+          <input type="number" id="war-interval" min="0" max="60" step="1" value="5"
+                 onchange="warSetInterval()" style="width:52px"> min
+          <input type="number" id="war-interval-sec" min="0" max="59" step="1" value="0"
+                 onchange="warSetInterval()" style="width:52px"> sec
         </label>
         <button class="btn-secondary" onclick="warCheckNow()">Check Now</button>
       </div>

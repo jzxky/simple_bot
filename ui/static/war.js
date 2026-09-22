@@ -68,6 +68,8 @@ function warRender(d) {
   document.getElementById("war-friendlies").innerHTML = warTable("friendlies", d.friendlies || []);
   const iv = document.getElementById("war-interval");
   if (iv && !iv.matches(":focus")) iv.value = String(d.interval || 5);
+  const ivs = document.getElementById("war-interval-sec");
+  if (ivs && !ivs.matches(":focus")) ivs.value = String(d.interval_seconds || 0);
   const log = document.getElementById("war-log");
   const events = d.events || [];
   log.innerHTML = events.length
@@ -131,9 +133,10 @@ function warSetTime(side, name, time) {
     body: JSON.stringify({name, side, time})}).then(() => warLoad());
 }
 function warSetInterval() {
-  const minutes = parseInt(document.getElementById("war-interval").value) || 5;
+  const minutes = parseInt(document.getElementById("war-interval").value) || 0;
+  const seconds = parseInt(document.getElementById("war-interval-sec").value) || 0;
   fetch("/api/war/set_interval", {method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({minutes})});
+    body: JSON.stringify({minutes, seconds})});
 }
 function warCheckNow() {
   fetch("/api/war/check", {method:"POST"}).then(r => r.json()).then(d => {
