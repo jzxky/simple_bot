@@ -6221,6 +6221,9 @@ def handle_ws_monitor(action: Action, state: GameState):
                 whacked += 1
             checked += 1
             record = {"name": name, "ws": ws}
+            est = state._estimated_server_time()
+            if est:
+                record["whack_time"] = est.strftime("%Y-%m-%d %H:%M:%S")
             status = _parse_profile_status(soup)
             if status:
                 record["status"] = status
