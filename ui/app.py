@@ -1512,7 +1512,9 @@ def api_war_lists():
     import war_mode
     st = war_mode.get_state()
     st["enabled"] = cfg.load().get("war_mode", {}).get("enabled", False)
-    st["interval"] = cfg.load().get("war_mode", {}).get("monitor_interval_minutes", 5)
+    wm = cfg.load().get("war_mode", {})
+    st["interval"] = wm.get("monitor_interval_minutes", 5)
+    st["interval_seconds"] = wm.get("monitor_interval_seconds", 0)
     st["running"] = bot.is_running()
     return jsonify(st)
 
@@ -1555,14 +1557,16 @@ def api_war_set_whack_time():
 @app.route("/api/war/set_interval", methods=["POST"])
 def api_war_set_interval():
     d = request.get_json(force=True) or {}
-    _ALLOWED_INTERVALS = {1, 2, 5, 10, 30, 60}
-    minutes = int(d.get("minutes", 5) or 5)
-    if minutes not in _ALLOWED_INTERVALS:
-        minutes = min(_ALLOWED_INTERVALS, key=lambda x: abs(x - minutes))
+    minutes = max(0, int(d.get("minutes", 5) or 5))
+    seconds = max(0, min(59, int(d.get("seconds", 0) or 0)))
+    if minutes == 0 and seconds < 30:
+        seconds = 30
     c = cfg.load()
-    c.setdefault("war_mode", {})["monitor_interval_minutes"] = minutes
+    wm = c.setdefault("war_mode", {})
+    wm["monitor_interval_minutes"] = minutes
+    wm["monitor_interval_seconds"] = seconds
     cfg.save(c)
-    return jsonify({"ok": True, "minutes": minutes})
+    return jsonify({"ok": True, "minutes": minutes, "seconds": seconds})
 
 
 @app.route("/api/war/test_webhook", methods=["POST"])

@@ -183,6 +183,7 @@ DEFAULT_CONFIG = {
         "mode": "local",
         "checking_enabled": False,
         "monitor_interval_minutes": 5,
+        "monitor_interval_seconds": 0,
         "skip_pin": False,
         "discord_webhook_url": "",
     },
