@@ -483,6 +483,8 @@ function _buildPayload() {
     smart_travel_home:           (document.getElementById("smart_travel_home")||{value:"home_city"}).value,
     sync_enabled:       (document.getElementById("sync_enabled")||{checked:false}).checked,
     sync_server_url:    (document.getElementById("sync_server_url")||{value:""}).value.trim(),
+    sync_api_key:       (document.getElementById("sync_api_key")||{value:""}).value.trim(),
+    sync_client_id:     (document.getElementById("sync_client_id")||{value:""}).value.trim(),
     sync_interval:      parseInt((document.getElementById("sync_interval")||{value:"2"}).value)||2,
     sync_online_time:   (document.getElementById("sync_online_time")||{checked:true}).checked,
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,

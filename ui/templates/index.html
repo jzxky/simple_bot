@@ -1638,6 +1638,14 @@
                 <input type="text" id="sync_server_url" value="{{ config.get('sync', {}).get('server_url', '') }}" placeholder="http://192.168.1.x:9090" style="width:180px" onchange="autoSave()">
               </div>
               <div class="setting-row">
+                <label for="sync_api_key">API Key</label>
+                <input type="password" id="sync_api_key" value="{{ config.get('sync', {}).get('api_key', '') }}" placeholder="From Player Hub admin" style="width:180px" onchange="autoSave()">
+              </div>
+              <div class="setting-row">
+                <label for="sync_client_id">Client ID</label>
+                <input type="text" id="sync_client_id" value="{{ config.get('sync', {}).get('client_id', '') }}" placeholder="e.g. bot-1" style="width:180px" onchange="autoSave()">
+              </div>
+              <div class="setting-row">
                 <label for="sync_interval">Sync every</label>
                 <select id="sync_interval" onchange="autoSave()">
                   {% for m in [1, 2, 5, 10, 15, 30] %}

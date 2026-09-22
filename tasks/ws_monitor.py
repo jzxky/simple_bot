@@ -55,4 +55,12 @@ class WSMonitorTask(Task):
 
     def run(self, state: GameState, executor):
         self._last = time.monotonic()
+        try:
+            result = war_mode.sync_from_hub()
+            if result is not None:
+                added, total = result
+                if added:
+                    state.add_log(f"War hub: synced {added} new name(s) ({total} total).")
+        except Exception as e:
+            state.add_log(f"War hub sync error: {e}")
         executor.execute(Action("ws_monitor"), state)

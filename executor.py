@@ -6150,10 +6150,37 @@ def _parse_whacks_survived(soup):
     return int(m.group(1)) if m else None
 
 
+def _parse_profile_status(soup) -> str:
+    """Detect player status from profile page: alive, in-jail, murdered."""
+    text = soup.get_text(" ", strip=True).lower()
+    if "has been murdered" in text or "rest in peace" in text:
+        return "murdered"
+    city_cell = soup.find("td", string=re.compile(r"Home\s*City", re.I))
+    if city_cell:
+        val = city_cell.find_next_sibling("td")
+        if val and val.get_text(strip=True).lower() in ("heaven", "hell"):
+            return "murdered"
+    if "currently in jail" in text or "maximum security" in text:
+        return "in-jail"
+    return "alive"
+
+
+def _parse_last_activity(soup) -> str:
+    """Extract last-activity text from profile page, or empty string."""
+    cell = soup.find("td", string=re.compile(r"Last\s*Activity", re.I))
+    if cell:
+        val = cell.find_next_sibling("td")
+        if val:
+            return val.get_text(strip=True)
+    return ""
+
+
 def handle_ws_monitor(action: Action, state: GameState):
     """Sweep the War Mode watch lists, parsing whacks-survived from each
-    profile. war_mode.record_ws stamps a whack + logs an event on an increase."""
+    profile. war_mode.record_ws stamps a whack + logs an event on an increase.
+    Reports results to Player Hub if configured."""
     import war_mode
+    import war_hub_client
     if state.server_time is not None:
         war_mode.set_server_now(state.server_time)
     target = (action.params.get("target") or "").strip()
@@ -6163,6 +6190,7 @@ def handle_ws_monitor(action: Action, state: GameState):
     if not pairs:
         return
     checked = whacked = 0
+    hub_records = []
     for side, name in pairs:
         try:
             _nav(_u(f"/userprofile.asp?username={name}"), state)
@@ -6175,8 +6203,18 @@ def handle_ws_monitor(action: Action, state: GameState):
             if war_mode.record_ws(name, side, ws):
                 whacked += 1
             checked += 1
+            record = {"name": name, "ws": ws}
+            status = _parse_profile_status(soup)
+            if status:
+                record["status"] = status
+            last_activity = _parse_last_activity(soup)
+            if last_activity:
+                record["last_activity"] = last_activity
+            hub_records.append(record)
         except Exception as e:
             state.add_log(f"WS monitor: error checking {name}: {e}")
+    if hub_records:
+        war_hub_client.report_ws(hub_records)
     msg = f"WS monitor: checked {checked} name(s)."
     if whacked:
         msg += f" {whacked} newly whacked."

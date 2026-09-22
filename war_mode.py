@@ -239,6 +239,39 @@ def send_discord_test(url):
     urllib.request.urlopen(req, timeout=10)
 
 
+def sync_from_hub():
+    """Sync the local watch lists from Player Hub's centralized war lists.
+
+    Adds names from the hub that aren't tracked locally, and preserves
+    local-only entries.  Returns (added, total) counts or None on failure.
+    """
+    import war_hub_client
+    data = war_hub_client.fetch_war_lists()
+    if data is None:
+        return None
+    added = 0
+    with _lock:
+        d = _load()
+        for side in SIDES:
+            local_names = {e["name"].lower() for e in d.get(side, [])}
+            for entry in data.get(side, []):
+                name = entry.get("name", "").strip()
+                if not name or name.lower() in local_names:
+                    continue
+                new = _new_entry(name)
+                if entry.get("ws") is not None:
+                    new["ws"] = entry["ws"]
+                if entry.get("whack_type") in WHACK_TYPES:
+                    new["whack_type"] = entry["whack_type"]
+                if entry.get("last_whack_time"):
+                    new["last_whack_time"] = entry["last_whack_time"]
+                d[side].append(new)
+                added += 1
+        _save(d)
+    total = sum(len(d.get(s, [])) for s in SIDES)
+    return added, total
+
+
 def all_names() -> list:
     """[(side, name), …] for the monitor sweep."""
     d = _load()
