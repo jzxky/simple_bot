@@ -621,6 +621,10 @@ def _run(c: dict):
                     # Don't spin on a machine that can't launch Chrome right now.
                     time.sleep(30)
 
+            if browser.should_restart_for_nav_failures():
+                state.add_log("Too many consecutive navigation failures — restarting browser.")
+                _restart_browser(state, c)
+
             _scheduler_snapshot = sched.snapshot(state)
 
             # Respect refresh requests from the Flask thread
