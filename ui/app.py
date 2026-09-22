@@ -217,6 +217,11 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["war_mode"]["checking_enabled"] = data.get("war_mode_checking_enabled", False)
     c["war_mode"]["skip_pin"] = data.get("war_mode_skip_pin", False)
     c["war_mode"]["discord_webhook_url"] = data.get("war_mode_discord_webhook_url", "")
+    _ALLOWED_SERVER_INTERVALS = {1, 2, 5, 10, 20, 30}
+    sci = int(data.get("war_mode_server_check_interval", 5) or 5)
+    if sci not in _ALLOWED_SERVER_INTERVALS:
+        sci = min(_ALLOWED_SERVER_INTERVALS, key=lambda x: abs(x - sci))
+    c["war_mode"]["server_check_interval_minutes"] = sci
 
     c.setdefault("jail", {})
     c["jail"]["enabled"] = data.get("jail_enabled", False)
@@ -1512,9 +1517,7 @@ def api_war_lists():
     import war_mode
     st = war_mode.get_state()
     st["enabled"] = cfg.load().get("war_mode", {}).get("enabled", False)
-    wm = cfg.load().get("war_mode", {})
-    st["interval"] = wm.get("monitor_interval_minutes", 5)
-    st["interval_seconds"] = wm.get("monitor_interval_seconds", 0)
+    st["interval"] = cfg.load().get("war_mode", {}).get("monitor_interval_minutes", 5)
     st["running"] = bot.is_running()
     return jsonify(st)
 
@@ -1557,16 +1560,14 @@ def api_war_set_whack_time():
 @app.route("/api/war/set_interval", methods=["POST"])
 def api_war_set_interval():
     d = request.get_json(force=True) or {}
-    minutes = max(0, int(d.get("minutes", 5) or 5))
-    seconds = max(0, min(59, int(d.get("seconds", 0) or 0)))
-    if minutes == 0 and seconds < 30:
-        seconds = 30
+    _ALLOWED_INTERVALS = {1, 2, 5, 10, 30, 60}
+    minutes = int(d.get("minutes", 5) or 5)
+    if minutes not in _ALLOWED_INTERVALS:
+        minutes = min(_ALLOWED_INTERVALS, key=lambda x: abs(x - minutes))
     c = cfg.load()
-    wm = c.setdefault("war_mode", {})
-    wm["monitor_interval_minutes"] = minutes
-    wm["monitor_interval_seconds"] = seconds
+    c.setdefault("war_mode", {})["monitor_interval_minutes"] = minutes
     cfg.save(c)
-    return jsonify({"ok": True, "minutes": minutes, "seconds": seconds})
+    return jsonify({"ok": True, "minutes": minutes})
 
 
 @app.route("/api/war/test_webhook", methods=["POST"])

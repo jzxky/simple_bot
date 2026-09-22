@@ -374,6 +374,7 @@ function _buildPayload() {
     war_mode_checking_enabled: (document.getElementById("war_mode_checking_enabled")||{checked:false}).checked,
     war_mode_skip_pin: (document.getElementById("war_mode_skip_pin")||{checked:false}).checked,
     war_mode_discord_webhook_url: (document.getElementById("war_mode_discord_webhook_url")||{value:""}).value.trim(),
+    war_mode_server_check_interval: parseInt((document.getElementById("war_mode_server_check_interval")||{value:"5"}).value) || 5,
     jail_enabled: document.getElementById("jail_enabled").checked,
     jail_duty: document.getElementById("jail_duty").value,
     jail_action: document.getElementById("jail_action").value,
@@ -526,6 +527,8 @@ function toggleWarModeFields() {
   const mode = (document.getElementById("war_mode_mode") || {value:"local"}).value;
   const local = document.getElementById("war-local-settings");
   if (local) local.style.display = mode === "local" ? "" : "none";
+  const server = document.getElementById("war-server-settings");
+  if (server) server.style.display = mode === "server" ? "" : "none";
   const note = document.getElementById("war-mode-note");
   if (note) note.textContent = mode === "server"
     ? "Server mode: bot scrapes and reports to the hub. Visit the hub to view war data."
