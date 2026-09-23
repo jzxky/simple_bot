@@ -6237,7 +6237,7 @@ def handle_ws_monitor(action: Action, state: GameState):
         war_hub_client.report_ws(hub_records)
     if checked and state.current_city:
         try:
-            online = _get_online_local_players(state)
+            online = list(state.local_players)
             war_hub_client.report_online(state.current_city, online)
         except Exception:
             pass
