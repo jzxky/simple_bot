@@ -19,13 +19,17 @@ class BusinessScrapeTask(Task):
     def __init__(self):
         self._last: float = 0.0
 
+    def _interval(self) -> int:
+        wm = cfg.load().get("war_mode", {})
+        return max(10, int(wm.get("business_check_interval_seconds", 31) or 31))
+
     def can_run(self, state: GameState) -> bool:
         wm = cfg.load().get("war_mode", {})
         if not wm.get("enabled", False):
             return False
         if not state.logged_in:
             return False
-        return time.monotonic() - self._last >= 35
+        return time.monotonic() - self._last >= self._interval()
 
     def blocked_reasons(self, state):
         reasons = []
@@ -34,7 +38,7 @@ class BusinessScrapeTask(Task):
             reasons.append("War mode disabled")
         if not state.logged_in:
             reasons.append("Not logged in")
-        remaining = 35 - (time.monotonic() - self._last)
+        remaining = self._interval() - (time.monotonic() - self._last)
         if remaining > 0:
             reasons.append(f"Interval ({int(remaining)}s)")
         return reasons

@@ -6284,6 +6284,24 @@ def handle_scrape_businesses(action: Action, state: GameState):
     _nav(_u("/main.asp"), state)
 
 
+def handle_check_jail(action: Action, state: GameState):
+    import war_hub_client
+    _nav(_u("/localcity/jail.asp"), state)
+    if not _check_session(state):
+        return
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    inmates = []
+    for a in soup.find_all("a", style=lambda v: v and "color: #FFFFFF" in v):
+        name = a.get_text(strip=True)
+        if name:
+            inmates.append(name)
+    city = state.current_city or ""
+    if city:
+        war_hub_client.report_jail(city, inmates)
+        state.add_log(f"Jail check: {len(inmates)} inmate(s) in {city}.")
+    _nav(_u("/main.asp"), state)
+
+
 def handle_refresh_event_inventory(action: Action, state: GameState):
     """Visit bossevent.asp once to capture the current event-consumable stock
     (used on login so the inventory is known before any attack cycle)."""
@@ -6583,6 +6601,7 @@ HANDLERS = {
     "refresh_event_inventory": handle_refresh_event_inventory,
     "ws_monitor": handle_ws_monitor,
     "scrape_businesses": handle_scrape_businesses,
+    "check_jail": handle_check_jail,
     "crossroad": handle_crossroad,
     "interact": handle_interact,
     "check_weapon": handle_check_weapon,
