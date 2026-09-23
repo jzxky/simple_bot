@@ -6248,6 +6248,7 @@ def handle_ws_monitor(action: Action, state: GameState):
 
 
 def handle_scrape_businesses(action: Action, state: GameState):
+    import war_hub_client
     _nav(_u("/business/business.asp"), state)
     if not _check_session(state):
         return
