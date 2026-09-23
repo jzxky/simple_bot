@@ -223,6 +223,30 @@ def _apply_payload(c: dict, data: dict) -> dict:
         sci = min(_ALLOWED_SERVER_INTERVALS, key=lambda x: abs(x - sci))
     c["war_mode"]["server_check_interval_minutes"] = sci
 
+    _ALLOWED_BIZ_INTERVALS = {31, 300, 600, 1800}
+    bci = int(data.get("war_mode_business_check_interval", 31) or 31)
+    if bci not in _ALLOWED_BIZ_INTERVALS:
+        bci = min(_ALLOWED_BIZ_INTERVALS, key=lambda x: abs(x - bci))
+    c["war_mode"]["business_check_interval_seconds"] = bci
+
+    _ALLOWED_ONLINE_INTERVALS = {1, 5}
+    oci = int(data.get("war_mode_online_check_interval", 1) or 1)
+    if oci not in _ALLOWED_ONLINE_INTERVALS:
+        oci = min(_ALLOWED_ONLINE_INTERVALS, key=lambda x: abs(x - oci))
+    c["war_mode"]["online_check_interval_minutes"] = oci
+
+    _ALLOWED_HOMECITY_INTERVALS = {1, 5, 30}
+    hci = int(data.get("war_mode_home_city_check_interval", 5) or 5)
+    if hci not in _ALLOWED_HOMECITY_INTERVALS:
+        hci = min(_ALLOWED_HOMECITY_INTERVALS, key=lambda x: abs(x - hci))
+    c["war_mode"]["home_city_check_interval_minutes"] = hci
+
+    _ALLOWED_JAIL_INTERVALS = {1, 5, 30}
+    jci = int(data.get("war_mode_jail_check_interval", 5) or 5)
+    if jci not in _ALLOWED_JAIL_INTERVALS:
+        jci = min(_ALLOWED_JAIL_INTERVALS, key=lambda x: abs(x - jci))
+    c["war_mode"]["jail_check_interval_minutes"] = jci
+
     c.setdefault("jail", {})
     c["jail"]["enabled"] = data.get("jail_enabled", False)
     c["jail"]["duty"] = data.get("jail_duty", "laundry")

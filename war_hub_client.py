@@ -120,3 +120,33 @@ def report_businesses(businesses: list) -> bool:
     except Exception as e:
         log.warning("war_hub: report_businesses failed: %s", e)
         return False
+
+
+def report_jail(city: str, inmates: list) -> bool:
+    """Report jail inmates for a city.
+
+    inmates is a list of player name strings.
+    """
+    if not is_configured() or not city:
+        return False
+    try:
+        result = _post("/api/sync/war/jail", {"city": city, "inmates": inmates})
+        return result.get("ok", False)
+    except Exception as e:
+        log.warning("war_hub: report_jail failed: %s", e)
+        return False
+
+
+def report_home_cities(cities: list) -> bool:
+    """Report home cities for war targets.
+
+    Each item: {"name": "...", "city": "..."}
+    """
+    if not is_configured() or not cities:
+        return False
+    try:
+        result = _post("/api/sync/war/home_cities", {"cities": cities})
+        return result.get("ok", False)
+    except Exception as e:
+        log.warning("war_hub: report_home_cities failed: %s", e)
+        return False
