@@ -6738,22 +6738,16 @@ class ActionExecutor:
                             state.add_log("Recovery successful.")
                         except Exception as rec_err:
                             browser.record_nav_failure()
+                            rec_err_str = str(rec_err)
                             state.add_log(f"Recovery navigation failed: {rec_err} — marking as logged out.")
                             state.logged_in = False
-                            if browser.is_lost_error(rec_err):
-                                state.add_log("Browser lost during recovery — restarting browser.")
-                                state.agg_tab_active = False
-                                try:
-                                    headless = cfg.load().get("misc", {}).get("headless", False)
-                                    browser.stop()
-                                    browser.start(headless=headless)
-                                    state.add_log("Browser restarted — will re-login on next tick.")
-                                except Exception as restart_err:
-                                    state.add_log(f"Browser restart failed: {restart_err}")
-                            elif browser.should_restart_for_nav_failures():
-                                state.add_log(
-                                    f"Too many consecutive navigation failures — restarting browser."
-                                )
+                            needs_restart = (
+                                browser.is_lost_error(rec_err_str)
+                                or browser.should_restart_for_nav_failures()
+                                or "chrome-error://" in rec_err_str
+                            )
+                            if needs_restart:
+                                state.add_log("Browser in broken state during recovery — restarting browser.")
                                 state.agg_tab_active = False
                                 try:
                                     headless = cfg.load().get("misc", {}).get("headless", False)
