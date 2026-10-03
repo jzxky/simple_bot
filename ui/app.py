@@ -812,6 +812,7 @@ def status():
         "energy_threshold": cfg.load().get("aggravated_crimes", {}).get("primary", {}).get("energy_threshold", 50),
         "agg_pro_active": s.agg_pro_active,
         "server_time": s.server_time.strftime("%m/%d/%Y %I:%M:%S %p") if s.server_time else None,
+        "server_time_now": _now.strftime("%H:%M:%S") if (_now := s._estimated_server_time()) else None,
         "timers": {
             k: {"ready": v["ready"], "end": v["end"].strftime("%m/%d/%Y %I:%M:%S %p") if v.get("end") else None}
             for k, v in s.timers.items()
