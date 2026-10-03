@@ -31,8 +31,7 @@ header h1 {
   font-size: 20px;
   font-weight: 700;
   color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   margin-bottom: 10px;
 }
 
@@ -56,6 +55,9 @@ header h1 {
 .dot.stopped { background: var(--muted); }
 .dot.paused  { background: #c8a020; box-shadow: 0 0 6px #c8a020; }
 .status-task { color: var(--muted); font-size: 12px; font-style: italic; }
+.status-row { display: flex; align-items: center; gap: 12px; }
+.status-row .status-bar { flex: 1; min-width: 0; }
+#game-time-value { font-family: ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 14px; white-space: nowrap; }
 
 .card {
   background: var(--surface);

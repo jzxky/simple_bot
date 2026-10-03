@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MafiaMatrix Bot</title>
+<title>OpenBot</title>
 <link rel="stylesheet" href="/static/style.css?v={{ app_version }}">
 </head>
 <body>
@@ -15,14 +15,17 @@
 </svg>
 <div class="container">
   <header>
-    <h1>MafiaMatrix Bot</h1>
+    <h1>OpenBot</h1>
     <a id="close-bot-link" onclick="openCloseBotModal()" href="#" style="position:absolute;top:12px;right:16px;font-size:0.75rem;color:var(--muted);text-decoration:none;opacity:0.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">Close Bot</a>
+    <div class="status-row">
     <div class="status-bar">
       <span id="status-dot" class="dot stopped"></span>
       <span id="status-text">Stopped</span>
       <span id="status-task" class="status-task"></span>
       <button id="cancel-snipe-btn" style="display:none; margin-left:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; padding:2px 10px; cursor:pointer; font-size:12px;" onclick="cancelSnipe()">Cancel Snipe</button>
       <button id="cancel-agg-btn" style="display:none; margin-left:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; padding:2px 10px; cursor:pointer; font-size:12px;" onclick="cancelAggTab()">Cancel Crime Tab</button>
+    </div>
+    <span id="game-time-value" title="In-game time">--:--:--</span>
     </div>
   </header>
 

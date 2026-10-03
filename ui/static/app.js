@@ -1216,6 +1216,31 @@ function updateBotState(running, paused) {
   txt.textContent = running ? (paused ? "Paused" : "Running") : "Stopped";
 }
 
+let _gameClockSecs = null;
+let _gameClockAnchorMs = 0;
+
+function _renderGameClock() {
+  const el = document.getElementById("game-time-value");
+  if (!el) return;
+  if (_gameClockSecs === null) { el.textContent = "--:--:--"; return; }
+  const t = (_gameClockSecs + Math.floor((Date.now() - _gameClockAnchorMs) / 1000)) % 86400;
+  const p = n => String(n).padStart(2, "0");
+  el.textContent = `${p(Math.floor(t / 3600))}:${p(Math.floor((t % 3600) / 60))}:${p(t % 60)}`;
+}
+
+function syncGameClock(hms) {
+  if (!hms) {
+    _gameClockSecs = null;
+  } else {
+    const [h, m, s] = hms.split(":").map(Number);
+    _gameClockSecs = h * 3600 + m * 60 + s;
+    _gameClockAnchorMs = Date.now();
+  }
+  _renderGameClock();
+}
+
+setInterval(_renderGameClock, 1000);
+
 const CONSUMABLE_LABELS = {
   marijuana: "Weed", cocaine: "Cocaine", ecstasy: "Ecstasy",
   acid: "Acid", speed: "Speed", heroin: "Heroin", pice: "P/Ice",
@@ -1227,6 +1252,7 @@ function pollStatus() {
     .then(d => {
       window._lastStatus = d;
       updateBotState(d.running, d.paused);
+      syncGameClock(d.server_time_now);
 
       // Cross-tab settings sync: a higher revision than we've seen means a
       // different tab (or the bot) changed the config — re-sync this tab.
@@ -5136,7 +5162,7 @@ function _updateNotifIndicators(count) {
     mobileBadge.textContent = count > 4 ? "5+" : String(count);
     mobileBadge.classList.toggle("has-count", count > 0);
   }
-  document.title = count > 0 ? `(${count}) MafiaMatrix Bot` : "MafiaMatrix Bot";
+  document.title = count > 0 ? `(${count}) OpenBot` : "OpenBot";
 }
 
 function _collectNotifSettings() {
