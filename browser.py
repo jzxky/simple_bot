@@ -51,6 +51,9 @@ def start(headless: bool = False):
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/136.0.0.0 Safari/537.36"
     )
+    # Patchright adds this by default; Chrome then shows an "unsupported
+    # command-line flag" infobar. Strip it from the default args.
+    ignore_default_args = ["--disable-blink-features=AutomationControlled"]
     if headless:
         args.append("--window-size=1920,1080")
         _context = _playwright.chromium.launch_persistent_context(
@@ -63,6 +66,7 @@ def start(headless: bool = False):
             locale="en-US",
             timezone_id="America/New_York",
             args=args,
+            ignore_default_args=ignore_default_args,
         )
     else:
         args.append("--start-maximized")
@@ -75,6 +79,7 @@ def start(headless: bool = False):
             locale="en-US",
             timezone_id="America/New_York",
             args=args,
+            ignore_default_args=ignore_default_args,
         )
     _page = _context.pages[0] if _context.pages else _context.new_page()
     global _nav_fail_count
