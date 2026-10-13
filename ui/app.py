@@ -354,8 +354,13 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["drug_store"]["enabled"] = data.get("drug_store_enabled", False)
     c["drug_store"]["wanted_items"] = data.get("drug_store_wanted_items", [])
     c["drug_store"]["priority_order"] = data.get("drug_store_priority_order", [])
-    c["drug_store"]["check_interval_minutes"] = max(0, min(59, int(data.get("drug_store_interval_minutes", 5) or 5)))
-    c["drug_store"]["check_interval_seconds"] = max(0, min(59, int(data.get("drug_store_interval_seconds", 0) or 0)))
+    ds_min = data.get("drug_store_interval_minutes", 5)
+    ds_min = max(0, min(59, int(5 if ds_min is None or ds_min == "" else ds_min)))
+    ds_sec = max(0, min(59, int(data.get("drug_store_interval_seconds", 0) or 0)))
+    if ds_min == 0 and ds_sec < 5:
+        ds_sec = 5  # drug store tab polls no faster than every 5s
+    c["drug_store"]["check_interval_minutes"] = ds_min
+    c["drug_store"]["check_interval_seconds"] = ds_sec
 
     c.setdefault("skills", {})
     c["skills"].setdefault("travel_expert", {})
@@ -775,17 +780,12 @@ def _get_weapon_store_next_check_at(state) -> "float | None":
 
 
 def _get_drug_store_next_check_at(state) -> "float | None":
-    import time as _time
+    """Next drug store tab poll (or end of post-purchase cooldown); None while
+    the tab isn't open."""
     task = bot.get_drug_store_task()
-    if not task or task.last_checked_at <= 0:
+    if not task or not state.drug_store_tab_active:
         return None
-    now = _time.time()
-    if task.purchase_cooldown_until > now:
-        return task.purchase_cooldown_until
-    d = cfg.load().get("drug_store", {})
-    interval = max(1, int(d.get("check_interval_minutes", 5)) * 60
-                   + int(d.get("check_interval_seconds", 0)))
-    return task.last_checked_at + interval
+    return task.next_poll_at()
 
 
 @app.route("/status")

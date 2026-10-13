@@ -162,6 +162,9 @@ def _restart_browser(state: GameState, c: dict) -> bool:
     state.logged_in = False
     state.agg_tab_active = False
     state.snipe_active = False
+    if _drug_store_task is not None:
+        _drug_store_task.stop_tab(state)
+    state.drug_store_tab_active = False
     try:
         browser.stop()
         browser.start(headless=c.get("misc", {}).get("headless", False))
@@ -301,7 +304,10 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(_bionics_task)
     _weapon_store_task = WeaponStoreTask()
     sched.add(_weapon_store_task)
-    _drug_store_task = DrugStoreTask()
+    # Reuse the existing instance so a config save doesn't orphan or reopen the
+    # drug store tab — tick_drug_store() reads config live.
+    existing_ds = next((t for t in old_sched._tasks if isinstance(t, DrugStoreTask)), None) if old_sched else None
+    _drug_store_task = existing_ds or DrugStoreTask()
     sched.add(_drug_store_task)
     sched.add(RespectTask())
     sched.add(EventBossTask())
@@ -618,6 +624,9 @@ def _run(c: dict):
 
                 if state.agg_tab_active and _agg_task is not None:
                     _agg_task.tick_agg(state)
+
+                if state.drug_store_tab_active and _drug_store_task is not None:
+                    _drug_store_task.tick_drug_store(state)
             except Exception as tick_err:
                 # Task code that talks to the browser outside executor.execute()
                 # has no recovery of its own — a dead driver here would otherwise
@@ -728,6 +737,8 @@ def _run(c: dict):
             _snipe_task.tick_snipe(state)
         if state.agg_tab_active and _agg_task is not None:
             _agg_task.stop_tab(state)
+        if _drug_store_task is not None:
+            _drug_store_task.stop_tab(state)
         try:
             if state.logged_in and c.get("misc", {}).get("logout_on_stop", True):
                 state.add_log("Logging out...")
