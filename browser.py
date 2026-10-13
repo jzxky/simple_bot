@@ -6,6 +6,7 @@ Uses a persistent profile so Cloudflare trusts the session over time.
 
 import json
 import os
+import threading
 from contextlib import contextmanager
 import paths
 from patchright.sync_api import sync_playwright, Page, BrowserContext
@@ -19,15 +20,18 @@ _page: Page = None
 # Optional override so code written against page()/navigate()/current_url()
 # can be pointed at a second tab (e.g. the aggravated-crimes tab) without
 # threading a `page` argument through every call site. Set via use_page().
-_active_page: "Page | None" = None
+# Thread-local so the side-browser worker thread (side_browser.py) can point
+# page() at its own tab without redirecting the main thread's navigations.
+_local = threading.local()
+_main_thread: "threading.Thread | None" = None
 
 _NAV_FAIL_THRESHOLD = 3
 _nav_fail_count = 0
 
 
-def _clear_window_placement():
+def _clear_window_placement(profile_dir: str):
     """Remove saved window bounds from Chrome profile so --start-maximized takes effect."""
-    prefs_path = os.path.join(PROFILE_DIR, "Default", "Preferences")
+    prefs_path = os.path.join(profile_dir, "Default", "Preferences")
     if not os.path.exists(prefs_path):
         return
     try:
@@ -40,11 +44,11 @@ def _clear_window_placement():
         pass
 
 
-def start(headless: bool = False):
-    global _playwright, _context, _page
-    os.makedirs(PROFILE_DIR, exist_ok=True)
-    _clear_window_placement()
-    _playwright = sync_playwright().start()
+def launch_context(pw, profile_dir: str, headless: bool = False) -> BrowserContext:
+    """Launch a persistent Chrome context on `profile_dir` with the bot's
+    standard settings. Shared by the main browser and the side browser."""
+    os.makedirs(profile_dir, exist_ok=True)
+    _clear_window_placement(profile_dir)
     args = ["--disable-notifications", "--disable-save-password-bubble", "--disable-wake-lock"]
     DESKTOP_UA = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -56,8 +60,8 @@ def start(headless: bool = False):
     ignore_default_args = ["--disable-blink-features=AutomationControlled"]
     if headless:
         args.append("--window-size=1920,1080")
-        _context = _playwright.chromium.launch_persistent_context(
-            PROFILE_DIR,
+        return pw.chromium.launch_persistent_context(
+            profile_dir,
             channel="chrome",
             headless=True,
             chromium_sandbox=True,
@@ -68,19 +72,25 @@ def start(headless: bool = False):
             args=args,
             ignore_default_args=ignore_default_args,
         )
-    else:
-        args.append("--start-maximized")
-        _context = _playwright.chromium.launch_persistent_context(
-            PROFILE_DIR,
-            channel="chrome",
-            headless=False,
-            chromium_sandbox=True,
-            no_viewport=True,
-            locale="en-US",
-            timezone_id="America/New_York",
-            args=args,
-            ignore_default_args=ignore_default_args,
-        )
+    args.append("--start-maximized")
+    return pw.chromium.launch_persistent_context(
+        profile_dir,
+        channel="chrome",
+        headless=False,
+        chromium_sandbox=True,
+        no_viewport=True,
+        locale="en-US",
+        timezone_id="America/New_York",
+        args=args,
+        ignore_default_args=ignore_default_args,
+    )
+
+
+def start(headless: bool = False):
+    global _playwright, _context, _page, _main_thread
+    _main_thread = threading.current_thread()
+    _playwright = sync_playwright().start()
+    _context = launch_context(_playwright, PROFILE_DIR, headless)
     _page = _context.pages[0] if _context.pages else _context.new_page()
     global _nav_fail_count
     _nav_fail_count = 0
@@ -92,7 +102,7 @@ def stop():
     closing the page/context raises) still lets us stop playwright itself —
     otherwise the node driver process leaks and the next start() piles another
     one on top."""
-    global _playwright, _context, _page, _active_page
+    global _playwright, _context, _page
     for label, fn in (
         ("page.close", lambda: _page and _page.close()),
         ("context.close", lambda: _context and _context.close()),
@@ -102,7 +112,7 @@ def stop():
             fn()
         except Exception as e:
             print(f"[browser] Error during stop ({label}): {e}")
-    _page = _context = _playwright = _active_page = None
+    _page = _context = _playwright = None
     print("[browser] Browser stopped.")
 
 
@@ -139,14 +149,22 @@ def is_alive() -> bool:
         return False
 
 
+def _on_main_thread() -> bool:
+    return _main_thread is None or threading.current_thread() is _main_thread
+
+
 def record_nav_failure():
+    # The failure counter drives restarts of the main browser — the side
+    # browser's navigations must not touch it.
     global _nav_fail_count
-    _nav_fail_count += 1
+    if _on_main_thread():
+        _nav_fail_count += 1
 
 
 def record_nav_success():
     global _nav_fail_count
-    _nav_fail_count = 0
+    if _on_main_thread():
+        _nav_fail_count = 0
 
 
 def should_restart_for_nav_failures() -> bool:
@@ -154,29 +172,33 @@ def should_restart_for_nav_failures() -> bool:
 
 
 def page() -> Page:
-    return _active_page or _page
+    return getattr(_local, "page", None) or _page
 
 
 def is_secondary_page_active() -> bool:
     """True while use_page() has page()/navigate()/current_url() pointed at a
-    tab other than the main one."""
-    return _active_page is not None
+    tab other than the main one, on the calling thread."""
+    return getattr(_local, "page", None) is not None
 
 
 @contextmanager
 def use_page(pg: Page):
     """Temporarily point page()/navigate()/current_url() at `pg` instead of the
-    main tab, so existing code that calls browser.page() can be reused unchanged
-    against a second tab (e.g. the aggravated-crimes tab). Not reentrant —
-    nesting overwrites and then restores the previous override, which is fine
-    since only one secondary tab drives at a time."""
-    global _active_page
-    prev = _active_page
-    _active_page = pg
+    main tab, for the calling thread only, so existing code that calls
+    browser.page() can be reused unchanged against another tab (the drug store
+    tab on the main thread, or a side-browser tab on the worker thread)."""
+    prev = getattr(_local, "page", None)
+    _local.page = pg
     try:
         yield pg
     finally:
-        _active_page = prev
+        _local.page = prev
+
+
+def export_cookies() -> list:
+    """Main browser's cookies (session + Cloudflare clearance), for seeding the
+    side browser. Main thread only — patchright objects are thread-bound."""
+    return _context.cookies() if _context is not None else []
 
 
 SCREENSHOT_PATH = os.path.join(paths.data_dir(), "last_screenshot.png")
@@ -194,10 +216,11 @@ def navigate(url: str) -> str:
             raise
     record_nav_success()
     _wait_for_cloudflare_on(pg)
-    try:
-        pg.screenshot(path=SCREENSHOT_PATH, full_page=False)
-    except Exception:
-        pass
+    if _on_main_thread():  # don't let the side browser race the main one for the file
+        try:
+            pg.screenshot(path=SCREENSHOT_PATH, full_page=False)
+        except Exception:
+            pass
     return pg.content()
 
 

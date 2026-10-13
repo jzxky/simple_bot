@@ -11,6 +11,7 @@ import config as cfg
 import paths
 import urls
 import browser
+import side_browser
 from state import GameState
 from scheduler import Scheduler
 from executor import ActionExecutor
@@ -160,8 +161,8 @@ def _restart_browser(state: GameState, c: dict) -> bool:
     """Tear down and relaunch the browser after the driver or browser died.
     Returns True if the new browser came up."""
     state.logged_in = False
-    state.agg_tab_active = False
-    state.snipe_active = False
+    # The side browser (snipe / separate-tab crimes) is a separate Chrome and
+    # keeps running; it fetches fresh cookies if the session changes.
     if _drug_store_task is not None:
         _drug_store_task.stop_tab(state)
     state.drug_store_tab_active = False
@@ -489,6 +490,13 @@ def _run(c: dict):
                     state.relog_suppressed = True
                     _pause_event.set()
 
+            # Side browser (snipe / separate-tab crimes) asking for fresh cookies
+            if side_browser.cookies_requested() and state.logged_in:
+                try:
+                    side_browser.provide_cookies(browser.export_cookies())
+                except Exception as e:
+                    state.add_log(f"Side browser cookie refresh error: {e}")
+
             # Bar threads requests from the Flask thread
             if not _bar_threads_request.empty():
                 try:
@@ -619,12 +627,6 @@ def _run(c: dict):
             try:
                 sched.tick(state, executor)
 
-                if state.snipe_active and _snipe_task is not None:
-                    _snipe_task.tick_snipe(state)
-
-                if state.agg_tab_active and _agg_task is not None:
-                    _agg_task.tick_agg(state)
-
                 if state.drug_store_tab_active and _drug_store_task is not None:
                     _drug_store_task.tick_drug_store(state)
             except Exception as tick_err:
@@ -732,11 +734,10 @@ def _run(c: dict):
     except Exception as e:
         state.add_log(f"Bot crashed: {e}")
     finally:
-        if state.snipe_active and _snipe_task is not None:
-            _cancel_snipe_event.set()
-            _snipe_task.tick_snipe(state)
-        if state.agg_tab_active and _agg_task is not None:
-            _agg_task.stop_tab(state)
+        side_browser.shutdown()
+        state.snipe_active = False
+        state.agg_tab_active = False
+        state.agg_tab_crime = ""
         if _drug_store_task is not None:
             _drug_store_task.stop_tab(state)
         try:

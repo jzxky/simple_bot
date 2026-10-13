@@ -8,17 +8,23 @@ any other task (except consume) is ready; if so it yields, otherwise it retries 
 
 Separate-tab mode (config: aggravated_crimes.separate_tab): instead of running the crime
 loop inline on the main tab — which blocks every other task until it returns — this task
-opens a second browser tab and drives it one step per bot-loop tick via tick_agg(), the
-same cooperative pattern tasks/snipe_top_job.py uses for its own second tab. Each of the
-executor's crime handlers is available in generator form (see executor._do_crime_steps,
-_breaking_entering_steps, _armed_robbery_steps, _torch_business_steps) — they yield once
-per target/attempt instead of running the whole loop in one call, so sched.tick() and every
-other ready task get serviced on the main tab within one loop iteration (~2s) instead of
-waiting for the entire crime run to finish.
+hands the run to the side browser (side_browser.py): a separate patchright instance on its
+own thread. It opens a new tab there and runs the executor's crime routine (generator forms:
+executor._do_crime_steps, _breaking_entering_steps, _armed_robbery_steps,
+_torch_business_steps) back to back with no gaps, exactly like inline mode, until the
+targets run out or there's a success/fail result; then it closes the tab. Between targets
+it re-checks the stop conditions (cancel, bot stop, jail, hospital, CS sentence, too many
+fails, energy/crime selection change, or a top-job snipe taking over the side browser).
+
+The run works on its own copy of the GameState so the side tab's page parses never
+overwrite the main tab's page_html/current_url; the relevant results (energy, money, jail,
+timers, agg fails, payback victim, targets-exhausted) are copied back when it ends.
 """
 
+import copy
 import time
 import browser
+import side_browser
 import config as cfg
 from tasks.base import Task, Action
 from state import GameState
@@ -54,11 +60,8 @@ class AggCrimeTask(Task):
         self._hack_exhausted: bool = False
         self.scheduler = None  # set by bot.py after scheduler is built
 
-        # Separate-tab run state
-        self._page = None
-        self._gen = None
-        self._active_crime: "str | None" = None
-        self._active_threshold: int = 0
+        # Separate-tab run (side browser job) in flight, if any
+        self._job = None
 
     def _other_task_ready(self, state: GameState) -> bool:
         """Return True if any task other than self or ConsumeTask can run."""
@@ -223,24 +226,22 @@ class AggCrimeTask(Task):
         return executor._do_crime_steps(action, state)
 
     def _launch_tab(self, state: GameState, crime: str, threshold: int):
-        try:
-            page = browser.new_page()
-        except Exception as e:
-            state.add_log(f"Agg Crimes: failed to open tab: {e}")
-            return
-
+        import bot as _bot
         action = self._build_action(crime, threshold)
-        self._page = page
-        self._gen = self._build_generator(action, state)
-        self._active_crime = crime
-        self._active_threshold = threshold
+        _bot._cancel_agg_event.clear()  # a stale cancel click mustn't kill this run
         state.agg_tab_active = True
         state.agg_tab_crime = crime
-        state.add_log(f"Agg Crimes: launching '{crime}' in a new tab.")
+        state.add_log(f"Agg Crimes: launching '{crime}' in the side browser.")
+        headless = cfg.load().get("misc", {}).get("headless", False)
+        self._job = side_browser.submit(
+            "agg",
+            lambda side, job: self._run_job(side, job, state, action, crime, threshold),
+            cookies=browser.export_cookies(), headless=headless,
+        )
 
-    def _stop_reason(self, state: GameState) -> "str | None":
+    def _stop_reason(self, state: GameState, crime: str, threshold: int) -> "str | None":
         """Re-check the same launch conditions can_run() would; return why the
-        tab run should stop now, or None to keep going."""
+        run should stop now, or None to keep going."""
         if not state.logged_in:
             return "logged out"
         if state.in_jail:
@@ -251,68 +252,114 @@ class AggCrimeTask(Task):
             return "CS sentence issued"
         if state.agg_fail_count() >= 3:
             return "too many agg fails"
-        crime, _ = self._pick_crime(state)
-        if crime != self._active_crime:
-            return "conditions changed" if crime is None else "crime selection changed"
-        if self._active_threshold and state.energy < self._active_threshold:
+        picked, _ = self._pick_crime(state)
+        if picked != crime:
+            return "conditions changed" if picked is None else "crime selection changed"
+        if threshold and state.energy < threshold:
             return "energy dropped below threshold"
         return None
 
-    def tick_agg(self, state: GameState):
-        """Called once per bot-loop iteration while state.agg_tab_active — advances
-        the crime tab's generator by exactly one step."""
+    # ------------------------------------------------------------------
+    # Worker thread
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _shadow_state(state: GameState) -> GameState:
+        """A copy of `state` for the side tab to parse into. Logs and
+        notifications still go to the real state."""
+        shadow = copy.copy(state)
+        shadow.agg_fail_times = list(state.agg_fail_times)
+        shadow.timers = dict(state.timers)
+        shadow.add_log = lambda msg: state.add_log(f"[Side] {msg}")
+        shadow.push_notification = state.push_notification
+        for attr in ("_last_crime_victim", "_last_crime_amount",
+                     "_last_crime_payback_mode", "_agg_targets_exhausted"):
+            shadow.__dict__.pop(attr, None)
+        return shadow
+
+    @staticmethod
+    def _merge_back(state: GameState, shadow: GameState, fails_before: list):
+        """Copy the run's results from the shadow state onto the real one."""
+        for t in shadow.agg_fail_times:
+            if t not in fails_before:
+                state.agg_fail_times.append(t)
+        for attr in ("energy", "clean_money", "dirty_money", "in_jail", "in_hospital",
+                     "hospital_release_at", "cs_sentence", "jail_release_secs"):
+            setattr(state, attr, getattr(shadow, attr))
+        if shadow.timers:
+            state.timers = shadow.timers
+            state.action_timer_ready = shadow.action_timer_ready
+            state.action_timer_end = shadow.action_timer_end
+            state.agg_pro_active = shadow.agg_pro_active
+            state.agg_pro_end = shadow.agg_pro_end
+        if getattr(shadow, "_agg_targets_exhausted", False):
+            state._agg_targets_exhausted = True
+        if getattr(shadow, "_last_crime_victim", None):
+            # The main loop pays back as soon as it sees _last_crime_victim, so
+            # set the amount (and mode) first.
+            state._last_crime_amount = shadow._last_crime_amount
+            if hasattr(shadow, "_last_crime_payback_mode"):
+                state._last_crime_payback_mode = shadow._last_crime_payback_mode
+            state._last_crime_victim = shadow._last_crime_victim
+
+    def _run_job(self, side, job, state: GameState, action: Action, crime: str, threshold: int):
         import bot as _bot
-
-        if _bot._cancel_agg_event.is_set():
-            _bot._cancel_agg_event.clear()
-            self._finish_agg(state, reason="cancelled")
-            return
-
-        if _bot._stop_event.is_set():
-            self._finish_agg(state, reason="bot stopping")
-            return
-
-        reason = self._stop_reason(state)
-        if reason:
-            self._finish_agg(state, reason=reason)
-            return
-
-        saved_html, saved_url = state.page_html, state.current_url
+        shadow = self._shadow_state(state)
+        fails_before = list(state.agg_fail_times)
+        pg = None
+        reason = "run finished"
+        finished = False
         try:
-            with browser.use_page(self._page):
-                next(self._gen)
-        except StopIteration:
-            self._handle_post_run(state)
-            self._finish_agg(state, reason="run finished")
-            return
+            if state.snipe_active:
+                # A snipe was queued while this run waited to start — it owns
+                # the side browser now.
+                reason = "snipe active"
+                return
+            pg = side.new_page(job)
+            with browser.use_page(pg):
+                gen = self._build_generator(action, shadow)
+                try:
+                    for _ in gen:
+                        if _bot._cancel_agg_event.is_set():
+                            _bot._cancel_agg_event.clear()
+                            reason = "cancelled"
+                            break
+                        if job.cancel.is_set():
+                            reason = job.cancel_reason or "stopped"
+                            break
+                        if state.snipe_active:
+                            reason = "snipe starting"
+                            break
+                        stop = self._stop_reason(shadow, crime, threshold)
+                        if stop:
+                            reason = stop
+                            break
+                    else:
+                        finished = True
+                finally:
+                    gen.close()
         except Exception as e:
-            state.add_log(f"Agg Crimes (tab): error — {e}")
-            self._finish_agg(state, reason="error")
-            return
+            state.add_log(f"Agg Crimes (side): error — {e}")
+            reason = "error"
         finally:
-            # Between ticks, state.page_html/current_url must keep describing the
-            # main tab — many unrelated handlers read them assuming that.
-            state.page_html, state.current_url = saved_html, saved_url
-
-    def _finish_agg(self, state: GameState, reason: str = ""):
-        if self._gen is not None:
+            if pg is not None:
+                side.close_page(pg)
             try:
-                self._gen.close()
-            except Exception:
-                pass
-            self._gen = None
-        if self._page is not None:
-            browser.close_page(self._page)
-            self._page = None
-        state.agg_tab_active = False
-        state.agg_tab_crime = ""
-        self._active_crime = None
-        self._active_threshold = 0
-        if reason:
-            state.add_log(f"Agg Crimes: tab closed ({reason}).")
+                self._merge_back(state, shadow, fails_before)
+                if finished:
+                    self._handle_post_run(state)
+            finally:
+                # Last, so the scheduler can't relaunch before the cooldown is set.
+                state.agg_tab_active = False
+                state.agg_tab_crime = ""
+                state.add_log(f"Agg Crimes: side tab closed ({reason}).")
 
-    def stop_tab(self, state: GameState):
-        """External request to abandon the current tab run immediately (e.g. a
-        manual travel request, or the scheduler being rebuilt on config save)."""
-        if self._gen is not None or self._page is not None:
-            self._finish_agg(state, reason="stopped")
+    def stop_tab(self, state: GameState, wait: float = 10.0):
+        """Main thread: abandon the current run (e.g. a manual travel request,
+        or the scheduler being rebuilt on config save) and wait up to `wait`
+        seconds for it to wind down — it stops at its next target."""
+        job = self._job
+        if job is None or job.done.is_set():
+            return
+        job.request_cancel("stopped")
+        job.done.wait(wait)
