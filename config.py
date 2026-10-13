@@ -80,8 +80,8 @@ DEFAULT_CONFIG = {
     "event_boss": {
         "enabled": False,
         "consume": {
-            "Burger": False, "Coffee": False, "Egg": False, "Fries": False,
-            "Lightning": False, "Milk": False, "Popcorn": False, "Watermelon": False,
+            "case": False, "launder": False, "travel": False, "agg_strength": False,
+            "agg_pro": False, "earn": False, "action": False, "random": False,
         },
     },
     "case_work": {

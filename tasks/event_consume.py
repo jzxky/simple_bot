@@ -2,12 +2,13 @@
 Event-boss consumable task.
 
 When event-boss handling is enabled, auto-consumes collected event items whose
-per-item toggle is on and whose condition is met:
-  - timer items  → the reset target timer is on cooldown
-  - Fries        → energy < 100%
-  - Milk         → whenever stock remains
-  - Popcorn        → resets earn timer (only in manual earn mode)
-  - Lightning      → unsupported (never consumed)
+effect toggle is on and whose condition is met (item names differ per event;
+event_consumables.ALIASES maps them to effects):
+  - timer effects → the reset target timer is on cooldown
+  - agg_strength  → energy < 100%
+  - agg_pro       → whenever stock remains
+  - earn          → resets earn timer (only in manual earn mode)
+  - random        → unsupported (never consumed)
 
 Stock counts come from the last bossevent.asp visit (EventBossTask); consuming
 decrements the local count so we don't over-retry between visits.
@@ -30,6 +31,7 @@ class EventConsumeTask(Task):
 
     def __init__(self):
         self._last: float = 0.0
+        self._warned_unknown: set = set()
 
     def _eligible(self, state: GameState, cond) -> bool:
         kind, param = cond
@@ -48,18 +50,24 @@ class EventConsumeTask(Task):
         return False  # unsupported
 
     def _pick(self, state: GameState, consume_cfg: dict):
-        stock = state.event_consumables or {}
-        for name in _ec.EVENT_ORDER:
-            _label, kind, param = _ec.INFO[name]
-            if kind == "unsupported":
+        toggles = _ec.effect_toggles(consume_cfg)
+        by_effect = {}
+        for name, ec in (state.event_consumables or {}).items():
+            eff = _ec.effect_for(name)
+            if eff is None:
+                if name not in self._warned_unknown:
+                    self._warned_unknown.add(name)
+                    state.add_log(f"Event consume: unknown item '{name}' — ignored")
                 continue
-            if not consume_cfg.get(name, False):
+            if ec.get("qty", 0) <= 0 or not ec.get("url"):
                 continue
-            ec = stock.get(name)
-            if not ec or ec.get("qty", 0) <= 0 or not ec.get("url"):
+            by_effect.setdefault(eff, (name, ec["url"]))
+        for eff in _ec.EFFECT_ORDER:
+            _label, kind, param = _ec.EFFECTS[eff]
+            if kind == "unsupported" or not toggles.get(eff) or eff not in by_effect:
                 continue
             if self._eligible(state, (kind, param)):
-                return name, ec["url"]
+                return by_effect[eff]
         return None
 
     def can_run(self, state: GameState) -> bool:

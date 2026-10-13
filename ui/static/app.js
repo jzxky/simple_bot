@@ -504,10 +504,10 @@ function _buildPayload() {
   };
 }
 
-const _EVENT_ITEMS = ["Burger","Coffee","Egg","Fries","Lightning","Milk","Popcorn","Watermelon"];
+const _EVENT_EFFECTS = ["case","launder","travel","action","agg_strength","agg_pro","earn","random"];
 function _collectEventConsume() {
   const o = {};
-  _EVENT_ITEMS.forEach(n => {
+  _EVENT_EFFECTS.forEach(n => {
     const el = document.getElementById("event_consume_" + n);
     o["event_consume_" + n] = el ? el.checked : false;
   });
@@ -1368,7 +1368,7 @@ function pollStatus() {
       const evWrap = document.getElementById("stat-event-consumables-wrap");
       if (evWrap) {
         const evc = d.event_consumables || {};
-        const evNames = _EVENT_ITEMS.filter(n => evc[n] && (evc[n].qty ?? 0) > 0);
+        const evNames = Object.keys(evc).sort().filter(n => (evc[n].qty ?? 0) > 0);
         if (d.event_boss_enabled && evNames.length) {
           evWrap.style.display = "";
           document.getElementById("stat-event-consumables").innerHTML =

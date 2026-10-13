@@ -1299,22 +1299,15 @@
                 placeholder="00:00" oninput="markNumDirty(this)">
             </div>
           </div>
-          {% set ec_cfg = config.get('event_boss', {}).get('consume', {}) %}
+          {% set ec_on = event_consumables.effect_toggles(config.get('event_boss', {}).get('consume', {})) %}
           <div class="settings-group" id="event-consume-settings" style="grid-column: 1 / -1; display:none">
             <h3>Event Items</h3>
-            <p class="setting-note">Auto-consume collected event-boss items (shown while Event Boss handling is enabled).</p>
-            {% for name, plabel, supported in [
-                ('Burger','Case', True),
-                ('Coffee','Laundering', True),
-                ('Egg','Travel', True),
-                ('Watermelon','Action', True),
-                ('Fries','Agg strength 100%', True),
-                ('Milk','+1hr agg pro', True),
-                ('Popcorn','Earn (manual mode only)', True),
-                ('Lightning','Random prize', False),
-            ] %}
-            <label class="inline-toggle setting-row"{% if not supported %} title="Not supported yet"{% endif %}>{{ name }} ({{ plabel }})
-              <label class="toggle-label"><input type="checkbox" id="event_consume_{{ name }}" {% if ec_cfg.get(name) %}checked{% endif %}{% if not supported %} disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+            <p class="setting-note">Auto-consume collected event-boss items (shown while Event Boss handling is enabled). Item names change per event; each toggle covers every item with that effect.</p>
+            {% for eff in ['case','launder','travel','action','agg_strength','agg_pro','earn','random'] %}
+            {% set plabel, kind, _p = event_consumables.EFFECTS[eff] %}
+            {% set supported = kind != 'unsupported' %}
+            <label class="inline-toggle setting-row"{% if not supported %} title="Not supported yet"{% endif %}>{{ plabel }} ({{ event_consumables.item_names(eff) | join(' / ') }})
+              <label class="toggle-label"><input type="checkbox" id="event_consume_{{ eff }}" {% if ec_on.get(eff) %}checked{% endif %}{% if not supported %} disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
             </label>
             {% endfor %}
           </div>

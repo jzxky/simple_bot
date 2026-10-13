@@ -17,6 +17,7 @@ import character_history as ch
 import consumable_limit_detector as cld
 import trait_requirements as tr
 import notifications_store
+import event_consumables as _ec_mod
 import pathlib
 
 _APP_VERSION = pathlib.Path(os.path.dirname(os.path.dirname(__file__)), "VERSION").read_text().strip()
@@ -98,7 +99,7 @@ def index():
     return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS,
                            notif_defaults=cfg.DEFAULT_CONFIG["notifications"],
                            pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin(),
-                           app_version=_APP_VERSION)
+                           app_version=_APP_VERSION, event_consumables=_ec_mod)
 
 
 def _merge_changed(target: dict, before: dict, after: dict):
@@ -271,9 +272,10 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c.setdefault("event_boss", {})
     c["event_boss"]["enabled"] = data.get("event_boss_enabled", False)
     import event_consumables as _ec
-    c["event_boss"].setdefault("consume", {})
-    for _name in _ec.EVENT_ORDER:
-        c["event_boss"]["consume"][_name] = data.get(f"event_consume_{_name}", False)
+    # Keyed by effect; replaces any legacy per-item-name keys.
+    c["event_boss"]["consume"] = {
+        _eff: data.get(f"event_consume_{_eff}", False) for _eff in _ec.EFFECT_ORDER
+    }
 
     c.setdefault("sync", {})
     c["sync"]["enabled"]          = data.get("sync_enabled", False)
