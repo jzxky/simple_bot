@@ -6580,7 +6580,6 @@ class ActionExecutor:
                     state.add_log("Browser/page lost — restarting browser.")
                     # Whatever the browser was mid-way through is gone with it.
                     state.logged_in = False
-                    state.agg_tab_active = False
                     try:
                         headless = cfg.load().get("misc", {}).get("headless", False)
                         browser.stop()
@@ -6595,7 +6594,6 @@ class ActionExecutor:
                             f"Too many consecutive navigation failures — restarting browser."
                         )
                         state.logged_in = False
-                        state.agg_tab_active = False
                         try:
                             headless = cfg.load().get("misc", {}).get("headless", False)
                             browser.stop()
@@ -6626,7 +6624,6 @@ class ActionExecutor:
                             )
                             if needs_restart:
                                 state.add_log("Browser in broken state during recovery — restarting browser.")
-                                state.agg_tab_active = False
                                 try:
                                     headless = cfg.load().get("misc", {}).get("headless", False)
                                     browser.stop()
