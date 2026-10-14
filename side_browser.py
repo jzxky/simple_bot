@@ -9,8 +9,12 @@ its own Chrome window on a dedicated profile (.browser_profile_side). It shares
 the main browser's login by importing the main context's cookies (session +
 Cloudflare clearance) — no second login.
 
-Jobs run one at a time, each in a fresh tab that it closes when done. The
-browser itself launches on the first job and stays open until shutdown().
+Work is split into lanes ("snipe", "crime"), each its own worker thread with
+its own Chrome window and profile (.browser_profile_side_<lane>), so a top-job
+snipe and a crime run can go at the same time without waiting on each other.
+Within a lane, jobs run one at a time, each in a fresh tab that it closes when
+done. A lane's browser launches on its first job and stays open until
+shutdown().
 
 Threading contract:
   - submit(), cookies_requested(), provide_cookies(), cancel_current(),
@@ -25,8 +29,7 @@ import queue
 import threading
 import paths
 
-SIDE_PROFILE_DIR = os.path.join(paths.data_dir(), ".browser_profile_side")
-COOKIE_WAIT_SECS = 30
+SIDE_PROFILE_DIR = os.path.join(paths.data_dir(), ".browser_profile_side")  # + "_<lane>"
 
 
 class Job:
@@ -48,7 +51,8 @@ class Job:
 class _Side:
     """Worker-thread handle passed to each job's fn."""
 
-    def __init__(self):
+    def __init__(self, lane: "_Lane"):
+        self._lane = lane
         self._pw = None
         self._context = None
 
@@ -59,7 +63,7 @@ class _Side:
         import browser
         self._pw = sync_playwright().start()
         try:
-            self._context = browser.launch_context(self._pw, SIDE_PROFILE_DIR, headless)
+            self._context = browser.launch_context(self._pw, f"{SIDE_PROFILE_DIR}_{self._lane.name}", headless)
         except Exception:
             self._stop_pw()
             raise
@@ -73,7 +77,7 @@ class _Side:
     def refresh_cookies(self, job: Job) -> bool:
         """Ask the main thread for fresh cookies (e.g. after the session
         rotated) and load them. Returns False if none arrived in time."""
-        cookies = _request_cookies(job)
+        cookies = self._lane.request_cookies(job)
         if not cookies:
             return False
         self._context.add_cookies(cookies)
@@ -103,118 +107,145 @@ class _Side:
             self._pw = None
 
 
-_jobs: "queue.Queue[Job]" = queue.Queue()
-_thread: "threading.Thread | None" = None
-_shutdown = threading.Event()  # stop flag of the current worker; replaced per thread
-_current: "Job | None" = None
-_lock = threading.Lock()
-_cookie_request = threading.Event()
-_cookie_reply: queue.Queue = queue.Queue(maxsize=1)
+class _Lane:
+    def __init__(self, name: str):
+        self.name = name
+        self.jobs: "queue.Queue[Job]" = queue.Queue()
+        self.thread: "threading.Thread | None" = None
+        self.stop = threading.Event()  # replaced per worker thread
+        self.current: "Job | None" = None
+        self.lock = threading.Lock()
+        self.cookie_request = threading.Event()
+        self.cookie_reply: queue.Queue = queue.Queue(maxsize=1)
+
+    # ---- worker thread ----
+
+    def request_cookies(self, job: Job) -> list:
+        stop = self.stop
+        while not self.cookie_reply.empty():
+            self.cookie_reply.get_nowait()
+        self.cookie_request.set()
+        try:
+            while True:
+                try:
+                    return self.cookie_reply.get(timeout=0.5)
+                except queue.Empty:
+                    if job.cancel.is_set() or stop.is_set():
+                        return []
+                    if not self.cookie_request.is_set():
+                        return []
+        finally:
+            self.cookie_request.clear()
+
+    def run(self, stop: threading.Event):
+        import browser
+        side = _Side(self)
+        try:
+            while not stop.is_set():
+                try:
+                    job = self.jobs.get(timeout=0.5)
+                except queue.Empty:
+                    continue
+                with self.lock:
+                    self.current = job
+                try:
+                    job.fn(side, job)
+                except Exception as e:
+                    # Jobs handle their own errors; this is a last-resort guard so
+                    # one bad job can't kill the worker. A dead browser is torn
+                    # down so the next job relaunches it.
+                    print(f"[side_browser:{self.name}] job {job.kind} crashed: {e}")
+                    if browser.is_lost_error(e):
+                        side.teardown()
+                finally:
+                    with self.lock:
+                        self.current = None
+                    job.done.set()
+        finally:
+            side.teardown()
+            # Anything still queued never ran — release whoever waits on it.
+            while True:
+                try:
+                    self.jobs.get_nowait().done.set()
+                except queue.Empty:
+                    break
+
+    # ---- main thread ----
+
+    def submit(self, job: Job):
+        if self.thread is None or not self.thread.is_alive():
+            self.stop = threading.Event()
+            self.thread = threading.Thread(target=self.run, args=(self.stop,),
+                                           name=f"side-browser-{self.name}", daemon=True)
+            self.thread.start()
+        self.jobs.put(job)
+
+    def cancel_current(self, reason: str, kind: str = "") -> "Job | None":
+        with self.lock:
+            job = self.current
+        if job is not None and (not kind or job.kind == kind):
+            job.request_cancel(reason)
+            return job
+        return None
+
+    def shutdown(self, timeout: float):
+        self.stop.set()
+        self.cancel_current("bot stopping")
+        self.cookie_request.clear()
+        t = self.thread
+        if t is not None and t.is_alive() and t is not threading.current_thread():
+            t.join(timeout)
+        self.thread = None
 
 
-def _request_cookies(job: Job) -> list:
-    stop = _shutdown
-    while not _cookie_reply.empty():
-        _cookie_reply.get_nowait()
-    _cookie_request.set()
-    try:
-        while True:
-            try:
-                return _cookie_reply.get(timeout=0.5)
-            except queue.Empty:
-                if job.cancel.is_set() or stop.is_set():
-                    return []
-                if not _cookie_request.is_set():
-                    return []
-    finally:
-        _cookie_request.clear()
+_lanes: "dict[str, _Lane]" = {}
+_lanes_lock = threading.Lock()
 
 
-def _worker(stop: threading.Event):
-    global _current
-    import browser
-    side = _Side()
-    try:
-        while not stop.is_set():
-            try:
-                job = _jobs.get(timeout=0.5)
-            except queue.Empty:
-                continue
-            with _lock:
-                _current = job
-            try:
-                job.fn(side, job)
-            except Exception as e:
-                # Jobs handle their own errors; this is a last-resort guard so
-                # one bad job can't kill the worker. A dead browser is torn down
-                # so the next job relaunches it.
-                print(f"[side_browser] job {job.kind} crashed: {e}")
-                if browser.is_lost_error(e):
-                    side.teardown()
-            finally:
-                with _lock:
-                    _current = None
-                job.done.set()
-    finally:
-        side.teardown()
-        # Anything still queued never ran — release whoever waits on it.
-        while True:
-            try:
-                _jobs.get_nowait().done.set()
-            except queue.Empty:
-                break
+def _lane(name: str) -> _Lane:
+    with _lanes_lock:
+        if name not in _lanes:
+            _lanes[name] = _Lane(name)
+        return _lanes[name]
 
 
-def submit(kind: str, fn, cookies: list, headless: bool = False,
-           preempt: bool = False) -> Job:
-    """Queue `fn(side, job)` to run on the worker thread. With preempt=True the
-    job currently running (if any) is asked to stop so this one starts next."""
-    global _thread, _shutdown
+def submit(lane: str, kind: str, fn, cookies: list, headless: bool = False) -> Job:
+    """Queue `fn(side, job)` to run on `lane`'s worker thread."""
     job = Job(kind, fn, cookies, headless)
-    if _thread is None or not _thread.is_alive():
-        _shutdown = threading.Event()
-        _thread = threading.Thread(target=_worker, args=(_shutdown,), name="side-browser", daemon=True)
-        _thread.start()
-    if preempt:
-        cancel_current(f"{kind} starting")
-    _jobs.put(job)
+    _lane(lane).submit(job)
     return job
 
 
-def current_kind() -> str:
-    with _lock:
-        return _current.kind if _current else ""
-
-
-def cancel_current(reason: str, kind: str = "") -> "Job | None":
-    """Ask the running job (optionally only if it is of `kind`) to stop."""
-    with _lock:
-        job = _current
-    if job is not None and (not kind or job.kind == kind):
-        job.request_cancel(reason)
-        return job
-    return None
+def cancel_current(lane: str, reason: str, kind: str = "") -> "Job | None":
+    """Ask the job running on `lane` (optionally only if it is of `kind`) to stop."""
+    return _lane(lane).cancel_current(reason, kind)
 
 
 def cookies_requested() -> bool:
-    return _cookie_request.is_set()
+    with _lanes_lock:
+        lanes = list(_lanes.values())
+    return any(l.cookie_request.is_set() for l in lanes)
 
 
 def provide_cookies(cookies: list):
-    try:
-        _cookie_reply.put_nowait(cookies)
-    except queue.Full:
-        pass
+    """Hand fresh cookies to every lane that asked for them."""
+    with _lanes_lock:
+        lanes = list(_lanes.values())
+    for l in lanes:
+        if l.cookie_request.is_set():
+            try:
+                l.cookie_reply.put_nowait(cookies)
+            except queue.Full:
+                pass
 
 
 def shutdown(timeout: float = 15.0):
-    """Stop the worker: cancel the running job, close the side browser, and
-    wait (up to `timeout`) for the thread to exit."""
-    global _thread
-    _shutdown.set()
-    cancel_current("bot stopping")
-    _cookie_request.clear()
-    t = _thread
-    if t is not None and t.is_alive() and t is not threading.current_thread():
-        t.join(timeout)
-    _thread = None
+    """Stop every lane: cancel running jobs, close the side browsers, and wait
+    (up to `timeout` each) for the threads to exit."""
+    with _lanes_lock:
+        lanes = list(_lanes.values())
+    for l in lanes:
+        l.stop.set()
+        l.cancel_current("bot stopping")
+    for l in lanes:
+        l.shutdown(timeout)

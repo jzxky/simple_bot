@@ -8,13 +8,14 @@ any other task (except consume) is ready; if so it yields, otherwise it retries 
 
 Separate-tab mode (config: aggravated_crimes.separate_tab): instead of running the crime
 loop inline on the main tab — which blocks every other task until it returns — this task
-hands the run to the side browser (side_browser.py): a separate patchright instance on its
-own thread. It opens a new tab there and runs the executor's crime routine (generator forms:
+hands the run to the side browser's "crime" lane (side_browser.py): a separate patchright
+instance on its own thread, independent of the top-job sniper's lane. It opens a new tab there and runs the executor's crime routine (generator forms:
 executor._do_crime_steps, _breaking_entering_steps, _armed_robbery_steps,
 _torch_business_steps) back to back with no gaps, exactly like inline mode, until the
 targets run out or there's a success/fail result; then it closes the tab. Between targets
 it re-checks the stop conditions (cancel, bot stop, jail, hospital, CS sentence, too many
-fails, energy/crime selection change, or a top-job snipe taking over the side browser).
+fails, energy/crime selection change, or — for armed robbery only, since a failed armed
+robbery can hospitalise the character — a top-job snipe starting).
 
 The run works on its own copy of the GameState so the side tab's page parses never
 overwrite the main tab's page_html/current_url; the relevant results (energy, money, jail,
@@ -95,7 +96,7 @@ class AggCrimeTask(Task):
         return None, 0
 
     def can_run(self, state: GameState) -> bool:
-        if state.agg_tab_active or state.snipe_active:
+        if state.agg_tab_active:
             return False
         if not state.logged_in or state.in_jail:
             return False
@@ -109,6 +110,10 @@ class AggCrimeTask(Task):
         crime, _ = self._pick_crime(state)
         if crime is None:
             return False
+        # A failed armed robbery can hospitalise the character, which would
+        # wreck a top-job snipe in progress. Other crimes run alongside it.
+        if crime == "armed" and state.snipe_active:
+            return False
         # Non-gangsters using armed robbery consume the action timer; skip if it's not free
         if crime == "armed" and "gangster" not in state.occupation.lower() and not state.action_available():
             return False
@@ -118,8 +123,6 @@ class AggCrimeTask(Task):
         reasons = []
         if state.agg_tab_active:
             reasons.append("Crime tab already running")
-        if state.snipe_active:
-            reasons.append("Snipe tab active")
         if not state.logged_in:
             reasons.append("Not logged in")
         if state.in_jail:
@@ -134,6 +137,8 @@ class AggCrimeTask(Task):
         crime, _ = self._pick_crime(state)
         if crime is None:
             reasons.append("No crime available")
+        elif crime == "armed" and state.snipe_active:
+            reasons.append("Top-job snipe active (armed robbery)")
         elif crime == "armed" and "gangster" not in state.occupation.lower() and not state.action_available():
             reasons.append("Action timer busy (armed robbery)")
         return reasons
@@ -234,7 +239,7 @@ class AggCrimeTask(Task):
         state.add_log(f"Agg Crimes: launching '{crime}' in the side browser.")
         headless = cfg.load().get("misc", {}).get("headless", False)
         self._job = side_browser.submit(
-            "agg",
+            "crime", f"agg:{crime}",
             lambda side, job: self._run_job(side, job, state, action, crime, threshold),
             cookies=browser.export_cookies(), headless=headless,
         )
@@ -310,10 +315,8 @@ class AggCrimeTask(Task):
         reason = "run finished"
         finished = False
         try:
-            if state.snipe_active:
-                # A snipe was queued while this run waited to start — it owns
-                # the side browser now.
-                reason = "snipe active"
+            if crime == "armed" and state.snipe_active:
+                reason = "top-job snipe active"
                 return
             pg = side.new_page(job)
             with browser.use_page(pg):
@@ -327,8 +330,8 @@ class AggCrimeTask(Task):
                         if job.cancel.is_set():
                             reason = job.cancel_reason or "stopped"
                             break
-                        if state.snipe_active:
-                            reason = "snipe starting"
+                        if crime == "armed" and state.snipe_active:
+                            reason = "top-job snipe started"
                             break
                         stop = self._stop_reason(shadow, crime, threshold)
                         if stop:
