@@ -1,0 +1,213 @@
+<!-- First-run setup overlay: shown when there are no game credentials in .env,
+     or config.json didn't exist when the bot launched. Submits to POST /setup. -->
+<div id="setup-overlay" class="setup-overlay" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+  <form class="setup-box" id="setup-form" onsubmit="submitSetup(event)" autocomplete="off">
+    <div class="setup-head">
+      <h2 id="setup-title">Welcome to OpenBot — quick setup</h2>
+      <p>No account or settings were found on this machine. Enter your game login and pick what the bot should do to get started. Everything here can be changed later in the main tabs.</p>
+    </div>
+
+    <div class="setup-body">
+
+      <!-- Game account (required) -->
+      <section class="setup-section setup-required">
+        <div class="setup-section-head"><h3>Game account</h3><span class="setup-badge">Required</span></div>
+        <div class="setup-section-body">
+          <label class="setup-field">Email
+            <input type="email" id="setup_email" value="{{ setup.email }}" placeholder="you@example.com" oninput="setupValidate()">
+          </label>
+          <label class="setup-field">Password
+            <input type="password" id="setup_password" value="{{ setup.password }}" placeholder="••••••••" oninput="setupValidate()">
+          </label>
+          <p class="setup-note setup-lock">Saved to the <code>.env</code> file on this machine only — never written to config.json.</p>
+        </div>
+      </section>
+
+      <div class="setup-grid">
+        <!-- Earns -->
+        <section class="setup-section{% if not setup.earns_enabled %} setup-off{% endif %}" id="setup-sec-earns">
+          <div class="setup-section-head"><h3>Earns</h3>
+            <label class="toggle-label"><input type="checkbox" id="setup_earns_enabled" {% if setup.earns_enabled %}checked{% endif %} onchange="setupToggle('setup-sec-earns', this)"><span class="toggle"></span></label></div>
+          <div class="setup-section-body setup-stack">
+            <label class="setup-field">Earn
+              <select id="setup_earn_type">
+                {% for cat, earns in setup_earns %}
+                <optgroup label="{{ cat }}">
+                  {% for v, l in earns %}<option value="{{ v }}" {% if setup.earn_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+                </optgroup>
+                {% endfor %}
+              </select>
+            </label>
+            <p class="setup-note">Mode: auto (every 30 min). Categories and planner are on the Earns tab.</p>
+          </div>
+        </section>
+
+        <!-- Actions -->
+        <section class="setup-section{% if not setup.action_enabled %} setup-off{% endif %}" id="setup-sec-actions">
+          <div class="setup-section-head"><h3>Actions</h3>
+            <label class="toggle-label"><input type="checkbox" id="setup_action_enabled" {% if setup.action_enabled %}checked{% endif %} onchange="setupToggle('setup-sec-actions', this)"><span class="toggle"></span></label></div>
+          <div class="setup-section-body setup-stack">
+            <label class="setup-field">Action
+              <select id="setup_action_type" onchange="setupActionChanged()">
+                {% for v, l in setup_actions %}<option value="{{ v }}" {% if setup.action_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="setup-field" id="setup_action_sub_wrap">Option
+              <select id="setup_action_sub" data-current="{{ setup.action_sub }}"></select>
+            </label>
+            <label class="setup-field" id="setup_action_fb_wrap">When finished, switch to
+              <select id="setup_action_fallback">
+                {% for v, l in setup_fallbacks %}<option value="{{ v }}" {% if setup.action_fallback == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <!-- Aggravated crimes -->
+        <section class="setup-section{% if not setup.agg_enabled %} setup-off{% endif %}" id="setup-sec-aggs">
+          <div class="setup-section-head"><h3>Aggravated crimes</h3>
+            <label class="toggle-label"><input type="checkbox" id="setup_agg_enabled" {% if setup.agg_enabled %}checked{% endif %} onchange="setupToggle('setup-sec-aggs', this)"><span class="toggle"></span></label></div>
+          <div class="setup-section-body setup-stack">
+            <label class="setup-field">Home city crime
+              <select id="setup_agg_crime" onchange="setupAggChanged()">
+                {% for v, l in setup_crimes %}<option value="{{ v }}" {% if setup.agg_crime == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="setup-field" id="setup_away_wrap">Away from home city crime
+              <select id="setup_away_crime">
+                {% for v, l in setup_crimes[:5] %}<option value="{{ v }}" {% if setup.away_crime == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="setup-field">Minimum energy before attempting (%)
+              <input type="number" id="setup_agg_threshold" min="1" max="100" value="{{ setup.agg_threshold }}">
+            </label>
+          </div>
+        </section>
+
+        <!-- Case work -->
+        <section class="setup-section{% if not setup.case_work_enabled %} setup-off{% endif %}" id="setup-sec-case">
+          <div class="setup-section-head"><h3>Case work</h3>
+            <label class="toggle-label"><input type="checkbox" id="setup_case_work_enabled" {% if setup.case_work_enabled %}checked{% endif %} onchange="setupToggle('setup-sec-case', this)"><span class="toggle"></span></label></div>
+          <div class="setup-section-body setup-stack">
+            <p class="setup-note">Works hospital, engineering, fire, banking and law cases for your current occupation with the default task lists. Fine-tune on the Case Work tab.</p>
+          </div>
+        </section>
+
+        <!-- Gym -->
+        <section class="setup-section{% if not setup.gym_enabled %} setup-off{% endif %}" id="setup-sec-gym">
+          <div class="setup-section-head"><h3>Gym</h3>
+            <label class="toggle-label"><input type="checkbox" id="setup_gym_enabled" {% if setup.gym_enabled %}checked{% endif %} onchange="setupToggle('setup-sec-gym', this)"><span class="toggle"></span></label></div>
+          <div class="setup-section-body setup-stack">
+            <label class="setup-field">Activity
+              <select id="setup_gym_activity">
+                {% for v, l in setup_gym %}<option value="{{ v }}" {% if setup.gym_activity == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="setup-check"><input type="checkbox" id="setup_gym_auto_travel" {% if setup.gym_auto_travel %}checked{% endif %}> Auto-travel to Chicago <span class="setup-muted">(requires vehicle)</span></label>
+          </div>
+        </section>
+
+        <!-- Casino -->
+        <section class="setup-section{% if not setup.casino_enabled %} setup-off{% endif %}" id="setup-sec-casino">
+          <div class="setup-section-head"><h3>Casino</h3>
+            <label class="toggle-label"><input type="checkbox" id="setup_casino_enabled" {% if setup.casino_enabled %}checked{% endif %} onchange="setupToggle('setup-sec-casino', this)"><span class="toggle"></span></label></div>
+          <div class="setup-section-body">
+            <label class="setup-field">Game
+              <select id="setup_casino_activity">
+                {% for v, l in setup_casino %}<option value="{{ v }}" {% if setup.casino_activity == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="setup-field">Bet $
+              <input type="number" id="setup_casino_bet_amount" min="100" max="99999" value="{{ setup.casino_bet_amount }}">
+            </label>
+            <label class="setup-check"><input type="checkbox" id="setup_casino_auto_travel" {% if setup.casino_auto_travel %}checked{% endif %}> Auto-travel to Beirut <span class="setup-muted">(requires vehicle)</span></label>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="setup-foot">
+      <label class="setup-check"><input type="checkbox" id="setup_start_now" checked> Start the bot when I'm done</label>
+      <span class="setup-spacer"></span>
+      <span class="setup-error" id="setup-error"></span>
+      <button type="submit" class="setup-btn" id="setup-save-btn" disabled>Save &amp; continue</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  const FALLBACK_TYPES = new Set(["career_training", "university", "training_centre"]);
+  const $ = id => document.getElementById(id);
+
+  window.setupToggle = function (secId, cb) {
+    $(secId).classList.toggle("setup-off", !cb.checked);
+  };
+
+  window.setupActionChanged = function () {
+    const type = $("setup_action_type").value;
+    const sub = $("setup_action_sub");
+    const opts = ((typeof ACTION_SUB_MAP !== "undefined" && ACTION_SUB_MAP[type]) || [])
+      .map(([v, l]) => (type === "university" && v === "") ? [v, "All degrees in order"] : [v, l]);
+    const current = sub.dataset.current || "";
+    sub.innerHTML = opts.map(([v, l]) =>
+      `<option value="${v}"${v === current ? " selected" : ""}>${l}</option>`).join("");
+    $("setup_action_sub_wrap").style.display = opts.length ? "" : "none";
+    $("setup_action_fb_wrap").style.display = FALLBACK_TYPES.has(type) ? "" : "none";
+  };
+
+  window.setupAggChanged = function () {
+    $("setup_away_wrap").style.display = $("setup_agg_crime").value === "hack" ? "" : "none";
+  };
+
+  window.setupValidate = function () {
+    const ok = $("setup_email").value.trim() !== "" && $("setup_password").value !== "";
+    $("setup-save-btn").disabled = !ok;
+    $("setup-error").textContent = ok ? "" : "Enter your email and password to continue";
+    return ok;
+  };
+
+  window.submitSetup = async function (ev) {
+    ev.preventDefault();
+    if (!setupValidate()) return;
+    const v = id => $(id).value;
+    const on = id => $(id).checked;
+    const typeWithSub = $("setup_action_sub_wrap").style.display !== "none";
+    const payload = {
+      email: v("setup_email").trim(), password: v("setup_password"),
+      earns_enabled: on("setup_earns_enabled"), earn_type: v("setup_earn_type"),
+      action_enabled: on("setup_action_enabled"), action_type: v("setup_action_type"),
+      action_sub: typeWithSub ? v("setup_action_sub") : "",
+      action_fallback: FALLBACK_TYPES.has(v("setup_action_type")) ? v("setup_action_fallback") : "",
+      agg_enabled: on("setup_agg_enabled"), agg_crime: v("setup_agg_crime"),
+      agg_threshold: v("setup_agg_threshold"), away_crime: v("setup_away_crime"),
+      case_work_enabled: on("setup_case_work_enabled"),
+      gym_enabled: on("setup_gym_enabled"), gym_activity: v("setup_gym_activity"),
+      gym_auto_travel: on("setup_gym_auto_travel"),
+      casino_enabled: on("setup_casino_enabled"), casino_activity: v("setup_casino_activity"),
+      casino_bet_amount: v("setup_casino_bet_amount"), casino_auto_travel: on("setup_casino_auto_travel"),
+      start_now: on("setup_start_now"),
+    };
+    const btn = $("setup-save-btn");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      const res = await fetch("/setup", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) throw new Error(data.error || `Save failed (${res.status})`);
+      location.reload();
+    } catch (e) {
+      $("setup-error").textContent = e.message;
+      btn.disabled = false;
+      btn.textContent = "Save & continue";
+    }
+  };
+
+  document.body.classList.add("setup-open");
+  setupActionChanged();
+  setupAggChanged();
+  setupValidate();
+})();
+</script>

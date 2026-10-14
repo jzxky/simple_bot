@@ -5,6 +5,9 @@ import paths
 
 CONFIG_PATH = os.path.join(paths.data_dir(), "config.json")
 ENV_PATH = os.path.join(paths.data_dir(), ".env")
+# Captured at import, before anything calls load() (which writes a default
+# config.json when none exists) — the UI uses it to detect a first run.
+CONFIG_EXISTED_AT_START = os.path.exists(CONFIG_PATH)
 
 DEFAULT_CONFIG = {
     "earns": {
@@ -346,6 +349,11 @@ def get_env_var(key: str, default: str = "") -> str:
                 if k.strip() == key:
                     return v.strip()
     return os.environ.get(key, default)
+
+
+def credentials_present() -> bool:
+    creds = _load_env()
+    return bool(creds["email"] and creds["password"])
 
 
 def save_env(email: str, password: str, pin_required: bool = None, pin: str = None):

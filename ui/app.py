@@ -93,13 +93,183 @@ def logout():
     return redirect(url_for("login"))
 
 
+# ---------------------------------------------------------------------------
+# First-run setup overlay
+# ---------------------------------------------------------------------------
+
+_setup_completed = False
+
+SETUP_ACTIONS = [
+    ("community_service", "Community Service"),
+    ("fire_duties", "Fire Duties"),
+    ("career_training", "Career Training"),
+    ("university", "University Training"),
+    ("training_centre", "Training Centre"),
+    ("drug_manufacturing", "Drug Manufacturing"),
+    ("dog_trains", "Dog Trains"),
+]
+SETUP_FALLBACKS = [
+    ("", "Nothing (stop actions)"),
+    ("community_service", "Community Service"),
+    ("drug_manufacturing", "Drug Manufacturing"),
+    ("dog_trains", "Dog Trains"),
+]
+SETUP_CRIMES = [
+    ("pickpocket", "Pickpocket"), ("mugging", "Mugging"), ("breaking", "Breaking & Entering"),
+    ("armed", "Armed Robbery"), ("torch", "Torch Business"), ("hack", "Hack Bank Account"),
+]
+SETUP_GYM = [("weights", "Hit the weights"), ("pool", "Do some lengths in the pool"),
+             ("treadmill", "Work the treadmill"), ("spa", "Have a spa/sauna")]
+SETUP_CASINO = [("slots", "Slots"), ("blackjack", "Blackjack")]
+
+
+def _needs_setup() -> bool:
+    """First run: no game credentials in .env, or config.json didn't exist
+    when the bot launched (and the setup form hasn't been completed since)."""
+    if not cfg.credentials_present():
+        return True
+    return not cfg.CONFIG_EXISTED_AT_START and not _setup_completed
+
+
+def _earn_catalog_grouped() -> list:
+    """[(category, [(schedule_value, label), ...]), ...] for the setup earn list."""
+    import json
+    catalog = []
+    for base in (paths.data_dir(), paths.resource_dir()):
+        path = os.path.join(base, "available_earns.json")
+        try:
+            with open(path, encoding="utf-8") as f:
+                catalog = json.load(f)
+            if catalog:
+                break
+        except Exception:
+            continue
+    groups = {}
+    for e in catalog:
+        if e.get("schedule_value") and e.get("label"):
+            groups.setdefault(e.get("category") or "Other", []).append((e["schedule_value"], e["label"]))
+    return list(groups.items()) or [("Hospital", [("surgeon", "Surgeon at local hospital")])]
+
+
+def _setup_prefill(c: dict) -> dict:
+    """Values the setup form starts with. A brand-new install gets earns and
+    actions on and everything else off; if config.json already existed (only
+    the credentials are missing) the current settings are shown."""
+    creds = cfg._load_env()
+    fresh = not cfg.CONFIG_EXISTED_AT_START
+    agg = c.get("aggravated_crimes", {})
+    action = c.get("action", {})
+    gym, casino = c.get("gym", {}), c.get("casino", {})
+    return {
+        "email": creds["email"],
+        "password": creds["password"],
+        "earns_enabled": True if fresh else c.get("earns", {}).get("enabled", True),
+        "earn_type": c.get("earns", {}).get("earn_type", "surgeon"),
+        "action_enabled": True if fresh else action.get("enabled", True),
+        "action_type": action.get("type", "community_service"),
+        "action_sub": action.get("sub_option", ""),
+        "action_fallback": action.get("fallback_action", "") if not fresh else "community_service",
+        "agg_enabled": False if fresh else agg.get("enabled", False),
+        "agg_crime": agg.get("primary", {}).get("crime", "hack"),
+        "agg_threshold": int(agg.get("primary", {}).get("energy_threshold", 60)),
+        "away_crime": agg.get("away_crime", {}).get("crime", "pickpocket"),
+        "case_work_enabled": False if fresh else c.get("case_work", {}).get("enabled", False),
+        "gym_enabled": False if fresh else gym.get("enabled", False),
+        "gym_activity": gym.get("activity", "weights"),
+        "gym_auto_travel": gym.get("auto_travel", False),
+        "casino_enabled": False if fresh else casino.get("enabled", False),
+        "casino_activity": casino.get("activity", "slots"),
+        "casino_bet_amount": int(casino.get("bet_amount", 100)),
+        "casino_auto_travel": casino.get("auto_travel", False),
+    }
+
+
+def _apply_setup(c: dict, data: dict) -> dict:
+    """Write the setup form's choices onto config dict `c` (credentials are
+    handled separately — they never go into config.json)."""
+    valid = lambda v, opts, default: v if v in [o[0] for o in opts] else default
+
+    earns = c.setdefault("earns", {})
+    earns["enabled"] = bool(data.get("earns_enabled"))
+    if data.get("earn_type"):
+        earns["earn_type"] = str(data["earn_type"])
+    earns["earn_mode"] = "auto"
+
+    action = c.setdefault("action", {})
+    action["enabled"] = bool(data.get("action_enabled"))
+    action["type"] = valid(data.get("action_type"), SETUP_ACTIONS, "community_service")
+    action["sub_option"] = str(data.get("action_sub") or "")
+    action["fallback_action"] = valid(data.get("action_fallback", ""), SETUP_FALLBACKS, "")
+    c.setdefault("away_action", {})["enabled"] = False
+
+    agg = c.setdefault("aggravated_crimes", {})
+    agg["enabled"] = bool(data.get("agg_enabled"))
+    agg.setdefault("primary", {})["crime"] = valid(data.get("agg_crime"), SETUP_CRIMES, "hack")
+    try:
+        threshold = float(data.get("agg_threshold", 60))
+    except (TypeError, ValueError):
+        threshold = 60.0
+    agg["primary"]["energy_threshold"] = max(1.0, min(100.0, threshold))
+    agg.setdefault("away_crime", {})["crime"] = valid(data.get("away_crime"), SETUP_CRIMES[:5], "pickpocket")
+
+    c.setdefault("case_work", {})["enabled"] = bool(data.get("case_work_enabled"))
+
+    gym = c.setdefault("gym", {})
+    gym["enabled"] = bool(data.get("gym_enabled"))
+    gym["activity"] = valid(data.get("gym_activity"), SETUP_GYM, "weights")
+    gym["auto_travel"] = bool(data.get("gym_auto_travel"))
+
+    casino = c.setdefault("casino", {})
+    casino["enabled"] = bool(data.get("casino_enabled"))
+    casino["activity"] = valid(data.get("casino_activity"), SETUP_CASINO, "slots")
+    try:
+        bet = int(data.get("casino_bet_amount", 100) or 100)
+    except (TypeError, ValueError):
+        bet = 100
+    casino["bet_amount"] = max(100, min(99999, bet))
+    casino["auto_travel"] = bool(data.get("casino_auto_travel"))
+    return c
+
+
+@app.route("/setup", methods=["POST"])
+def setup():
+    global _setup_completed
+    import settings_rev
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email", "")).strip()
+    password = str(data.get("password", ""))
+    if not email or not password:
+        return jsonify({"error": "Email and password are required."}), 400
+    if any(ch in email + password for ch in "\r\n"):
+        return jsonify({"error": "Email and password can't contain line breaks."}), 400
+
+    cfg.save_env(email, password)
+    c = cfg.load()
+    c.pop("credentials", None)
+    cfg.save(_apply_setup(c, data))
+    _setup_completed = True
+    settings_rev.bump()
+
+    if bot.is_running():
+        bot.request_reload()
+    elif data.get("start_now"):
+        bot.start()
+    return jsonify({"ok": True})
+
+
 @app.route("/")
 def index():
     c = cfg.load()
+    needs_setup = _needs_setup()
     return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS,
                            notif_defaults=cfg.DEFAULT_CONFIG["notifications"],
                            pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin(),
-                           app_version=_APP_VERSION, event_consumables=_ec_mod)
+                           app_version=_APP_VERSION, event_consumables=_ec_mod,
+                           setup=_setup_prefill(c) if needs_setup else None,
+                           setup_earns=_earn_catalog_grouped() if needs_setup else [],
+                           setup_actions=SETUP_ACTIONS, setup_fallbacks=SETUP_FALLBACKS,
+                           setup_crimes=SETUP_CRIMES, setup_gym=SETUP_GYM,
+                           setup_casino=SETUP_CASINO)
 
 
 def _merge_changed(target: dict, before: dict, after: dict):
