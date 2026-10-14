@@ -26,7 +26,12 @@ class TrainingCentreTask(Task):
         self.discipline = discipline
 
     def can_run(self, state: GameState) -> bool:
-        if not cfg.load().get("action", {}).get("enabled", False):
+        action_cfg = cfg.load().get("action", {})
+        if not action_cfg.get("enabled", False):
+            return False
+        # A fallback may have switched the action type; don't run again in the
+        # moment before the scheduler rebuilds without this task.
+        if action_cfg.get("type") != "training_centre":
             return False
         if not (state.logged_in and not state.in_jail and state.action_available()
                 and state.in_home_city() and not state.hold_action_timer):
@@ -35,8 +40,11 @@ class TrainingCentreTask(Task):
 
     def blocked_reasons(self, state):
         reasons = []
-        if not cfg.load().get("action", {}).get("enabled", False):
+        action_cfg = cfg.load().get("action", {})
+        if not action_cfg.get("enabled", False):
             reasons.append("Not enabled")
+        elif action_cfg.get("type") != "training_centre":
+            reasons.append("Action switched (fallback)")
         if not state.logged_in:
             reasons.append("Not logged in")
         if state.in_jail:

@@ -2110,7 +2110,12 @@ def _action_fallback(state: GameState, reason: str):
     else:
         c["action"]["enabled"] = False
         cfg.save(c)
+        import settings_rev; settings_rev.bump()
         state.add_log(f"{reason} — disabling actions.")
+    # Rebuild the scheduler so the old action task is dropped and the fallback
+    # one created — saving config alone doesn't change the running task list.
+    import bot as _bot
+    _bot.request_reload()
 
 
 def handle_career_training(action: Action, state: GameState):
@@ -2197,7 +2202,12 @@ def handle_university(action: Action, state: GameState):
         soup = BeautifulSoup(page.content(), "html.parser")
         select = soup.find("select", attrs={"name": "action"})
         if not select:
-            state.add_log("University: form not found.")
+            if _step == 0 and "university.asp" in browser.current_url():
+                # The university page renders no degree form once every
+                # degree has been completed.
+                _action_fallback(state, "University: no degree form (all degrees completed)")
+            else:
+                state.add_log("University: form not found.")
             return
         options = {opt.get("value", ""): opt.get_text(strip=True) for opt in select.find_all("option")}
 
