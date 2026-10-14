@@ -69,11 +69,13 @@ class SnipeTopJobTask(Task):
         state.add_log(f"SnipeTopJob: starting in side browser — targeting {top_job}, "
                       f"refreshing main.asp every {SNIPE_INTERVAL:g}s for up to 30 minutes.")
         headless = cfg.load().get("misc", {}).get("headless", False)
-        # preempt: a separate-tab crime run in the side browser stops at its next target.
+        # Runs in its own side-browser lane, alongside any crime run. An armed
+        # robbery run (which can hospitalise the character) sees snipe_active
+        # and stops at its next attempt.
         self._job = side_browser.submit(
-            "snipe",
+            "snipe", "snipe",
             lambda side, job: self._snipe_job(side, job, state, promo_url, top_job),
-            cookies=browser.export_cookies(), headless=headless, preempt=True,
+            cookies=browser.export_cookies(), headless=headless,
         )
 
     # ------------------------------------------------------------------
