@@ -5558,7 +5558,29 @@ function _gsSetMsg(id, text, kind) {
   el.className = "gs-msg" + (id === "gs-quit-result" ? " gs-quit-result" : "") + (kind ? " " + kind : "");
 }
 
+let _gsLawyers = [];   // usernames of living Lawyers from the player DB
+
+// Personal Lawyer selector: "None", every known lawyer, plus the current value
+// if it isn't in the player list (so loading never silently changes it).
+function _gsFillLawyers(current) {
+  const sel = document.getElementById("gs_lawyer");
+  if (!sel) return;
+  const opts = ['<option value="">None</option>'];
+  const names = new Set();
+  _gsLawyers.forEach(name => {
+    names.add(name.toLowerCase());
+    // Keep the game's spelling for the current lawyer so it stays selected.
+    const value = current && current.toLowerCase() === name.toLowerCase() ? current : name;
+    opts.push(`<option value="${escHtml(value)}">${escHtml(name)}</option>`);
+  });
+  if (current && !names.has(current.toLowerCase())) {
+    opts.splice(1, 0, `<option value="${escHtml(current)}">${escHtml(current)} (not a known lawyer)</option>`);
+  }
+  sel.innerHTML = opts.join("");
+}
+
 function _gsSetInputs(options) {
+  _gsFillLawyers(options ? options.lawyer || "" : "");
   GS_FIELDS.forEach(k => {
     const el = document.getElementById("gs_" + k);
     if (!el) return;
@@ -5588,6 +5610,7 @@ function gsLoad() {
       if (d.error) throw new Error(d.error);
       _gsOriginal = d.options || {};
       _gsWarnings = d.warnings || {};
+      _gsLawyers = d.lawyers || [];
       _gsSetInputs(_gsOriginal);
       _gsStamp();
       gsDirty();

@@ -217,7 +217,9 @@
               <h3>Options</h3>
               <div class="setting-row">
                 <label for="gs_lawyer">Personal Lawyer</label>
-                <input type="text" id="gs_lawyer" placeholder="Player name (blank = none)" style="width:200px" oninput="gsDirty()" disabled>
+                <select id="gs_lawyer" style="width:200px" onchange="gsDirty()" disabled>
+                  <option value="">None</option>
+                </select>
               </div>
               <div class="setting-row">
                 <label for="gs_fee">Case Fee ($)</label>
