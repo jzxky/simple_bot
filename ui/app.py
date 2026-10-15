@@ -1502,6 +1502,80 @@ def profile():
         return jsonify({"error": str(e)}), 500
 
 
+def _game_settings_warnings() -> dict:
+    """Extra warning lines for the Game Settings quit dialogs, based on what
+    the bot is configured to do."""
+    c = cfg.load()
+    action = c.get("action", {})
+    warnings = {}
+    action_labels = {"university": "University Training", "career_training": "Career Training"}
+    if action.get("enabled") and action.get("type") in action_labels:
+        warnings["training"] = (f"The bot's {action_labels[action['type']]} action is enabled — "
+                                "it will start again at the next action timer.")
+    career_users = []
+    if c.get("earns", {}).get("enabled"):
+        career_users.append("earns")
+    if c.get("case_work", {}).get("enabled"):
+        career_users.append("case work")
+    if career_users:
+        warnings["career"] = (f"Bot {' and '.join(career_users)} that depend on your occupation "
+                              "may stop working until you have a new career.")
+    return warnings
+
+
+def _int_or_blank(value) -> "str | None":
+    """Whole number >= 0 as a string, or "" for blank; None if invalid."""
+    text = str(value if value is not None else "").strip().replace(",", "")
+    if text == "":
+        return ""
+    return text if text.isdigit() else None
+
+
+@app.route("/game-options", methods=["GET"])
+def game_options_get():
+    if not bot.is_running():
+        return jsonify({"error": "Start the bot to load game settings."}), 400
+    try:
+        result = bot.request_game_settings("fetch_game_options")
+        result["warnings"] = _game_settings_warnings()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/game-options", methods=["POST"])
+def game_options_save():
+    if not bot.is_running():
+        return jsonify({"error": "Start the bot to save game settings."}), 400
+    data = request.get_json(silent=True) or {}
+    values = {"lawyer": str(data.get("lawyer", "")).strip()}
+    for key, label in (("fee", "Case Fee"), ("aggvalue", "Default Agg Value")):
+        v = _int_or_blank(data.get(key, ""))
+        if v is None:
+            return jsonify({"error": f"{label} must be a whole number."}), 400
+        values[key] = v
+    try:
+        return jsonify(bot.request_game_settings("save_game_options", values=values))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/game-options/quit", methods=["POST"])
+def game_options_quit():
+    if not bot.is_running():
+        return jsonify({"error": "Start the bot first."}), 400
+    data = request.get_json(silent=True) or {}
+    what = data.get("what")
+    if what not in ("career", "training", "crew"):
+        return jsonify({"error": "Unknown quit option."}), 400
+    if data.get("confirm") is not True:
+        return jsonify({"error": "Confirmation required."}), 400
+    try:
+        return jsonify(bot.request_game_settings("quit_game", what=what))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/navigate", methods=["POST"])
 def navigate():
     if not bot.is_running():
