@@ -5841,6 +5841,7 @@ def handle_fetch_respect(action: Action, state: GameState):
 # In-game settings (Status → Game Settings sub-tab)
 # ---------------------------------------------------------------------------
 
+PROFILE_PATH = "/profile/default.asp"
 GAME_OPTIONS_PATH = "/profile/options.asp"
 QUIT_JOB_PATH = "/profile/quitjob.asp"
 GAME_OPTION_FIELDS = {"lawyer": "Personallawyer", "fee": "fee", "aggvalue": "aggvalue"}
@@ -5873,12 +5874,38 @@ def _game_result_message(html: str) -> "tuple[bool | None, str]":
     return None, text[:300]
 
 
+def _open_game_options(state: GameState):
+    """Open options.asp. The game only serves it when it's reached from the
+    profile page, so visit /profile/default.asp first and follow its options
+    link (or, if that link isn't visible, load options.asp with the profile
+    page as the referrer)."""
+    _nav(_u(PROFILE_PATH), state)
+    if not _check_session(state):
+        raise RuntimeError("Session expired.")
+    page = browser.page()
+    link = page.locator("a[href*='options.asp']").first
+    if link.count() and link.is_visible():
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+            link.click()
+    else:
+        page.goto(_u(GAME_OPTIONS_PATH), wait_until="domcontentloaded",
+                  timeout=30000, referer=_u(PROFILE_PATH))
+    _refresh_state(state)
+    if not _check_session(state):
+        raise RuntimeError("Session expired.")
+    if "options.asp" not in browser.current_url():
+        raise RuntimeError(f"Options page didn't open (ended on {browser.current_url()}).")
+    html = page.content()
+    if all(v is None for v in _parse_game_options(html).values()):
+        success, message = _game_result_message(html)
+        raise RuntimeError(f"Game refused the options page: {message}" if message
+                           else "Options form not found on the page.")
+
+
 def handle_fetch_game_options(action: Action, state: GameState):
     result_q = action.params.get("result_queue")
     try:
-        _nav(_u(GAME_OPTIONS_PATH), state)
-        if not _check_session(state):
-            raise RuntimeError("Session expired.")
+        _open_game_options(state)
         options = _parse_game_options(browser.page().content())
         if all(v is None for v in options.values()):
             raise RuntimeError("Options form not found on the page.")
@@ -5892,19 +5919,17 @@ def handle_save_game_options(action: Action, state: GameState):
     result_q = action.params.get("result_queue")
     values = action.params.get("values", {})
     try:
-        _nav(_u(GAME_OPTIONS_PATH), state)
-        if not _check_session(state):
-            raise RuntimeError("Session expired.")
+        _open_game_options(state)
         page = browser.page()
         for key, name in GAME_OPTION_FIELDS.items():
             if key in values:
                 page.fill(f"#holder_content input[name='{name}']", str(values[key]))
-        page.click("#holder_content input[type='submit'][name='Submit']")
-        page.wait_for_load_state("domcontentloaded")
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+            page.click("#holder_content input[type='submit'][name='Submit']")
         _refresh_state(state)
         success, message = _game_result_message(page.content())
         # Read back what the game actually stored.
-        _nav(_u(GAME_OPTIONS_PATH), state)
+        _open_game_options(state)
         options = _parse_game_options(browser.page().content())
         changed = ", ".join(f"{k} {options.get(k)!r}" for k in values)
         state.add_log(f"Game options saved ({changed})" + (f" — {message}" if message else "."))
