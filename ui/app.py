@@ -1523,6 +1523,16 @@ def _game_settings_warnings() -> dict:
     return warnings
 
 
+def _known_lawyers() -> list:
+    """Living players whose occupation is Lawyer, from the player database —
+    choices for the Personal Lawyer selector."""
+    try:
+        import player_db
+        return player_db.get_active_players_by_occupation("Lawyer")
+    except Exception:
+        return []
+
+
 def _int_or_blank(value) -> "str | None":
     """Whole number >= 0 as a string, or "" for blank; None if invalid."""
     text = str(value if value is not None else "").strip().replace(",", "")
@@ -1538,6 +1548,7 @@ def game_options_get():
     try:
         result = bot.request_game_settings("fetch_game_options")
         result["warnings"] = _game_settings_warnings()
+        result["lawyers"] = _known_lawyers()
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

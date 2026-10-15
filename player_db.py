@@ -266,6 +266,22 @@ def get_all_players() -> list:
             con.close()
 
 
+def get_active_players_by_occupation(occupation: str) -> list:
+    """Usernames of living (active) players with this occupation."""
+    with _lock:
+        con = _conn()
+        try:
+            rows = con.execute(
+                """SELECT username FROM players
+                   WHERE active=1 AND LOWER(occupation)=LOWER(?)
+                   ORDER BY username COLLATE NOCASE""",
+                (occupation,),
+            ).fetchall()
+            return [r["username"] for r in rows]
+        finally:
+            con.close()
+
+
 def get_players_by_group(group_name: str) -> list:
     with _lock:
         con = _conn()
