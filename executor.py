@@ -5837,6 +5837,131 @@ def handle_fetch_respect(action: Action, state: GameState):
     _nav(_u("/main.asp"), state)
 
 
+# ---------------------------------------------------------------------------
+# In-game settings (Status → Game Settings sub-tab)
+# ---------------------------------------------------------------------------
+
+GAME_OPTIONS_PATH = "/profile/options.asp"
+QUIT_JOB_PATH = "/profile/quitjob.asp"
+GAME_OPTION_FIELDS = {"lawyer": "Personallawyer", "fee": "fee", "aggvalue": "aggvalue"}
+# Submit button value on quitjob.asp for each quit kind
+QUIT_BUTTONS = {"career": "Quit career", "training": "Quit study / training", "crew": "Leave crew"}
+
+
+def _parse_game_options(html: str) -> dict:
+    soup = BeautifulSoup(html, "html.parser")
+    root = soup.select_one("#holder_content") or soup
+    result = {}
+    for key, name in GAME_OPTION_FIELDS.items():
+        inp = root.find("input", attrs={"name": name})
+        result[key] = (inp.get("value") or "") if inp else None
+    return result
+
+
+def _game_result_message(html: str) -> "tuple[bool | None, str]":
+    """(success, message) from the page after a form submit — the usual
+    #success / #fail boxes, else the main content text."""
+    soup = BeautifulSoup(html, "html.parser")
+    ok = soup.find("div", id="success")
+    if ok:
+        return True, ok.get_text(" ", strip=True)
+    fail = soup.find("div", id="fail")
+    if fail:
+        return False, fail.get_text(" ", strip=True)
+    holder = soup.select_one("#holder_content")
+    text = holder.get_text(" ", strip=True) if holder else ""
+    return None, text[:300]
+
+
+def handle_fetch_game_options(action: Action, state: GameState):
+    result_q = action.params.get("result_queue")
+    try:
+        _nav(_u(GAME_OPTIONS_PATH), state)
+        if not _check_session(state):
+            raise RuntimeError("Session expired.")
+        options = _parse_game_options(browser.page().content())
+        if all(v is None for v in options.values()):
+            raise RuntimeError("Options form not found on the page.")
+        result_q.put({"options": options})
+    except Exception as e:
+        result_q.put(e)
+        raise
+
+
+def handle_save_game_options(action: Action, state: GameState):
+    result_q = action.params.get("result_queue")
+    values = action.params.get("values", {})
+    try:
+        _nav(_u(GAME_OPTIONS_PATH), state)
+        if not _check_session(state):
+            raise RuntimeError("Session expired.")
+        page = browser.page()
+        for key, name in GAME_OPTION_FIELDS.items():
+            if key in values:
+                page.fill(f"#holder_content input[name='{name}']", str(values[key]))
+        page.click("#holder_content input[type='submit'][name='Submit']")
+        page.wait_for_load_state("domcontentloaded")
+        _refresh_state(state)
+        success, message = _game_result_message(page.content())
+        # Read back what the game actually stored.
+        _nav(_u(GAME_OPTIONS_PATH), state)
+        options = _parse_game_options(browser.page().content())
+        changed = ", ".join(f"{k} {options.get(k)!r}" for k in values)
+        state.add_log(f"Game options saved ({changed})" + (f" — {message}" if message else "."))
+        result_q.put({"options": options, "success": success, "message": message})
+    except Exception as e:
+        result_q.put(e)
+        raise
+
+
+def handle_quit_game(action: Action, state: GameState):
+    """Quit career / study-training / crew on quitjob.asp. The page nests its
+    <form>s inside a table, so in the DOM each form is empty and the selects and
+    buttons aren't its descendants — the browser still ties each button to its
+    form, so clicking the real button submits correctly. If a button has no
+    form owner at all, the nearest preceding form is submitted directly."""
+    result_q = action.params.get("result_queue")
+    what = action.params.get("what", "")
+    try:
+        button_value = QUIT_BUTTONS[what]
+        _nav(_u(QUIT_JOB_PATH), state)
+        if not _check_session(state):
+            raise RuntimeError("Session expired.")
+        page = browser.page()
+        button = page.locator(f"input[type='submit'][value='{button_value}']")
+        if button.count() == 0:
+            raise RuntimeError(f"'{button_value}' button not found on the page.")
+        # The quitoption select sits just before its button in the same cell.
+        select = button.locator("xpath=preceding::select[@name='quitoption'][1]")
+        select.select_option("yes")
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+            if button.evaluate("b => !!b.form"):
+                button.click()
+            else:
+                # No form owner (forms left empty in the markup): submit the
+                # nearest preceding form ourselves with quitoption=yes.
+                submitted = button.evaluate("""b => {
+                    const forms = [...document.querySelectorAll("form")]
+                        .filter(f => f.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+                    const form = forms[forms.length - 1];
+                    if (!form) return false;
+                    const opt = document.createElement("input");
+                    opt.type = "hidden"; opt.name = "quitoption"; opt.value = "yes";
+                    form.appendChild(opt);
+                    form.submit();
+                    return true;
+                }""")
+                if not submitted:
+                    raise RuntimeError("Could not find the form for this option.")
+        _refresh_state(state)
+        success, message = _game_result_message(page.content())
+        state.add_log(f"{button_value}: {message or 'submitted.'}")
+        result_q.put({"success": success, "message": message})
+    except Exception as e:
+        result_q.put(e)
+        raise
+
+
 def handle_fetch_profile(action: Action, state: GameState):
     result_q = action.params.get("result_queue")
     try:
@@ -6547,6 +6672,9 @@ HANDLERS = {
     "travel": handle_travel,
     "fetch_respect": handle_fetch_respect,
     "fetch_profile": handle_fetch_profile,
+    "fetch_game_options": handle_fetch_game_options,
+    "save_game_options": handle_save_game_options,
+    "quit_game": handle_quit_game,
     "navigate": handle_navigate,
     "scrape_player": handle_scrape_player,
     "discover_skills": handle_discover_skills,

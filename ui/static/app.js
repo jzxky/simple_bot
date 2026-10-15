@@ -5535,3 +5535,144 @@ function commsSendNew() {
   }).catch(() => { btn.disabled = false; });
 }
 
+
+// ---------------------------------------------------------------------------
+// Status → Game Settings sub-tab (in-game options + quit career/study/crew)
+// ---------------------------------------------------------------------------
+
+const GS_FIELDS = ["lawyer", "fee", "aggvalue"];
+const GS_QUIT = {
+  career:   { title: "Quit career?",            text: "You'll lose your current legitimate career. This can't be undone from the bot.",          btn: "Yes, quit career" },
+  training: { title: "Quit study / training?",  text: "All degree progress and police, army or customs training (including role-change training) will be reset.", btn: "Yes, quit studying" },
+  crew:     { title: "Leave crew?",             text: "Your family may look on this unfavourably. Made men can't leave this way.",               btn: "Yes, leave crew" },
+};
+let _gsOriginal = null;   // last values loaded from / confirmed by the game
+let _gsWarnings = {};
+let _gsBusy = false;
+let _gsPendingQuit = null;
+
+function _gsSetMsg(id, text, kind) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "gs-msg" + (id === "gs-quit-result" ? " gs-quit-result" : "") + (kind ? " " + kind : "");
+}
+
+function _gsSetInputs(options) {
+  GS_FIELDS.forEach(k => {
+    const el = document.getElementById("gs_" + k);
+    if (!el) return;
+    el.value = options && options[k] != null ? options[k] : "";
+    el.disabled = !options;
+  });
+}
+
+function _gsStamp() {
+  const el = document.getElementById("gs-updated");
+  if (el) el.textContent = "Loaded from game at " + new Date().toLocaleTimeString();
+}
+
+function gsOpen() {
+  if (_gsOriginal === null && !_gsBusy) gsLoad();
+}
+
+function gsLoad() {
+  if (_gsBusy) return;
+  _gsBusy = true;
+  const updated = document.getElementById("gs-updated");
+  if (updated) updated.textContent = "Loading from game…";
+  _gsSetMsg("gs-msg", "");
+  fetch("/game-options")
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) throw new Error(d.error);
+      _gsOriginal = d.options || {};
+      _gsWarnings = d.warnings || {};
+      _gsSetInputs(_gsOriginal);
+      _gsStamp();
+      gsDirty();
+    })
+    .catch(e => {
+      if (updated) updated.textContent = "Not loaded";
+      _gsSetMsg("gs-msg", e.message, "err");
+    })
+    .finally(() => { _gsBusy = false; });
+}
+
+function _gsChanged() {
+  if (!_gsOriginal) return false;
+  return GS_FIELDS.some(k => (document.getElementById("gs_" + k).value || "") !== (_gsOriginal[k] || ""));
+}
+
+function gsDirty() {
+  const changed = _gsChanged();
+  document.getElementById("gs-save").disabled = !changed || _gsBusy;
+  document.getElementById("gs-revert").disabled = !changed || _gsBusy;
+  if (changed) _gsSetMsg("gs-msg", "Unsaved changes");
+  else if (document.getElementById("gs-msg").textContent === "Unsaved changes") _gsSetMsg("gs-msg", "");
+}
+
+function gsRevert() {
+  _gsSetInputs(_gsOriginal);
+  gsDirty();
+}
+
+function gsSave() {
+  if (_gsBusy || !_gsChanged()) return;
+  const body = {};
+  GS_FIELDS.forEach(k => { body[k] = document.getElementById("gs_" + k).value; });
+  _gsBusy = true;
+  document.getElementById("gs-save").disabled = true;
+  document.getElementById("gs-revert").disabled = true;
+  _gsSetMsg("gs-msg", "Saving to game…");
+  fetch("/game-options", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) throw new Error(d.error);
+      _gsOriginal = d.options || body;
+      _gsSetInputs(_gsOriginal);
+      _gsStamp();
+      const kind = d.success === false ? "err" : "ok";
+      _gsSetMsg("gs-msg", d.message ? "Game: " + d.message : "Saved.", kind);
+    })
+    .catch(e => _gsSetMsg("gs-msg", e.message, "err"))
+    .finally(() => {
+      _gsBusy = false;
+      if (_gsChanged()) gsDirty();
+    });
+}
+
+function gsAskQuit(what) {
+  const q = GS_QUIT[what];
+  if (!q) return;
+  _gsPendingQuit = what;
+  document.getElementById("gs-confirm-title").textContent = q.title;
+  document.getElementById("gs-confirm-text").textContent = q.text;
+  const warn = document.getElementById("gs-confirm-warning");
+  warn.textContent = _gsWarnings[what] || "";
+  warn.style.display = _gsWarnings[what] ? "" : "none";
+  const btn = document.getElementById("gs-confirm-btn");
+  btn.textContent = q.btn;
+  btn.disabled = false;
+  document.getElementById("gs-confirm").classList.add("active");
+}
+
+function gsCloseQuit() {
+  document.getElementById("gs-confirm").classList.remove("active");
+  _gsPendingQuit = null;
+}
+
+function gsDoQuit() {
+  const what = _gsPendingQuit;
+  if (!what) return;
+  document.getElementById("gs-confirm-btn").disabled = true;
+  gsCloseQuit();
+  _gsSetMsg("gs-quit-result", "Sending to game…");
+  fetch("/game-options/quit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ what, confirm: true }) })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) throw new Error(d.error);
+      _gsSetMsg("gs-quit-result", "Game: " + (d.message || "submitted."), d.success === false ? "err" : "ok");
+    })
+    .catch(e => _gsSetMsg("gs-quit-result", e.message, "err"));
+}

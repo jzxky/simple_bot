@@ -132,6 +132,8 @@ _respect_refresh_queue: queue.Queue = queue.Queue()
 _ws_monitor_queue: queue.Queue = queue.Queue()
 _profile_request: queue.Queue = queue.Queue(maxsize=1)
 _profile_result: queue.Queue = queue.Queue(maxsize=1)
+_game_settings_request: queue.Queue = queue.Queue(maxsize=1)
+_game_settings_result: queue.Queue = queue.Queue(maxsize=1)
 _navigate_queue: queue.Queue = queue.Queue()
 _repair_vehicle_queue: queue.Queue = queue.Queue()
 _skill_queue: queue.Queue = queue.Queue()
@@ -673,6 +675,16 @@ def _run(c: dict):
                 except Exception as e:
                     _profile_result.put(e)
 
+            # Game Settings sub-tab requests (fetch / save options, quit) from the Flask thread
+            if not _game_settings_request.empty():
+                try:
+                    kind, params = _game_settings_request.get_nowait()
+                    result_q = queue.Queue()
+                    executor.execute(Action(kind, result_queue=result_q, **params), state)
+                    _game_settings_result.put(result_q.get(timeout=30))
+                except Exception as e:
+                    _game_settings_result.put(e)
+
             # Bulk-add laundering contacts if requested from UI
             if not _bulk_launder_queue.empty():
                 try:
@@ -1008,6 +1020,18 @@ def request_profile(timeout: float = 30.0) -> dict:
         _profile_result.get_nowait()
     _profile_request.put(True)
     result = _profile_result.get(timeout=timeout)
+    if isinstance(result, Exception):
+        raise result
+    return result
+
+
+def request_game_settings(kind: str, timeout: float = 45.0, **params) -> dict:
+    """Run a Game Settings action ("fetch_game_options", "save_game_options",
+    "quit_game") on the bot thread and return its result dict."""
+    while not _game_settings_result.empty():
+        _game_settings_result.get_nowait()
+    _game_settings_request.put((kind, params), timeout=5)
+    result = _game_settings_result.get(timeout=timeout)
     if isinstance(result, Exception):
         raise result
     return result

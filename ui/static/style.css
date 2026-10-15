@@ -1912,3 +1912,24 @@ body.setup-open { overflow: hidden; }
   .setup-box { border-radius: 0; min-height: 100vh; }
   .setup-head, .setup-body, .setup-foot { padding-left: 16px; padding-right: 16px; }
 }
+
+
+/* ---- Status → Game Settings sub-tab ---- */
+.gs-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.gs-updated { font-size: 0.75rem; color: var(--muted); }
+.gs-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 10px; flex-wrap: wrap; }
+.gs-msg { font-size: 0.8rem; color: var(--muted); margin-right: auto; }
+.gs-msg.ok { color: var(--success); }
+.gs-msg.err { color: var(--red); }
+.gs-quit-result { margin-top: 8px; }
+.gs-save { background: var(--accent); color: var(--bg); }
+.gs-save:hover:not(:disabled) { background: var(--accent-hover); }
+.gs-save:disabled { background: #3a4a62; color: var(--muted); cursor: not-allowed; }
+.gs-quit-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.gs-quit-row:last-of-type { border-bottom: none; }
+.gs-quit-title { font-size: 0.9rem; color: var(--text); }
+.gs-quit-note { font-size: 0.78rem; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.gs-quit-row .btn-danger { flex-shrink: 0; white-space: nowrap; }
+.gs-confirm-text { font-size: 0.85rem; color: var(--muted); line-height: 1.45; margin: 0; }
+.gs-confirm-warning { font-size: 0.82rem; color: #e0b050; line-height: 1.45; margin: 0; padding: 8px 10px; border: 1px solid #6b5a2a; border-radius: var(--radius); background: rgba(200, 168, 75, 0.08); }
+.gs-actions .btn-secondary:disabled { opacity: .45; cursor: not-allowed; }
