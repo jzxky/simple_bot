@@ -173,6 +173,7 @@
           </div>
         </div>
         <div id="status-profile" class="tab-panel">
+          <div id="profile-sale-msg" class="profile-sale-msg" hidden></div>
           <div id="profile-content" class="profile-refreshing">
             <div class="stats-grid">
               <div class="stat-item"><span class="stat-label">Username</span><span class="stat-value">--</span></div>
@@ -2495,22 +2496,27 @@
   </div>
 </div>
 
-<!-- Weapon action overlay -->
-<div id="weapon-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeWeaponOverlay()">
-  <div class="pl-modal-box">
-    <h3 id="weapon-overlay-title" style="margin:0 0 8px"></h3>
-    <div id="weapon-overlay-body" style="display:flex;flex-direction:column;gap:8px;"></div>
-    <div style="margin-top:8px"><button class="action-btn" onclick="closeWeaponOverlay()">Close</button></div>
-  </div>
-</div>
-
-<!-- Vehicle action overlay -->
-<div id="vehicle-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeVehicleOverlay()">
-  <div class="pl-modal-box">
-    <h3 id="vehicle-overlay-title" style="margin:0 0 8px"></h3>
-    <div id="vehicle-overlay-body" style="display:flex;flex-direction:column;gap:8px;"></div>
-    <div style="margin-top:8px"><button class="action-btn" onclick="closeVehicleOverlay()">Close</button></div>
-  </div>
+<!-- Weapon / vehicle sale dialog -->
+<div id="sell-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeSellOverlay()">
+  <form class="pl-modal-box sell-modal" onsubmit="submitSell(event)" autocomplete="off">
+    <h3 id="sell-overlay-title"></h3>
+    <div class="sell-field">
+      <label for="sell-buyer">Buyer</label>
+      <input id="sell-buyer" type="text" placeholder="Start typing a player name" oninput="sellBuyerInput()" onkeydown="sellBuyerKey(event)" onblur="setTimeout(sellHideAc, 120)">
+      <div id="sell-ac" class="sell-ac" hidden></div>
+      <div id="sell-buyer-hint" class="sell-hint"></div>
+    </div>
+    <div class="sell-field">
+      <label for="sell-price">Price</label>
+      <input id="sell-price" type="text" inputmode="numeric" placeholder="e.g. 250k or 250,000" oninput="sellValidate()">
+      <div id="sell-price-hint" class="sell-hint"></div>
+    </div>
+    <div id="sell-confirm" class="sell-hint"></div>
+    <div class="sell-actions">
+      <button type="button" class="btn-secondary" onclick="closeSellOverlay()">Cancel</button>
+      <button type="submit" class="action-btn" id="sell-submit" disabled>Sell</button>
+    </div>
+  </form>
 </div>
 
 <!-- Vehicle repair overlay -->

@@ -2,6 +2,7 @@
 Flask web UI for bot configuration and control.
 """
 
+import re
 import sys
 import os
 import subprocess
@@ -1603,6 +1604,82 @@ def navigate():
         return jsonify({"error": "url is required"}), 400
     bot.request_navigate(url)
     return jsonify({"ok": True})
+
+
+def _sale_buyer_and_price(data: dict):
+    """Validated (buyer, price) from a sale request, or (None, error message).
+    The buyer must be a living player in the database; returns their exact name."""
+    import player_db as _db
+    name = (data.get("buyer") or "").strip().lower()
+    buyer = next((p["username"] for p in _db.get_active_player_names()
+                  if p["username"].lower() == name), None)
+    if not buyer:
+        return None, "Buyer is not a living player in the player database."
+    price = _int_or_blank(data.get("price"))
+    if not price or int(price) <= 0:
+        return None, "Price must be a whole number above 0."
+    return (buyer, int(price)), None
+
+
+def _run_item_sale(kind: str, **params):
+    try:
+        return jsonify(bot.request_item_sale(kind, **params))
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e) or "The request failed — see the log."}), 500
+
+
+@app.route("/sell_weapon", methods=["POST"])
+def sell_weapon_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    weapon = (data.get("weapon") or "").strip()
+    if not re.fullmatch(r"/weapons\.asp\?action=sell[a-z]*", url) or not weapon:
+        return jsonify({"ok": False, "message": "Unknown weapon — refresh the profile."}), 400
+    parsed, err = _sale_buyer_and_price(data)
+    if err:
+        return jsonify({"ok": False, "message": err}), 400
+    buyer, price = parsed
+    return _run_item_sale("sell_weapon", url=url, weapon=weapon, buyer=buyer, price=price)
+
+
+@app.route("/cancel_weapon_sale", methods=["POST"])
+def cancel_weapon_sale_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    return _run_item_sale("cancel_weapon_sale")
+
+
+@app.route("/sell_vehicle", methods=["POST"])
+def sell_vehicle_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    vid = str(data.get("vehicle_id") or "").strip()
+    vehicle = (data.get("vehicle") or "").strip()
+    if not vid.isdigit() or not vehicle:
+        return jsonify({"ok": False, "message": "Unknown vehicle — refresh the profile."}), 400
+    parsed, err = _sale_buyer_and_price(data)
+    if err:
+        return jsonify({"ok": False, "message": err}), 400
+    buyer, price = parsed
+    return _run_item_sale("sell_vehicle", vehicle_id=vid, vehicle=vehicle, buyer=buyer, price=price)
+
+
+@app.route("/api/item_image/<key>")
+def api_item_image(key):
+    import item_images as _ii
+    path = _ii.path_for_key(key)
+    if not path:
+        abort(404)
+    return send_file(path)
+
+
+@app.route("/api/players/names")
+def api_player_names():
+    import player_db as _db
+    return jsonify({"players": _db.get_active_player_names()})
 
 
 @app.route("/repair_vehicle", methods=["POST"])

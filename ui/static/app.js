@@ -938,47 +938,146 @@ function closeRespectOverlay() {
 }
 
 // ---------------------------------------------------------------------------
-// Weapon action overlay
+// Weapon / vehicle sale dialog (buyer autocomplete from the player database)
 // ---------------------------------------------------------------------------
 
-function openWeaponOverlay(el) {
-  const name = el.dataset.wname || "";
-  const slot = el.dataset.wslot || "";
-  const dur = el.dataset.wdur || "";
-  const actions = JSON.parse(el.dataset.wactions || "[]");
-  document.getElementById("weapon-overlay-title").textContent = name + (slot ? " (" + slot + ")" : "");
-  const body = document.getElementById("weapon-overlay-body");
-  body.innerHTML = dur ? `<span class="muted">${escHtml(dur)}</span>` : "";
-  actions.forEach(a => {
-    const btn = document.createElement("button");
-    btn.className = "action-btn";
-    btn.textContent = a.label;
-    btn.onclick = () => { closeWeaponOverlay(); navigateTo(a.url); loadProfile(); };
-    body.appendChild(btn);
-  });
-  document.getElementById("weapon-overlay").classList.add("active");
-}
-function closeWeaponOverlay() {
-  document.getElementById("weapon-overlay").classList.remove("active");
+let _sellCtx = null;          // {kind: "weapon"|"vehicle", name, url?, id?}
+let _sellPlayers = [];        // [{username, rank, homecity}]
+let _sellPlayersAt = 0;
+let _sellAcIdx = -1;
+
+function _loadSellPlayers() {
+  if (_sellPlayers.length && Date.now() - _sellPlayersAt < 5 * 60 * 1000) return;
+  fetch("/api/players/names")
+    .then(r => r.json())
+    .then(d => { _sellPlayers = d.players || []; _sellPlayersAt = Date.now(); sellValidate(); })
+    .catch(() => {});
 }
 
-function openVehicleOverlay(el) {
-  const name = el.dataset.vname || "";
-  const actions = JSON.parse(el.dataset.vactions || "[]");
-  document.getElementById("vehicle-overlay-title").textContent = name;
-  const body = document.getElementById("vehicle-overlay-body");
-  body.innerHTML = "";
-  actions.forEach(a => {
-    const btn = document.createElement("button");
-    btn.className = "action-btn";
-    btn.textContent = a.label;
-    btn.onclick = () => { closeVehicleOverlay(); navigateTo(a.url); loadProfile(); };
-    body.appendChild(btn);
-  });
-  document.getElementById("vehicle-overlay").classList.add("active");
+function _parseSellPrice(s) {
+  const m = String(s || "").trim().toLowerCase().replace(/[$,\s]/g, "").match(/^(\d+(?:\.\d+)?)([km]?)$/);
+  if (!m) return null;
+  const n = Math.round(parseFloat(m[1]) * (m[2] === "k" ? 1e3 : m[2] === "m" ? 1e6 : 1));
+  return n > 0 ? n : null;
 }
-function closeVehicleOverlay() {
-  document.getElementById("vehicle-overlay").classList.remove("active");
+
+function _sellBuyerMatch() {
+  const v = document.getElementById("sell-buyer").value.trim().toLowerCase();
+  return v ? _sellPlayers.find(p => p.username.toLowerCase() === v) || null : null;
+}
+
+function _setSellHint(id, text, kind) {
+  const el = document.getElementById(id);
+  el.textContent = text || " ";
+  el.className = "sell-hint" + (kind ? " " + kind : "");
+}
+
+function sellValidate() {
+  if (!_sellCtx) return;
+  const buyerEl = document.getElementById("sell-buyer");
+  const priceEl = document.getElementById("sell-price");
+  const p = _sellBuyerMatch();
+  const n = _parseSellPrice(priceEl.value);
+  if (!buyerEl.value.trim()) _setSellHint("sell-buyer-hint", "Must be a living player in the player database.", "");
+  else if (p) _setSellHint("sell-buyer-hint", `✓ ${p.username}${p.rank ? " · " + p.rank : ""}${p.homecity ? " · " + p.homecity : ""}`, "good");
+  else _setSellHint("sell-buyer-hint", "Not found in the player database.", "bad");
+  if (!priceEl.value.trim()) _setSellHint("sell-price-hint", "", "");
+  else if (n) _setSellHint("sell-price-hint", "$" + n.toLocaleString("en-US"), "good");
+  else _setSellHint("sell-price-hint", "Enter an amount above 0 (250000, 250k, 1.5m).", "bad");
+  buyerEl.classList.toggle("input-good", !!p);
+  buyerEl.classList.toggle("input-bad", !!buyerEl.value.trim() && !p);
+  priceEl.classList.toggle("input-good", !!n);
+  priceEl.classList.toggle("input-bad", !!priceEl.value.trim() && !n);
+  _setSellHint("sell-confirm", p && n ? `Sell ${_sellCtx.name} to ${p.username} for $${n.toLocaleString("en-US")}?` : "", "");
+  document.getElementById("sell-submit").disabled = !(p && n);
+}
+
+function _renderSellAc() {
+  const ac = document.getElementById("sell-ac");
+  const v = document.getElementById("sell-buyer").value.trim().toLowerCase();
+  const hits = v ? _sellPlayers.filter(p => p.username.toLowerCase().startsWith(v)).slice(0, 8) : [];
+  if (!hits.length || (hits.length === 1 && hits[0].username.toLowerCase() === v)) { ac.hidden = true; _sellAcIdx = -1; return; }
+  if (_sellAcIdx >= hits.length) _sellAcIdx = hits.length - 1;
+  ac.innerHTML = hits.map((p, i) =>
+    `<div class="sell-ac-item${i === _sellAcIdx ? " sel" : ""}" data-name="${escHtml(p.username)}" onmousedown="event.preventDefault();sellPickBuyer(this.dataset.name)">` +
+    `<span>${escHtml(p.username)}</span><small>${escHtml([p.rank, p.homecity].filter(Boolean).join(" · "))}</small></div>`
+  ).join("");
+  ac.hidden = false;
+}
+
+function sellPickBuyer(name) {
+  document.getElementById("sell-buyer").value = name;
+  document.getElementById("sell-ac").hidden = true;
+  _sellAcIdx = -1;
+  sellValidate();
+  document.getElementById("sell-price").focus();
+}
+
+function sellBuyerInput() { _sellAcIdx = -1; _renderSellAc(); sellValidate(); }
+
+function sellBuyerKey(e) {
+  const ac = document.getElementById("sell-ac");
+  const items = ac.hidden ? [] : ac.querySelectorAll(".sell-ac-item");
+  if (!items.length) return;
+  if (e.key === "ArrowDown") { _sellAcIdx = (_sellAcIdx + 1) % items.length; _renderSellAc(); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { _sellAcIdx = (_sellAcIdx - 1 + items.length) % items.length; _renderSellAc(); e.preventDefault(); }
+  else if ((e.key === "Enter" || e.key === "Tab") && _sellAcIdx >= 0) { sellPickBuyer(items[_sellAcIdx].dataset.name); e.preventDefault(); }
+  else if (e.key === "Escape") { ac.hidden = true; e.stopPropagation(); }
+}
+
+function sellHideAc() { document.getElementById("sell-ac").hidden = true; }
+
+function openSellOverlay(ctx) {
+  _sellCtx = ctx;
+  document.getElementById("sell-overlay-title").textContent = `Sell ${ctx.kind}: ${ctx.name}`;
+  document.getElementById("sell-buyer").value = "";
+  document.getElementById("sell-price").value = "";
+  document.getElementById("sell-ac").hidden = true;
+  document.getElementById("sell-submit").textContent = "Sell";
+  _loadSellPlayers();
+  sellValidate();
+  document.getElementById("sell-overlay").classList.add("active");
+  document.getElementById("sell-buyer").focus();
+}
+
+function closeSellOverlay() {
+  document.getElementById("sell-overlay").classList.remove("active");
+  _sellCtx = null;
+}
+
+function _showSaleResult(d) {
+  const el = document.getElementById("profile-sale-msg");
+  if (!el) return;
+  el.textContent = d.message || (d.ok ? "Done." : "Failed.");
+  el.className = "profile-sale-msg " + (d.ok ? "ok" : "bad");
+  el.hidden = false;
+}
+
+function _postSale(url, body) {
+  return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})})
+    .then(r => r.json())
+    .catch(e => ({ok: false, message: String(e)}))
+    .then(d => { _showSaleResult(d); loadProfile(); return d; });
+}
+
+function submitSell(e) {
+  e.preventDefault();
+  const p = _sellBuyerMatch();
+  const n = _parseSellPrice(document.getElementById("sell-price").value);
+  if (!_sellCtx || !p || !n) return;
+  const ctx = _sellCtx;
+  const btn = document.getElementById("sell-submit");
+  btn.disabled = true;
+  btn.textContent = "Selling…";
+  const req = ctx.kind === "weapon"
+    ? _postSale("/sell_weapon", {url: ctx.url, weapon: ctx.name, buyer: p.username, price: n})
+    : _postSale("/sell_vehicle", {vehicle_id: ctx.id, vehicle: ctx.name, buyer: p.username, price: n});
+  req.then(() => closeSellOverlay());
+}
+
+function cancelWeaponSales(btn) {
+  btn.disabled = true;
+  _postSale("/cancel_weapon_sale").then(() => { btn.disabled = false; });
 }
 
 function openRepairOverlay(condition) {
@@ -5274,9 +5373,40 @@ function loadProfile() {
     });
 }
 
+let _profileActions = [];
+
+function profileAction(i) {
+  const a = _profileActions[i];
+  if (!a) return;
+  if (a.type === "sell") openSellOverlay(a.ctx);
+  else if (a.type === "repair") openRepairOverlay(a.condition);
+  else { navigateTo(a.url); loadProfile(); }
+}
+
+function _profileBtn(label, action, cls) {
+  _profileActions.push(action);
+  return `<button class="profile-btn${cls ? " " + cls : ""}" onclick="profileAction(${_profileActions.length - 1})">${escHtml(label)}</button>`;
+}
+
+function _profileImg(key) {
+  const img = key ? `<img src="/api/item_image/${encodeURIComponent(key)}" alt="" onerror="this.remove()">` : "";
+  return `<div class="profile-item-img">${img}</div>`;
+}
+
+function _profileBar(pct, warn) {
+  if (pct == null || isNaN(pct)) return "";
+  const w = Math.max(0, Math.min(100, pct));
+  return `<div class="profile-bar"><i class="${warn ? "warn" : ""}" style="width:${w}%"></i></div>`;
+}
+
+function _profileSection(title, extra) {
+  return `<div class="profile-section-title profile-section-row"><span>${escHtml(title)}</span>${extra || ""}</div>`;
+}
+
 function _renderProfile(d) {
   const h = [];
-  const row = (label, val) => `<div class="stat-item"><span class="stat-label">${escHtml(label)}</span><span class="stat-value">${escHtml(val || "—")}</span></div>`;
+  _profileActions = [];
+  const row = (label, val) => `<div class="stat-item"><span class="stat-label">${escHtml(label)}</span><span class="stat-value">${escHtml(String(val || "—"))}</span></div>`;
 
   // Basic info
   h.push('<div class="stats-grid">');
@@ -5285,80 +5415,100 @@ function _renderProfile(d) {
   }
   h.push('</div>');
 
-  // Bionics
+  // Bionics — one slot per body part, installed vs empty
   if (d.bionics && d.bionics.length) {
-    h.push('<hr class="stat-divider"><div class="profile-section-title">Bionics</div>');
-    h.push('<div class="profile-tags">');
-    d.bionics.forEach(b => h.push(`<span class="profile-tag">${escHtml(b)}</span>`));
+    const n = d.bionics.filter(b => b.installed).length;
+    h.push('<hr class="stat-divider">');
+    h.push(_profileSection("Bionics", `<span class="profile-count">${n} of ${d.bionics.length} installed</span>`));
+    h.push('<div class="profile-bionics">');
+    d.bionics.forEach(b => {
+      const state = b.installed ? "Installed" : "Empty";
+      h.push(`<div class="profile-bionic ${b.installed ? "installed" : "empty"}" title="Bionic ${escHtml(b.slot)}: ${b.installed ? "installed" : "not installed"}">`);
+      h.push(_profileImg(b.img));
+      h.push(`<span class="profile-bionic-name">${escHtml(b.slot)}</span><span class="profile-bionic-chip">${state}</span></div>`);
+    });
     h.push('</div>');
   }
 
-  // Weapons — grouped by slot type, pill badges per group
-  if (d.weapons && d.weapons.length) {
-    h.push('<hr class="stat-divider"><div class="profile-section-title">Weapons</div>');
-    const wgroups = {"On Hand": [], "Stash": [], "Vault": []};
-    d.weapons.forEach(w => {
-      const s = (w.slot || "").toLowerCase();
-      if (s.includes("hand"))       wgroups["On Hand"].push(w);
-      else if (s.includes("stash")) wgroups["Stash"].push(w);
-      else                          wgroups["Vault"].push(w);
-    });
-    ["On Hand", "Stash", "Vault"].forEach(group => {
-      if (!wgroups[group].length) return;
-      h.push(`<div class="profile-weapon-group">${escHtml(group)}</div>`);
-      h.push('<div class="profile-tags">');
-      wgroups[group].forEach(w => {
-        const hasActions = group !== "Vault" && w.actions && w.actions.length;
-        if (hasActions) {
-          const actionsAttr = JSON.stringify(w.actions).replace(/'/g, "&#39;");
-          h.push(`<span class="profile-weapon-pill profile-item-clickable" data-wname="${escHtml(w.item||"")}" data-wslot="${escHtml(w.slot||"")}" data-wdur="${escHtml(w.durability||"")}" data-wactions='${actionsAttr}' onclick="openWeaponOverlay(this)">`);
-        } else {
-          h.push('<span class="profile-weapon-pill">');
-        }
-        h.push(`<span class="profile-slot">${escHtml(w.slot||"")}</span>`);
-        if (w.item) h.push(` <span class="profile-item-name">${escHtml(w.item)}</span>`);
-        if (w.durability) h.push(` <span class="muted">${escHtml(w.durability)}</span>`);
-        h.push('</span>');
-      });
+  // Weapons — grouped by slot type; Sell opens the sale dialog
+  h.push('<hr class="stat-divider">');
+  h.push(_profileSection("Weapons", `<button class="profile-btn danger" onclick="cancelWeaponSales(this)">Cancel sales</button>`));
+  const weapons = d.weapons || [];
+  if (!weapons.length) h.push('<div class="muted profile-empty">No weapons.</div>');
+  const wgroups = {"On Hand": [], "Stash": [], "Vault": []};
+  weapons.forEach(w => {
+    const s = (w.slot || "").toLowerCase();
+    if (s.includes("hand"))       wgroups["On Hand"].push(w);
+    else if (s.includes("stash")) wgroups["Stash"].push(w);
+    else                          wgroups["Vault"].push(w);
+  });
+  ["On Hand", "Stash", "Vault"].forEach(group => {
+    if (!wgroups[group].length) return;
+    h.push(`<div class="profile-weapon-group">${escHtml(group)}</div>`);
+    wgroups[group].forEach(w => {
+      const dm = String(w.durability || "").match(/(\d+)\s*\/\s*(\d+)/);
+      const pct = dm && +dm[2] ? (100 * +dm[1] / +dm[2]) : null;
+      h.push('<div class="profile-item-row">');
+      h.push(_profileImg(w.img));
+      h.push('<div class="profile-item-meta">');
+      h.push(`<span class="profile-item-name">${escHtml(w.item || "")}`);
+      if (w.slot) h.push(` <span class="profile-badge">${escHtml(w.slot)}</span>`);
+      if (w.serial) h.push(` <span class="profile-badge">#${escHtml(w.serial)}</span>`);
+      h.push('</span>');
+      if (w.durability) h.push(`<span class="muted">Durability ${escHtml(w.durability)}</span>${_profileBar(pct, pct != null && pct < 40)}`);
+      h.push('</div>');
+      if (group !== "Vault" && w.actions && w.actions.length) {
+        h.push('<div class="profile-item-actions">');
+        w.actions.forEach(a => {
+          if (a.label.toLowerCase() === "sell") {
+            h.push(_profileBtn("Sell", {type: "sell", ctx: {kind: "weapon", name: w.item || "", url: a.url}}, "primary"));
+          } else {
+            h.push(_profileBtn(a.label, {type: "nav", url: a.url}));
+          }
+        });
+        h.push('</div>');
+      }
       h.push('</div>');
     });
-  }
+  });
 
   // Vehicles
   if (d.vehicles && d.vehicles.length) {
-    h.push('<hr class="stat-divider"><div class="profile-section-title">Vehicles</div>');
+    h.push('<hr class="stat-divider">');
+    h.push(_profileSection(d.vehicles.length > 1 ? "Vehicles" : "Vehicle"));
     d.vehicles.forEach(v => {
-      const hasActions = v.actions && v.actions.length;
-      const actionsAttr = hasActions ? JSON.stringify(v.actions).replace(/'/g, "&#39;") : "[]";
-      h.push('<div class="stats-grid">');
-      if (v.Type) {
-        if (hasActions) {
-          h.push(`<div class="stat-item profile-item-clickable" data-vname="${escHtml(v.Type)}" data-vactions='${actionsAttr}' onclick="openVehicleOverlay(this)"><span class="stat-label">Type</span><span class="stat-value">${escHtml(v.Type)}</span></div>`);
+      const cm = String(v.Condition || "").match(/(\d+)%/);
+      const pct = cm ? +cm[1] : null;
+      const status = String(v.Condition || "").replace(/\s*\[\d+%\]\s*/, "").trim();
+      const bits = [status, pct != null ? pct + "%" : "", v.Location, v["Parking/security"] ? "Parking: " + v["Parking/security"] : ""].filter(Boolean);
+      h.push('<div class="profile-item-row">');
+      h.push(_profileImg(v.img));
+      h.push(`<div class="profile-item-meta"><span class="profile-item-name">${escHtml(v.Type)}</span>`);
+      h.push(`<span class="muted">${escHtml(bits.join(" · "))}</span>${_profileBar(pct, pct != null && pct < 60)}</div>`);
+      h.push('<div class="profile-item-actions">');
+      if (v.Condition) h.push(_profileBtn("Repair", {type: "repair", condition: v.Condition}));
+      (v.actions || []).forEach(a => {
+        if (a.label.toLowerCase() === "sell") {
+          if (v.id) h.push(_profileBtn("Sell", {type: "sell", ctx: {kind: "vehicle", name: v.Type, id: v.id}}, "primary"));
         } else {
-          h.push(row("Type", v.Type));
+          h.push(_profileBtn(a.label, {type: "nav", url: a.url}));
         }
-      }
-      if (v.Condition) {
-        h.push(`<div class="stat-item profile-item-clickable" onclick="openRepairOverlay('${escHtml(v.Condition)}')"><span class="stat-label">Condition</span><span class="stat-value">${escHtml(v.Condition)}</span></div>`);
-      }
-      for (const k of ["Location", "Parking/security"]) {
-        if (v[k]) h.push(row(k, v[k]));
-      }
-      h.push('</div>');
+      });
+      h.push('</div></div>');
     });
   }
 
   // Apartment
-  if (d.apartment && Object.keys(d.apartment).length) {
-    h.push('<hr class="stat-divider"><div class="profile-section-title">Apartment</div>');
-    h.push('<div class="stats-grid">');
-    for (const k of ["Apartment","Status","Storage"]) {
-      if (d.apartment[k]) h.push(row(k, d.apartment[k]));
-    }
+  if (d.apartment && d.apartment.Apartment) {
+    const a = d.apartment;
+    const bits = [a.Status, a.Storage ? "Storage: " + a.Storage : ""].filter(Boolean);
+    h.push('<hr class="stat-divider">');
+    h.push(_profileSection("Apartment"));
+    h.push('<div class="profile-item-row">');
+    h.push(_profileImg(a.img));
+    h.push(`<div class="profile-item-meta"><span class="profile-item-name">${escHtml(a.Apartment)}</span><span class="muted">${escHtml(bits.join(" · "))}</span></div>`);
+    if (a.action_url) h.push(`<div class="profile-item-actions">${_profileBtn(a.action_label || "Enter/Manage", {type: "nav", url: a.action_url})}</div>`);
     h.push('</div>');
-    if (d.apartment.action_url) {
-      h.push(`<div class="profile-nav-bar" style="margin-top:6px"><button class="action-btn" onclick="navigateTo('${escHtml(d.apartment.action_url)}')">${escHtml(d.apartment.action_label||"Enter/Manage")}</button></div>`);
-    }
   }
 
   // Pets
@@ -5376,11 +5526,12 @@ function _renderProfile(d) {
   // Businesses
   if (d.businesses && d.businesses.length) {
     h.push('<hr class="stat-divider"><div class="profile-section-title">Businesses</div>');
+    h.push('<div class="profile-tags">');
     d.businesses.forEach(b => {
-      h.push(`<div class="profile-item"><span class="profile-item-name">${escHtml(b.name)}</span>`);
-      if (b.next_restock && b.next_restock !== "N/A") h.push(` <span class="muted">restock: ${escHtml(b.next_restock)}</span>`);
-      h.push('</div>');
+      const restock = b.next_restock && b.next_restock !== "N/A" ? ` <span class="muted">· restock ${escHtml(b.next_restock)}</span>` : "";
+      h.push(`<span class="profile-tag">${escHtml(b.name)}${restock}</span>`);
     });
+    h.push('</div>');
   }
 
   // Misc

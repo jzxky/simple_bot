@@ -13,6 +13,8 @@ from bs4 import BeautifulSoup
 from tasks.base import Action
 from state import GameState, parse_state
 import browser
+import item_images
+from urllib.parse import quote, urljoin
 
 
 # Cooldown set when pre-travel warrant check finds unresolvable warrants.
@@ -6127,12 +6129,40 @@ def handle_quit_game(action: Action, state: GameState):
         raise
 
 
+_PROFILE_BIONIC_SLOTS = [("brain", "Brain"), ("eye", "Eyes"), ("heart", "Heart"),
+                         ("arms", "Arms"), ("legs", "Legs")]
+
+
+def _download_item_images(urls):
+    """Cache any profile item artwork not yet on disk (best-effort)."""
+    def _fetch(url):
+        try:
+            resp = browser.page().request.get(url, timeout=15000)
+            return resp.body() if resp.ok else None
+        except Exception:
+            return None
+    try:
+        item_images.download_missing(urls, _fetch)
+    except Exception as e:
+        print(f"[profile] Item image download error: {e}")
+
+
 def handle_fetch_profile(action: Action, state: GameState):
     result_q = action.params.get("result_queue")
     try:
         _nav(_u("/profile/default.asp"), state)
         soup = BeautifulSoup(browser.page().content(), "html.parser")
         result = {}
+        img_urls = []
+
+        def _img_key(img) -> str:
+            """Cache key for an <img>, remembering its URL for download."""
+            src = (img.get("src") if img else "") or ""
+            if not src:
+                return ""
+            url = urljoin(browser.current_url(), src)
+            img_urls.append(quote(url, safe=":/?&=%#"))
+            return item_images.key_for_url(url)
 
         info_table = soup.select_one("#account_profile table.item_table")
         if info_table:
@@ -6144,12 +6174,17 @@ def handle_fetch_profile(action: Action, state: GameState):
                     result[label] = value
 
         bionics = []
-        for div in soup.select("#account_bionics [id^='player_bionic']"):
+        for part, slot in _PROFILE_BIONIC_SLOTS:
+            div = soup.select_one(f"#account_bionics #player_bionic{part}")
+            if not div:
+                continue
             a = div.find("a", class_="title")
-            if a and a.get("title"):
-                name = a["title"].split("|")[0].replace(" installed", "").strip()
-                if name:
-                    bionics.append(name)
+            title = (a.get("title") if a else "") or ""
+            img = div.find("img")
+            src = (img.get("src") if img else "") or ""
+            installed = ("not installed" not in title.lower()
+                         and "blank_profile_box" not in src)
+            bionics.append({"slot": slot, "installed": installed, "img": _img_key(img)})
         result["bionics"] = bionics
 
         weapons = []
@@ -6160,7 +6195,12 @@ def handle_fetch_profile(action: Action, state: GameState):
                 w["slot"] = slot_div.get_text(strip=True)
             item_td = tbl.find("td", class_="item_content")
             if item_td:
-                w["item"] = item_td.get_text(strip=True)
+                b = item_td.find("b")
+                w["item"] = (b or item_td).get_text(strip=True)
+                serial = re.search(r"Serial:\s*#?(\d+)", item_td.get_text(" ", strip=True))
+                if serial:
+                    w["serial"] = serial.group(1)
+            w["img"] = _img_key(tbl.select_one("td[rowspan] img"))
             dur_div = tbl.select_one(".item_shots_content div")
             if dur_div:
                 w["durability"] = dur_div.get_text(strip=True)
@@ -6190,6 +6230,8 @@ def handle_fetch_profile(action: Action, state: GameState):
             if apt_link:
                 apt["action_url"] = apt_link.get("href", "")
                 apt["action_label"] = apt_link.get_text(strip=True)
+            if "Apartment:" in tbl.get_text() and tbl.select_one("td[rowspan] img"):
+                apt["img"] = _img_key(tbl.select_one("td[rowspan] img"))
         if apt:
             result["apartment"] = apt
 
@@ -6209,8 +6251,12 @@ def handle_fetch_profile(action: Action, state: GameState):
                             lbl = a.get_text(strip=True)
                             if href and lbl:
                                 actions.append({"label": lbl, "url": href})
+                            vid = re.search(r"[?&]id=(\d+)", href)
+                            if vid:
+                                v["id"] = vid.group(1)
                         v["actions"] = actions
             if v.get("Type"):
+                v["img"] = _img_key(tbl.select_one("td[rowspan] img"))
                 vehicles.append(v)
         result["vehicles"] = vehicles
 
@@ -6250,12 +6296,109 @@ def handle_fetch_profile(action: Action, state: GameState):
                     misc.append(text)
         result["misc"] = misc
 
+        _download_item_images(img_urls)
+
         if result_q is not None:
             result_q.put(result)
     except Exception as e:
         if result_q is not None:
             result_q.put(e)
         raise
+
+
+_SELL_FORM = "form:has(input[name='action'][value='sellconfirm'])"
+
+
+def _page_result_div(soup):
+    """First #success/#fail div that reports an action result — skips the
+    profile's own "You have no armours!"-style section placeholders."""
+    for div in soup.find_all("div", id=["success", "fail"]):
+        if div.find_parent(class_=re.compile(r"^show")):
+            continue
+        return div
+    return None
+
+
+def _report_sale_result(state: GameState, label: str) -> dict:
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    div = _page_result_div(soup)
+    if div is None:
+        msg = "submitted, but the page showed no result message."
+        state.add_log(f"{label}: {msg}")
+        return {"ok": True, "message": msg}
+    msg = div.get_text(" ", strip=True)
+    ok = div.get("id") == "success"
+    state.add_log(f"{label}: {msg}" if ok else f"{label} failed: {msg}")
+    return {"ok": ok, "message": msg}
+
+
+def _submit_sale_form(state: GameState, label: str, hidden_name: str, expected: str,
+                      buyer: str, price: int) -> dict:
+    """Fill and submit the weapon/vehicle sell form on the current page.
+    Refuses if the form's hidden `hidden_name` value isn't `expected`, so a
+    stale profile never sells the wrong item."""
+    if not _check_session(state):
+        return {"ok": False, "message": "Session expired."}
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    hidden = soup.select_one(f"{_SELL_FORM} input[name='{hidden_name}']")
+    if hidden is None:
+        div = _page_result_div(soup)
+        msg = div.get_text(" ", strip=True) if div else "sell form not found."
+        state.add_log(f"{label} failed: {msg}")
+        return {"ok": False, "message": msg}
+    actual = (hidden.get("value") or "").strip()
+    if actual.lower() != expected.strip().lower():
+        msg = f"the sell page is for '{actual}', not '{expected}' — refresh the profile and try again."
+        state.add_log(f"{label} cancelled: {msg}")
+        return {"ok": False, "message": msg}
+    page = browser.page()
+    form = page.locator(_SELL_FORM)
+    form.locator("input[name='name']").fill(buyer)
+    form.locator("input[name='price']").fill(str(price))
+    form.locator("input[name='B1']").click()
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    return _report_sale_result(state, label)
+
+
+def handle_sell_weapon(action: Action, state: GameState):
+    result_q = action.params.get("result_queue")
+    url    = action.params.get("url", "")
+    weapon = action.params.get("weapon", "")
+    buyer  = action.params.get("buyer", "")
+    price  = int(action.params.get("price", 0))
+    label  = f"Sell weapon {weapon} to {buyer} for ${price:,}"
+    state.add_log(f"{label}…")
+    _nav(_u(url), state)
+    result = _submit_sale_form(state, label, "type", weapon, buyer, price)
+    if result_q is not None:
+        result_q.put(result)
+
+
+def handle_cancel_weapon_sale(action: Action, state: GameState):
+    result_q = action.params.get("result_queue")
+    label = "Cancel weapon sales"
+    _nav(_u("/weapons.asp?action=cancelsale"), state)
+    if not _check_session(state):
+        result = {"ok": False, "message": "Session expired."}
+    else:
+        result = _report_sale_result(state, label)
+    if result_q is not None:
+        result_q.put(result)
+
+
+def handle_sell_vehicle(action: Action, state: GameState):
+    result_q = action.params.get("result_queue")
+    vid     = str(action.params.get("vehicle_id", ""))
+    vehicle = action.params.get("vehicle", "")
+    buyer   = action.params.get("buyer", "")
+    price   = int(action.params.get("price", 0))
+    label   = f"Sell vehicle {vehicle} to {buyer} for ${price:,}"
+    state.add_log(f"{label}…")
+    _nav(_u(f"/vehicles.asp?action=sell&id={vid}"), state)
+    result = _submit_sale_form(state, label, "id", vid, buyer, price)
+    if result_q is not None:
+        result_q.put(result)
 
 
 def handle_navigate(action: Action, state: GameState):
@@ -6838,6 +6981,9 @@ HANDLERS = {
     "travel": handle_travel,
     "fetch_respect": handle_fetch_respect,
     "fetch_profile": handle_fetch_profile,
+    "sell_weapon": handle_sell_weapon,
+    "cancel_weapon_sale": handle_cancel_weapon_sale,
+    "sell_vehicle": handle_sell_vehicle,
     "fetch_game_options": handle_fetch_game_options,
     "save_game_options": handle_save_game_options,
     "quit_game": handle_quit_game,
