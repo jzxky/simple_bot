@@ -6147,163 +6147,183 @@ def _download_item_images(urls):
         print(f"[profile] Item image download error: {e}")
 
 
+def _parse_profile_page() -> dict:
+    """Parse the profile/default.asp page currently in the browser."""
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    result = {}
+    img_urls = []
+
+    def _img_key(img) -> str:
+        """Cache key for an <img>, remembering its URL for download."""
+        src = (img.get("src") if img else "") or ""
+        if not src:
+            return ""
+        url = urljoin(browser.current_url(), src)
+        img_urls.append(quote(url, safe=":/?&=%#"))
+        return item_images.key_for_url(url)
+
+    info_table = soup.select_one("#account_profile table.item_table")
+    if info_table:
+        for row in info_table.find_all("tr"):
+            cells = row.find_all("td")
+            for i in range(0, len(cells) - 1, 2):
+                label = cells[i].get_text(strip=True).rstrip(":")
+                value = cells[i + 1].get_text(strip=True)
+                result[label] = value
+
+    bionics = []
+    for part, slot in _PROFILE_BIONIC_SLOTS:
+        div = soup.select_one(f"#account_bionics #player_bionic{part}")
+        if not div:
+            continue
+        a = div.find("a", class_="title")
+        title = (a.get("title") if a else "") or ""
+        img = div.find("img")
+        src = (img.get("src") if img else "") or ""
+        installed = ("not installed" not in title.lower()
+                     and "blank_profile_box" not in src)
+        bionics.append({"slot": slot, "installed": installed, "img": _img_key(img)})
+    result["bionics"] = bionics
+
+    weapons = []
+    for tbl in soup.select(".showWeapons table.item_table"):
+        w = {}
+        slot_div = tbl.select_one("td[colspan] div")
+        if slot_div:
+            w["slot"] = slot_div.get_text(strip=True)
+        item_td = tbl.find("td", class_="item_content")
+        if item_td:
+            b = item_td.find("b")
+            w["item"] = (b or item_td).get_text(strip=True)
+            serial = re.search(r"Serial:\s*#?(\d+)", item_td.get_text(" ", strip=True))
+            if serial:
+                w["serial"] = serial.group(1)
+        w["img"] = _img_key(tbl.select_one("td[rowspan] img"))
+        dur_div = tbl.select_one(".item_shots_content div")
+        if dur_div:
+            w["durability"] = dur_div.get_text(strip=True)
+        actions = []
+        action_td = tbl.select_one("td.item_content[align='center']")
+        if action_td:
+            for a in action_td.find_all("a"):
+                href = a.get("href", "")
+                label = a.get_text(strip=True)
+                if href and label:
+                    actions.append({"label": label, "url": href})
+        w["actions"] = actions
+        if w:
+            weapons.append(w)
+    result["weapons"] = weapons
+
+    apt = {}
+    for tbl in soup.select("#holder_content > table.item_table"):
+        for row in tbl.find_all("tr"):
+            cells = row.find_all("td")
+            if len(cells) >= 2:
+                label = cells[-2].get_text(strip=True).rstrip(":")
+                value = cells[-1].get_text(strip=True)
+                if label in ("Apartment", "Status", "Storage"):
+                    apt[label] = value
+        apt_link = tbl.select_one("td.item_content[colspan='3'] a")
+        if apt_link:
+            apt["action_url"] = apt_link.get("href", "")
+            apt["action_label"] = apt_link.get_text(strip=True)
+        if "Apartment:" in tbl.get_text() and tbl.select_one("td[rowspan] img"):
+            apt["img"] = _img_key(tbl.select_one("td[rowspan] img"))
+    if apt:
+        result["apartment"] = apt
+
+    vehicles = []
+    for tbl in soup.select("#holder_content > table[cellspacing='2'].item_table"):
+        v = {}
+        for row in tbl.find_all("tr"):
+            cells = row.find_all("td")
+            if len(cells) >= 2:
+                label = cells[-2].get_text(strip=True).rstrip(":")
+                if label in ("Type", "Condition", "Location", "Parking/security"):
+                    v[label] = cells[-1].get_text(strip=True)
+                elif label == "Action":
+                    actions = []
+                    for a in cells[-1].find_all("a"):
+                        href = a.get("href", "")
+                        lbl = a.get_text(strip=True)
+                        if href and lbl:
+                            actions.append({"label": lbl, "url": href})
+                        vid = re.search(r"[?&]id=(\d+)", href)
+                        if vid:
+                            v["id"] = vid.group(1)
+                    v["actions"] = actions
+        if v.get("Type"):
+            v["img"] = _img_key(tbl.select_one("td[rowspan] img"))
+            vehicles.append(v)
+    result["vehicles"] = vehicles
+
+    pets = []
+    for tbl in soup.select(".showPets table.item_table"):
+        p = {}
+        for row in tbl.find_all("tr"):
+            cells = row.find_all("td")
+            if len(cells) >= 2:
+                label = cells[0].get_text(strip=True).rstrip(":")
+                val = cells[-1].get_text(strip=True)
+                if label in ("Name", "Breed", "Age", "Fights won", "Fights lost"):
+                    p[label] = val
+        slot_div = tbl.select_one("td[colspan] div")
+        if slot_div:
+            p["slot"] = slot_div.get_text(strip=True)
+        if p.get("Breed"):
+            pets.append(p)
+    result["pets"] = pets
+
+    businesses = []
+    for tbl in soup.select(".showBusinesses table.item_table"):
+        for row in tbl.find_all("tr")[1:]:
+            cells = row.find_all("td")
+            if len(cells) >= 2:
+                businesses.append({
+                    "name": cells[0].get_text(strip=True),
+                    "next_restock": cells[1].get_text(strip=True),
+                })
+    result["businesses"] = businesses
+
+    misc = []
+    for tbl in soup.select("#holder_content > table.item_table"):
+        for td in tbl.select("td.item_info"):
+            text = td.get_text(strip=True)
+            if " - " in text:
+                misc.append(text)
+    result["misc"] = misc
+
+    _download_item_images(img_urls)
+    return result
+
+
 def handle_fetch_profile(action: Action, state: GameState):
     result_q = action.params.get("result_queue")
     try:
         _nav(_u("/profile/default.asp"), state)
-        soup = BeautifulSoup(browser.page().content(), "html.parser")
-        result = {}
-        img_urls = []
-
-        def _img_key(img) -> str:
-            """Cache key for an <img>, remembering its URL for download."""
-            src = (img.get("src") if img else "") or ""
-            if not src:
-                return ""
-            url = urljoin(browser.current_url(), src)
-            img_urls.append(quote(url, safe=":/?&=%#"))
-            return item_images.key_for_url(url)
-
-        info_table = soup.select_one("#account_profile table.item_table")
-        if info_table:
-            for row in info_table.find_all("tr"):
-                cells = row.find_all("td")
-                for i in range(0, len(cells) - 1, 2):
-                    label = cells[i].get_text(strip=True).rstrip(":")
-                    value = cells[i + 1].get_text(strip=True)
-                    result[label] = value
-
-        bionics = []
-        for part, slot in _PROFILE_BIONIC_SLOTS:
-            div = soup.select_one(f"#account_bionics #player_bionic{part}")
-            if not div:
-                continue
-            a = div.find("a", class_="title")
-            title = (a.get("title") if a else "") or ""
-            img = div.find("img")
-            src = (img.get("src") if img else "") or ""
-            installed = ("not installed" not in title.lower()
-                         and "blank_profile_box" not in src)
-            bionics.append({"slot": slot, "installed": installed, "img": _img_key(img)})
-        result["bionics"] = bionics
-
-        weapons = []
-        for tbl in soup.select(".showWeapons table.item_table"):
-            w = {}
-            slot_div = tbl.select_one("td[colspan] div")
-            if slot_div:
-                w["slot"] = slot_div.get_text(strip=True)
-            item_td = tbl.find("td", class_="item_content")
-            if item_td:
-                b = item_td.find("b")
-                w["item"] = (b or item_td).get_text(strip=True)
-                serial = re.search(r"Serial:\s*#?(\d+)", item_td.get_text(" ", strip=True))
-                if serial:
-                    w["serial"] = serial.group(1)
-            w["img"] = _img_key(tbl.select_one("td[rowspan] img"))
-            dur_div = tbl.select_one(".item_shots_content div")
-            if dur_div:
-                w["durability"] = dur_div.get_text(strip=True)
-            actions = []
-            action_td = tbl.select_one("td.item_content[align='center']")
-            if action_td:
-                for a in action_td.find_all("a"):
-                    href = a.get("href", "")
-                    label = a.get_text(strip=True)
-                    if href and label:
-                        actions.append({"label": label, "url": href})
-            w["actions"] = actions
-            if w:
-                weapons.append(w)
-        result["weapons"] = weapons
-
-        apt = {}
-        for tbl in soup.select("#holder_content > table.item_table"):
-            for row in tbl.find_all("tr"):
-                cells = row.find_all("td")
-                if len(cells) >= 2:
-                    label = cells[-2].get_text(strip=True).rstrip(":")
-                    value = cells[-1].get_text(strip=True)
-                    if label in ("Apartment", "Status", "Storage"):
-                        apt[label] = value
-            apt_link = tbl.select_one("td.item_content[colspan='3'] a")
-            if apt_link:
-                apt["action_url"] = apt_link.get("href", "")
-                apt["action_label"] = apt_link.get_text(strip=True)
-            if "Apartment:" in tbl.get_text() and tbl.select_one("td[rowspan] img"):
-                apt["img"] = _img_key(tbl.select_one("td[rowspan] img"))
-        if apt:
-            result["apartment"] = apt
-
-        vehicles = []
-        for tbl in soup.select("#holder_content > table[cellspacing='2'].item_table"):
-            v = {}
-            for row in tbl.find_all("tr"):
-                cells = row.find_all("td")
-                if len(cells) >= 2:
-                    label = cells[-2].get_text(strip=True).rstrip(":")
-                    if label in ("Type", "Condition", "Location", "Parking/security"):
-                        v[label] = cells[-1].get_text(strip=True)
-                    elif label == "Action":
-                        actions = []
-                        for a in cells[-1].find_all("a"):
-                            href = a.get("href", "")
-                            lbl = a.get_text(strip=True)
-                            if href and lbl:
-                                actions.append({"label": lbl, "url": href})
-                            vid = re.search(r"[?&]id=(\d+)", href)
-                            if vid:
-                                v["id"] = vid.group(1)
-                        v["actions"] = actions
-            if v.get("Type"):
-                v["img"] = _img_key(tbl.select_one("td[rowspan] img"))
-                vehicles.append(v)
-        result["vehicles"] = vehicles
-
-        pets = []
-        for tbl in soup.select(".showPets table.item_table"):
-            p = {}
-            for row in tbl.find_all("tr"):
-                cells = row.find_all("td")
-                if len(cells) >= 2:
-                    label = cells[0].get_text(strip=True).rstrip(":")
-                    val = cells[-1].get_text(strip=True)
-                    if label in ("Name", "Breed", "Age", "Fights won", "Fights lost"):
-                        p[label] = val
-            slot_div = tbl.select_one("td[colspan] div")
-            if slot_div:
-                p["slot"] = slot_div.get_text(strip=True)
-            if p.get("Breed"):
-                pets.append(p)
-        result["pets"] = pets
-
-        businesses = []
-        for tbl in soup.select(".showBusinesses table.item_table"):
-            for row in tbl.find_all("tr")[1:]:
-                cells = row.find_all("td")
-                if len(cells) >= 2:
-                    businesses.append({
-                        "name": cells[0].get_text(strip=True),
-                        "next_restock": cells[1].get_text(strip=True),
-                    })
-        result["businesses"] = businesses
-
-        misc = []
-        for tbl in soup.select("#holder_content > table.item_table"):
-            for td in tbl.select("td.item_info"):
-                text = td.get_text(strip=True)
-                if " - " in text:
-                    misc.append(text)
-        result["misc"] = misc
-
-        _download_item_images(img_urls)
-
+        result = _parse_profile_page()
         if result_q is not None:
             result_q.put(result)
     except Exception as e:
         if result_q is not None:
             result_q.put(e)
         raise
+
+
+def _with_profile(state: GameState, result: dict) -> dict:
+    """Attach a freshly parsed profile to a Profile-tab task result. Parses
+    the current page when the game already returned to profile/default.asp,
+    otherwise revisits it."""
+    try:
+        if "/profile/default.asp" not in browser.current_url().lower():
+            _nav(_u("/profile/default.asp"), state)
+            if not _check_session(state):
+                return result
+        result["profile"] = _parse_profile_page()
+    except Exception as e:
+        state.add_log(f"Profile refresh failed: {e}")
+    return result
 
 
 _SELL_FORM = "form:has(input[name='action'][value='sellconfirm'])"
@@ -6370,7 +6390,7 @@ def handle_sell_weapon(action: Action, state: GameState):
     label  = f"Sell weapon {weapon} to {buyer} for ${price:,}"
     state.add_log(f"{label}…")
     _nav(_u(url), state)
-    result = _submit_sale_form(state, label, "type", weapon, buyer, price)
+    result = _with_profile(state, _submit_sale_form(state, label, "type", weapon, buyer, price))
     if result_q is not None:
         result_q.put(result)
 
@@ -6382,7 +6402,7 @@ def handle_cancel_weapon_sale(action: Action, state: GameState):
     if not _check_session(state):
         result = {"ok": False, "message": "Session expired."}
     else:
-        result = _report_sale_result(state, label)
+        result = _with_profile(state, _report_sale_result(state, label))
     if result_q is not None:
         result_q.put(result)
 
@@ -6396,7 +6416,98 @@ def handle_sell_vehicle(action: Action, state: GameState):
     label   = f"Sell vehicle {vehicle} to {buyer} for ${price:,}"
     state.add_log(f"{label}…")
     _nav(_u(f"/vehicles.asp?action=sell&id={vid}"), state)
-    result = _submit_sale_form(state, label, "id", vid, buyer, price)
+    result = _with_profile(state, _submit_sale_form(state, label, "id", vid, buyer, price))
+    if result_q is not None:
+        result_q.put(result)
+
+
+_DISPOSE_FORM = "form:has(input[name='action'][value='disposeaction'])"
+
+
+def _dispose_form_fields() -> "dict | None":
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    form = soup.select_one(_DISPOSE_FORM)
+    if form is None:
+        return None
+    hidden = {i.get("name"): (i.get("value") or "").strip()
+              for i in form.find_all("input", attrs={"type": "hidden"})}
+    options = [{"value": o.get("value", ""), "label": o.get_text(strip=True)}
+               for o in form.select("select[name='dispose'] option")]
+    question = form.find(string=re.compile(r"dispose", re.I))
+    return {"weapon": hidden.get("type", ""), "id": hidden.get("id", ""), "options": options,
+            "question": question.strip() if question else ""}
+
+
+def _open_dispose_page(state: GameState, url: str, label: str) -> "tuple[dict | None, dict | None]":
+    """Navigate to a weapon dispose link. Returns (form fields, None) or
+    (None, failure result)."""
+    _nav(_u(url), state)
+    if not _check_session(state):
+        return None, {"ok": False, "message": "Session expired."}
+    fields = _dispose_form_fields()
+    if fields is None:
+        div = _page_result_div(BeautifulSoup(browser.page().content(), "html.parser"))
+        msg = div.get_text(" ", strip=True) if div else "dispose form not found."
+        state.add_log(f"{label} failed: {msg}")
+        return None, {"ok": False, "message": msg}
+    return fields, None
+
+
+def handle_fetch_dispose_weapon(action: Action, state: GameState):
+    """Open a weapon's dispose page and return its confirmation form."""
+    result_q = action.params.get("result_queue")
+    fields, fail = _open_dispose_page(state, action.params.get("url", ""), "Dispose weapon")
+    result = fail or {"ok": True, "message": "", "form": fields}
+    if result_q is not None:
+        result_q.put(result)
+
+
+def handle_dispose_weapon(action: Action, state: GameState):
+    """Confirm a weapon disposal (params: url, weapon, weapon_id from the
+    fetched form). Refuses if the page is now for a different weapon."""
+    result_q = action.params.get("result_queue")
+    weapon = action.params.get("weapon", "")
+    wid    = str(action.params.get("weapon_id", ""))
+    label  = f"Dispose weapon {weapon}"
+    fields, result = _open_dispose_page(state, action.params.get("url", ""), label)
+    if fields is not None:
+        if fields["weapon"].lower() != weapon.lower() or (wid and fields["id"] != wid):
+            msg = f"the dispose page is for '{fields['weapon']}', not '{weapon}' — refresh the profile and try again."
+            state.add_log(f"{label} cancelled: {msg}")
+            result = {"ok": False, "message": msg}
+        else:
+            page = browser.page()
+            form = page.locator(_DISPOSE_FORM)
+            form.locator("select[name='dispose']").select_option("Yes")
+            form.locator("input[name='B1']").click()
+            page.wait_for_load_state("domcontentloaded")
+            _refresh_state(state)
+            result = _report_sale_result(state, label)
+    result = _with_profile(state, result)
+    if result_q is not None:
+        result_q.put(result)
+
+
+def handle_weapon_link(action: Action, state: GameState):
+    """Follow a one-click weapon action link (stash / carry) and report it."""
+    result_q = action.params.get("result_queue")
+    label = f"{action.params.get('label', 'Weapon action')} {action.params.get('weapon', '')}".strip()
+    _nav(_u(action.params.get("url", "")), state)
+    if not _check_session(state):
+        result = {"ok": False, "message": "Session expired."}
+    else:
+        result = _with_profile(state, _report_sale_result(state, label))
+    if result_q is not None:
+        result_q.put(result)
+
+
+def handle_repair_vehicle_ui(action: Action, state: GameState):
+    """Repair from the Profile tab, then revisit the profile."""
+    result_q = action.params.get("result_queue")
+    ok = handle_repair_vehicle(action, state)
+    result = {"ok": bool(ok),
+              "message": "Repair booked." if ok else "Repair not booked — see the log for why."}
+    result = _with_profile(state, result)
     if result_q is not None:
         result_q.put(result)
 
@@ -7128,6 +7239,10 @@ HANDLERS = {
     "cancel_weapon_sale": handle_cancel_weapon_sale,
     "sell_vehicle": handle_sell_vehicle,
     "fetch_apartment": handle_fetch_apartment,
+    "fetch_dispose_weapon": handle_fetch_dispose_weapon,
+    "dispose_weapon": handle_dispose_weapon,
+    "weapon_link": handle_weapon_link,
+    "repair_vehicle_ui": handle_repair_vehicle_ui,
     "apartment_money": handle_apartment_money,
     "stash_drugs": handle_stash_drugs,
     "fetch_game_options": handle_fetch_game_options,

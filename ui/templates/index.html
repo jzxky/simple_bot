@@ -2519,6 +2519,23 @@
   </form>
 </div>
 
+<!-- Weapon dispose confirmation -->
+<div id="dispose-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeDisposeOverlay()">
+  <form class="pl-modal-box dispose-modal" onsubmit="submitDispose(event)">
+    <h3>Dispose weapon</h3>
+    <div id="dispose-loading" class="muted"></div>
+    <div id="dispose-body" hidden>
+      <p>Are you sure you want to dispose of your <b id="dispose-weapon"></b>? <span id="dispose-id" class="profile-badge"></span></p>
+      <label for="dispose-select" class="stat-label">Dispose</label>
+      <select id="dispose-select" onchange="disposeSelectChanged()"></select>
+    </div>
+    <div class="dispose-actions">
+      <button type="button" class="btn-secondary" onclick="closeDisposeOverlay()">Cancel</button>
+      <button type="submit" class="action-btn" id="dispose-submit" disabled>Submit</button>
+    </div>
+  </form>
+</div>
+
 <!-- Apartment overlay (profile/dirty.asp stash) -->
 <div id="apartment-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeApartmentOverlay()">
   <div class="pl-modal-box apt-modal">
