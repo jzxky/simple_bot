@@ -1621,9 +1621,9 @@ def _sale_buyer_and_price(data: dict):
     return (buyer, int(price)), None
 
 
-def _run_item_sale(kind: str, **params):
+def _run_profile_task(kind: str, **params):
     try:
-        return jsonify(bot.request_item_sale(kind, **params))
+        return jsonify(bot.request_profile_task(kind, **params))
     except Exception as e:
         return jsonify({"ok": False, "message": str(e) or "The request failed — see the log."}), 500
 
@@ -1641,14 +1641,14 @@ def sell_weapon_route():
     if err:
         return jsonify({"ok": False, "message": err}), 400
     buyer, price = parsed
-    return _run_item_sale("sell_weapon", url=url, weapon=weapon, buyer=buyer, price=price)
+    return _run_profile_task("sell_weapon", url=url, weapon=weapon, buyer=buyer, price=price)
 
 
 @app.route("/cancel_weapon_sale", methods=["POST"])
 def cancel_weapon_sale_route():
     if not bot.is_running():
         return jsonify({"ok": False, "message": "Bot must be running."}), 400
-    return _run_item_sale("cancel_weapon_sale")
+    return _run_profile_task("cancel_weapon_sale")
 
 
 @app.route("/sell_vehicle", methods=["POST"])
@@ -1664,7 +1664,45 @@ def sell_vehicle_route():
     if err:
         return jsonify({"ok": False, "message": err}), 400
     buyer, price = parsed
-    return _run_item_sale("sell_vehicle", vehicle_id=vid, vehicle=vehicle, buyer=buyer, price=price)
+    return _run_profile_task("sell_vehicle", vehicle_id=vid, vehicle=vehicle, buyer=buyer, price=price)
+
+
+@app.route("/apartment")
+def apartment_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    return _run_profile_task("fetch_apartment")
+
+
+@app.route("/apartment/money", methods=["POST"])
+def apartment_money_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    mode = data.get("mode")
+    amount = _int_or_blank(data.get("amount"))
+    if mode not in ("stash", "grab"):
+        return jsonify({"ok": False, "message": "Choose stash or grab."}), 400
+    if not amount or not 0 < int(amount) <= 99_999_999:
+        return jsonify({"ok": False, "message": "Amount must be a whole number from 1 to 99,999,999."}), 400
+    return _run_profile_task("apartment_money", mode=mode, amount=int(amount))
+
+
+@app.route("/apartment/drugs", methods=["POST"])
+def apartment_drugs_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    values = {}
+    for name, raw in (data.get("values") or {}).items():
+        v = _int_or_blank(raw)
+        if not re.fullmatch(r"[sg][A-Za-z]+", str(name)) or v is None or int(v or 0) > 99_999:
+            return jsonify({"ok": False, "message": f"Invalid amount for {name}."}), 400
+        if v and int(v) > 0:
+            values[name] = int(v)
+    if not values:
+        return jsonify({"ok": False, "message": "Enter at least one amount."}), 400
+    return _run_profile_task("stash_drugs", values=values)
 
 
 @app.route("/api/item_image/<key>")

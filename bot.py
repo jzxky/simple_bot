@@ -143,8 +143,8 @@ _bar_threads_result: queue.Queue = queue.Queue(maxsize=1)
 _bulk_launder_queue: queue.Queue = queue.Queue()
 _interact_request: queue.Queue = queue.Queue(maxsize=1)
 _interact_result: queue.Queue = queue.Queue(maxsize=1)
-_item_sale_request: queue.Queue = queue.Queue(maxsize=1)
-_item_sale_result: queue.Queue = queue.Queue(maxsize=1)
+_profile_task_request: queue.Queue = queue.Queue(maxsize=1)
+_profile_task_result: queue.Queue = queue.Queue(maxsize=1)
 state = GameState()
 
 
@@ -522,18 +522,18 @@ def _run(c: dict):
                 except Exception as e:
                     _interact_result.put(e)
 
-            # Weapon/vehicle sale + cancel-sale requests from the Flask thread
-            if not _item_sale_request.empty():
+            # Profile-tab tasks (sales, apartment stash) from the Flask thread
+            if not _profile_task_request.empty():
                 try:
-                    kind, params = _item_sale_request.get_nowait()
+                    kind, params = _profile_task_request.get_nowait()
                     result_q = queue.Queue()
                     executor.execute(Action(kind, result_queue=result_q, **params), state)
                     try:
-                        _item_sale_result.put(result_q.get(timeout=60))
+                        _profile_task_result.put(result_q.get(timeout=60))
                     except queue.Empty:
-                        _item_sale_result.put(RuntimeError("The request failed — see the log."))
+                        _profile_task_result.put(RuntimeError("The request failed — see the log."))
                 except Exception as e:
-                    _item_sale_result.put(e)
+                    _profile_task_result.put(e)
 
             # Jail inmates requests from the Flask thread
             if not _jail_inmates_request.empty():
@@ -1085,13 +1085,13 @@ def request_interact(crime: str, target: str, amount: int = 0, timeout: float = 
     return result
 
 
-def request_item_sale(kind: str, timeout: float = 90.0, **params) -> dict:
-    """Run sell_weapon / cancel_weapon_sale / sell_vehicle on the bot thread
-    and return {"ok": bool, "message": str}."""
-    while not _item_sale_result.empty():
-        _item_sale_result.get_nowait()
-    _item_sale_request.put((kind, params), timeout=timeout)
-    result = _item_sale_result.get(timeout=timeout)
+def request_profile_task(kind: str, timeout: float = 90.0, **params) -> dict:
+    """Run a Profile-tab task (weapon/vehicle sales, apartment stash) on the
+    bot thread and return its result dict ({"ok": bool, "message": str, ...})."""
+    while not _profile_task_result.empty():
+        _profile_task_result.get_nowait()
+    _profile_task_request.put((kind, params), timeout=timeout)
+    result = _profile_task_result.get(timeout=timeout)
     if isinstance(result, Exception):
         raise result
     return result

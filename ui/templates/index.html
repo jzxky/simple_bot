@@ -2519,6 +2519,55 @@
   </form>
 </div>
 
+<!-- Apartment overlay (profile/dirty.asp stash) -->
+<div id="apartment-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeApartmentOverlay()">
+  <div class="pl-modal-box apt-modal">
+    <div class="apt-head">
+      <h3>Apartment</h3>
+      <button type="button" class="pl-icon-btn" onclick="closeApartmentOverlay()" aria-label="Close">✕</button>
+    </div>
+    <div id="apt-banner" class="profile-sale-msg" hidden></div>
+    <div id="apt-loading" class="muted"></div>
+    <div id="apt-body" hidden>
+      <section class="apt-sec">
+        <h4>Dirty money</h4>
+        <div class="apt-cap"><span>Stashed <b id="apt-money-stashed"></b></span><span>Max <b id="apt-money-max"></b></span></div>
+        <div class="profile-bar apt-bar"><i id="apt-money-bar"></i></div>
+        <div class="apt-figs">
+          <div><span class="stat-label">Dirty on hand</span><b id="apt-onhand"></b></div>
+          <div><span class="stat-label">Room left</span><b id="apt-room"></b></div>
+        </div>
+        <div class="apt-amount">
+          <div class="apt-amount-in"><span>$</span><input id="apt-amount" type="text" inputmode="numeric" placeholder="Amount, e.g. 500k" aria-label="Amount" oninput="aptValidateMoney()"></div>
+          <button type="button" class="profile-btn" onclick="aptMax('stash')">Max stash</button>
+          <button type="button" class="profile-btn" onclick="aptMax('grab')">Max grab</button>
+        </div>
+        <div id="apt-money-hint" class="sell-hint"></div>
+        <div class="apt-actions">
+          <button type="button" class="profile-btn" id="apt-grab" onclick="aptSubmitMoney('grab')" disabled>Grab</button>
+          <button type="button" class="profile-btn primary" id="apt-stash" onclick="aptSubmitMoney('stash')" disabled>Stash</button>
+        </div>
+      </section>
+      <section class="apt-sec">
+        <h4>Drugs <span class="muted">Grab only in your home city</span></h4>
+        <div class="apt-cap"><span>Stashed <b id="apt-drug-stashed"></b> units</span><span>Max <b id="apt-drug-max"></b></span></div>
+        <div class="profile-bar apt-bar"><i id="apt-drug-bar"></i></div>
+        <div class="apt-table-wrap">
+          <table class="apt-drugs">
+            <thead><tr><th>Drug</th><th>Carrying</th><th>Stashed</th><th>Stash</th><th>Grab</th></tr></thead>
+            <tbody id="apt-drugs"></tbody>
+          </table>
+        </div>
+        <div class="apt-actions">
+          <div id="apt-drug-hint" class="sell-hint"></div>
+          <button type="button" class="profile-btn" onclick="aptClearDrugs()">Clear</button>
+          <button type="button" class="profile-btn primary" id="apt-drug-submit" onclick="aptSubmitDrugs()" disabled>Submit drugs</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
 <!-- Vehicle repair overlay -->
 <div id="repair-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeRepairOverlay()">
   <div class="pl-modal-box">
