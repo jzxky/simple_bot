@@ -487,6 +487,15 @@ button {
 .sell-ac-item:hover, .sell-ac-item.sel { background: var(--surface2); color: var(--accent); }
 .sell-ac-item small { color: var(--muted); }
 .sell-modal > .sell-actions { display: flex; gap: 8px; justify-content: flex-end; }
+/* Weapon dispose confirmation */
+.dispose-modal { max-width: 380px; }
+.pl-modal-box.dispose-modal > #dispose-body { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 6px; }
+.pl-modal-box.dispose-modal > #dispose-body[hidden] { display: none; }
+.dispose-modal p { margin: 0 0 6px; line-height: 1.5; }
+.dispose-modal b { color: var(--accent); }
+#dispose-select { padding: 7px 9px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font: inherit; }
+#dispose-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 /* Apartment overlay */
 .apt-modal { max-width: 560px; max-height: 92vh; overflow-y: auto; }
 .pl-modal-box.apt-modal > div { display: block; }
@@ -1600,6 +1609,7 @@ input.input-unsaved { color: var(--red) !important; }
 }
 .pl-modal-box h3 { margin: 0; font-size: 1rem; }
 .pl-modal-box > div { display: flex; gap: 8px; justify-content: flex-end; }
+.pl-modal-box > div[hidden] { display: none; }
 #skill-overlay .pl-modal-box { max-width: 360px; }
 #skill-overlay-body { flex-direction: column; justify-content: flex-start; gap: 12px; }
 

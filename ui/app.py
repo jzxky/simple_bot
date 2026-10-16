@@ -1667,6 +1667,46 @@ def sell_vehicle_route():
     return _run_profile_task("sell_vehicle", vehicle_id=vid, vehicle=vehicle, buyer=buyer, price=price)
 
 
+_WEAPON_DISPOSE_URL = re.compile(r"/weapons\.asp\?action=dispose\w*")
+_WEAPON_ACTION_URL = re.compile(r"/weapons\.asp\?action=\w+(&id=\d+)?")
+
+
+@app.route("/weapon_dispose_form", methods=["POST"])
+def weapon_dispose_form_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    url = ((request.get_json(silent=True) or {}).get("url") or "").strip()
+    if not _WEAPON_DISPOSE_URL.fullmatch(url):
+        return jsonify({"ok": False, "message": "Unknown weapon — refresh the profile."}), 400
+    return _run_profile_task("fetch_dispose_weapon", url=url)
+
+
+@app.route("/dispose_weapon", methods=["POST"])
+def dispose_weapon_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    weapon = (data.get("weapon") or "").strip()
+    wid = str(data.get("weapon_id") or "").strip()
+    if not _WEAPON_DISPOSE_URL.fullmatch(url) or not weapon or (wid and not wid.isdigit()):
+        return jsonify({"ok": False, "message": "Unknown weapon — refresh the profile."}), 400
+    return _run_profile_task("dispose_weapon", url=url, weapon=weapon, weapon_id=wid)
+
+
+@app.route("/weapon_action", methods=["POST"])
+def weapon_action_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    if not _WEAPON_ACTION_URL.fullmatch(url):
+        return jsonify({"ok": False, "message": "Unknown weapon action — refresh the profile."}), 400
+    return _run_profile_task("weapon_link", url=url,
+                             label=str(data.get("label") or "Weapon action")[:20],
+                             weapon=str(data.get("weapon") or "")[:60])
+
+
 @app.route("/apartment")
 def apartment_route():
     if not bot.is_running():
@@ -1724,8 +1764,7 @@ def api_player_names():
 def repair_vehicle_route():
     if not bot.is_running():
         return jsonify({"error": "Bot must be running."}), 400
-    bot.request_repair_vehicle()
-    return jsonify({"ok": True})
+    return _run_profile_task("repair_vehicle_ui")
 
 
 @app.route("/screenshot")

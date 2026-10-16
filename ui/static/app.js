@@ -1062,7 +1062,79 @@ function _postSale(url, body) {
   return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})})
     .then(r => r.json())
     .catch(e => ({ok: false, message: String(e)}))
-    .then(d => { _showSaleResult(d); loadProfile(); return d; });
+    .then(d => { _showSaleResult(d); _applyProfileResult(d); return d; });
+}
+
+// Render the profile a task returned (parsed from the page the game landed on);
+// fall back to a fresh fetch when the task couldn't include one.
+function _applyProfileResult(d) {
+  const el = document.getElementById("profile-content");
+  if (d && d.profile && el) el.innerHTML = _renderProfile(d.profile);
+  else loadProfile();
+}
+
+// ── Weapon dispose confirmation (mirrors weapons.asp?action=dispose…) ──────
+let _disposeCtx = null;   // {url, weapon, id}
+
+function openDisposeOverlay(a) {
+  _disposeCtx = null;
+  const body = document.getElementById("dispose-body");
+  const sel = document.getElementById("dispose-select");
+  document.getElementById("dispose-loading").hidden = false;
+  document.getElementById("dispose-loading").textContent = `Opening the dispose page for ${a.weapon}…`;
+  body.hidden = true;
+  sel.innerHTML = "";
+  document.getElementById("dispose-submit").disabled = true;
+  document.getElementById("dispose-overlay").classList.add("active");
+  _postJson("/weapon_dispose_form", {url: a.url}).then(d => {
+    if (!d.ok || !d.form) {
+      document.getElementById("dispose-loading").textContent = d.message || "Could not open the dispose page.";
+      return;
+    }
+    const f = d.form;
+    _disposeCtx = {url: a.url, weapon: f.weapon, id: f.id};
+    document.getElementById("dispose-weapon").textContent = f.weapon;
+    document.getElementById("dispose-id").textContent = f.id ? `#${f.id}` : "";
+    sel.innerHTML = (f.options || []).map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join("");
+    document.getElementById("dispose-loading").hidden = true;
+    body.hidden = false;
+    disposeSelectChanged();
+  });
+}
+
+function disposeSelectChanged() {
+  const v = document.getElementById("dispose-select").value;
+  document.getElementById("dispose-submit").disabled = !(v === "Yes" || v === "No");
+}
+
+function closeDisposeOverlay() {
+  document.getElementById("dispose-overlay").classList.remove("active");
+  _disposeCtx = null;
+}
+
+function submitDispose(e) {
+  e.preventDefault();
+  const v = document.getElementById("dispose-select").value;
+  const ctx = _disposeCtx;
+  if (!ctx || v !== "Yes") { closeDisposeOverlay(); return; }
+  const btn = document.getElementById("dispose-submit");
+  btn.disabled = true;
+  btn.textContent = "Disposing…";
+  _postSale("/dispose_weapon", {url: ctx.url, weapon: ctx.weapon, weapon_id: ctx.id})
+    .then(() => { btn.textContent = "Submit"; closeDisposeOverlay(); });
+}
+
+function _postJson(url, body) {
+  return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})})
+    .then(r => r.json())
+    .catch(e => ({ok: false, message: String(e)}));
+}
+
+function _runWeaponLink(a) {
+  const el = document.getElementById("profile-content");
+  if (el) el.classList.add("profile-refreshing");
+  _postSale("/weapon_action", {url: a.url, label: a.label, weapon: a.weapon})
+    .then(() => { if (el) el.classList.remove("profile-refreshing"); });
 }
 
 function submitSell(e) {
@@ -1268,10 +1340,9 @@ function closeRepairOverlay() {
 }
 function submitRepair() {
   closeRepairOverlay();
-  fetch("/repair_vehicle", {method: "POST"})
-    .then(r => r.json())
-    .then(d => { if (d.error) alert(d.error); else loadProfile(); })
-    .catch(e => alert(String(e)));
+  const el = document.getElementById("profile-content");
+  if (el) el.classList.add("profile-refreshing");
+  _postSale("/repair_vehicle").then(() => { if (el) el.classList.remove("profile-refreshing"); });
 }
 
 // ---------------------------------------------------------------------------
@@ -5560,6 +5631,8 @@ function profileAction(i) {
   if (a.type === "sell") openSellOverlay(a.ctx);
   else if (a.type === "repair") openRepairOverlay(a.condition);
   else if (a.type === "apartment") openApartmentOverlay();
+  else if (a.type === "dispose") openDisposeOverlay(a);
+  else if (a.type === "weapon_link") _runWeaponLink(a);
   else { navigateTo(a.url); loadProfile(); }
 }
 
@@ -5642,8 +5715,10 @@ function _renderProfile(d) {
         w.actions.forEach(a => {
           if (a.label.toLowerCase() === "sell") {
             h.push(_profileBtn("Sell", {type: "sell", ctx: {kind: "weapon", name: w.item || "", url: a.url}}, "primary"));
+          } else if (/action=dispose/i.test(a.url)) {
+            h.push(_profileBtn(a.label, {type: "dispose", url: a.url, weapon: w.item || ""}));
           } else {
-            h.push(_profileBtn(a.label, {type: "nav", url: a.url}));
+            h.push(_profileBtn(a.label, {type: "weapon_link", url: a.url, label: a.label, weapon: w.item || ""}));
           }
         });
         h.push('</div>');
