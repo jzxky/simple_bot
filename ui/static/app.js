@@ -60,58 +60,62 @@ function _showAllEarns() {
   return cb && cb.checked;
 }
 
+// Earn selector: one dropdown with the categories as <optgroup> headers (same
+// style as the Earn Planner's add selector).
 function _populateEarnCategories(selectedEarnType) {
-  const catSel = document.getElementById("earn_category");
-  if (!catSel) return;
+  const sel = document.getElementById("earn_type");
+  if (!sel) return;
 
   // When called without an argument (e.g. from Show All toggle), preserve
   // the currently selected earn so the dropdown doesn't reset.
   if (selectedEarnType === undefined) {
-    const sel = document.getElementById("earn_type");
-    selectedEarnType = sel ? (sel.value || sel.dataset.current || "") : "";
+    selectedEarnType = sel.value || sel.dataset.current || "";
   }
 
+  // Default: only earns currently available on the earn page. Show All lists
+  // every earn in the catalog — including ones not currently offered
+  // (enabled === false) — so you can pick one ahead of time.
   const showAll = _showAllEarns();
-  const seen = new Set();
-  const cats = [];
+  const groups = new Map();   // category -> [entries], in catalog order
   _earnCatalog.forEach(e => {
-    if (e.enabled === false) return;
-    if (!showAll && e.available !== true) return;
+    if (!showAll && (!e.schedule_value || e.enabled === false || e.available !== true)) return;
     const cat = e.category || "Uncategorized";
-    if (!seen.has(cat)) { seen.add(cat); cats.push(cat); }
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat).push(e);
   });
 
-  // Determine which category the saved earn_type belongs to
-  const entry = _earnCatalog.find(e => e.schedule_value === selectedEarnType);
-  const selectedCat = entry ? (entry.category || "Uncategorized") : (cats[0] || "");
-
-  catSel.innerHTML = cats.map(c =>
-    `<option value="${c}"${c === selectedCat ? " selected" : ""}>${c}</option>`
-  ).join("");
-
-  _renderEarnSelect(selectedEarnType);
-}
-
-function _renderEarnSelect(selectedValue) {
-  const catSel = document.getElementById("earn_category");
-  const sel = document.getElementById("earn_type");
-  if (!sel) return;
-  const cat = catSel ? catSel.value : "";
-  const showAll = _showAllEarns();
-  const items = _earnCatalog.filter(e => e.schedule_value && e.enabled !== false && (showAll || e.available === true) && (e.category || "Uncategorized") === cat);
-  if (!items.length) {
+  if (!groups.size) {
     // Preserve current value so a failed/empty catalog load doesn't overwrite config
-    const preserved = sel.dataset.current || sel.value || "";
+    const preserved = selectedEarnType || "";
     sel.innerHTML = preserved
-      ? `<option value="${preserved}">${preserved}</option>`
-      : '<option value="">— no earns in this category —</option>';
+      ? `<option value="${escHtml(preserved)}">${escHtml(preserved)}</option>`
+      : '<option value="">— no earns available —</option>';
     _updateEarnsPills();
     return;
   }
-  sel.innerHTML = items.map(e => {
-    const selected = e.schedule_value === selectedValue ? " selected" : "";
-    return `<option value="${e.schedule_value}"${selected}>${e.label}</option>`;
-  }).join("");
+
+  let html = "";
+  let found = false;
+  groups.forEach((items, cat) => {
+    html += `<optgroup label="${escHtml(cat)}">` + items.map(e => {
+      // Earns with no schedule value only appear in the game's manual list
+      // and can't be set as the bot's earn — show them, but not selectable.
+      if (!e.schedule_value) {
+        return `<option disabled>${escHtml(e.label || "?")} (can't be scheduled)</option>`;
+      }
+      const selected = e.schedule_value === selectedEarnType;
+      if (selected) found = true;
+      return `<option value="${escHtml(e.schedule_value)}"${selected ? " selected" : ""}>${escHtml(e.label || e.schedule_value)}</option>`;
+    }).join("") + "</optgroup>";
+  });
+  // Keep the saved earn selectable even if it's hidden by the current filter,
+  // so re-rendering never silently switches earns.
+  if (selectedEarnType && !found) {
+    const entry = _earnCatalog.find(e => e.schedule_value === selectedEarnType);
+    const label = entry ? (entry.label || selectedEarnType) : selectedEarnType;
+    html = `<option value="${escHtml(selectedEarnType)}" selected>${escHtml(label)} (not available)</option>` + html;
+  }
+  sel.innerHTML = html;
   _updateEarnsPills();
 }
 
@@ -143,9 +147,7 @@ function toggleEarnPlanner() {
 function _syncEarnPlannerLock() {
   const toggle = document.getElementById("earn-planner-toggle");
   const hasEntries = toggle && toggle.checked && Object.keys(_earnPlannerLimits).length > 0;
-  const catSel = document.getElementById("earn_category");
   const earnSel = document.getElementById("earn_type");
-  if (catSel) catSel.disabled = hasEntries;
   if (earnSel) earnSel.disabled = hasEntries;
 }
 
