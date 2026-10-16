@@ -342,9 +342,7 @@
               Works through the queue in order. When the active earn reaches its limit, the next available earn takes over.
               Progress is checked after each character history update (every <b id="earn-planner-interval">{{ config.get('character_history', {}).get('refresh_interval_minutes', 30) }} min</b> — change in Settings › Misc).
             </p>
-            <div id="earn-planner-waiting" class="ep-unavailable" style="display:none;margin-bottom:12px">
-              No earn in the queue is available right now — earns are disabled. The planner rechecks every 10 minutes and turns earns back on when one becomes available.
-            </div>
+            <div id="earn-planner-waiting" class="ep-unavailable" style="display:none;margin-bottom:12px"></div>
             <div class="ep-add">
               <label class="ep-add-earn">Earn
                 <select id="earn-planner-add-select"></select>
@@ -361,6 +359,14 @@
             </div>
             <table class="priority-table ep-table"><tbody id="earn-planner-tbody"></tbody></table>
             <div id="earn-planner-empty" style="margin-top:12px"></div>
+            <div class="ep-default">
+              <label class="ep-add-earn" for="earn-planner-default">Default earn
+                <select id="earn-planner-default" onchange="this.dataset.current=this.value; autoSave()" data-current="{{ config.earn_planner.get('default_earn', '') }}">
+                  <option value="">None — disable earns</option>
+                </select>
+              </label>
+              <p class="ep-note" style="margin:4px 0 0">Used when no earn in the queue is available. The queue is re-checked after each earns list refresh.</p>
+            </div>
           </div>
         </div>
 

@@ -4,8 +4,10 @@ character-history update and moves through the planner queue (see
 earn_planner.py / executor.handle_earn_planner_check).
 
 Only runs while the planner is enabled, has earns queued, and Character
-History is enabled (the earn counts come from it). While waiting for an earn
-to become available it rechecks every 10 minutes, silently.
+History is enabled (the earn counts come from it). When no queued earn is
+available the bot uses the planner's default earn (if set) and re-assesses
+after each earn-list refresh; with no default, earns are disabled and it
+rechecks every 10 minutes, silently.
 """
 
 import time
@@ -30,8 +32,15 @@ class EarnPlannerTask(Task):
         c = cfg.load()
         return c.get("earn_planner", {}), c.get("character_history", {})
 
+    @staticmethod
+    def _earns_enabled() -> bool:
+        return cfg.load().get("earns", {}).get("enabled", False)
+
     def _waiting_due(self, planner: dict) -> bool:
+        # The 10-minute timed recheck only applies while earns are disabled;
+        # on the default earn, every earn-list refresh triggers a re-assess.
         return (planner.get("waiting_for_earns", False)
+                and not self._earns_enabled()
                 and time.monotonic() - self._last_wait_check >= WAITING_RECHECK_SECS)
 
     def can_run(self, state: GameState) -> bool:
@@ -55,7 +64,10 @@ class EarnPlannerTask(Task):
             reasons.append("No earns in planner")
         if not history.get("enabled"):
             reasons.append("Character History disabled")
-        if planner.get("waiting_for_earns"):
+        if planner.get("waiting_for_earns") and self._earns_enabled():
+            if not state.earn_planner_check_pending:
+                reasons.append("On default earn — waiting for next earn-list refresh")
+        elif planner.get("waiting_for_earns"):
             remaining = WAITING_RECHECK_SECS - (time.monotonic() - self._last_wait_check)
             if 0 < remaining < float("inf"):
                 reasons.append(f"Waiting for an available earn ({int(remaining // 60)}m)")
@@ -65,7 +77,10 @@ class EarnPlannerTask(Task):
 
     def run(self, state: GameState, executor):
         planner, _ = self._cfg()
+        timed = not state.earn_planner_check_pending and self._waiting_due(planner)
         state.earn_planner_check_pending = False
         if planner.get("waiting_for_earns"):
             self._last_wait_check = time.monotonic()
-        executor.execute(Action("earn_planner_check"), state)
+        # The timed recheck refreshes the earn list itself; checks triggered by a
+        # history update or an earn-list refresh use the list as it is.
+        executor.execute(Action("earn_planner_check", refresh_catalog=timed), state)
