@@ -395,6 +395,20 @@ def get_active_count() -> int:
             con.close()
 
 
+def get_active_player_names() -> list:
+    """Living players as [{username, rank, homecity}] — buyer choices for sales."""
+    with _lock:
+        con = _conn()
+        try:
+            rows = con.execute(
+                "SELECT username, rank, homecity FROM players WHERE active=1 "
+                "ORDER BY username COLLATE NOCASE"
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            con.close()
+
+
 def get_usernames() -> list:
     with _lock:
         con = _conn()

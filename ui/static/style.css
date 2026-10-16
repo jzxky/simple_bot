@@ -412,6 +412,82 @@ button {
 .profile-item-clickable:hover { background: var(--surface2); border-radius: 4px; cursor: pointer; }
 .profile-weapon-pill { display:inline-flex; align-items:center; gap:4px; background:var(--card-bg); border:1px solid var(--border); border-radius:4px; padding:3px 10px; font-size:12px; color:var(--text); }
 .profile-weapon-pill.profile-item-clickable:hover { border-color:var(--accent); cursor:pointer; background:var(--surface2); }
+.profile-section-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.profile-count { text-transform: none; letter-spacing: 0; }
+.profile-empty { font-size: 12px; margin-bottom: 4px; }
+.profile-item-img {
+  width: 48px; height: 48px; flex: none; border-radius: 3px; overflow: hidden;
+  border: 1px solid var(--border);
+  background: repeating-linear-gradient(45deg, #2a3850 0 6px, #26334a 6px 12px);
+}
+.profile-item-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* Bionics: one slot per body part */
+.profile-bionics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+.profile-bionic {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 4px; border-radius: var(--radius); text-align: center;
+  border: 1px dashed var(--border);
+}
+.profile-bionic-name { font-size: 12px; font-weight: 600; }
+.profile-bionic-chip {
+  font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: 1px 6px; border-radius: 9px;
+}
+.profile-bionic.empty .profile-item-img { opacity: .35; filter: grayscale(1); }
+.profile-bionic.empty .profile-bionic-name { color: var(--muted); }
+.profile-bionic.empty .profile-bionic-chip { color: var(--muted); border: 1px solid var(--border); }
+.profile-bionic.installed { border: 1px solid var(--success); background: rgba(58,158,95,.08); }
+.profile-bionic.installed .profile-item-img { border-color: var(--success); box-shadow: 0 0 8px rgba(58,158,95,.45); }
+.profile-bionic.installed .profile-bionic-chip { background: var(--success); color: #0e1a14; }
+
+/* Item rows (weapons, vehicle, apartment) */
+.profile-item-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius);
+  margin-bottom: 6px;
+}
+.profile-item-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.profile-item-meta .profile-item-name { font-size: 13px; }
+.profile-badge { font-size: 10px; font-weight: 400; padding: 1px 6px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); }
+.profile-bar { height: 5px; max-width: 160px; background: #121a26; border-radius: 3px; overflow: hidden; }
+.profile-bar i { display: block; height: 100%; background: var(--accent); }
+.profile-bar i.warn { background: #c8a020; }
+.profile-item-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.profile-btn {
+  font-size: 12px; padding: 4px 11px; border-radius: var(--radius); cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  text-transform: none; letter-spacing: 0;
+}
+.profile-btn:hover { border-color: var(--accent); }
+.profile-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.profile-btn.primary:hover { background: var(--accent-hover); }
+.profile-btn.danger { color: #f08c8c; border-color: #6a2a2a; }
+.profile-btn:disabled { opacity: .4; cursor: not-allowed; }
+.profile-sale-msg { font-size: 12px; padding: 6px 10px; border-radius: var(--radius); margin-bottom: 8px; border: 1px solid; }
+.profile-sale-msg.ok { color: #7fd09c; border-color: var(--success); background: rgba(58,158,95,.08); }
+.profile-sale-msg.bad { color: #f08c8c; border-color: #6a2a2a; background: rgba(204,42,42,.08); }
+
+/* Sale dialog */
+.sell-modal { max-width: 380px; }
+.sell-modal > .sell-field { display: block; position: relative; }
+.sell-modal > .sell-hint { display: block; }
+.sell-field label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+.sell-field input { width: 100%; padding: 7px 9px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font: inherit; }
+.sell-field input.input-good { border-color: var(--success); }
+.sell-field input.input-bad { border-color: var(--red); }
+.sell-hint { font-size: 11.5px; margin-top: 4px; min-height: 15px; color: var(--muted); }
+.sell-hint.good { color: #7fd09c; }
+.sell-hint.bad { color: #f08c8c; }
+.sell-ac {
+  position: absolute; left: 0; right: 0; top: 58px; z-index: 5; max-height: 200px; overflow-y: auto;
+  background: #182233; border: 1px solid var(--border); border-radius: var(--radius);
+}
+.sell-ac-item { display: flex; justify-content: space-between; gap: 8px; padding: 6px 9px; cursor: pointer; font-size: 13px; }
+.sell-ac-item:hover, .sell-ac-item.sel { background: var(--surface2); color: var(--accent); }
+.sell-ac-item small { color: var(--muted); }
+.sell-modal > .sell-actions { display: flex; gap: 8px; justify-content: flex-end; }
+@media (max-width: 520px) { .profile-bionics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .profile-refreshing { opacity: 0.5; pointer-events: none; transition: opacity 0.15s; }
 .profile-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
 .profile-tag {

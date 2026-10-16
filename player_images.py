@@ -21,10 +21,6 @@ IMAGES_DIR = os.path.join(paths.data_dir(), "player_images")
 _ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
-def _ensure_dir():
-    os.makedirs(IMAGES_DIR, exist_ok=True)
-
-
 def filename_for_url(url: str) -> str:
     """Deterministic, collision-safe local filename for a remote image URL.
 
@@ -48,14 +44,16 @@ def has_image(url: str) -> bool:
     return bool(p) and os.path.exists(p)
 
 
-def download_missing(pic_urls, fetch_bytes) -> int:
+def download_missing(pic_urls, fetch_bytes, images_dir: str = "") -> int:
     """Download only images not already on disk.
 
     pic_urls    — iterable of remote URLs (duplicates fine).
     fetch_bytes — callable(url) -> bytes | None (None on failure/skip).
+    images_dir  — destination folder (defaults to the player image cache).
 
     Returns the number of new images written."""
-    _ensure_dir()
+    images_dir = images_dir or IMAGES_DIR
+    os.makedirs(images_dir, exist_ok=True)
     downloaded = 0
     seen = set()
     for url in pic_urls:
@@ -68,7 +66,7 @@ def download_missing(pic_urls, fetch_bytes) -> int:
         ext = os.path.splitext(name)[1].lower()
         if ext not in _ALLOWED_EXT:
             continue
-        dest = os.path.join(IMAGES_DIR, name)
+        dest = os.path.join(images_dir, name)
         if os.path.exists(dest):
             continue
         try:
