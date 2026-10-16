@@ -3426,6 +3426,8 @@ def handle_bank_invest(action: Action, state: GameState):
     page = browser.page()
 
     page.goto(BANK_URL, wait_until="domcontentloaded", timeout=15000)
+    # Refresh so the closing balance reflects any just-matured investment or deposit.
+    page.reload(wait_until="domcontentloaded", timeout=15000)
     soup = BeautifulSoup(page.content(), "html.parser")
     closing_bal = 0
     for span in soup.find_all("span"):
@@ -3436,6 +3438,7 @@ def handle_bank_invest(action: Action, state: GameState):
             if bal_m:
                 closing_bal = int(bal_m.group(1).replace(",", ""))
             break
+    state.add_log(f"Banking: bank balance ${closing_bal:,} (refreshed).")
 
     amount = min(amount, 1500000, closing_bal)
     if amount < 1:
