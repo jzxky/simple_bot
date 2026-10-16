@@ -94,6 +94,8 @@ class PromoPageTask(Task):
             parse_state(page.content(), page.url, state)
             msg = f"Auto-promo: {promo['rank']} — option {choice} ({option_label}) submitted."
             state.add_log(msg)
+            # New rank → the available earns often change; refresh the list.
+            state.earn_catalog_refresh_pending = True
             if cfg.load().get("notifications", {}).get("auto_promo", False):
                 state.push_notification("auto_promo", msg)
         except Exception as e:

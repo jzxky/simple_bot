@@ -58,6 +58,9 @@ class GameState:
     agg_tab_active: bool = False
     agg_tab_crime: str = ""   # crime kind currently running on the agg-crimes tab, else ""
     drug_store_tab_active: bool = False
+    # Set after a promotion is submitted — the available earns often change, so
+    # the bot loop refreshes the earns list (earn.asp) on its next pass.
+    earn_catalog_refresh_pending: bool = False
     in_jail: bool = False
     jail_rank: str = ""
     has_new_journals: bool = False

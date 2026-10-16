@@ -175,6 +175,10 @@ class SnipeTopJobTask(Task):
                 state.add_log(f"SnipeTopJob: post-promotion error: {e}")
             if pg is not None:
                 side.close_page(pg)
+            if promoted:
+                # New rank → the available earns often change; the main bot
+                # loop refreshes the list (this thread can't use the main browser).
+                state.earn_catalog_refresh_pending = True
             state.snipe_top_job_pending = False
             state.snipe_top_job_promo_url = ""
             state.snipe_active = False
