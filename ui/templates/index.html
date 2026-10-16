@@ -307,7 +307,7 @@
           <hr class="stat-divider">
           <div class="setting-row">
             <label for="earn_mode">Earn Mode</label>
-            <select id="earn_mode" onchange="autoSave()" style="width:160px">
+            <select id="earn_mode" onchange="_populateEarnCategories(); autoSave()" style="width:160px">
               <option value="auto" {% if config.earns.earn_mode == 'auto' or not config.earns.earn_mode %}selected{% endif %}>Auto</option>
               <option value="manual" {% if config.earns.earn_mode == 'manual' %}selected{% endif %}>Manual</option>
             </select>

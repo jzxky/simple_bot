@@ -293,22 +293,8 @@ def _scrape_earn_catalog(page, state: GameState):
     except Exception:
         pass
 
-    auto_div = page.query_selector("div.mm-earn-mode-auto")
-    if auto_div:
-        style = auto_div.get_attribute("style") or ""
-        if "display: none" in style or "display:none" in style:
-            page.evaluate("document.querySelector('#mm_earn_mode_toggle').click()")
-            page.wait_for_function(
-                "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
-                "return el && !el.style.display.includes('none'); }",
-                timeout=5000
-            )
-            page.wait_for_selector(
-                "select[name='schedule_earn_identifier']",
-                state="visible", timeout=5000,
-            )
-            state.add_log("Switched to AUTO earn mode.")
-
+    # Both the AUTO and MANUAL panels are in the page whichever mode is shown
+    # (the other is just display:none), so read them as-is — no mode switch.
     soup = BeautifulSoup(page.content(), "html.parser")
     auto_panel = soup.find("div", class_="mm-earn-mode-auto")
     available_values = []
@@ -560,6 +546,11 @@ def handle_check_earns(action: Action, state: GameState):
     earn_type = action.params["earn_type"]
     page = browser.page()
 
+    if earn_type.startswith(MANUAL_EARN_PREFIX):
+        state.add_log(f"Earns: '{_earn_display_name(earn_type)}' is a manual-only earn — "
+                      "set Earn Mode to Manual or pick another earn.")
+        return
+
     # Fetch character history first — it navigates away from earn.asp.
     import earn_planner as _ep
     import character_history as _ch
@@ -664,64 +655,87 @@ def _load_earn_catalog():
         return list(_EARN_SEED)
 
 
-def _earn_display_name(schedule_value: str) -> str:
+MANUAL_EARN_PREFIX = "manual:"
+
+
+def _earn_entry(earn_type: str) -> "dict | None":
+    """Catalog entry for an earn. Auto earns are identified by schedule_value;
+    manual-only earns (no schedule_value, e.g. Pizza Restaurant) by
+    "manual:<data-earn>"."""
     for entry in _load_earn_catalog():
-        if entry.get("schedule_value") == schedule_value:
-            return entry["label"]
+        if earn_type.startswith(MANUAL_EARN_PREFIX):
+            if (not entry.get("schedule_value")
+                    and entry.get("data_earn") == earn_type[len(MANUAL_EARN_PREFIX):]):
+                return entry
+        elif entry.get("schedule_value") == earn_type:
+            return entry
+    return None
+
+
+def _earn_display_name(schedule_value: str) -> str:
+    entry = _earn_entry(schedule_value)
+    if entry:
+        return entry["label"]
+    if schedule_value.startswith(MANUAL_EARN_PREFIX):
+        return schedule_value[len(MANUAL_EARN_PREFIX):]
     import earn_planner as _ep
     return _ep.HISTORY_NAME.get(schedule_value, schedule_value)
 
 
-def _earn_data_earn(schedule_value: str):
-    for entry in _load_earn_catalog():
-        if entry.get("schedule_value") == schedule_value:
-            return entry.get("data_earn")
-    return None
-
-
 def _try_quick_earn(page, display_name: str, schedule_value: str, state: GameState) -> bool:
-    links = page.query_selector_all("a[href*='doLoadfastincome']")
-    for link in links:
-        href = link.get_attribute("href") or ""
-        match = re.search(r"doLoadfastincome\('([^']+)'", href)
-        if not match:
-            continue
-        lastearn_text = match.group(1)
-        catalog = _load_earn_catalog()
-        matched = False
-        if lastearn_text.lower() == display_name.lower():
-            matched = True
-        else:
-            for entry in catalog:
-                if entry.get("schedule_value") == schedule_value:
-                    if entry.get("lastearn_name", "").lower() == lastearn_text.lower():
-                        matched = True
-                    break
-        if not matched:
-            continue
-        link.click()
+    """Use the game's "repeat last earn" link (doLoadfastincome) if it's on the
+    current page and points at the wanted earn. Checked once on the loaded page
+    — no waiting for the link — so a missing link goes straight to earn.asp."""
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=3000)
+    except Exception:
+        pass
+    entry = _earn_entry(schedule_value) or {}
+    known = {display_name.lower(), (entry.get("lastearn_name") or "").lower()} - {""}
+    target = None
+    lastearn_text = ""
+    for link in page.query_selector_all("a[href*='doLoadfastincome']"):
+        match = re.search(r"doLoadfastincome\('([^']+)'", link.get_attribute("href") or "")
+        if match and match.group(1).lower() in known:
+            target, lastearn_text = link, match.group(1)
+            break
+    if target is None:
+        return False
+
+    target.click()
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=10000)
+    except Exception:
+        pass
+    try:
+        page.wait_for_selector("input[name='lastearn']", timeout=5000)
+    except Exception:
+        pass
+    lastearn = page.query_selector("input[name='lastearn']")
+    if lastearn:
+        lastearn.click()
         try:
             page.wait_for_load_state("domcontentloaded", timeout=10000)
         except Exception:
             pass
-        try:
-            page.wait_for_selector("input[name='lastearn']", timeout=5000)
-        except Exception:
-            pass
-        lastearn = page.query_selector("input[name='lastearn']")
-        if lastearn:
-            lastearn.click()
-            try:
-                page.wait_for_load_state("domcontentloaded", timeout=10000)
-            except Exception:
-                pass
-            state.add_log(f"Manual earn: quick-earn '{display_name}' — submitted via lastearn.")
-            _map_lastearn_to_catalog(lastearn_text, schedule_value)
-        else:
-            state.add_log(f"Manual earn: quick-earn '{display_name}' — lastearn input not found.")
+        _map_lastearn_to_catalog(lastearn_text, schedule_value)
         _refresh_state(state)
-        return True
-    return False
+        _log_manual_earn_result(state, display_name, page.content(), "quick earn")
+    else:
+        state.add_log(f"Manual earn: quick-earn '{display_name}' — lastearn input not found.")
+        _refresh_state(state)
+    return True
+
+
+def _log_manual_earn_result(state: GameState, display_name: str, html: str, how: str):
+    """Log the game's #success / #fail message after an earn."""
+    success, message = _game_result_message(html)
+    if success is True:
+        state.add_log(f"Manual earn ({how}): {display_name} — {message}")
+    elif success is False:
+        state.add_log(f"Manual earn ({how}) failed: {display_name} — {message}")
+    else:
+        state.add_log(f"Manual earn ({how}): {display_name} — no result message on the page.")
 
 
 def _ensure_manual_earn_mode(page, state: GameState):
@@ -756,13 +770,48 @@ def _map_lastearn_to_catalog(lastearn_text: str, schedule_value: str):
             entries = _json.load(f)
     except Exception:
         return
+    is_manual = schedule_value.startswith(MANUAL_EARN_PREFIX)
+    manual_id = schedule_value[len(MANUAL_EARN_PREFIX):] if is_manual else None
     for entry in entries:
-        if entry.get("schedule_value") == schedule_value:
+        if is_manual:
+            hit = not entry.get("schedule_value") and entry.get("data_earn") == manual_id
+        else:
+            hit = entry.get("schedule_value") == schedule_value
+        if hit:
             if entry.get("lastearn_name") != lastearn_text:
                 entry["lastearn_name"] = lastearn_text
                 with open(path, "w", encoding="utf-8") as f:
                     _json.dump(entries, f, indent=2)
             return
+
+
+def _find_manual_earn_option(page, earn_type: str, display_name: str):
+    """The first NOT-trapped option for the wanted earn in the manual list.
+    Trapped decoys (struck through, in red) share the label and get their own
+    data-earn number, so match by label (or by data-earn for manual-only
+    earns, whose ids like "Pizza" are stable) and skip any with <s>."""
+    manual_id = earn_type[len(MANUAL_EARN_PREFIX):] if earn_type.startswith(MANUAL_EARN_PREFIX) else None
+    for opt in page.query_selector_all("#earns_list div.earn-option"):
+        span = opt.query_selector("span")
+        if not span:
+            continue
+        label = span.inner_text().strip().lower()
+        matches = (label == display_name.lower()
+                   or (manual_id is not None and opt.get_attribute("data-earn") == manual_id))
+        if matches and not span.query_selector("s"):
+            return opt
+    return None
+
+
+def _disable_earns(state: GameState, reason: str):
+    import settings_rev
+    c = cfg.load()
+    c["earns"]["enabled"] = False
+    cfg.save(c)
+    settings_rev.bump()
+    import bot as _bot
+    _bot.request_reload()
+    state.add_log(reason)
 
 
 def handle_manual_earn(action: Action, state: GameState):
@@ -773,47 +822,29 @@ def handle_manual_earn(action: Action, state: GameState):
     if _try_quick_earn(page, display_name, earn_type, state):
         return
 
-    _nav(_u("/income/earn.asp"), state)
-    if not _check_session(state):
-        return
-
+    # Opens earn.asp and refreshes the earn list (no mode switching).
     _scrape_earn_catalog(page, state)
-    _ensure_manual_earn_mode(page, state)
-
-    data_earn = _earn_data_earn(earn_type)
-    option = None
-    if data_earn is not None:
-        option = page.query_selector(f"div.earn-option[data-earn='{data_earn}']")
-
-    if not option:
-        options = page.query_selector_all("div.earn-option")
-        for opt in options:
-            span = opt.query_selector("span")
-            if span and span.inner_text().strip().lower() == display_name.lower():
-                option = opt
-                break
-
-    if not option:
-        state.add_log(f"Manual earn: could not find '{display_name}' in earn list.")
+    if not state.logged_in or "earn.asp" not in browser.current_url():
         return
+    _ensure_manual_earn_mode(page, state)   # only toggles if not already MANUAL
 
-    trapped = option.query_selector("s")
-    if trapped:
-        state.add_log(f"Manual earn: '{display_name}' is trapped (red) — skipping.")
+    option = _find_manual_earn_option(page, earn_type, display_name)
+    if not option:
+        _disable_earns(state, f"Manual earn: '{display_name}' is not available in the earn list — disabling earns.")
         return
 
     option.click()
     time.sleep(0.3)
 
-    work_btn = page.query_selector("button.btn-new.bg-mm")
-    if not work_btn:
+    work_btn = page.locator("div.mm-earn-mode-manual form button.btn-new", has_text="Work").first
+    if work_btn.count() == 0:
         state.add_log("Manual earn: Work button not found.")
         return
 
-    work_btn.click()
-    page.wait_for_load_state("domcontentloaded")
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+        work_btn.click()
     _refresh_state(state)
-    state.add_log(f"Manual earn: worked '{display_name}'.")
+    _log_manual_earn_result(state, display_name, page.content(), "earn page")
 
     for lnk in page.query_selector_all("a[href*='doLoadfastincome']"):
         href = lnk.get_attribute("href") or ""
@@ -2947,20 +2978,30 @@ def _upsert_earn_catalog(auto_opts, manual_opts):
             by_label[label] = {"label": label, "schedule_value": val, "data_earn": None,
                                "available": True, "category": "Uncategorized"}
 
+    manual_ok = set()   # labels with a non-trapped option in the manual list
     for data_earn, label, is_trap in manual_opts:
         scraped_labels.add(label)
+        if not is_trap:
+            manual_ok.add(label)
         if label in by_label:
-            by_label[label]["data_earn"] = data_earn
+            # Trapped decoys share the label but get their own data-earn —
+            # only take the id from the real (non-trapped) option.
+            if not is_trap:
+                by_label[label]["data_earn"] = data_earn
             if is_trap and label not in auto_labels:
                 by_label[label]["available"] = False
         else:
-            by_label[label] = {"label": label, "schedule_value": None, "data_earn": data_earn,
+            by_label[label] = {"label": label, "schedule_value": None,
+                               "data_earn": None if is_trap else data_earn,
                                "available": not is_trap, "category": "Uncategorized"}
 
     for label, entry in by_label.items():
         if entry.get("available") is True and label not in auto_labels:
             entry["available"] = False
         entry["enabled"] = label in scraped_labels
+        if manual_opts:
+            # Usable in MANUAL earn mode (the manual list has a real option).
+            entry["manual_available"] = label in manual_ok
 
     with open(path, "w", encoding="utf-8") as f:
         _json.dump(list(by_label.values()), f, indent=2)
