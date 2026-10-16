@@ -60,6 +60,29 @@ function _showAllEarns() {
   return cb && cb.checked;
 }
 
+function _earnModeIsManual() {
+  const m = document.getElementById("earn_mode");
+  return !!m && m.value === "manual";
+}
+
+// The value the bot stores for an earn: its auto schedule value, or
+// "manual:<data-earn>" for manual-only earns.
+function _earnValue(e) {
+  if (e.schedule_value) return e.schedule_value;
+  return e.data_earn ? "manual:" + e.data_earn : "";
+}
+
+// Currently usable: Auto mode → offered in the auto list; Manual mode → a
+// real (non-trapped) option in the manual list.
+function _earnUsable(e, manualMode) {
+  if (e.enabled === false) return false;
+  if (manualMode) {
+    if (e.manual_available !== undefined) return e.manual_available === true && !!_earnValue(e);
+    return e.available === true && !!_earnValue(e);
+  }
+  return !!e.schedule_value && e.available === true;
+}
+
 // Earn selector: one dropdown with the categories as <optgroup> headers (same
 // style as the Earn Planner's add selector).
 function _populateEarnCategories(selectedEarnType) {
@@ -76,9 +99,10 @@ function _populateEarnCategories(selectedEarnType) {
   // every earn in the catalog — including ones not currently offered
   // (enabled === false) — so you can pick one ahead of time.
   const showAll = _showAllEarns();
+  const manualMode = _earnModeIsManual();
   const groups = new Map();   // category -> [entries], in catalog order
   _earnCatalog.forEach(e => {
-    if (!showAll && (!e.schedule_value || e.enabled === false || e.available !== true)) return;
+    if (!showAll && !_earnUsable(e, manualMode)) return;
     const cat = e.category || "Uncategorized";
     if (!groups.has(cat)) groups.set(cat, []);
     groups.get(cat).push(e);
@@ -98,20 +122,22 @@ function _populateEarnCategories(selectedEarnType) {
   let found = false;
   groups.forEach((items, cat) => {
     html += `<optgroup label="${escHtml(cat)}">` + items.map(e => {
-      // Earns with no schedule value only appear in the game's manual list
-      // and can't be set as the bot's earn — show them, but not selectable.
-      if (!e.schedule_value) {
-        return `<option disabled>${escHtml(e.label || "?")} (can't be scheduled)</option>`;
+      // Manual-only earns (no schedule value, e.g. Pizza Restaurant) can be
+      // used in Manual earn mode; in Auto mode they can't be queued.
+      const value = _earnValue(e);
+      if (!value) return `<option disabled>${escHtml(e.label || "?")}</option>`;
+      if (!e.schedule_value && !manualMode) {
+        return `<option disabled>${escHtml(e.label || "?")} (manual mode only)</option>`;
       }
-      const selected = e.schedule_value === selectedEarnType;
+      const selected = value === selectedEarnType;
       if (selected) found = true;
-      return `<option value="${escHtml(e.schedule_value)}"${selected ? " selected" : ""}>${escHtml(e.label || e.schedule_value)}</option>`;
+      return `<option value="${escHtml(value)}"${selected ? " selected" : ""}>${escHtml(e.label || value)}</option>`;
     }).join("") + "</optgroup>";
   });
   // Keep the saved earn selectable even if it's hidden by the current filter,
   // so re-rendering never silently switches earns.
   if (selectedEarnType && !found) {
-    const entry = _earnCatalog.find(e => e.schedule_value === selectedEarnType);
+    const entry = _earnCatalog.find(e => _earnValue(e) === selectedEarnType);
     const label = entry ? (entry.label || selectedEarnType) : selectedEarnType;
     html = `<option value="${escHtml(selectedEarnType)}" selected>${escHtml(label)} (not available)</option>` + html;
   }
