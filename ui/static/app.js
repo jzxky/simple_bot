@@ -1053,6 +1053,11 @@ function _showSaleResult(d) {
   el.hidden = false;
 }
 
+function clearSaleResult() {
+  const el = document.getElementById("profile-sale-msg");
+  if (el) { el.hidden = true; el.textContent = ""; }
+}
+
 function _postSale(url, body) {
   return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})})
     .then(r => r.json())
