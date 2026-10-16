@@ -5927,10 +5927,16 @@ def handle_save_game_options(action: Action, state: GameState):
         with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
             page.click("#holder_content input[type='submit'][name='Submit']")
         _refresh_state(state)
-        success, message = _game_result_message(page.content())
-        # Read back what the game actually stored.
-        _open_game_options(state)
-        options = _parse_game_options(browser.page().content())
+        html = page.content()
+        success, message = _game_result_message(html)
+        if success is None:
+            message = ""  # no result box — the fallback text would just be the form
+        # The game stays on options.asp after saving and shows the stored
+        # values — read them from this page. A field missing from the
+        # response falls back to the value that was submitted.
+        parsed = _parse_game_options(html)
+        options = {k: (parsed[k] if parsed.get(k) is not None else str(values.get(k, "")))
+                   for k in GAME_OPTION_FIELDS}
         changed = ", ".join(f"{k} {options.get(k)!r}" for k in values)
         state.add_log(f"Game options saved ({changed})" + (f" — {message}" if message else "."))
         result_q.put({"options": options, "success": success, "message": message})
