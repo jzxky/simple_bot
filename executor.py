@@ -6513,7 +6513,8 @@ def handle_repair_vehicle_ui(action: Action, state: GameState):
 
 
 _APARTMENT_URL = "/profile/dirty.asp"
-_APT_FORM = "form[action*='dirty.asp']"
+# The stash page is recognised by its controls, not the form's action attribute.
+_APT_MARKERS = "input[name='stashoption'], input[name='amount'], table#profile_dirty"
 
 
 def _strong_ints(el) -> list:
@@ -6524,7 +6525,7 @@ def _parse_apartment(state: GameState) -> "dict | None":
     """Stash figures and drug rows from the current dirty.asp page, or None
     if the stash form isn't there."""
     soup = BeautifulSoup(browser.page().content(), "html.parser")
-    if not soup.select_one(_APT_FORM):
+    if not soup.select_one(_APT_MARKERS):
         return None
     img_urls = []
     data = {"dirty_on_hand": state.dirty_money}
@@ -6571,17 +6572,47 @@ def _parse_apartment(state: GameState) -> "dict | None":
     return data
 
 
+def _apartment_ready() -> bool:
+    return browser.page().locator(_APT_MARKERS).count() > 0
+
+
 def _open_apartment(state: GameState) -> "dict | None":
-    """Navigate to dirty.asp and parse it. Returns a failure result dict
-    (ok False) when the page isn't usable, else None."""
+    """Open profile/dirty.asp so its stash form is on screen. Tries the URL
+    directly, then via the profile's Enter/Manage link (the game may want
+    the profile page as referrer). Returns a failure result dict (ok False)
+    when the form still isn't there, else None."""
     _nav(_u(_APARTMENT_URL), state)
     if not _check_session(state):
         return {"ok": False, "message": "Session expired."}
-    if not BeautifulSoup(browser.page().content(), "html.parser").select_one(_APT_FORM):
-        div = _page_result_div(BeautifulSoup(browser.page().content(), "html.parser"))
-        return {"ok": False, "message": div.get_text(" ", strip=True) if div else
-                "The apartment stash page isn't available."}
-    return None
+    if _apartment_ready():
+        return None
+
+    first_url = browser.current_url()
+    _nav(_u("/profile/default.asp"), state)
+    if not _check_session(state):
+        return {"ok": False, "message": "Session expired."}
+    page = browser.page()
+    link = page.locator("a[href*='dirty.asp']")
+    if link.count() > 0:
+        link.first.click()
+        page.wait_for_load_state("domcontentloaded")
+    else:
+        page.goto(_u(_APARTMENT_URL), referer=_u("/profile/default.asp"),
+                  wait_until="domcontentloaded", timeout=30000)
+    _refresh_state(state)
+    if _apartment_ready():
+        return None
+
+    soup = BeautifulSoup(page.content(), "html.parser")
+    div = _page_result_div(soup)
+    if div:
+        msg = div.get_text(" ", strip=True)
+    else:
+        heading = soup.select_one("#holder_top h1")
+        where = heading.get_text(" ", strip=True) if heading else (soup.title.get_text(strip=True) if soup.title else "")
+        msg = (f"the stash form wasn't on dirty.asp — the bot landed on {browser.current_url()}"
+               f"{f' ({where})' if where else ''}; first try landed on {first_url}.")
+    return {"ok": False, "message": msg}
 
 
 def _apartment_submit(state: GameState, label: str, submit_selector: str) -> dict:
@@ -6599,6 +6630,8 @@ def handle_fetch_apartment(action: Action, state: GameState):
     result = _open_apartment(state)
     if result is None:
         result = {"ok": True, "message": "", "apartment": _parse_apartment(state)}
+    else:
+        state.add_log(f"Open apartment failed: {result['message']}")
     if result_q is not None:
         result_q.put(result)
 
@@ -6613,8 +6646,8 @@ def handle_apartment_money(action: Action, state: GameState):
     if result is None:
         page = browser.page()
         page.check("#stashmoney" if mode == "stash" else "#grabmoney")
-        page.fill(f"{_APT_FORM} input[name='amount']", str(amount))
-        result = _apartment_submit(state, label, f"{_APT_FORM} input[name='amount'] ~ input[type='submit']")
+        page.fill("input[name='amount']", str(amount))
+        result = _apartment_submit(state, label, "input[name='amount'] ~ input[type='submit']")
     else:
         state.add_log(f"{label} failed: {result['message']}")
     if result_q is not None:
