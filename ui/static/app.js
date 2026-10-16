@@ -413,8 +413,11 @@ function showTab(id, btn) {
 
 function _buildPayload() {
   return {
-    email: document.getElementById("email").value,
-    password: document.getElementById("password").value,
+    // Absent when credentials are hidden (Settings › Misc › Developer) — the
+    // keys are then dropped from the payload and the server leaves .env alone.
+    email: document.getElementById("email")?.value,
+    password: document.getElementById("password")?.value,
+    hide_credentials: document.getElementById("hide_credentials").checked,
     pin_required: document.getElementById("pin_required").checked,
     ui_pin: document.getElementById("ui_pin").value,
     earns_enabled: document.getElementById("earns_enabled").checked,
@@ -746,9 +749,18 @@ function flushSave() {
 document.addEventListener("focusout", () => { if (_saveTimer) flushSave(); });
 
 function markCredsDirty() {
-  document.getElementById("email").classList.add("input-unsaved");
-  document.getElementById("password").classList.add("input-unsaved");
+  document.getElementById("email")?.classList.add("input-unsaved");
+  document.getElementById("password")?.classList.add("input-unsaved");
   debouncedSave();
+}
+
+function enableHideCredentials(el) {
+  if (!confirm("Hide your email and password from the UI?\n\nAfter this they can only be viewed and edited in the .env file. "
+             + "To undo, set UI_HIDE_CREDENTIALS=false in .env and reload this page.")) {
+    el.checked = false;
+    return;
+  }
+  autoSaveAndReload();
 }
 
 function markNumDirty(el) {

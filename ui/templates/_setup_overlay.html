@@ -13,6 +13,9 @@
       <section class="setup-section setup-required">
         <div class="setup-section-head"><h3>Game account</h3><span class="setup-badge">Required</span></div>
         <div class="setup-section-body">
+          {% if setup.creds_locked %}
+          <p class="setup-note setup-lock">Credentials are hidden from the UI — they're read from the <code>.env</code> file on this machine.</p>
+          {% else %}
           <label class="setup-field">Email
             <input type="email" id="setup_email" value="{{ setup.email }}" placeholder="you@example.com" oninput="setupValidate()">
           </label>
@@ -20,6 +23,7 @@
             <input type="password" id="setup_password" value="{{ setup.password }}" placeholder="••••••••" oninput="setupValidate()">
           </label>
           <p class="setup-note setup-lock">Saved to the <code>.env</code> file on this machine only — never written to config.json.</p>
+          {% endif %}
         </div>
       </section>
 
@@ -161,7 +165,7 @@
   };
 
   window.setupValidate = function () {
-    const ok = $("setup_email").value.trim() !== "" && $("setup_password").value !== "";
+    const ok = !$("setup_email") || ($("setup_email").value.trim() !== "" && $("setup_password").value !== "");
     $("setup-save-btn").disabled = !ok;
     $("setup-error").textContent = ok ? "" : "Enter your email and password to continue";
     return ok;
@@ -174,7 +178,7 @@
     const on = id => $(id).checked;
     const typeWithSub = $("setup_action_sub_wrap").style.display !== "none";
     const payload = {
-      email: v("setup_email").trim(), password: v("setup_password"),
+      email: $("setup_email")?.value.trim(), password: $("setup_password")?.value,
       earns_enabled: on("setup_earns_enabled"), earn_type: v("setup_earn_type"),
       action_enabled: on("setup_action_enabled"), action_type: v("setup_action_type"),
       action_sub: typeWithSub ? v("setup_action_sub") : "",

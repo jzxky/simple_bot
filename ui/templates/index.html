@@ -1906,6 +1906,13 @@
               <label class="inline-toggle setting-row">Screenshot on Error
                 <label class="toggle-label"><input type="checkbox" id="screenshot_errors" {% if config.get('misc', {}).get('screenshot_errors', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+              <label class="inline-toggle setting-row">Hide Credentials in UI
+                <label class="toggle-label"><input type="checkbox" id="hide_credentials" {% if hide_credentials %}checked disabled{% endif %} onchange="enableHideCredentials(this)"><span class="toggle"></span></label>
+              </label>
+              <p style="font-size:0.8rem;color:var(--muted);margin:4px 0 0">
+                {% if hide_credentials %}Email and password can only be viewed and edited in the .env file. To show them here again, set <code>UI_HIDE_CREDENTIALS=false</code> in .env and reload.
+                {% else %}Once on, email and password can only be viewed and edited in the .env file — this can't be turned off from the UI.{% endif %}
+              </p>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Character History</h3>
@@ -1925,6 +1932,9 @@
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Login</h3>
+              {% if hide_credentials %}
+              <p style="font-size:0.85rem;color:var(--muted);margin:8px 0 0">Credentials are hidden from the UI. Edit <code>MM_EMAIL</code> and <code>MM_PASSWORD</code> in the .env file to change them.</p>
+              {% else %}
               <div class="row">
                 <label>Email
                   <div class="input-with-btn">
@@ -1939,6 +1949,7 @@
                   </div>
                 </label>
               </div>
+              {% endif %}
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>UI Access PIN</h3>
