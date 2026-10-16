@@ -18,6 +18,7 @@ from executor import ActionExecutor
 from tasks.base import Action
 from tasks.login import LoginTask
 from tasks.earns import EarnsTask
+from tasks.earn_planner_task import EarnPlannerTask
 from tasks.manual_earns import ManualEarnsTask
 from tasks.agg_crimes import AggCrimeTask
 from tasks.community_service import CommunityServiceTask
@@ -154,7 +155,8 @@ def _transfer_state(old_sched: Scheduler, new_sched: Scheduler):
         old = old_by_type.get(type(new_task))
         if old is None:
             continue
-        for attr in ("_last_run", "_last_fired", "_last_checked", "_cooldown_until", "_hack_exhausted"):
+        for attr in ("_last_run", "_last_fired", "_last_checked", "_cooldown_until", "_hack_exhausted",
+                     "_last_wait_check"):
             if hasattr(old, attr):
                 setattr(new_task, attr, getattr(old, attr))
 
@@ -271,6 +273,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             preferred_contacts=launder_cfg.get("preferred_contacts", []),
         ))
 
+    sched.add(EarnPlannerTask())
     sched.add(RefreshTask(interval_seconds=60))
     sched.add(ConsumeTask(_consume_queue))
     sched.add(DepositTask(_deposit_queue))

@@ -61,6 +61,8 @@ class GameState:
     # Set after a promotion is submitted — the available earns often change, so
     # the bot loop refreshes the earns list (earn.asp) on its next pass.
     earn_catalog_refresh_pending: bool = False
+    # Set after each character-history update — the Earn Planner checks progress then.
+    earn_planner_check_pending: bool = False
     in_jail: bool = False
     jail_rank: str = ""
     has_new_journals: bool = False
