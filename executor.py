@@ -5197,6 +5197,21 @@ def _card_rank_value(img_src: str) -> "int | None":
     return _CARD_RANK_VALUE.get(m.group(1).lower())
 
 
+def _parse_repair_cost(html: str) -> "int | None":
+    """Repair price from repairs.asp, e.g. "The Auckland vehicle repair shop is
+    currently fixing Galactic Neros for <font color="gold">$9,833</font>." """
+    soup = BeautifulSoup(html, "html.parser")
+    for font in soup.find_all("font", color="gold"):
+        para = font.find_parent("p")
+        context = para.get_text(" ", strip=True).lower() if para else ""
+        if "repair shop" not in context or "fixing" not in context:
+            continue
+        m = re.search(r"\$([\d,]+)", font.get_text())
+        if m:
+            return int(m.group(1).replace(",", ""))
+    return None
+
+
 def handle_check_vehicle(action: Action, state: GameState) -> int:
     _nav(_u(_REPAIRS_URL), state)
     if not _check_session(state):
@@ -5224,7 +5239,9 @@ def handle_check_vehicle(action: Action, state: GameState) -> int:
     m = re.search(r"(\d+)", bar.get_text())
     pct = int(m.group(1)) if m else 0
     state.vehicle_health = pct
-    state.add_log(f"Check vehicle: health {pct}%.")
+    cost = _parse_repair_cost(state.page_html)
+    cost_txt = f", repair cost ${cost:,}" if cost is not None else ""
+    state.add_log(f"Check vehicle: health {pct}%{cost_txt}.")
     return pct
 
 
@@ -5239,20 +5256,20 @@ def handle_repair_vehicle(action: Action, state: GameState) -> bool:
     if _NO_VEHICLE_TEXT in state.page_html.lower():
         state.add_log("Repair vehicle: no vehicle to repair.")
         return False
-    soup = BeautifulSoup(state.page_html, "html.parser")
-    # Check and withdraw funds if needed
-    cost_font = soup.find("font", color="gold")
-    if cost_font:
-        cost_m = re.search(r"\$([\d,]+)", cost_font.get_text())
-        if cost_m:
-            cost = int(cost_m.group(1).replace(",", ""))
-            if state.clean_money < cost:
-                needed = cost - state.clean_money
-                state.add_log(f"Repair vehicle: need ${cost:,}, withdrawing ${needed:,}.")
-                handle_withdraw(Action("withdraw", amount=needed), state)
-                if state.clean_money < cost:
-                    state.add_log("Repair vehicle: insufficient funds — skipping.")
-                    return False
+    cost = _parse_repair_cost(state.page_html)
+    if cost is None:
+        state.add_log("Repair vehicle: could not parse repair cost — attempting repair anyway.")
+    elif state.clean_money < cost:
+        state.add_log(f"Repair vehicle: costs ${cost:,} but only ${state.clean_money:,} on hand, "
+                      f"withdrawing ${cost:,}.")
+        handle_withdraw(Action("withdraw", amount=cost), state)
+        if state.clean_money < cost:
+            state.add_log("Repair vehicle: insufficient funds — skipping.")
+            return False
+        # Withdrawing leaves the browser on the bank page — return to the repair form.
+        _nav(_u(_REPAIRS_URL), state)
+        if not _check_session(state):
+            return False
     page = browser.page()
     page.select_option("select[name='display']", "Yes")
     page.click("input[name='B1']")
