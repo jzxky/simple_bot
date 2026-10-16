@@ -374,9 +374,12 @@ def _save_earn_queue_cache(rows):
 
 
 def _ensure_auto_earn_mode(page):
-    """Make sure the AUTO earn panel is visible (it can collapse after a page reload)."""
+    """Make sure the AUTO earn panel is visible — the page loads in the
+    account's saved mode, so after any reload it may be showing MANUAL."""
     try:
-        page.wait_for_selector("div.mm-earn-mode-auto", timeout=5000)
+        # "attached", not the default "visible": in MANUAL mode the panel is in
+        # the page but hidden, and that's exactly when it needs switching.
+        page.wait_for_selector("div.mm-earn-mode-auto", state="attached", timeout=5000)
     except Exception:
         return
     auto_div = page.query_selector("div.mm-earn-mode-auto")
@@ -402,8 +405,9 @@ def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
         _ensure_auto_earn_mode(page)
         page.select_option("select[name='schedule_earn_identifier']", value)
         page.fill("input[name='schedule_count']", str(amount))
-        page.click("button.mm-earn-add-btn")
-        page.wait_for_load_state("domcontentloaded")
+        # The add form reloads earn.asp — wait for that reload, not the old page.
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+            page.click("button.mm-earn-add-btn")
         state.add_log(f"Earn queue: added {amount} x {value}.")
         return True
     except Exception as e:
@@ -625,8 +629,10 @@ def _clear_earn_queue(page, state: GameState) -> bool:
     if not btn:
         state.add_log("Clear queue button not found on earn page.")
         return False
-    btn.click()
-    page.wait_for_load_state("domcontentloaded")
+    # Clearing reloads earn.asp (possibly back in MANUAL mode) — wait for the
+    # reload so whatever runs next works on the new page, not the old one.
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+        btn.click()
     _refresh_state(state)
     state.add_log("Earn queue cleared.")
     return True
@@ -747,9 +753,13 @@ def _ensure_manual_earn_mode(page, state: GameState):
         return
     btn = page.query_selector("button.mm-earn-queue-clear-btn")
     if btn:
-        btn.click()
-        page.wait_for_load_state("domcontentloaded")
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+            btn.click()
         state.add_log("Earn queue cleared before switching to manual.")
+        manual_div = page.query_selector("div.mm-earn-mode-manual")
+        style = (manual_div.get_attribute("style") or "") if manual_div else ""
+        if manual_div and "display: none" not in style and "display:none" not in style:
+            return   # the reloaded page is already in MANUAL mode
     page.evaluate("document.querySelector('#mm_earn_mode_toggle').click()")
     page.wait_for_function(
         "() => { const el = document.querySelector('div.mm-earn-mode-manual'); "
@@ -3250,9 +3260,10 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
     if not _check_session(state):
         return
 
-    # If auto form is visible (queue active), clear it first.
+    # If auto form is visible (queue active), clear it first. ("attached": the
+    # panels are always in the page, one of them hidden.)
     try:
-        page.wait_for_selector("div.mm-earn-mode-auto", timeout=5000)
+        page.wait_for_selector("div.mm-earn-mode-auto", state="attached", timeout=5000)
     except Exception:
         pass
     auto_div = page.query_selector("div.mm-earn-mode-auto")
@@ -3265,7 +3276,7 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
                 return
 
     try:
-        page.wait_for_selector("div.mm-earn-mode-manual", timeout=5000)
+        page.wait_for_selector("div.mm-earn-mode-manual", state="attached", timeout=5000)
     except Exception:
         state.add_log("Jail duties: manual panel not found.")
         return
