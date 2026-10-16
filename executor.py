@@ -5150,6 +5150,7 @@ _TRAVEL_URL = "/travel/travel.asp"
 _REPAIRS_URL = "/localcity/repairs.asp"
 _DEPART_URL = "/travel/depart.asp"
 _AIRPORT_URL = "/travel/airport.asp"
+_TRAVEL_MIN_CLEAN = 5000
 _CHICAGO = "Chicago"
 _NO_VEHICLE_TEXT = "you don't own a vehicle, it's parked or it's stashed in your vehicles vault"
 
@@ -5343,6 +5344,12 @@ def handle_travel(action: Action, state: GameState) -> int:
         _deferred_travel = {"target_city": target, "method": method}
         state.add_log(f"Travel: travel timer not ready — travel to {target} deferred until it's free.")
         return 0
+
+    # Travel fails silently without enough cash on hand — top up from the bank first.
+    if state.clean_money < _TRAVEL_MIN_CLEAN:
+        state.add_log(f"Travel: clean money ${state.clean_money:,} below ${_TRAVEL_MIN_CLEAN:,}, "
+                      f"withdrawing ${_TRAVEL_MIN_CLEAN:,}.")
+        handle_withdraw(Action("withdraw", amount=_TRAVEL_MIN_CLEAN), state)
 
     if method == "own_vehicle":
         global _no_vehicle_cooldown_until
