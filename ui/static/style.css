@@ -487,6 +487,40 @@ button {
 .sell-ac-item:hover, .sell-ac-item.sel { background: var(--surface2); color: var(--accent); }
 .sell-ac-item small { color: var(--muted); }
 .sell-modal > .sell-actions { display: flex; gap: 8px; justify-content: flex-end; }
+/* Apartment overlay */
+.apt-modal { max-width: 560px; max-height: 92vh; overflow-y: auto; }
+.pl-modal-box.apt-modal > div { display: block; }
+.pl-modal-box.apt-modal > .apt-head { display: flex; align-items: center; justify-content: space-between; }
+.pl-modal-box.apt-modal > div[hidden] { display: none; }
+.apt-head h3 { color: var(--accent); }
+#apt-body { display: flex; flex-direction: column; gap: 12px; }
+#apt-body[hidden] { display: none; }
+.apt-sec { border: 1px solid var(--border); border-radius: 6px; padding: 12px; background: var(--surface2); display: flex; flex-direction: column; gap: 8px; }
+.apt-sec h4 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); display: flex; justify-content: space-between; gap: 8px; }
+.apt-sec h4 .muted { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 11.5px; }
+.apt-cap { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.apt-cap b { color: var(--text); }
+.profile-bar.apt-bar { max-width: none; height: 6px; }
+.apt-figs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; font-variant-numeric: tabular-nums; }
+.apt-figs > div { display: flex; flex-direction: column; }
+.apt-amount { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.apt-amount-in { flex: 1 1 140px; min-width: 0; display: flex; align-items: center; padding: 0 8px; background: #121a26; border: 1px solid var(--border); border-radius: var(--radius); }
+.apt-amount-in:focus-within { border-color: var(--accent); }
+.apt-amount-in span { color: var(--muted); }
+.apt-amount-in input { flex: 1; min-width: 0; background: none; border: none; outline: none; padding: 7px 4px; color: var(--text); font: inherit; font-variant-numeric: tabular-nums; }
+.apt-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.apt-actions .sell-hint { flex: 1 1 200px; margin: 0; }
+.apt-table-wrap { overflow-x: auto; }
+.apt-drugs { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.apt-drugs th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--border); text-align: center; }
+.apt-drugs th:first-child { text-align: left; }
+.apt-drugs td { padding: 4px 6px; text-align: center; border-bottom: 1px solid rgba(46,64,96,.5); }
+.apt-drugs td.apt-drug-name { text-align: left; font-weight: 600; white-space: nowrap; }
+.apt-drug-img { display: inline-block; width: 26px; height: 26px; vertical-align: middle; margin-right: 8px; border-radius: 3px; overflow: hidden; border: 1px solid var(--border); background: repeating-linear-gradient(45deg, #2a3850 0 4px, #26334a 4px 8px); }
+.apt-drug-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.apt-drugs input { width: 58px; text-align: center; padding: 4px; background: #121a26; border: 1px solid var(--border); border-radius: 3px; color: var(--text); font: inherit; }
+.apt-drugs input.input-set { border-color: var(--accent); color: var(--accent); }
+.apt-drugs input.input-bad { border-color: var(--red); color: #f08c8c; }
 @media (max-width: 520px) { .profile-bionics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .profile-refreshing { opacity: 0.5; pointer-events: none; transition: opacity 0.15s; }
 .profile-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }

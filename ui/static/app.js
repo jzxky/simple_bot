@@ -1085,6 +1085,180 @@ function cancelWeaponSales(btn) {
   _postSale("/cancel_weapon_sale").then(() => { btn.disabled = false; });
 }
 
+// ---------------------------------------------------------------------------
+// Apartment overlay — stash/grab dirty money and drugs (profile/dirty.asp)
+// ---------------------------------------------------------------------------
+
+let _apt = null;        // parsed dirty.asp data
+let _aptBusy = false;
+
+function _aptMoney(n) { return "$" + (n || 0).toLocaleString("en-US"); }
+
+function _parseAptAmount(s) {
+  const m = String(s || "").trim().toLowerCase().replace(/[$,\s]/g, "").match(/^(\d+(?:\.\d+)?)([km]?)$/);
+  if (!m) return null;
+  const n = Math.round(parseFloat(m[1]) * (m[2] === "k" ? 1e3 : m[2] === "m" ? 1e6 : 1));
+  return n > 0 && n <= 99999999 ? n : null;
+}
+
+function _aptBanner(d) {
+  const el = document.getElementById("apt-banner");
+  if (!d || !d.message) { el.hidden = true; return; }
+  el.textContent = d.message;
+  el.className = "profile-sale-msg " + (d.ok ? "ok" : "bad");
+  el.hidden = false;
+}
+
+function _aptSetBusy(busy) {
+  _aptBusy = busy;
+  document.getElementById("apt-body").classList.toggle("profile-refreshing", busy);
+  if (!busy) { aptValidateMoney(); aptValidateDrugs(); }
+}
+
+function openApartmentOverlay() {
+  _apt = null;
+  _aptBanner(null);
+  document.getElementById("apt-amount").value = "";
+  document.getElementById("apt-body").hidden = true;
+  document.getElementById("apt-loading").hidden = false;
+  document.getElementById("apt-loading").textContent = "Loading apartment…";
+  document.getElementById("apartment-overlay").classList.add("active");
+  fetch("/apartment")
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok || !d.apartment) { document.getElementById("apt-loading").textContent = d.message || "Could not load the apartment."; return; }
+      _renderApartment(d.apartment);
+    })
+    .catch(e => { document.getElementById("apt-loading").textContent = String(e); });
+}
+
+function closeApartmentOverlay() {
+  document.getElementById("apartment-overlay").classList.remove("active");
+  _aptBanner(null);
+  loadProfile();
+}
+
+function _renderApartment(a) {
+  _apt = a;
+  document.getElementById("apt-loading").hidden = true;
+  document.getElementById("apt-body").hidden = false;
+  const room = Math.max(0, a.money_max - a.money_stashed);
+  document.getElementById("apt-money-stashed").textContent = _aptMoney(a.money_stashed);
+  document.getElementById("apt-money-max").textContent = _aptMoney(a.money_max);
+  document.getElementById("apt-money-bar").style.width = (a.money_max ? 100 * a.money_stashed / a.money_max : 0) + "%";
+  document.getElementById("apt-onhand").textContent = _aptMoney(a.dirty_on_hand);
+  document.getElementById("apt-room").textContent = _aptMoney(room);
+
+  const drugStashed = a.drugs.reduce((t, d) => t + d.stashed, 0);
+  document.getElementById("apt-drug-stashed").textContent = drugStashed.toLocaleString("en-US");
+  document.getElementById("apt-drug-max").textContent = (a.drug_max || 0).toLocaleString("en-US");
+  document.getElementById("apt-drug-bar").style.width = (a.drug_max ? 100 * drugStashed / a.drug_max : 0) + "%";
+
+  const tb = document.getElementById("apt-drugs");
+  tb.innerHTML = a.drugs.map(d => {
+    const img = d.img ? `<img src="/api/item_image/${encodeURIComponent(d.img)}" alt="" onerror="this.remove()">` : "";
+    return `<tr>
+      <td class="apt-drug-name"><span class="apt-drug-img">${img}</span>${escHtml(d.name)}</td>
+      <td class="${d.carrying ? "" : "muted"}">${d.carrying}</td>
+      <td class="${d.stashed ? "" : "muted"}">${d.stashed}</td>
+      <td><input type="text" inputmode="numeric" value="0" data-name="${escHtml(d.stash_input)}" data-limit="${d.carrying}" data-kind="s" maxlength="${d.stash_max}" aria-label="Stash ${escHtml(d.name)}" oninput="aptValidateDrugs()" onfocus="this.select()"></td>
+      <td><input type="text" inputmode="numeric" value="0" data-name="${escHtml(d.grab_input)}" data-limit="${d.stashed}" data-kind="g" maxlength="${d.grab_max}" aria-label="Grab ${escHtml(d.name)}" oninput="aptValidateDrugs()" onfocus="this.select()"></td>
+    </tr>`;
+  }).join("");
+  aptValidateMoney();
+  aptValidateDrugs();
+}
+
+function _aptHint(id, text, bad) {
+  const el = document.getElementById(id);
+  el.textContent = text || " ";
+  el.className = "sell-hint" + (bad ? " bad" : "");
+}
+
+function aptValidateMoney() {
+  if (!_apt) return;
+  const raw = document.getElementById("apt-amount").value;
+  const n = _parseAptAmount(raw);
+  const room = Math.max(0, _apt.money_max - _apt.money_stashed);
+  const canStash = !!n && n <= _apt.dirty_on_hand && n <= room;
+  const canGrab = !!n && n <= _apt.money_stashed;
+  document.getElementById("apt-stash").disabled = _aptBusy || !canStash;
+  document.getElementById("apt-grab").disabled = _aptBusy || !canGrab;
+  if (!raw.trim()) return _aptHint("apt-money-hint", "");
+  if (!n) return _aptHint("apt-money-hint", "Enter an amount above 0 (500000, 500k, 1.2m).", true);
+  const bits = [_aptMoney(n)];
+  if (!canStash) bits.push(n > _apt.dirty_on_hand ? "more than you have on hand" : "over the stash limit");
+  if (!canGrab) bits.push(_apt.money_stashed ? "more than is stashed" : "nothing stashed to grab");
+  _aptHint("apt-money-hint", bits.join(" · "), !canStash && !canGrab);
+}
+
+function aptMax(mode) {
+  if (!_apt) return;
+  const n = mode === "stash"
+    ? Math.min(_apt.dirty_on_hand, Math.max(0, _apt.money_max - _apt.money_stashed))
+    : _apt.money_stashed;
+  document.getElementById("apt-amount").value = n ? n.toLocaleString("en-US") : "";
+  aptValidateMoney();
+}
+
+function aptSubmitMoney(mode) {
+  const n = _parseAptAmount(document.getElementById("apt-amount").value);
+  if (!n || _aptBusy) return;
+  _aptSetBusy(true);
+  _aptPost("/apartment/money", {mode, amount: n}, () => { document.getElementById("apt-amount").value = ""; });
+}
+
+function aptValidateDrugs() {
+  if (!_apt) return;
+  let any = false, bad = false, stashTotal = 0;
+  document.querySelectorAll("#apt-drugs input").forEach(i => {
+    i.value = i.value.replace(/\D/g, "");
+    const v = +i.value || 0;
+    const over = v > +i.dataset.limit;
+    if (v) any = true;
+    if (over) bad = true;
+    if (i.dataset.kind === "s") stashTotal += v;
+    i.className = over ? "input-bad" : v ? "input-set" : "";
+  });
+  if (stashTotal > _apt.drug_room) {
+    bad = true;
+    _aptHint("apt-drug-hint", `Stashing ${stashTotal} units, but only ${_apt.drug_room} units of room left.`, true);
+  } else if (bad) {
+    _aptHint("apt-drug-hint", "A red box is more than you're carrying or have stashed.", true);
+  } else if (any) {
+    _aptHint("apt-drug-hint", `Stash ${stashTotal} units · room left ${_apt.drug_room}.`);
+  } else {
+    _aptHint("apt-drug-hint", "Enter amounts to stash or grab, then submit.");
+  }
+  document.getElementById("apt-drug-submit").disabled = _aptBusy || !any || bad;
+}
+
+function aptClearDrugs() {
+  document.querySelectorAll("#apt-drugs input").forEach(i => { i.value = "0"; });
+  aptValidateDrugs();
+}
+
+function aptSubmitDrugs() {
+  if (_aptBusy) return;
+  const values = {};
+  document.querySelectorAll("#apt-drugs input").forEach(i => { const v = +i.value || 0; if (v) values[i.dataset.name] = v; });
+  if (!Object.keys(values).length) return;
+  _aptSetBusy(true);
+  _aptPost("/apartment/drugs", {values});
+}
+
+function _aptPost(url, body, onDone) {
+  fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
+    .then(r => r.json())
+    .catch(e => ({ok: false, message: String(e)}))
+    .then(d => {
+      _aptBanner(d);
+      if (d.apartment) _renderApartment(d.apartment);
+      if (onDone) onDone();
+      _aptSetBusy(false);
+    });
+}
+
 function openRepairOverlay(condition) {
   document.getElementById("repair-overlay-condition").textContent = condition || "Unknown";
   document.getElementById("repair-overlay").classList.add("active");
@@ -5385,6 +5559,7 @@ function profileAction(i) {
   if (!a) return;
   if (a.type === "sell") openSellOverlay(a.ctx);
   else if (a.type === "repair") openRepairOverlay(a.condition);
+  else if (a.type === "apartment") openApartmentOverlay();
   else { navigateTo(a.url); loadProfile(); }
 }
 
@@ -5512,7 +5687,10 @@ function _renderProfile(d) {
     h.push('<div class="profile-item-row">');
     h.push(_profileImg(a.img));
     h.push(`<div class="profile-item-meta"><span class="profile-item-name">${escHtml(a.Apartment)}</span><span class="muted">${escHtml(bits.join(" · "))}</span></div>`);
-    if (a.action_url) h.push(`<div class="profile-item-actions">${_profileBtn(a.action_label || "Enter/Manage", {type: "nav", url: a.action_url})}</div>`);
+    if (a.action_url) {
+      const act = /dirty\.asp/i.test(a.action_url) ? {type: "apartment"} : {type: "nav", url: a.action_url};
+      h.push(`<div class="profile-item-actions">${_profileBtn(a.action_label || "Enter/Manage", act)}</div>`);
+    }
     h.push('</div>');
   }
 

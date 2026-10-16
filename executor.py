@@ -6401,6 +6401,149 @@ def handle_sell_vehicle(action: Action, state: GameState):
         result_q.put(result)
 
 
+_APARTMENT_URL = "/profile/dirty.asp"
+_APT_FORM = "form[action*='dirty.asp']"
+
+
+def _strong_ints(el) -> list:
+    return [int(re.sub(r"[^\d]", "", b.get_text()) or 0) for b in el.find_all("strong")] if el else []
+
+
+def _parse_apartment(state: GameState) -> "dict | None":
+    """Stash figures and drug rows from the current dirty.asp page, or None
+    if the stash form isn't there."""
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    if not soup.select_one(_APT_FORM):
+        return None
+    img_urls = []
+    data = {"dirty_on_hand": state.dirty_money}
+
+    money_td = soup.find(lambda t: t.name == "td" and "You currently have" in t.get_text())
+    nums = _strong_ints(money_td)
+    data["money_stashed"] = nums[0] if len(nums) > 0 else 0
+    data["money_max"] = nums[1] if len(nums) > 1 else 0
+
+    drug_div = soup.find(lambda t: t.name == "div" and "You can stash another" in t.get_text()
+                         and not t.find("div"))
+    nums = _strong_ints(drug_div)
+    data["drug_room"] = nums[0] if len(nums) > 0 else 0
+    data["drug_max"] = nums[1] if len(nums) > 1 else 0
+
+    drugs = []
+    for tr in soup.select("table#profile_dirty tr"):
+        inputs = tr.find_all("input", attrs={"type": "text"})
+        cells = tr.find_all("td")
+        if len(inputs) != 2 or len(cells) < 6:
+            continue
+        img = cells[0].find("img")
+        key = ""
+        if img and img.get("src"):
+            url = quote(urljoin(browser.current_url(), img["src"]), safe=":/?&=%#")
+            img_urls.append(url)
+            key = item_images.key_for_url(url)
+
+        def _num(td):
+            return int(re.sub(r"[^\d]", "", td.get_text()) or 0)
+
+        drugs.append({
+            "name": cells[1].get_text(strip=True),
+            "img": key,
+            "carrying": _num(cells[2]),
+            "stashed": _num(cells[3]),
+            "stash_input": inputs[0].get("name", ""),
+            "stash_max": int(inputs[0].get("maxlength") or 3),
+            "grab_input": inputs[1].get("name", ""),
+            "grab_max": int(inputs[1].get("maxlength") or 3),
+        })
+    data["drugs"] = drugs
+    _download_item_images(img_urls)
+    return data
+
+
+def _open_apartment(state: GameState) -> "dict | None":
+    """Navigate to dirty.asp and parse it. Returns a failure result dict
+    (ok False) when the page isn't usable, else None."""
+    _nav(_u(_APARTMENT_URL), state)
+    if not _check_session(state):
+        return {"ok": False, "message": "Session expired."}
+    if not BeautifulSoup(browser.page().content(), "html.parser").select_one(_APT_FORM):
+        div = _page_result_div(BeautifulSoup(browser.page().content(), "html.parser"))
+        return {"ok": False, "message": div.get_text(" ", strip=True) if div else
+                "The apartment stash page isn't available."}
+    return None
+
+
+def _apartment_submit(state: GameState, label: str, submit_selector: str) -> dict:
+    page = browser.page()
+    page.locator(submit_selector).first.click()
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    result = _report_sale_result(state, label)
+    result["apartment"] = _parse_apartment(state)
+    return result
+
+
+def handle_fetch_apartment(action: Action, state: GameState):
+    result_q = action.params.get("result_queue")
+    result = _open_apartment(state)
+    if result is None:
+        result = {"ok": True, "message": "", "apartment": _parse_apartment(state)}
+    if result_q is not None:
+        result_q.put(result)
+
+
+def handle_apartment_money(action: Action, state: GameState):
+    """Stash or grab dirty money (params: mode "stash"|"grab", amount)."""
+    result_q = action.params.get("result_queue")
+    mode   = action.params.get("mode", "")
+    amount = int(action.params.get("amount", 0))
+    label  = f"{'Stash' if mode == 'stash' else 'Grab'} dirty money ${amount:,}"
+    result = _open_apartment(state)
+    if result is None:
+        page = browser.page()
+        page.check("#stashmoney" if mode == "stash" else "#grabmoney")
+        page.fill(f"{_APT_FORM} input[name='amount']", str(amount))
+        result = _apartment_submit(state, label, f"{_APT_FORM} input[name='amount'] ~ input[type='submit']")
+    else:
+        state.add_log(f"{label} failed: {result['message']}")
+    if result_q is not None:
+        result_q.put(result)
+
+
+def handle_stash_drugs(action: Action, state: GameState):
+    """Fill the drug stash/grab boxes (params: values {input name: units}) and submit."""
+    result_q = action.params.get("result_queue")
+    values = {k: int(v) for k, v in (action.params.get("values") or {}).items() if int(v) > 0}
+    label = "Stash/grab drugs"
+    result = _open_apartment(state)
+    if result is None:
+        apt = _parse_apartment(state) or {}
+        names = {d[k] for d in apt.get("drugs", []) for k in ("stash_input", "grab_input")}
+        unknown = [k for k in values if k not in names]
+        if unknown or not values:
+            msg = (f"the page has no drug box named {', '.join(unknown)}." if unknown
+                   else "no amounts entered.")
+            state.add_log(f"{label} failed: {msg}")
+            result = {"ok": False, "message": msg, "apartment": apt}
+        else:
+            parts = []
+            for d in apt["drugs"]:
+                s, g = values.get(d["stash_input"], 0), values.get(d["grab_input"], 0)
+                if s:
+                    parts.append(f"stash {s} {d['name']}")
+                if g:
+                    parts.append(f"grab {g} {d['name']}")
+            label = f"Drugs ({', '.join(parts)})"
+            page = browser.page()
+            for name, v in values.items():
+                page.fill(f"table#profile_dirty input[name='{name}']", str(v))
+            result = _apartment_submit(state, label, "table#profile_dirty tr.none input[type='submit']")
+    else:
+        state.add_log(f"{label} failed: {result['message']}")
+    if result_q is not None:
+        result_q.put(result)
+
+
 def handle_navigate(action: Action, state: GameState):
     url = action.params.get("url", "")
     if url:
@@ -6984,6 +7127,9 @@ HANDLERS = {
     "sell_weapon": handle_sell_weapon,
     "cancel_weapon_sale": handle_cancel_weapon_sale,
     "sell_vehicle": handle_sell_vehicle,
+    "fetch_apartment": handle_fetch_apartment,
+    "apartment_money": handle_apartment_money,
+    "stash_drugs": handle_stash_drugs,
     "fetch_game_options": handle_fetch_game_options,
     "save_game_options": handle_save_game_options,
     "quit_game": handle_quit_game,
