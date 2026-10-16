@@ -316,12 +316,8 @@
             <label class="toggle-label"><input type="checkbox" id="earn_show_all" {% if config.earns.get('show_all') %}checked{% endif %} onchange="_populateEarnCategories(); autoSave()"><span class="toggle"></span></label>
           </label>
           <div class="setting-row">
-            <label for="earn_category">Category</label>
-            <select id="earn_category" style="width:160px" onchange="_renderEarnSelect(); autoSave()"></select>
-          </div>
-          <div class="setting-row">
             <label for="earn_type">Earn</label>
-            <select id="earn_type" style="width:160px" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
+            <select id="earn_type" style="width:220px" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
           </div>
           <div class="setting-row">
             <button type="button" id="clear-earn-btn" class="btn-secondary" style="width:100%" onclick="clearEarnQueue()">Clear Queue</button>
