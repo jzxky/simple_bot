@@ -357,16 +357,24 @@ def credentials_present() -> bool:
     return bool(creds["email"] and creds["password"])
 
 
-def save_env(email: str, password: str, pin_required: bool = None, pin: str = None):
+def save_env(email: str = None, password: str = None, pin_required: bool = None, pin: str = None,
+             hide_credentials: bool = None):
+    """Update the managed keys in .env. A None argument leaves that key as-is."""
     lines = []
     if os.path.exists(ENV_PATH):
         with open(ENV_PATH) as f:
             lines = f.readlines()
-    managed = {"MM_EMAIL": email, "MM_PASSWORD": password}
+    managed = {}
+    if email is not None:
+        managed["MM_EMAIL"] = email
+    if password is not None:
+        managed["MM_PASSWORD"] = password
     if pin_required is not None:
         managed["UI_PIN_REQUIRED"] = "true" if pin_required else "false"
     if pin is not None:
         managed["UI_PIN"] = pin
+    if hide_credentials is not None:
+        managed["UI_HIDE_CREDENTIALS"] = "true" if hide_credentials else "false"
     seen = set()
     new_lines = []
     for line in lines:
@@ -394,6 +402,12 @@ def get_pin_required() -> bool:
 
 def get_pin() -> str:
     return get_env_var("UI_PIN", "")
+
+
+def get_hide_credentials() -> bool:
+    """When true the UI never shows or writes MM_EMAIL / MM_PASSWORD — they can
+    only be viewed and edited in .env. Turning it off is .env-only too."""
+    return get_env_var("UI_HIDE_CREDENTIALS", "false").lower() == "true"
 
 
 def get_or_create_secret_key() -> str:

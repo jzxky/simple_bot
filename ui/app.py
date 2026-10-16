@@ -158,6 +158,11 @@ def _setup_prefill(c: dict) -> dict:
     actions on and everything else off; if config.json already existed (only
     the credentials are missing) the current settings are shown."""
     creds = cfg._load_env()
+    # Hidden credentials that are already in .env stay out of the form; if
+    # they're missing the form still has to collect them.
+    creds_locked = cfg.get_hide_credentials() and cfg.credentials_present()
+    if creds_locked:
+        creds = {"email": "", "password": ""}
     fresh = not cfg.CONFIG_EXISTED_AT_START
     agg = c.get("aggravated_crimes", {})
     action = c.get("action", {})
@@ -165,6 +170,7 @@ def _setup_prefill(c: dict) -> dict:
     return {
         "email": creds["email"],
         "password": creds["password"],
+        "creds_locked": creds_locked,
         "earns_enabled": True if fresh else c.get("earns", {}).get("enabled", True),
         "earn_type": c.get("earns", {}).get("earn_type", "surgeon"),
         "action_enabled": True if fresh else action.get("enabled", True),
@@ -238,14 +244,15 @@ def setup():
     global _setup_completed
     import settings_rev
     data = request.get_json(silent=True) or {}
-    email = str(data.get("email", "")).strip()
-    password = str(data.get("password", ""))
-    if not email or not password:
-        return jsonify({"error": "Email and password are required."}), 400
-    if any(ch in email + password for ch in "\r\n"):
-        return jsonify({"error": "Email and password can't contain line breaks."}), 400
+    if not (cfg.get_hide_credentials() and cfg.credentials_present()):
+        email = str(data.get("email", "")).strip()
+        password = str(data.get("password", ""))
+        if not email or not password:
+            return jsonify({"error": "Email and password are required."}), 400
+        if any(ch in email + password for ch in "\r\n"):
+            return jsonify({"error": "Email and password can't contain line breaks."}), 400
+        cfg.save_env(email, password)
 
-    cfg.save_env(email, password)
     c = cfg.load()
     c.pop("credentials", None)
     cfg.save(_apply_setup(c, data))
@@ -263,9 +270,13 @@ def setup():
 def index():
     c = cfg.load()
     needs_setup = _needs_setup()
+    hide_credentials = cfg.get_hide_credentials()
+    if hide_credentials:
+        c["credentials"] = {"email": "", "password": ""}
     return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS,
                            notif_defaults=cfg.DEFAULT_CONFIG["notifications"],
                            pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin(),
+                           hide_credentials=hide_credentials,
                            app_version=_APP_VERSION, event_consumables=_ec_mod,
                            setup=_setup_prefill(c) if needs_setup else None,
                            setup_earns=_earn_catalog_grouped() if needs_setup else [],
@@ -631,10 +642,16 @@ def save():
         creds_changed = True
         pin_changed = True
 
-    if creds_changed or pin_changed:
-        cfg.save_env(data.get("email", ""), data.get("password", ""),
+    # Once credentials are hidden the UI can't write them, and can't un-hide
+    # them either — both are .env-only from then on.
+    hide_credentials = cfg.get_hide_credentials()
+    enable_hide = not hide_credentials and bool(data.get("hide_credentials"))
+    if creds_changed or pin_changed or enable_hide:
+        cfg.save_env(None if hide_credentials else data.get("email", ""),
+                     None if hide_credentials else data.get("password", ""),
                      pin_required=data.get("pin_required"),
-                     pin=data.get("ui_pin"))
+                     pin=data.get("ui_pin"),
+                     hide_credentials=True if enable_hide else None)
 
     new_duty = c.get("jail", {}).get("duty", "laundry")
     _MANUAL_DUTIES = {"makeshank", "digtunnel"}
