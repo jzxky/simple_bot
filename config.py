@@ -397,7 +397,9 @@ def save_env(email: str = None, password: str = None, pin_required: bool = None,
 
 
 def get_pin_required() -> bool:
-    return get_env_var("UI_PIN_REQUIRED", "false").lower() == "true"
+    # A blank PIN can never be required — that would lock everyone out.
+    return (get_env_var("UI_PIN_REQUIRED", "false").lower() == "true"
+            and bool(get_pin().strip()))
 
 
 def get_pin() -> str:

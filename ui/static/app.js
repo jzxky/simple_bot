@@ -2410,9 +2410,14 @@ function clearEarnQueue() {
     .finally(() => { btn.disabled = false; });
 }
 
-function togglePinInput() {
-  const row = document.getElementById("pin_input_row");
-  if (row) row.style.display = document.getElementById("pin_required").checked ? "" : "none";
+// "Require PIN" is only allowed once a non-blank PIN is entered — clearing the
+// PIN also turns the requirement off so nobody gets locked out.
+function syncPinRequired() {
+  const hasPin = document.getElementById("ui_pin").value.trim() !== "";
+  const req = document.getElementById("pin_required");
+  req.disabled = !hasPin;
+  if (!hasPin) req.checked = false;
+  document.getElementById("pin_required_hint").style.display = hasPin ? "none" : "";
 }
 
 function toggleFieldVisibility(id, btn) {
