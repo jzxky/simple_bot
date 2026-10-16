@@ -642,6 +642,15 @@ def _run(c: dict):
                     # Don't spin on a machine that can't launch Chrome right now.
                     time.sleep(30)
 
+            # Refresh the earns list after a promotion (set by Promo Page / the
+            # top-job sniper). earn.asp isn't usable from jail or hospital, so
+            # it waits until the character is out.
+            if (state.earn_catalog_refresh_pending and state.logged_in
+                    and not state.in_jail and not state.in_hospital):
+                state.earn_catalog_refresh_pending = False
+                state.add_log("Promotion detected — refreshing earns list.")
+                executor.execute(Action("refresh_earn_catalog"), state)
+
             if browser.should_restart_for_nav_failures():
                 state.add_log("Too many consecutive navigation failures — restarting browser.")
                 _restart_browser(state, c)
