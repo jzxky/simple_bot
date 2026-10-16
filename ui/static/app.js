@@ -129,8 +129,16 @@ function loadEarnPlanner() {
     .then(d => {
       _earnPlannerData = d;
       _syncEarnPlannerHistory(d.history_enabled);
+      _renderEarnPlannerDefault(d);
       const waitEl = document.getElementById("earn-planner-waiting");
-      if (waitEl) waitEl.style.display = d.waiting ? "" : "none";
+      if (waitEl) {
+        waitEl.style.display = d.waiting ? "" : "none";
+        if (d.waiting && d.earns_enabled && d.default_earn) {
+          waitEl.textContent = `No earn in the queue is available — using the default earn (${_earnPlannerLabel(d, d.default_earn)}). The queue is re-checked after each earns list refresh.`;
+        } else if (d.waiting) {
+          waitEl.textContent = "No earn in the queue is available — earns are disabled. The planner rechecks every 10 minutes and turns earns back on when one becomes available.";
+        }
+      }
       const intEl = document.getElementById("earn-planner-interval");
       if (intEl && d.history_interval) intEl.textContent = d.history_interval + " min";
       _earnPlannerLimits = {};
@@ -139,6 +147,43 @@ function loadEarnPlanner() {
       _syncEarnPlannerLock();
     })
     .catch(() => {});
+}
+
+function _earnPlannerLabel(d, value) {
+  for (const items of Object.values(d.catalog || {})) {
+    const hit = items.find(e => e.value === value);
+    if (hit) return hit.label;
+  }
+  return value;
+}
+
+// Until the planner data has loaded the selector only holds "None" — report the
+// saved value then, so an early save can't wipe the default earn.
+function _earnPlannerDefaultValue() {
+  const sel = document.getElementById("earn-planner-default");
+  if (!sel) return "";
+  if (sel.options.length <= 1 && sel.dataset.current) return sel.dataset.current;
+  return sel.value;
+}
+
+// Default earn selector: "None" plus every catalog earn, grouped by category.
+function _renderEarnPlannerDefault(d) {
+  const sel = document.getElementById("earn-planner-default");
+  if (!sel) return;
+  const current = d.default_earn != null ? d.default_earn : (sel.value || sel.dataset.current || "");
+  const catalog = d.catalog || {};
+  let html = '<option value="">None — disable earns</option>';
+  let found = !current;
+  Object.keys(catalog).sort().forEach(cat => {
+    html += `<optgroup label="${escHtml(cat)}">` + catalog[cat].map(e => {
+      const selected = e.value === current;
+      if (selected) found = true;
+      return `<option value="${escHtml(e.value)}"${selected ? " selected" : ""}>${escHtml(e.label)}</option>`;
+    }).join("") + "</optgroup>";
+  });
+  if (!found) html += `<option value="${escHtml(current)}" selected>${escHtml(current)}</option>`;
+  sel.innerHTML = html;
+  sel.dataset.current = current;
 }
 
 // The planner needs Character History (earn counts come from it): without it
@@ -351,7 +396,10 @@ function _buildPayload() {
     earn_show_all: document.getElementById("earn_show_all").checked,
     earn_type: document.getElementById("earn_type").value,
     earn_planner_enabled: document.getElementById("earn-planner-toggle").checked,
-    earn_planner_limits: (() => {
+    earn_planner_default: _earnPlannerDefaultValue(),
+    // Left out (undefined → dropped by JSON.stringify) until the planner data
+    // has loaded, so an early save can't overwrite the saved queue with {}.
+    earn_planner_limits: _earnPlannerData === null ? undefined : (() => {
       const tbody = document.getElementById("earn-planner-tbody");
       if (!tbody || !tbody.rows.length) return {..._earnPlannerLimits};
       const ordered = {};

@@ -336,6 +336,9 @@ def _scrape_earn_catalog(page, state: GameState):
             _upsert_earn_catalog(auto_opts, manual_opts)
         except Exception:
             pass
+        # Earn planner waiting for an available earn: re-assess with this list.
+        if cfg.load().get("earn_planner", {}).get("waiting_for_earns"):
+            state.earn_planner_check_pending = True
         auto_labels = ", ".join(f"{v} ({l})" for v, l in auto_opts) or "none"
         manual_labels = ", ".join(f"{d}:{l}" + (" [trap]" if t else "") for d, l, t in manual_opts) or "none"
         if cfg.load().get("debug_logging", False):
@@ -435,27 +438,48 @@ def _planner_set_active(state: GameState, value: str, enable_earns: bool = False
     _bot.request_reload()
 
 
-def _planner_advance(state: GameState, active: str, limits: dict, done: dict, history: dict):
-    """Move to the next available, unfinished earn in the planner queue; if
-    there is none, disable earns and wait (rechecked every 10 min)."""
+def _planner_fall_back(state: GameState, notify: bool = True):
+    """No planner earn is available: switch to the default earn if one is set
+    and available, otherwise disable earns. Either way the planner waits —
+    re-assessed after each earn-list refresh (and every 10 min while earns
+    are disabled, since nothing else refreshes the list then)."""
     import earn_planner as _ep
     import settings_rev
+    import bot as _bot
+    c = cfg.load()
+    planner = c.setdefault("earn_planner", {})
+    default = planner.get("default_earn", "")
+    planner["waiting_for_earns"] = True
+    if default and _ep.catalog_available(default):
+        c["earns"]["earn_type"] = default
+        c["earns"]["enabled"] = True
+        msg = (f"Earn planner: no available earns in the queue — using default earn "
+               f"{_earn_display_name(default)} until one is available.")
+        note = f"No available earns — using default earn {_earn_display_name(default)}"
+    else:
+        c["earns"]["enabled"] = False
+        why = " (default earn not available)" if default else ""
+        msg = (f"Earn planner: no available earns in the queue{why} — earns disabled. "
+               f"Rechecking every 10 minutes.")
+        note = "No available earns"
+    cfg.save(c)
+    settings_rev.bump()
+    _bot.request_reload()
+    state.add_log(msg)
+    if notify and cfg.load().get("notifications", {}).get("no_available_earns", True):
+        state.push_notification("no_available_earns", note)
+
+
+def _planner_advance(state: GameState, active: str, limits: dict, done: dict, history: dict):
+    """Move to the next available, unfinished earn in the planner queue; if
+    there is none, fall back to the default earn (or disable earns)."""
+    import earn_planner as _ep
     nxt = _ep.pick_next(limits, done, history, skip=(active,))
     if nxt:
         _planner_set_active(state, nxt)
         state.add_log(f"Earn planner: active earn is now {_earn_display_name(nxt)}.")
         return
-    c = cfg.load()
-    c["earns"]["enabled"] = False
-    c.setdefault("earn_planner", {})["waiting_for_earns"] = True
-    cfg.save(c)
-    settings_rev.bump()
-    import bot as _bot
-    _bot.request_reload()
-    msg = "Earn planner: no available earns in the queue — earns disabled. Rechecking every 10 minutes."
-    state.add_log(msg)
-    if cfg.load().get("notifications", {}).get("no_available_earns", True):
-        state.push_notification("no_available_earns", "No available earns")
+    _planner_fall_back(state)
 
 
 def handle_earn_planner_check(action: Action, state: GameState):
@@ -472,12 +496,25 @@ def handle_earn_planner_check(action: Action, state: GameState):
     history = _ch.load()
 
     if planner.get("waiting_for_earns"):
-        # Refresh available_earns.json so newly unlocked earns are seen.
-        _scrape_earn_catalog(browser.page(), state)
+        # Waiting (on the default earn, or with earns disabled). The timed
+        # recheck refreshes available_earns.json first; a check triggered by
+        # an earn-list refresh already has a fresh list.
+        if action.params.get("refresh_catalog"):
+            _scrape_earn_catalog(browser.page(), state)
         nxt = _ep.pick_next(limits, done, history)
         if nxt:
+            was_enabled = c.get("earns", {}).get("enabled", False)
             _planner_set_active(state, nxt, enable_earns=True)
-            state.add_log(f"Earn planner: {_earn_display_name(nxt)} is available — earns re-enabled.")
+            state.add_log(f"Earn planner: {_earn_display_name(nxt)} is available — "
+                          + ("switched from the default earn." if was_enabled else "earns re-enabled."))
+            return
+        # Still nothing in the queue. If the default earn has become
+        # (un)available, re-apply the fallback quietly.
+        default = planner.get("default_earn", "")
+        on_default = c.get("earns", {}).get("enabled", False)
+        default_ok = bool(default) and _ep.catalog_available(default)
+        if on_default != default_ok:
+            _planner_fall_back(state, notify=False)
         return
 
     if not c.get("earns", {}).get("enabled", False):
@@ -567,7 +604,10 @@ def handle_check_earns(action: Action, state: GameState):
 
     amount = QUEUE_MAX - current_count
     planner = cfg.load().get("earn_planner", {})
-    limit = planner.get("limits", {}).get(earn_type) if planner.get("enabled") else None
+    # While the planner is falling back to its default earn, that earn isn't
+    # bound by a planner limit.
+    capped = planner.get("enabled") and not planner.get("waiting_for_earns")
+    limit = planner.get("limits", {}).get(earn_type) if capped else None
     if limit:
         # Never queue past the planner limit: completed (history) + already queued.
         completed = _ep.completed_count(earn_type)

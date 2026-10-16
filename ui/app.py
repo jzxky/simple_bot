@@ -317,6 +317,11 @@ def _apply_payload(c: dict, data: dict) -> dict:
                 clean[k] = n
         c.setdefault("earn_planner", {})["limits"] = clean
     c.setdefault("earn_planner", {})["enabled"] = bool(data.get("earn_planner_enabled", False))
+    if "earn_planner_default" in data:
+        import earn_planner as _ep
+        default = str(data.get("earn_planner_default") or "")
+        valid = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
+        c["earn_planner"]["default_earn"] = default if default in valid else ""
 
     c["aggravated_crimes"]["enabled"] = data.get("crimes_enabled", False)
     c["aggravated_crimes"]["primary"]["crime"] = data.get("primary_crime", "pickpocket")
@@ -1781,6 +1786,8 @@ def api_earn_planner():
     active = c.get("earns", {}).get("earn_type", "")
     view = _ep.planner_view(limits, active, done=planner.get("done", {}),
                             waiting=bool(planner.get("waiting_for_earns")))
+    view["default_earn"] = planner.get("default_earn", "")
+    view["earns_enabled"] = bool(c.get("earns", {}).get("enabled", False))
     view["history_enabled"] = bool(c.get("character_history", {}).get("enabled", False))
     view["history_interval"] = int(c.get("character_history", {}).get("refresh_interval_minutes", 30))
     return jsonify(view)
