@@ -646,6 +646,8 @@ def save():
     # them either — both are .env-only from then on.
     hide_credentials = cfg.get_hide_credentials()
     enable_hide = not hide_credentials and bool(data.get("hide_credentials"))
+    if not str(data.get("ui_pin") or "").strip():
+        data["pin_required"] = False
     if creds_changed or pin_changed or enable_hide:
         cfg.save_env(None if hide_credentials else data.get("email", ""),
                      None if hide_credentials else data.get("password", ""),
