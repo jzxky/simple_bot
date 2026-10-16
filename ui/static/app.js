@@ -128,12 +128,31 @@ function loadEarnPlanner() {
     .then(r => r.json())
     .then(d => {
       _earnPlannerData = d;
+      _syncEarnPlannerHistory(d.history_enabled);
+      const waitEl = document.getElementById("earn-planner-waiting");
+      if (waitEl) waitEl.style.display = d.waiting ? "" : "none";
+      const intEl = document.getElementById("earn-planner-interval");
+      if (intEl && d.history_interval) intEl.textContent = d.history_interval + " min";
       _earnPlannerLimits = {};
       (d.earns || []).forEach(e => { _earnPlannerLimits[e.value] = e.limit; });
       _renderEarnPlanner();
       _syncEarnPlannerLock();
     })
     .catch(() => {});
+}
+
+// The planner needs Character History (earn counts come from it): without it
+// the planner switch is disabled and a notice is shown instead.
+function _syncEarnPlannerHistory(historyOn) {
+  const toggle = document.getElementById("earn-planner-toggle");
+  const notice = document.getElementById("earn-planner-needs-history");
+  const body = document.getElementById("earn-planner-body");
+  if (!toggle) return;
+  toggle.disabled = !historyOn;
+  if (notice) notice.style.display = historyOn ? "none" : "";
+  if (!historyOn && body) body.style.display = "none";
+  else if (historyOn && body) body.style.display = toggle.checked ? "" : "none";
+  _syncEarnPlannerLock();
 }
 
 function toggleEarnPlanner() {
@@ -146,7 +165,7 @@ function toggleEarnPlanner() {
 
 function _syncEarnPlannerLock() {
   const toggle = document.getElementById("earn-planner-toggle");
-  const hasEntries = toggle && toggle.checked && Object.keys(_earnPlannerLimits).length > 0;
+  const hasEntries = toggle && toggle.checked && !toggle.disabled && Object.keys(_earnPlannerLimits).length > 0;
   const earnSel = document.getElementById("earn_type");
   if (earnSel) earnSel.disabled = hasEntries;
 }
@@ -187,34 +206,33 @@ function _renderEarnPlanner() {
 
   tbody.innerHTML = values.map((value, idx) => {
     const info = earnsByValue[value] || {};
-    const name = info.label || value;
+    const name = escHtml(info.label || value);
     const limit = _earnPlannerLimits[value];
     const completed = info.completed || 0;
-    const isActive = value === d.active;
+    const finished = info.finished === true || completed >= limit;
     const pct = limit > 0 ? Math.min(100, Math.round((completed / limit) * 100)) : 0;
-    let barColor = "var(--accent,#89b4fa)";
-    let warn = "";
-    if (completed >= limit) { barColor = "var(--error,#f87171)"; warn = " — at cap"; }
-    else if (limit > 0 && completed / limit >= 0.9) { barColor = "var(--warn,#f59e0b)"; warn = " — near cap"; }
-    return `<tr draggable="true" data-item="${value}">
+    let badge = "";
+    if (finished) badge = '<span class="ep-badge done">Done</span>';
+    else if (value === d.active && !d.waiting) badge = '<span class="ep-badge active">Active</span>';
+    else if (info.catalog_available === false) badge = '<span class="ep-badge unavail">Not available</span>';
+    return `<tr draggable="true" data-item="${escHtml(value)}">
       <td class="priority-num">${idx + 1}</td>
-      <td style="font-weight:${isActive ? "600" : "400"}">${name}${isActive ? ' <span style="color:var(--accent);font-size:0.75rem">(active)</span>' : ""}</td>
-      <td style="font-size:0.8rem;color:var(--muted);white-space:nowrap">${completed} done</td>
-      <td style="color:var(--muted)">/</td>
-      <td><input type="number" min="1" max="99999" step="1" value="${limit}" style="width:70px"
-        onchange="earnPlannerSetLimit('${value}', this.value)"></td>
-      <td style="width:60px">
-        <div style="height:6px;background:var(--surface2,#1e2a3a);border-radius:3px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:${barColor}"></div>
+      <td class="ep-earn-cell">
+        <div class="ep-earn-name">${name} ${badge}</div>
+        <div class="ep-progress">
+          <div class="ep-bar${finished ? " done" : ""}"><div style="width:${pct}%"></div></div>
+          <span class="ep-count">${completed.toLocaleString()} / ${Number(limit).toLocaleString()} (${pct}%)</span>
         </div>
-        <div style="font-size:0.7rem;color:var(--muted)">${pct}%${warn}</div>
       </td>
+      <td class="ep-limit-cell"><input type="text" inputmode="numeric" maxlength="5" value="${limit}"
+        oninput="this.value=this.value.replace(/\\D/g,'')"
+        onchange="earnPlannerSetLimit('${escHtml(value)}', this.value)"></td>
       <td><div class="priority-move">
-        <button type="button" onclick="_moveRow(this,-1)">▲</button>
-        <button type="button" onclick="_moveRow(this,1)">▼</button>
+        <button type="button" title="Move up" onclick="_moveRow(this,-1)">▲</button>
+        <button type="button" title="Move down" onclick="_moveRow(this,1)">▼</button>
       </div></td>
       <td><button type="button" class="pl-icon-btn pl-icon-btn-danger" title="Remove"
-        onclick="earnPlannerRemove('${value}')">✕</button></td>
+        onclick="earnPlannerRemove('${escHtml(value)}')">✕</button></td>
     </tr>`;
   }).join("");
 
@@ -3107,6 +3125,7 @@ let _chReqs = null;
 
 function toggleCharHistoryTab() {
   const enabled = document.getElementById("char_history_enabled").checked;
+  _syncEarnPlannerHistory(enabled);
   const btn = document.getElementById("status-tab-history-btn");
   if (btn) btn.style.display = enabled ? "" : "none";
   const panel = document.getElementById("status-history");

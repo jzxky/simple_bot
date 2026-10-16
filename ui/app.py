@@ -41,6 +41,7 @@ NOTIFICATION_EVENTS = [
     ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
     ("agg_not_available",   "Agg crime not available"),
     ("dog_trains_unavailable", "Dog trains unavailable"),
+    ("no_available_earns",  "No available earns (earn planner)"),
 ]
 
 def _effective_consumable_limit():
@@ -1775,9 +1776,14 @@ def api_available_earns():
 def api_earn_planner():
     import earn_planner as _ep
     c = cfg.load()
-    limits = c.get("earn_planner", {}).get("limits", {})
+    planner = c.get("earn_planner", {})
+    limits = planner.get("limits", {})
     active = c.get("earns", {}).get("earn_type", "")
-    return jsonify(_ep.planner_view(limits, active))
+    view = _ep.planner_view(limits, active, done=planner.get("done", {}),
+                            waiting=bool(planner.get("waiting_for_earns")))
+    view["history_enabled"] = bool(c.get("character_history", {}).get("enabled", False))
+    view["history_interval"] = int(c.get("character_history", {}).get("refresh_interval_minutes", 30))
+    return jsonify(view)
 
 
 @app.route("/players")

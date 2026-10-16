@@ -313,6 +313,7 @@ DEFAULT_CONFIG = {
         "agg_not_available":   False,
         "dog_trains_unavailable": False,
         "new_message":         False,
+        "no_available_earns":  True,
     }
 }
 

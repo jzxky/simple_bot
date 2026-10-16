@@ -317,7 +317,7 @@
           </label>
           <div class="setting-row">
             <label for="earn_type">Earn</label>
-            <select id="earn_type" style="width:220px" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
+            <select id="earn_type" style="width:280px" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
           </div>
           <div class="setting-row">
             <button type="button" id="clear-earn-btn" class="btn-secondary" style="width:100%" onclick="clearEarnQueue()">Clear Queue</button>
@@ -328,25 +328,38 @@
 
           <!-- Earn Planner -->
           <hr class="stat-divider">
+          {% set _ch_on = config.get('character_history', {}).get('enabled', False) %}
           <label class="inline-toggle setting-row">
             Earn Planner
-            <label class="toggle-label"><input type="checkbox" id="earn-planner-toggle" {% if config.earn_planner.get('enabled') %}checked{% endif %} onchange="toggleEarnPlanner(); autoSave()"><span class="toggle"></span></label>
+            <label class="toggle-label"><input type="checkbox" id="earn-planner-toggle" {% if config.earn_planner.get('enabled') %}checked{% endif %} {% if not _ch_on %}disabled{% endif %} onchange="toggleEarnPlanner(); autoSave()"><span class="toggle"></span></label>
           </label>
-          <div id="earn-planner-body" style="display:{% if config.earn_planner.get('enabled') %}block{% else %}none{% endif %}">
-            <p style="font-size:0.82rem;color:var(--muted);margin:0 0 12px;">
-              Cap how many of each earn the bot will ever complete (lifetime).
-              Earns not listed here have no limit.
+          <div id="earn-planner-needs-history" class="ep-unavailable" style="display:{% if _ch_on %}none{% else %}block{% endif %}">
+            Earn Planner needs <b>Character History</b> — it uses your earn counts from it.
+            Turn on Character History in Settings › Misc to use the planner.
+          </div>
+          <div id="earn-planner-body" style="display:{% if config.earn_planner.get('enabled') and _ch_on %}block{% else %}none{% endif %}">
+            <p class="ep-note">
+              Works through the queue in order. When the active earn reaches its limit, the next available earn takes over.
+              Progress is checked after each character history update (every <b id="earn-planner-interval">{{ config.get('character_history', {}).get('refresh_interval_minutes', 30) }} min</b> — change in Settings › Misc).
             </p>
-            <div class="row" style="align-items:flex-end;gap:8px;max-width:520px">
-              <label style="flex:1">Earn
-                <select id="earn-planner-add-select" style="height:32px"></select>
-              </label>
-              <label style="width:80px">Limit
-                <input type="number" id="earn-planner-add-limit" min="1" max="99999" step="1" style="height:32px;width:80px" placeholder="e.g. 500" onkeydown="if(event.key==='Enter'){event.preventDefault();earnPlannerAdd()}">
-              </label>
-              <button type="button" class="action-btn" style="height:32px" onclick="earnPlannerAdd()">Add</button>
+            <div id="earn-planner-waiting" class="ep-unavailable" style="display:none;margin-bottom:12px">
+              No earn in the queue is available right now — earns are disabled. The planner rechecks every 10 minutes and turns earns back on when one becomes available.
             </div>
-            <table class="priority-table" style="margin-top:12px;max-width:520px"><tbody id="earn-planner-tbody"></tbody></table>
+            <div class="ep-add">
+              <label class="ep-add-earn">Earn
+                <select id="earn-planner-add-select"></select>
+              </label>
+              <div class="ep-add-limit">
+                <label for="earn-planner-add-limit">Limit</label>
+                <div class="ep-limit-row">
+                  <input type="text" id="earn-planner-add-limit" inputmode="numeric" maxlength="5" placeholder="e.g. 500"
+                    oninput="this.value=this.value.replace(/\D/g,'')"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();earnPlannerAdd()}">
+                  <button type="button" class="action-btn" onclick="earnPlannerAdd()">Add</button>
+                </div>
+              </div>
+            </div>
+            <table class="priority-table ep-table"><tbody id="earn-planner-tbody"></tbody></table>
             <div id="earn-planner-empty" style="margin-top:12px"></div>
           </div>
         </div>

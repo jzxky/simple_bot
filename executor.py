@@ -420,6 +420,98 @@ def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
         return False
 
 
+def _planner_set_active(state: GameState, value: str, enable_earns: bool = False):
+    """Make `value` the bot's earn (and optionally re-enable earns), then
+    rebuild the scheduler so the Earns task picks it up."""
+    import settings_rev
+    c = cfg.load()
+    c["earns"]["earn_type"] = value
+    if enable_earns:
+        c["earns"]["enabled"] = True
+    c.setdefault("earn_planner", {})["waiting_for_earns"] = False
+    cfg.save(c)
+    settings_rev.bump()
+    import bot as _bot
+    _bot.request_reload()
+
+
+def _planner_advance(state: GameState, active: str, limits: dict, done: dict, history: dict):
+    """Move to the next available, unfinished earn in the planner queue; if
+    there is none, disable earns and wait (rechecked every 10 min)."""
+    import earn_planner as _ep
+    import settings_rev
+    nxt = _ep.pick_next(limits, done, history, skip=(active,))
+    if nxt:
+        _planner_set_active(state, nxt)
+        state.add_log(f"Earn planner: active earn is now {_earn_display_name(nxt)}.")
+        return
+    c = cfg.load()
+    c["earns"]["enabled"] = False
+    c.setdefault("earn_planner", {})["waiting_for_earns"] = True
+    cfg.save(c)
+    settings_rev.bump()
+    import bot as _bot
+    _bot.request_reload()
+    msg = "Earn planner: no available earns in the queue — earns disabled. Rechecking every 10 minutes."
+    state.add_log(msg)
+    if cfg.load().get("notifications", {}).get("no_available_earns", True):
+        state.push_notification("no_available_earns", "No available earns")
+
+
+def handle_earn_planner_check(action: Action, state: GameState):
+    """Earn planner poll — runs after each character history update, and every
+    10 minutes (silently) while waiting for an earn to become available."""
+    import earn_planner as _ep
+    import character_history as _ch
+    c = cfg.load()
+    planner = c.get("earn_planner", {})
+    limits = planner.get("limits", {})
+    done = dict(planner.get("done", {}))
+    if not limits:
+        return
+    history = _ch.load()
+
+    if planner.get("waiting_for_earns"):
+        # Refresh available_earns.json so newly unlocked earns are seen.
+        _scrape_earn_catalog(browser.page(), state)
+        nxt = _ep.pick_next(limits, done, history)
+        if nxt:
+            _planner_set_active(state, nxt, enable_earns=True)
+            state.add_log(f"Earn planner: {_earn_display_name(nxt)} is available — earns re-enabled.")
+        return
+
+    if not c.get("earns", {}).get("enabled", False):
+        return
+    mode = c["earns"].get("earn_mode", "auto")
+    active = c["earns"].get("earn_type", "")
+    decision = _ep.planner_decision(mode, active, limits, done, history)
+    name = _earn_display_name(active)
+
+    if decision["action"] == "none":
+        return
+
+    if decision["action"] == "final_batch":
+        page = browser.page()
+        if not _clear_earn_queue(page, state):
+            return  # retry on the next poll
+        if decision["remaining"] > 0:
+            if not _queue_earn(page, active, decision["remaining"], state):
+                return
+            _refresh_state(state)
+        state.add_log(f"Earn planner: {name} at {decision['count']}/{decision['limit']} — "
+                      f"queued the final {decision['remaining']}.")
+        done[active] = decision["limit"]
+        c = cfg.load()
+        c.setdefault("earn_planner", {})["done"] = done
+        cfg.save(c)
+    elif active in limits:
+        if mode == "manual" and decision["count"] >= decision["limit"]:
+            state.add_log(f"Earn planner: {name} reached its limit "
+                          f"({decision['count']}/{decision['limit']}).")
+
+    _planner_advance(state, active, limits, done, history)
+
+
 def handle_refresh_earn_catalog(action: Action, state: GameState):
     """Scrape the earn page and update available_earns.json — no queue action."""
     _scrape_earn_catalog(browser.page(), state)
@@ -434,11 +526,19 @@ def handle_check_earns(action: Action, state: GameState):
     import character_history as _ch
     try:
         _ch.fetch_and_save(state.own_name or "")
+        state.earn_planner_check_pending = True
     except Exception:
         pass
 
     auto_opts, available_values = _scrape_earn_catalog(page, state)
     if not available_values:
+        return
+
+    planner_cfg = cfg.load().get("earn_planner", {})
+    if (earn_type not in available_values and planner_cfg.get("enabled")
+            and planner_cfg.get("limits")):
+        state.add_log(f"Earn '{earn_type}' is not available — earn planner will pick the next earn.")
+        state.earn_planner_check_pending = True
         return
 
     if earn_type not in available_values:
@@ -465,77 +565,44 @@ def handle_check_earns(action: Action, state: GameState):
         state.add_log(f"Earn queue at {current_count}/200, no top-up needed.")
         return
 
-    available_capacity = QUEUE_MAX - current_count
-    limits = cfg.load().get("earn_planner", {}).get("limits", {})
-
-    # Queue order: the active earn first, then any other planner earns (those with
-    # limits), all restricted to currently auto-earnable values.
-    candidates = [earn_type] + [v for v in limits if v != earn_type]
-    candidates = [v for v in candidates if v in available_values]
-
-    new_active = None
-    for value in candidates:
-        if available_capacity <= 0:
-            break
-        limit = limits.get(value)
-        if limit:
-            # Progress toward the lifetime cap = completed (history) + already queued.
-            completed = _ep.completed_count(value)
-            queued = _ep.queued_remaining(value, queue_rows)
-            need = int(limit) - completed - queued
-            if need <= 0:
-                if value == earn_type:
-                    state.add_log(
-                        f"Earn planner: '{value}' at cap "
-                        f"({completed} done + {queued} queued ≥ {limit}) — moving to next earn."
-                    )
-                continue
-            amount = min(need, available_capacity)
-        else:
-            # No cap configured for this earn — fill the remaining capacity.
-            amount = available_capacity
-
+    amount = QUEUE_MAX - current_count
+    planner = cfg.load().get("earn_planner", {})
+    limit = planner.get("limits", {}).get(earn_type) if planner.get("enabled") else None
+    if limit:
+        # Never queue past the planner limit: completed (history) + already queued.
+        completed = _ep.completed_count(earn_type)
+        queued = _ep.queued_remaining(earn_type, queue_rows)
+        amount = min(amount, int(limit) - completed - queued)
         if amount <= 0:
-            continue
-        if not _queue_earn(page, value, amount, state):
-            continue
-        available_capacity -= amount
-        if new_active is None:
-            new_active = value
+            state.add_log(f"Earn planner: '{earn_type}' already has enough queued for its "
+                          f"limit ({completed} done + {queued} queued, limit {limit}).")
+            return
 
-    if new_active is None:
-        state.add_log("Earn planner: nothing to queue (all listed earns at cap or no capacity).")
-        return
-
-    _refresh_state(state)
-
-    # Reflect a planner-driven earn switch in config so the UI updates.
-    if new_active != earn_type:
-        c = cfg.load()
-        c["earns"]["earn_type"] = new_active
-        cfg.save(c)
-        state.add_log(f"Earn planner: active earn updated to {new_active}.")
+    if _queue_earn(page, earn_type, amount, state):
+        _refresh_state(state)
 
 
-def handle_clear_earn_queue(action: Action, state: GameState):
-    page = browser.page()
+def _clear_earn_queue(page, state: GameState) -> bool:
+    """Open earn.asp in AUTO mode and clear the in-game earn queue."""
     _nav(_u("/income/earn.asp"), state)
-
     if not _check_session(state):
-        return
-
-    # Ensure AUTO panel is visible
+        return False
     _ensure_auto_earn_mode(page)
-
     btn = page.query_selector("button.mm-earn-queue-clear-btn")
     if not btn:
         state.add_log("Clear queue button not found on earn page.")
-        return
-
+        return False
     btn.click()
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
     state.add_log("Earn queue cleared.")
+    return True
+
+
+def handle_clear_earn_queue(action: Action, state: GameState):
+    page = browser.page()
+    if not _clear_earn_queue(page, state):
+        return
 
     c = cfg.load()
     if c.get("earns", {}).get("enabled", False):
@@ -6635,6 +6702,7 @@ HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
     "refresh_earn_catalog": handle_refresh_earn_catalog,
+    "earn_planner_check": handle_earn_planner_check,
     "clear_earn_queue": handle_clear_earn_queue,
     "manual_earn": handle_manual_earn,
     "bulk_add_launder_contacts": handle_bulk_add_launder_contacts,

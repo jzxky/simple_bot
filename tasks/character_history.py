@@ -51,6 +51,7 @@ class CharacterHistoryTask(Task):
             ch.fetch_and_save(state.own_name or "")
             self._last_run = time.time()
             state.char_history_updated_at = self._last_run
+            state.earn_planner_check_pending = True
             state.add_log("Character history updated.")
         except Exception as e:
             state.add_log(f"Character history fetch failed: {e}")
