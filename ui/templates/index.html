@@ -307,7 +307,7 @@
           <hr class="stat-divider">
           <div class="setting-row">
             <label for="earn_mode">Earn Mode</label>
-            <select id="earn_mode" onchange="_populateEarnCategories(); autoSave()" style="width:160px">
+            <select id="earn_mode" onchange="onEarnModeChange(this)" style="width:160px">
               <option value="auto" {% if config.earns.earn_mode == 'auto' or not config.earns.earn_mode %}selected{% endif %}>Auto</option>
               <option value="manual" {% if config.earns.earn_mode == 'manual' %}selected{% endif %}>Manual</option>
             </select>
@@ -2917,6 +2917,20 @@
     <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px;">
       <button class="btn-secondary" onclick="closeEarnCatalog()">Cancel</button>
       <button class="btn-primary" onclick="saveEarnCatalog()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Earn mode blocked: a manual-only earn is selected -->
+<div class="pl-modal-overlay" id="earn-mode-block" onclick="if (event.target === this) closeEarnModeBlock()">
+  <div class="pl-modal-box">
+    <h3>Pick another earn first</h3>
+    <p style="font-size:0.85rem;color:var(--muted);line-height:1.5;margin:0">
+      <b id="earn-mode-block-name" style="color:var(--text)"></b> can only be done in <b>Manual</b> earn mode.
+      Select an earn that can be queued in Auto mode, then change the earn mode.
+    </p>
+    <div>
+      <button class="btn-secondary" onclick="closeEarnModeBlock()">OK</button>
     </div>
   </div>
 </div>
