@@ -373,37 +373,86 @@ def _save_earn_queue_cache(rows):
         json.dump(cache, f)
 
 
-def _ensure_auto_earn_mode(page):
-    """Make sure the AUTO earn panel is visible — the page loads in the
-    account's saved mode, so after any reload it may be showing MANUAL."""
+# True once the page has applied an earn mode: exactly one of the two panels
+# is displayed. Both panels are in the HTML and the game hides one with its
+# own script, so until then the visible panel says nothing about the mode.
+_EARN_MODE_APPLIED_JS = """() => {
+  const a = document.querySelector('div.mm-earn-mode-auto');
+  const m = document.querySelector('div.mm-earn-mode-manual');
+  if (!a || !m) return true;
+  const shown = e => getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;
+  return shown(a) !== shown(m);
+}"""
+
+
+def _settle_earn_page(page):
+    """Wait for earn.asp to finish loading and for the game to apply the saved
+    earn mode, before we look at which panel is showing."""
     try:
-        # "attached", not the default "visible": in MANUAL mode the panel is in
-        # the page but hidden, and that's exactly when it needs switching.
-        page.wait_for_selector("div.mm-earn-mode-auto", state="attached", timeout=5000)
+        page.wait_for_load_state("load", timeout=10000)
     except Exception:
-        return
-    auto_div = page.query_selector("div.mm-earn-mode-auto")
-    if not auto_div:
-        return
-    style = auto_div.get_attribute("style") or ""
-    if "display: none" in style or "display:none" in style:
+        pass
+    try:
+        page.wait_for_function(_EARN_MODE_APPLIED_JS, timeout=5000)
+    except Exception:
+        pass
+
+
+def _earn_panel_shown(page, which: str) -> bool:
+    """True if the AUTO / MANUAL panel ("auto" / "manual") is actually showing
+    (computed visibility, not the style attribute)."""
+    loc = page.locator(f"div.mm-earn-mode-{which}").first
+    try:
+        return loc.count() > 0 and loc.is_visible()
+    except Exception:
+        return False
+
+
+def _click_earn_mode_toggle(page):
+    """Click the AUTO/MANUAL switch the way a person would (its label)."""
+    try:
+        page.click("label.mm-earn-toggle-label", timeout=3000)
+    except Exception:
         page.evaluate("document.querySelector('#mm_earn_mode_toggle').click()")
-        page.wait_for_function(
-            "() => { const el = document.querySelector('div.mm-earn-mode-auto'); "
-            "return el && !el.style.display.includes('none'); }",
-            timeout=5000,
-        )
-    page.wait_for_selector(
-        "select[name='schedule_earn_identifier']",
-        state="visible", timeout=5000,
-    )
+
+
+def _queue_count(page) -> int:
+    """Number of earns in the in-game queue, from the "N / 200" counter."""
+    try:
+        text = page.locator("span.mm-earn-queue-cap").first.inner_text(timeout=2000)
+        return int(text.split("/")[0].strip())
+    except Exception:
+        return 0
+
+
+def _ensure_auto_earn_mode(page, state: "GameState | None" = None) -> bool:
+    """Make sure the AUTO panel is showing: if not, click the toggle once and
+    wait for the queue form. Returns True once the earn select is visible."""
+    _settle_earn_page(page)
+    if page.locator("div.mm-earn-mode-auto").count() == 0:
+        return False
+    if not _earn_panel_shown(page, "auto"):
+        _click_earn_mode_toggle(page)
+        if state is not None:
+            state.add_log("Switched to AUTO earn mode.")
+    try:
+        page.wait_for_selector("div.mm-earn-mode-auto select[name='schedule_earn_identifier']",
+                               state="visible", timeout=5000)
+        return True
+    except Exception:
+        return False
 
 
 def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
     """Add `amount` of one auto-earn to the queue. Returns True on success."""
     try:
-        _ensure_auto_earn_mode(page)
-        page.select_option("select[name='schedule_earn_identifier']", value)
+        if not _ensure_auto_earn_mode(page, state):
+            state.add_log(f"Earn queue: failed to add {value} — the AUTO earn panel didn't show.")
+            return False
+        if not _earn_panel_shown(page, "auto") and not _ensure_auto_earn_mode(page, state):
+            state.add_log(f"Earn queue: failed to add {value} — the AUTO earn panel didn't show.")
+            return False
+        page.select_option("div.mm-earn-mode-auto select[name='schedule_earn_identifier']", value)
         page.fill("input[name='schedule_count']", str(amount))
         # The add form reloads earn.asp — wait for that reload, not the old page.
         with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
@@ -474,6 +523,27 @@ def _planner_advance(state: GameState, active: str, limits: dict, done: dict, hi
     _planner_fall_back(state)
 
 
+def _planner_final_batch(page, state: GameState, active: str, decision: dict, done: dict,
+                         navigate: bool = True) -> bool:
+    """Auto mode, active earn within 200 of its limit: clear the queue (only
+    if it holds anything — clearing leaves the page switched back to AUTO),
+    queue the remaining earns, and record the hand-off. If the add fails the
+    queue is now empty, so the retry won't clear again."""
+    if not _clear_earn_queue(page, state, navigate=navigate):
+        return False
+    if decision["remaining"] > 0:
+        if not _queue_earn(page, active, decision["remaining"], state):
+            return False
+        _refresh_state(state)
+    state.add_log(f"Earn planner: {_earn_display_name(active)} at {decision['count']}/{decision['limit']} — "
+                  f"queued the final {decision['remaining']}.")
+    done[active] = decision["limit"]
+    c = cfg.load()
+    c.setdefault("earn_planner", {})["done"] = done
+    cfg.save(c)
+    return True
+
+
 def handle_earn_planner_check(action: Action, state: GameState):
     """Earn planner poll — runs after each character history update, and every
     10 minutes (silently) while waiting for an earn to become available."""
@@ -520,19 +590,8 @@ def handle_earn_planner_check(action: Action, state: GameState):
         return
 
     if decision["action"] == "final_batch":
-        page = browser.page()
-        if not _clear_earn_queue(page, state):
-            return  # retry on the next poll
-        if decision["remaining"] > 0:
-            if not _queue_earn(page, active, decision["remaining"], state):
-                return
-            _refresh_state(state)
-        state.add_log(f"Earn planner: {name} at {decision['count']}/{decision['limit']} — "
-                      f"queued the final {decision['remaining']}.")
-        done[active] = decision["limit"]
-        c = cfg.load()
-        c.setdefault("earn_planner", {})["done"] = done
-        cfg.save(c)
+        if not _planner_final_batch(browser.page(), state, active, decision, done):
+            return  # retry on the next poll (no second clear: the queue is now empty)
     elif active in limits:
         if mode == "manual" and decision["count"] >= decision["limit"]:
             state.add_log(f"Earn planner: {name} reached its limit "
@@ -547,6 +606,9 @@ def handle_refresh_earn_catalog(action: Action, state: GameState):
 
 
 def handle_check_earns(action: Action, state: GameState):
+    """Auto earn mode: refresh history (planner mode), open earn.asp, make sure
+    the AUTO panel is showing, then either the planner step (planner mode) or
+    a plain top-up (free mode)."""
     earn_type = action.params["earn_type"]
     page = browser.page()
 
@@ -555,56 +617,65 @@ def handle_check_earns(action: Action, state: GameState):
                       "set Earn Mode to Manual or pick another earn.")
         return
 
-    # Fetch character history first — it navigates away from earn.asp.
     import earn_planner as _ep
     import character_history as _ch
-    try:
-        _ch.fetch_and_save(state.own_name or "")
-        state.earn_planner_check_pending = True
-    except Exception:
-        pass
+    c = cfg.load()
+    planner = c.get("earn_planner", {})
+    planner_mode = bool(planner.get("enabled") and planner.get("limits")
+                        and c.get("character_history", {}).get("enabled")
+                        and not planner.get("waiting_for_earns"))
 
+    # 1. Planner mode: refresh character history (the earn counts).
+    if planner_mode:
+        try:
+            _ch.fetch_and_save(state.own_name or "")
+        except Exception:
+            pass
+
+    # 2. Open earn.asp and refresh the earn list.
     auto_opts, available_values = _scrape_earn_catalog(page, state)
     if not available_values:
         return
 
-    planner_cfg = cfg.load().get("earn_planner", {})
-    if (earn_type not in available_values and planner_cfg.get("enabled")
-            and planner_cfg.get("limits")):
-        state.add_log(f"Earn '{earn_type}' is not available — earn planner will pick the next earn.")
-        state.earn_planner_check_pending = True
-        return
-
     if earn_type not in available_values:
-        state.add_log(f"Earn '{earn_type}' is not available — disabling earns. Select a new earn and save to re-enable.")
-        c = cfg.load()
-        c["earns"]["enabled"] = False
-        cfg.save(c)
+        if planner.get("enabled") and planner.get("limits"):
+            state.add_log(f"Earn '{earn_type}' is not available — earn planner will pick the next earn.")
+            state.earn_planner_check_pending = True
+        else:
+            _disable_earns(state, f"Earn '{earn_type}' is not available — disabling earns. "
+                                  "Select a new earn and save to re-enable.")
         return
 
-    # Read queue count from current page content
-    earn_soup = BeautifulSoup(page.content(), "html.parser")
-    cap_span = earn_soup.find("span", class_="mm-earn-queue-cap")
-    current_count = 0
-    if cap_span:
-        try:
-            current_count = int(cap_span.get_text(strip=True).split("/")[0].strip())
-        except (ValueError, IndexError):
-            pass
+    # 3. AUTO panel showing? If not, click the toggle.
+    if not _ensure_auto_earn_mode(page, state):
+        state.add_log("Earns: the AUTO earn panel didn't show — will retry on the next check.")
+        return
 
-    queue_rows = _parse_earn_queue_rows(earn_soup)
+    current_count = _queue_count(page)
+    queue_rows = _parse_earn_queue_rows(BeautifulSoup(page.content(), "html.parser"))
     _save_earn_queue_cache(queue_rows)
 
+    # 4a. Planner mode: decide on this page, before any top-up.
+    if planner_mode:
+        limits = planner.get("limits", {})
+        done = dict(planner.get("done", {}))
+        history = _ch.load()
+        decision = _ep.planner_decision("auto", earn_type, limits, done, history)
+        if decision["action"] == "final_batch":
+            if _planner_final_batch(page, state, earn_type, decision, done, navigate=False):
+                _planner_advance(state, earn_type, limits, done, history)
+            return
+        if decision["action"] == "advance":
+            _planner_advance(state, earn_type, limits, done, history)
+            return
+
+    # 4b. Top-up (free mode, or planner mode not yet near the limit).
     if current_count >= QUEUE_MIN:
         state.add_log(f"Earn queue at {current_count}/200, no top-up needed.")
         return
 
     amount = QUEUE_MAX - current_count
-    planner = cfg.load().get("earn_planner", {})
-    # While the planner is falling back to its default earn, that earn isn't
-    # bound by a planner limit.
-    capped = planner.get("enabled") and not planner.get("waiting_for_earns")
-    limit = planner.get("limits", {}).get(earn_type) if capped else None
+    limit = planner.get("limits", {}).get(earn_type) if planner_mode else None
     if limit:
         # Never queue past the planner limit: completed (history) + already queued.
         completed = _ep.completed_count(earn_type)
@@ -619,23 +690,30 @@ def handle_check_earns(action: Action, state: GameState):
         _refresh_state(state)
 
 
-def _clear_earn_queue(page, state: GameState) -> bool:
-    """Open earn.asp in AUTO mode and clear the in-game earn queue."""
-    _nav(_u("/income/earn.asp"), state)
-    if not _check_session(state):
+def _clear_earn_queue(page, state: GameState, navigate: bool = True) -> bool:
+    """Clear the in-game earn queue, leaving the page in AUTO mode.
+    Skips the click when the queue is already empty. Clearing switches the
+    game to MANUAL, so it switches back to AUTO afterwards."""
+    if navigate:
+        _nav(_u("/income/earn.asp"), state)
+        if not _check_session(state):
+            return False
+    _settle_earn_page(page)
+    if _queue_count(page) == 0:
+        return _ensure_auto_earn_mode(page, state)
+    if not _ensure_auto_earn_mode(page, state):
+        state.add_log("Earn queue: can't clear — the AUTO earn panel didn't show.")
         return False
-    _ensure_auto_earn_mode(page)
-    btn = page.query_selector("button.mm-earn-queue-clear-btn")
+    btn = page.query_selector("div.mm-earn-mode-auto button.mm-earn-queue-clear-btn")
     if not btn:
         state.add_log("Clear queue button not found on earn page.")
         return False
-    # Clearing reloads earn.asp (possibly back in MANUAL mode) — wait for the
-    # reload so whatever runs next works on the new page, not the old one.
     with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
         btn.click()
     _refresh_state(state)
     state.add_log("Earn queue cleared.")
-    return True
+    # Clearing the queue puts the game in MANUAL mode — switch back to AUTO.
+    return _ensure_auto_earn_mode(page, state)
 
 
 def handle_clear_earn_queue(action: Action, state: GameState):
@@ -745,28 +823,28 @@ def _log_manual_earn_result(state: GameState, display_name: str, html: str, how:
 
 
 def _ensure_manual_earn_mode(page, state: GameState):
-    manual_div = page.query_selector("div.mm-earn-mode-manual")
-    if not manual_div:
+    """Put earn.asp in MANUAL mode:
+      - MANUAL showing → nothing to do;
+      - earns in the queue → Clear queue (which switches the game to MANUAL);
+      - queue empty → click the toggle."""
+    _settle_earn_page(page)
+    if _earn_panel_shown(page, "manual"):
         return
-    style = manual_div.get_attribute("style") or ""
-    if "display: none" not in style and "display:none" not in style:
-        return
-    btn = page.query_selector("button.mm-earn-queue-clear-btn")
-    if btn:
-        with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
-            btn.click()
-        state.add_log("Earn queue cleared before switching to manual.")
-        manual_div = page.query_selector("div.mm-earn-mode-manual")
-        style = (manual_div.get_attribute("style") or "") if manual_div else ""
-        if manual_div and "display: none" not in style and "display:none" not in style:
-            return   # the reloaded page is already in MANUAL mode
-    page.evaluate("document.querySelector('#mm_earn_mode_toggle').click()")
-    page.wait_for_function(
-        "() => { const el = document.querySelector('div.mm-earn-mode-manual'); "
-        "return el && !el.style.display.includes('none'); }",
-        timeout=5000
-    )
-    state.add_log("Switched to MANUAL earn mode.")
+    if _queue_count(page) > 0:
+        btn = page.query_selector("div.mm-earn-mode-auto button.mm-earn-queue-clear-btn")
+        if btn:
+            with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+                btn.click()
+            state.add_log("Earn queue cleared — switched to MANUAL earn mode.")
+            _settle_earn_page(page)
+            if _earn_panel_shown(page, "manual"):
+                return
+    _click_earn_mode_toggle(page)
+    try:
+        page.wait_for_selector("div.mm-earn-mode-manual", state="visible", timeout=5000)
+        state.add_log("Switched to MANUAL earn mode.")
+    except Exception:
+        state.add_log("Manual earn: the MANUAL earn panel didn't show.")
 
 
 def _map_lastearn_to_catalog(lastearn_text: str, schedule_value: str):

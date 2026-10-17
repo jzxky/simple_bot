@@ -60,6 +60,27 @@ function _showAllEarns() {
   return cb && cb.checked;
 }
 
+// Earn Mode change: a manual-only earn (Pizza Restaurant, Local 7/11,
+// Bar/Nightclub) can't be queued in Auto mode — keep Manual and explain.
+function onEarnModeChange(sel) {
+  const earnSel = document.getElementById("earn_type");
+  const current = earnSel ? (earnSel.value || earnSel.dataset.current || "") : "";
+  if (sel.value === "auto" && current.startsWith("manual:")) {
+    sel.value = "manual";
+    const entry = _earnCatalog.find(e => _earnValue(e) === current);
+    document.getElementById("earn-mode-block-name").textContent =
+      entry ? entry.label : current.slice("manual:".length);
+    document.getElementById("earn-mode-block").classList.add("active");
+    return;
+  }
+  _populateEarnCategories();
+  autoSave();
+}
+
+function closeEarnModeBlock() {
+  document.getElementById("earn-mode-block").classList.remove("active");
+}
+
 function _earnModeIsManual() {
   const m = document.getElementById("earn_mode");
   return !!m && m.value === "manual";
