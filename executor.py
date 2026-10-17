@@ -6151,27 +6151,34 @@ def _game_result_message(html: str) -> "tuple[bool | None, str]":
     return None, text[:300]
 
 
-def _open_game_options(state: GameState):
-    """Open options.asp. The game only serves it when it's reached from the
-    profile page, so visit /profile/default.asp first and follow its options
-    link (or, if that link isn't visible, load options.asp with the profile
-    page as the referrer)."""
+def _open_profile_subpage(state: GameState, path: str, what: str):
+    """Open a /profile/ sub-page (options.asp, quitjob.asp). The game only
+    serves these when they're reached from the profile page, so visit
+    /profile/default.asp first and follow its link to the page (or, if that
+    link isn't visible, load the page with the profile page as the referrer)."""
     _nav(_u(PROFILE_PATH), state)
     if not _check_session(state):
         raise RuntimeError("Session expired.")
     page = browser.page()
-    link = page.locator("a[href*='options.asp']").first
+    filename = path.rsplit("/", 1)[-1]
+    link = page.locator(f"a[href*='{filename}']").first
     if link.count() and link.is_visible():
         with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
             link.click()
     else:
-        page.goto(_u(GAME_OPTIONS_PATH), wait_until="domcontentloaded",
+        page.goto(_u(path), wait_until="domcontentloaded",
                   timeout=30000, referer=_u(PROFILE_PATH))
     _refresh_state(state)
     if not _check_session(state):
         raise RuntimeError("Session expired.")
-    if "options.asp" not in browser.current_url():
-        raise RuntimeError(f"Options page didn't open (ended on {browser.current_url()}).")
+    if filename not in browser.current_url():
+        raise RuntimeError(f"{what} page didn't open (ended on {browser.current_url()}).")
+
+
+def _open_game_options(state: GameState):
+    """Open options.asp (via the profile page) and check the form is there."""
+    _open_profile_subpage(state, GAME_OPTIONS_PATH, "Options")
+    page = browser.page()
     html = page.content()
     if all(v is None for v in _parse_game_options(html).values()):
         success, message = _game_result_message(html)
@@ -6232,13 +6239,13 @@ def handle_quit_game(action: Action, state: GameState):
     what = action.params.get("what", "")
     try:
         button_value = QUIT_BUTTONS[what]
-        _nav(_u(QUIT_JOB_PATH), state)
-        if not _check_session(state):
-            raise RuntimeError("Session expired.")
+        _open_profile_subpage(state, QUIT_JOB_PATH, "Quit")
         page = browser.page()
         button = page.locator(f"input[type='submit'][value='{button_value}']")
         if button.count() == 0:
-            raise RuntimeError(f"'{button_value}' button not found on the page.")
+            _, message = _game_result_message(page.content())
+            raise RuntimeError(f"'{button_value}' button not found on {browser.current_url()}"
+                               + (f" — the game showed: {message}" if message else "."))
         # The quitoption select sits just before its button in the same cell.
         select = button.locator("xpath=preceding::select[@name='quitoption'][1]")
         select.select_option("yes")
