@@ -315,6 +315,7 @@ function _renderEarnPlanner() {
           <div class="ep-bar${finished ? " done" : ""}"><div style="width:${pct}%"></div></div>
           <span class="ep-count">${completed.toLocaleString()} / ${Number(limit).toLocaleString()} (${pct}%)</span>
         </div>
+        ${finished && info.queued > 0 ? `<div class="ep-queued">⏳ ${info.queued.toLocaleString()} still in the game queue — limit reached once they finish</div>` : ""}
       </td>
       <td class="ep-limit-cell"><input type="text" inputmode="numeric" maxlength="5" value="${limit}"
         oninput="this.value=this.value.replace(/\\D/g,'')"
