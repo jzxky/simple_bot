@@ -3978,6 +3978,17 @@ def _jailbreak_result(soup) -> str:
 
 
 def handle_jailbreak_plan(action: Action, state: GameState):
+    try:
+        _jailbreak_plan(action, state)
+    finally:
+        # Release the hold Auto Jail Time placed while waiting for this plan to run.
+        if state.auto_jail_hold:
+            state.auto_jail_hold = False
+            if not action.params.get("hold_action_timer", False):
+                state.hold_action_timer = False
+
+
+def _jailbreak_plan(action: Action, state: GameState):
     target = action.params.get("target", "")
     partner = action.params.get("partner", "")
     hold = action.params.get("hold_action_timer", False)
