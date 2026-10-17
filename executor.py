@@ -2443,6 +2443,12 @@ def handle_university(action: Action, state: GameState):
         if "Yes" in options:
             _submit("Yes")
             soup2 = BeautifulSoup(page.content(), "html.parser")
+            ok_div = soup2.find("div", id="success")
+            fail_div = soup2.find("div", id="fail")
+            if fail_div:
+                state.add_log(f"University: study failed — {fail_div.get_text(' ', strip=True)}")
+                return
+            result = f" — {ok_div.get_text(' ', strip=True)}" if ok_div else ""
             page_text = soup2.get_text(" ").lower()
             if any(w in page_text for w in ("congratulations", "completed", "graduated", "degree awarded")):
                 degree_match = _re.search(r"degree in (\w+)", page_text, _re.I)
@@ -2454,9 +2460,13 @@ def handle_university(action: Action, state: GameState):
                     if canonical not in completed:
                         completed.append(canonical)
                         cfg.save(c)
-                    state.add_log(f"University: completed {canonical} degree.")
+                    state.add_log(f"University: completed {canonical} degree{result or '.'}")
+                else:
+                    state.add_log(f"University: studied{result or '.'}")
+            elif ok_div:
+                state.add_log(f"University: studied{result}")
             else:
-                state.add_log("University: studied.")
+                state.add_log("University: studied (no success/fail message on the result page).")
             return
 
         # --- Enrollment confirmation page: accept the degree ---
