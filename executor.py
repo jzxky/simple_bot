@@ -6444,6 +6444,7 @@ def handle_fetch_profile(action: Action, state: GameState):
     try:
         _nav(_u("/profile/default.asp"), state)
         result = _parse_profile_page()
+        result["in_home_city"] = _apartment_reachable(state)
         if result_q is not None:
             result_q.put(result)
     except Exception as e:
@@ -6462,6 +6463,7 @@ def _with_profile(state: GameState, result: dict) -> dict:
             if not _check_session(state):
                 return result
         result["profile"] = _parse_profile_page()
+        result["profile"]["in_home_city"] = _apartment_reachable(state)
     except Exception as e:
         state.add_log(f"Profile refresh failed: {e}")
     return result
@@ -6717,11 +6719,54 @@ def _apartment_ready() -> bool:
     return browser.page().locator(_APT_MARKERS).count() > 0
 
 
+def _apartment_reachable(state: GameState) -> bool:
+    """False only when the bot knows it's outside the home city (the apartment
+    can only be managed at home). Unknown cities don't hide it."""
+    if not state.home_city or not state.current_city:
+        return True
+    return state.in_home_city()
+
+
+_apartment_tab = None
+
+
+def _apartment_page():
+    """The dedicated tab the Apartment overlay works in (opened on first use)."""
+    global _apartment_tab
+    if _apartment_tab is None or _apartment_tab.is_closed():
+        _apartment_tab = browser.new_page()
+    return _apartment_tab
+
+
+def _in_apartment_tab(handler):
+    """Run an apartment handler against its own tab, so other bot tasks
+    navigating the main tab never pull the stash page out from under it."""
+    def run(action: Action, state: GameState):
+        if not _apartment_reachable(state):
+            return handler(action, state)  # refuses before navigating; no tab needed
+        with browser.use_page(_apartment_page()):
+            return handler(action, state)
+    return run
+
+
+def handle_close_apartment_tab(action: Action, state: GameState):
+    global _apartment_tab
+    result_q = action.params.get("result_queue")
+    if _apartment_tab is not None:
+        browser.close_page(_apartment_tab)
+        _apartment_tab = None
+    if result_q is not None:
+        result_q.put({"ok": True, "message": ""})
+
+
 def _open_apartment(state: GameState) -> "dict | None":
     """Open profile/dirty.asp so its stash form is on screen. Tries the URL
     directly, then via the profile's Enter/Manage link (the game may want
     the profile page as referrer). Returns a failure result dict (ok False)
     when the form still isn't there, else None."""
+    if not _apartment_reachable(state):
+        return {"ok": False, "message": f"You're in {state.current_city} — the apartment can only "
+                                        f"be managed in your home city ({state.home_city})."}
     _nav(_u(_APARTMENT_URL), state)
     if not _check_session(state):
         return {"ok": False, "message": "Session expired."}
@@ -7412,13 +7457,14 @@ HANDLERS = {
     "sell_weapon": handle_sell_weapon,
     "cancel_weapon_sale": handle_cancel_weapon_sale,
     "sell_vehicle": handle_sell_vehicle,
-    "fetch_apartment": handle_fetch_apartment,
+    "fetch_apartment": _in_apartment_tab(handle_fetch_apartment),
+    "close_apartment_tab": handle_close_apartment_tab,
     "fetch_dispose_weapon": handle_fetch_dispose_weapon,
     "dispose_weapon": handle_dispose_weapon,
     "weapon_link": handle_weapon_link,
     "repair_vehicle_ui": handle_repair_vehicle_ui,
-    "apartment_money": handle_apartment_money,
-    "stash_drugs": handle_stash_drugs,
+    "apartment_money": _in_apartment_tab(handle_apartment_money),
+    "stash_drugs": _in_apartment_tab(handle_stash_drugs),
     "fetch_game_options": handle_fetch_game_options,
     "save_game_options": handle_save_game_options,
     "quit_game": handle_quit_game,

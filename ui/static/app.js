@@ -1273,7 +1273,8 @@ function openApartmentOverlay() {
 function closeApartmentOverlay() {
   document.getElementById("apartment-overlay").classList.remove("active");
   _aptBanner(null);
-  loadProfile();
+  // Close the bot's apartment tab first, then refresh the profile.
+  fetch("/apartment/close", {method: "POST"}).catch(() => {}).then(() => loadProfile());
 }
 
 function _renderApartment(a) {
@@ -5833,7 +5834,8 @@ function _renderProfile(d) {
     h.push('<div class="profile-item-row">');
     h.push(_profileImg(a.img));
     h.push(`<div class="profile-item-meta"><span class="profile-item-name">${escHtml(a.Apartment)}</span><span class="muted">${escHtml(bits.join(" · "))}</span></div>`);
-    if (a.action_url) {
+    // The apartment can only be managed in the home city.
+    if (a.action_url && !(/dirty\.asp/i.test(a.action_url) && d.in_home_city === false)) {
       const act = /dirty\.asp/i.test(a.action_url) ? {type: "apartment"} : {type: "nav", url: a.action_url};
       h.push(`<div class="profile-item-actions">${_profileBtn(a.action_label || "Enter/Manage", act)}</div>`);
     }
