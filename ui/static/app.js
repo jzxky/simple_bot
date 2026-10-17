@@ -303,8 +303,13 @@ function _renderEarnPlanner() {
     const completed = info.completed || 0;
     const finished = info.finished === true || completed >= limit;
     const pct = limit > 0 ? Math.min(100, Math.round((completed / limit) * 100)) : 0;
+    // Handed off with its final batch still in the game queue: QUEUED until
+    // history reaches the limit, with the queued part striped on the bar.
+    const queued = finished ? (info.queued || 0) : 0;
+    const qPct = limit > 0 ? Math.max(0, Math.min(100 - pct, Math.round((queued / limit) * 100))) : 0;
     let badge = "";
-    if (finished) badge = '<span class="ep-badge done">Done</span>';
+    if (queued > 0) badge = '<span class="ep-badge queued">Queued</span>';
+    else if (finished) badge = '<span class="ep-badge done">Done</span>';
     else if (value === d.active && !d.waiting) badge = '<span class="ep-badge active">Active</span>';
     else if (info.catalog_available === false) badge = '<span class="ep-badge unavail">Not available</span>';
     return `<tr draggable="true" data-item="${escHtml(value)}">
@@ -312,10 +317,11 @@ function _renderEarnPlanner() {
       <td class="ep-earn-cell">
         <div class="ep-earn-name">${name} ${badge}</div>
         <div class="ep-progress">
-          <div class="ep-bar${finished ? " done" : ""}"><div style="width:${pct}%"></div></div>
-          <span class="ep-count">${completed.toLocaleString()} / ${Number(limit).toLocaleString()} (${pct}%)</span>
+          <div class="ep-bar${finished ? " done" : ""}"><div style="width:${pct}%"></div>${queued > 0 ? `<div class="ep-bar-queued" style="width:${qPct}%"></div>` : ""}</div>
+          <span class="ep-count">${queued > 0
+            ? `${completed.toLocaleString()} done + <b class="ep-count-queued">${queued.toLocaleString()} queued</b> / ${Number(limit).toLocaleString()}`
+            : `${completed.toLocaleString()} / ${Number(limit).toLocaleString()} (${pct}%)`}</span>
         </div>
-        ${finished && info.queued > 0 ? `<div class="ep-queued">⏳ ${info.queued.toLocaleString()} still in the game queue — limit reached once they finish</div>` : ""}
       </td>
       <td class="ep-limit-cell"><input type="text" inputmode="numeric" maxlength="5" value="${limit}"
         oninput="this.value=this.value.replace(/\\D/g,'')"
