@@ -302,11 +302,19 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
             completed = counts.get(history_name.lower(), 0)
         if not completed and label:
             completed = counts.get(label.lower(), 0)
+        # Handed off with its final batch queued but not all worked yet: the
+        # rest is still in the game queue. Derived from history (refreshed far
+        # more often than the queue snapshot), so it shrinks as earns finish.
+        handed_off_at = (done or {}).get(value)
+        queued = 0
+        if handed_off_at is not None and int(limit) <= int(handed_off_at) and completed < int(limit):
+            queued = int(handed_off_at) - completed
         earns.append({
             "value": value,
             "label": label,
             "completed": completed,
             "limit": limit,
+            "queued": queued,
             "catalog_available": catalog_available(value, catalog_entries),
             "finished": is_finished(value, limit, done, data),
         })

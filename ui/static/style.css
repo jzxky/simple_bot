@@ -2078,6 +2078,7 @@ body.setup-open { overflow: hidden; }
 .ep-bar.done > div { background: var(--success); }
 .ep-count { font-size: 0.72rem; color: var(--muted); white-space: nowrap; min-width: 118px; text-align: right; }
 .ep-limit-cell input { width: 70px; }
+.ep-queued { margin-top: 3px; font-size: 0.72rem; color: #a9cdf3; line-height: 1.35; }
 @media (max-width: 640px) {
   .ep-progress { flex-wrap: wrap; gap: 3px; }
   .ep-bar { flex: 1 1 100%; }
