@@ -927,6 +927,10 @@ def request_jailbreak_plan(target: str, partner: str, hold_action_timer: bool):
     })
 
 
+def jailbreak_plan_pending() -> bool:
+    return not _jailbreak_plan_queue.empty()
+
+
 def request_jailbreak_execute():
     _jailbreak_execute_queue.put(True)
 

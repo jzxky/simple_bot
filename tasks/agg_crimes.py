@@ -115,7 +115,8 @@ class AggCrimeTask(Task):
         if crime == "armed" and state.snipe_active:
             return False
         # Non-gangsters using armed robbery consume the action timer; skip if it's not free
-        if crime == "armed" and "gangster" not in state.occupation.lower() and not state.action_available():
+        if crime == "armed" and "gangster" not in state.occupation.lower() and (
+                state.hold_action_timer or not state.action_available()):
             return False
         return True
 
@@ -141,6 +142,8 @@ class AggCrimeTask(Task):
             reasons.append("Top-job snipe active (armed robbery)")
         elif crime == "armed" and "gangster" not in state.occupation.lower() and not state.action_available():
             reasons.append("Action timer busy (armed robbery)")
+        elif crime == "armed" and "gangster" not in state.occupation.lower() and state.hold_action_timer:
+            reasons.append("Action timer held (armed robbery)")
         return reasons
 
     def run(self, state: GameState, executor):

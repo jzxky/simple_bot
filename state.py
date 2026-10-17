@@ -72,6 +72,9 @@ class GameState:
     jail_consumables: dict = field(default_factory=dict)
     jail_release_secs: "int | None" = None
     hold_action_timer: bool = False
+    # True while hold_action_timer was set by Auto Jail Time waiting to plan a
+    # break (as opposed to a manual hold from the jailbreak plan UI).
+    auto_jail_hold: bool = False
     vehicle_health: "int | None" = None
     flight_departs_at: "float | None" = None
     char_history_updated_at: float = 0.0

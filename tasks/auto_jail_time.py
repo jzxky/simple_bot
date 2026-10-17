@@ -52,6 +52,12 @@ def _after_changeover(t: int) -> bool:
     return _CHANGEOVER_MIN <= t < _PLAN_START_MIN
 
 
+def _release_hold(state):
+    state.auto_jail_hold = False
+    state.hold_action_timer = False
+    state.add_log("Auto Jail Time: action timer hold released.")
+
+
 class AutoJailTimeTask(Task):
     priority = 75
     label = "Auto Jail Time"
@@ -61,6 +67,19 @@ class AutoJailTimeTask(Task):
         self._last_jail_check: float = 0.0
 
     def can_run(self, state: GameState) -> bool:
+        ready = self._ready_except_timer(state)
+        self._sync_hold(state, ready)
+        if not ready:
+            return False
+        # A manual hold (jailbreak plan UI) still blocks; our own hold doesn't.
+        if state.hold_action_timer and not state.auto_jail_hold:
+            return False
+        # Planning consumes the action timer — wait until it's free. Priority 75
+        # (above the 50–60 action-timer tasks) ensures it runs first once free.
+        return state.action_available()
+
+    def _ready_except_timer(self, state: GameState) -> bool:
+        """Every run condition except the action timer being free/unheld."""
         if not state.logged_in or state.in_jail or state.in_hospital:
             return False
         c = cfg.load()
@@ -71,14 +90,8 @@ class AutoJailTimeTask(Task):
         # A partner is required to plan a jail break.
         if not jail_cfg.get("auto_jail_partner", "").strip():
             return False
-        if state.hold_action_timer:
-            return False
         # Non-gangsters can only plan a jail break in their home city.
         if "gangster" not in (state.occupation or "").lower() and not state.in_home_city():
-            return False
-        # Planning consumes the action timer — wait until it's free. Priority 75
-        # (above the 50–60 action-timer tasks) ensures it runs first once free.
-        if not state.action_available():
             return False
         if jail_cfg.get("jailbreak_execute_at", 0) > 0:
             return False
@@ -98,6 +111,17 @@ class AutoJailTimeTask(Task):
                 return True
             return time.time() - self._last_jail_check >= _JAIL_CHECK_INTERVAL
 
+    def _sync_hold(self, state: GameState, ready: bool):
+        """While waiting to go, hold the action timer so no other task takes it;
+        keep holding until the queued plan executes (the plan handler releases it)."""
+        if ready:
+            if not state.hold_action_timer:
+                state.hold_action_timer = True
+                state.auto_jail_hold = True
+                state.add_log("Auto Jail Time: holding action timer until the jail break is planned.")
+        elif state.auto_jail_hold and not bot.jailbreak_plan_pending():
+            _release_hold(state)
+
     def blocked_reasons(self, state):
         reasons = []
         if not state.logged_in:
@@ -114,7 +138,7 @@ class AutoJailTimeTask(Task):
             return reasons
         if not jail_cfg.get("auto_jail_partner", "").strip():
             reasons.append("No partner set")
-        if state.hold_action_timer:
+        if state.hold_action_timer and not state.auto_jail_hold:
             reasons.append("Action timer held")
         if "gangster" not in (state.occupation or "").lower() and not state.in_home_city():
             reasons.append("Not in home city (non-gangster)")
@@ -183,6 +207,8 @@ class AutoJailTimeTask(Task):
 
         if not target:
             state.add_log("Auto Jail Time: no target found.")
+            if state.auto_jail_hold:
+                _release_hold(state)
             return
 
         state.add_log(f"Auto Jail Time: planning jailbreak for {target} (partner: {partner or 'none'}).")
