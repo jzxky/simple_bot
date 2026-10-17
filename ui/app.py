@@ -1733,6 +1733,13 @@ def apartment_route():
     return _run_profile_task("fetch_apartment")
 
 
+@app.route("/apartment/close", methods=["POST"])
+def apartment_close_route():
+    if not bot.is_running():
+        return jsonify({"ok": True, "message": ""})
+    return _run_profile_task("close_apartment_tab")
+
+
 @app.route("/apartment/money", methods=["POST"])
 def apartment_money_route():
     if not bot.is_running():
