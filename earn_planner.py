@@ -69,13 +69,6 @@ HISTORY_NAME = {
     "dig_tunnel":          "Dig Tunnel",
 }
 
-# Catalog label (lowercase) → character-history "type" name, for earns whose
-# history name is abbreviated. Used by the label fallback, so the count still
-# resolves when the schedule_value isn't in HISTORY_NAME.
-LABEL_HISTORY_ALIAS = {
-    "volunteer fire fighter": "vol. fire fighter",
-}
-
 # schedule_value → name shown in the earn-queue list (.mm-earn-queue-row-name).
 # These differ from both schedule_value and the history names (e.g. queue shows
 # "Scamming" while history shows "Scams"). Confirmed: scamming → "Scamming".
@@ -132,20 +125,29 @@ QUEUE_NAME = {
 }
 
 
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", "", s or "").lower()
+def _count_key(name: str) -> str:
+    """Canonical earn name for count lookups: lowercase, letters/digits only, with
+    "volunteer" abbreviated, so the catalog label "Volunteer Firefighter" matches
+    the history name "Vol. Fire Fighter"."""
+    key = re.sub(r"[^a-z0-9]", "", (name or "").lower())
+    return re.sub(r"^volunteer", "vol", key)
+
+
+def _queue_candidates(schedule_value: str) -> set:
+    """Canonical names a queue row for this earn may show: the queue-name and
+    history-name mappings plus the catalog label (covers unmapped values)."""
+    candidates = {_count_key(QUEUE_NAME.get(schedule_value, "")),
+                  _count_key(HISTORY_NAME.get(schedule_value, "")),
+                  _count_key(_catalog_labels().get(schedule_value, ""))}
+    candidates.discard("")
+    return candidates
 
 
 def matches_queue_name(schedule_value: str, row_name: str) -> bool:
-    """True if a queue-row name belongs to the given auto-earn. Compares against
-    the queue-name mapping and the history-name mapping, whitespace/case-insensitive."""
-    target = _norm(row_name)
-    if not target:
-        return False
-    candidates = {_norm(QUEUE_NAME.get(schedule_value, "")),
-                  _norm(HISTORY_NAME.get(schedule_value, ""))}
-    candidates.discard("")
-    return target in candidates
+    """True if a queue-row name belongs to the given auto-earn. Compares canonical
+    names (_count_key), so case, spacing and punctuation differences still match."""
+    target = _count_key(row_name)
+    return bool(target) and target in _queue_candidates(schedule_value)
 
 
 def queued_remaining(schedule_value: str, rows) -> int:
@@ -153,9 +155,10 @@ def queued_remaining(schedule_value: str, rows) -> int:
 
     `rows` is an iterable of (name, completed, total) tuples parsed from the
     .mm-earn-queue-row elements on earn.asp."""
+    candidates = _queue_candidates(schedule_value)
     total = 0
     for name, completed, tot in rows:
-        if matches_queue_name(schedule_value, name):
+        if _count_key(name) in candidates:
             total += max(0, tot - completed)
     return total
 
@@ -168,22 +171,15 @@ def is_available(history: dict | None = None) -> bool:
 
 
 def _completed_counts(history: dict | None = None) -> dict:
-    """Return {lowercase_type_name: count} flattened across all earn-history categories.
-    Keys are lowercased so lookups are case-insensitive."""
+    """Return {_count_key(type_name): count} flattened across all earn-history categories."""
     data = history if history is not None else ch.load()
     counts = {}
     for cat in data.get("earn_history", []):
         for entry in cat.get("entries", []):
             name = entry.get("type", "")
             if name:
-                counts[name.replace(" ", " ").lower()] = entry.get("count", 0)
+                counts[_count_key(name)] = entry.get("count", 0)
     return counts
-
-
-def _label_count(label: str, counts: dict) -> int:
-    """History count for a catalog label, trying its abbreviated alias too."""
-    key = (label or "").lower()
-    return counts.get(key, 0) or counts.get(LABEL_HISTORY_ALIAS.get(key, ""), 0)
 
 
 def completed_count(schedule_value: str, history: dict | None = None) -> int:
@@ -192,10 +188,11 @@ def completed_count(schedule_value: str, history: dict | None = None) -> int:
     counts = _completed_counts(history)
     name = HISTORY_NAME.get(schedule_value)
     if name:
-        result = counts.get(name.lower(), 0)
+        result = counts.get(_count_key(name), 0)
         if result:
             return result
-    return _label_count(_catalog_labels().get(schedule_value), counts)
+    label = _catalog_labels().get(schedule_value)
+    return counts.get(_count_key(label), 0) if label else 0
 
 
 def _load_catalog() -> list:
@@ -309,9 +306,9 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
         label = catalog_labels.get(value, history_name or value)
         completed = 0
         if history_name:
-            completed = counts.get(history_name.lower(), 0)
-        if not completed:
-            completed = _label_count(label, counts)
+            completed = counts.get(_count_key(history_name), 0)
+        if not completed and label:
+            completed = counts.get(_count_key(label), 0)
         # Handed off with its final batch queued but not all worked yet: the
         # rest is still in the game queue. Derived from history (refreshed far
         # more often than the queue snapshot), so it shrinks as earns finish.
