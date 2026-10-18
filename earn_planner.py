@@ -69,6 +69,13 @@ HISTORY_NAME = {
     "dig_tunnel":          "Dig Tunnel",
 }
 
+# Catalog label (lowercase) → character-history "type" name, for earns whose
+# history name is abbreviated. Used by the label fallback, so the count still
+# resolves when the schedule_value isn't in HISTORY_NAME.
+LABEL_HISTORY_ALIAS = {
+    "volunteer fire fighter": "vol. fire fighter",
+}
+
 # schedule_value → name shown in the earn-queue list (.mm-earn-queue-row-name).
 # These differ from both schedule_value and the history names (e.g. queue shows
 # "Scamming" while history shows "Scams"). Confirmed: scamming → "Scamming".
@@ -173,6 +180,12 @@ def _completed_counts(history: dict | None = None) -> dict:
     return counts
 
 
+def _label_count(label: str, counts: dict) -> int:
+    """History count for a catalog label, trying its abbreviated alias too."""
+    key = (label or "").lower()
+    return counts.get(key, 0) or counts.get(LABEL_HISTORY_ALIAS.get(key, ""), 0)
+
+
 def completed_count(schedule_value: str, history: dict | None = None) -> int:
     """Lifetime completed count for an auto-earn, via the history-name mapping.
     Falls back to matching the catalog label against history if unmapped."""
@@ -182,10 +195,7 @@ def completed_count(schedule_value: str, history: dict | None = None) -> int:
         result = counts.get(name.lower(), 0)
         if result:
             return result
-    label = _catalog_labels().get(schedule_value)
-    if label:
-        return counts.get(label.lower(), 0)
-    return 0
+    return _label_count(_catalog_labels().get(schedule_value), counts)
 
 
 def _load_catalog() -> list:
@@ -300,8 +310,8 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
         completed = 0
         if history_name:
             completed = counts.get(history_name.lower(), 0)
-        if not completed and label:
-            completed = counts.get(label.lower(), 0)
+        if not completed:
+            completed = _label_count(label, counts)
         # Handed off with its final batch queued but not all worked yet: the
         # rest is still in the game queue. Derived from history (refreshed far
         # more often than the queue snapshot), so it shrinks as earns finish.
