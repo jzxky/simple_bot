@@ -785,6 +785,31 @@
         <div id="income-banking" class="tab-panel">
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Transfer Money</h3>
+              <div class="tx-row">
+                <div class="sell-field tx-name">
+                  <input id="tx-name" type="text" placeholder="Player name" autocomplete="off" disabled
+                    oninput="txNameInput()" onkeydown="txNameKey(event)" onblur="setTimeout(txHideAc, 120)">
+                  <div id="tx-ac" class="sell-ac" hidden></div>
+                </div>
+                <div class="sell-field tx-amount">
+                  <input id="tx-amount" type="text" inputmode="numeric" placeholder="Amount" autocomplete="off" disabled
+                    oninput="txValidate()" onkeydown="if(event.key==='Enter'){event.preventDefault();openTxConfirm();}">
+                </div>
+                <button type="button" class="action-btn tx-send" id="tx-send" onclick="openTxConfirm()" disabled>Send</button>
+              </div>
+              <div id="tx-result" class="profile-sale-msg" hidden></div>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Cash</h3>
+              <div class="setting-row">
+                <span>Min Cash on Hand</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="number" id="min_cash_on_hand" value="{{ config.get('misc', {}).get('min_cash_on_hand', 0) }}" min="0" step="1000" style="width:120px;" onchange="autoSave()" oninput="markNumDirty(this)">
+                </div>
+              </div>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Investments</h3>
               <label class="inline-toggle setting-row" style="margin-bottom:12px">
                 Auto-Invest
@@ -1864,12 +1889,6 @@
               <label class="inline-toggle setting-row">Show timers row above Status tabs
                 <label class="toggle-label"><input type="checkbox" id="show_timers_row" {% if config.get('misc', {}).get('show_timers_row', True) %}checked{% endif %} onchange="autoSave(); toggleTimersRow()"><span class="toggle"></span></label>
               </label>
-              <div class="setting-row">
-                <span>Min Cash on Hand</span>
-                <div style="display:flex;gap:6px;align-items:center;">
-                  <input type="number" id="min_cash_on_hand" value="{{ config.get('misc', {}).get('min_cash_on_hand', 0) }}" min="0" step="1000" style="width:120px;" onchange="autoSave()" oninput="markNumDirty(this)">
-                </div>
-              </div>
               <div class="setting-row" id="update-row" style="display:none">
                 <span>Software Update</span>
                 <div class="setting-btn-row">
@@ -2529,6 +2548,19 @@
       <button type="submit" class="action-btn" id="sell-submit" disabled>Sell</button>
     </div>
   </form>
+</div>
+
+<!-- Transfer money confirmation -->
+<div id="tx-confirm" class="pl-modal-overlay" onclick="if(event.target===this)closeTxConfirm()">
+  <div class="pl-modal-box tx-confirm-box" role="dialog" aria-modal="true" aria-labelledby="tx-confirm-title">
+    <h3 id="tx-confirm-title">Confirm transfer</h3>
+    <p class="tx-confirm-amount" id="tx-confirm-amount"></p>
+    <p class="tx-confirm-to">to <b id="tx-confirm-name"></b></p>
+    <div>
+      <button type="button" class="action-btn" onclick="closeTxConfirm()">Cancel</button>
+      <button type="button" class="action-btn tx-confirm-btn" id="tx-confirm-btn" onclick="submitTransfer()">Confirm</button>
+    </div>
+  </div>
 </div>
 
 <!-- Weapon dispose confirmation -->

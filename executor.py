@@ -2018,11 +2018,11 @@ def handle_interact(action: Action, state: GameState):
             if amount <= 0:
                 _reply({"ok": False, "message": "Enter an amount greater than 0."})
                 return
-            ok = _do_transfer(target, amount, state)
+            ok, game_msg = _send_transfer(target, amount, state)
             msg = (f"Transferred ${amount:,} to {target}." if ok
                    else f"Transfer of ${amount:,} to {target} failed.")
             state.add_log(f"Interact: {msg}")
-            _reply({"ok": ok, "message": msg})
+            _reply({"ok": ok, "message": game_msg or msg})
             return
         if crime == "breaking":
             _reply(_interact_breaking(target, state))
@@ -2658,12 +2658,12 @@ def handle_training_centre(action: Action, state: GameState):
     _action_fallback(state, f"Training centre: discipline '{discipline}' not available in selector")
 
 
-def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
-    """Returns True if transfer succeeded, False otherwise."""
+def _send_transfer(recipient: str, amount: int, state: GameState) -> "tuple[bool, str]":
+    """Transfer money on bank.asp. Returns (success, the game's success/fail text)."""
     page = browser.page()
     _nav(_u("/income/bank.asp?option=transfers"), state)
     if not _check_session(state):
-        return False
+        return False, "Session expired."
     page.fill("input[name='transferamount']", str(amount))
     page.fill("input[name='transfername']", recipient)
     page.click("input[name='B1']")
@@ -2673,11 +2673,16 @@ def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
     success = soup.find("div", id="success")
     if success:
         state.add_log(f"Transfer sent: ${amount:,} to {recipient}.")
-        return True
+        return True, success.get_text(" ", strip=True)
     fail = soup.find("div", id="fail")
-    msg = fail.get_text(strip=True) if fail else "Unknown error"
+    msg = fail.get_text(" ", strip=True) if fail else "Unknown error"
     state.add_log(f"Transfer failed to {recipient}: {msg}")
-    return False
+    return False, msg
+
+
+def _do_transfer(recipient: str, amount: int, state: GameState) -> bool:
+    """Returns True if transfer succeeded, False otherwise."""
+    return _send_transfer(recipient, amount, state)[0]
 
 
 def _get_public_business_owner(business_name: str, state: GameState) -> "str | None":
