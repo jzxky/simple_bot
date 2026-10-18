@@ -2226,6 +2226,37 @@ def handle_probe_agcrime(action: Action, state: GameState):
         _check_cs_punishment(state)
 
 
+def _select_radio(page, name: str, value: str) -> bool:
+    """Select a radio button. Playwright's check() fails when the page's own
+    script doesn't let the click stick ("Clicking the checkbox did not change
+    its state"), so fall back to setting it in the page and firing the events
+    a click would. Returns True if the radio ends up selected."""
+    sel = f"input[name='{name}'][value='{value}']"
+    try:
+        page.check(sel, timeout=5000)
+    except Exception:
+        page.eval_on_selector(sel, """el => {
+            el.checked = true;
+            el.dispatchEvent(new Event('input', {bubbles: true}));
+            el.dispatchEvent(new Event('change', {bubbles: true}));
+        }""")
+    return page.eval_on_selector(sel, "el => el.checked")
+
+
+def _submit_comservice_form(page, state: GameState, label: str):
+    """Submit the community service form and log the game's success/fail box."""
+    page.click("input[type='submit'][name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    soup = BeautifulSoup(page.content(), "html.parser")
+    ok = soup.find("div", id="success")
+    fail = soup.find("div", id="fail")
+    if fail:
+        state.add_log(f"{label}: failed — {fail.get_text(' ', strip=True)}")
+    elif ok:
+        state.add_log(f"{label}: {ok.get_text(' ', strip=True)}")
+
+
 def handle_community_service(action: Action, state: GameState):
     in_home = action.params["in_home_city"]
     page = browser.page()
@@ -2242,7 +2273,9 @@ def handle_community_service(action: Action, state: GameState):
             state.add_log("No community service options found.")
             return
         last = options[-1]
-        page.check(f"input[name='comservice'][value='{last['value']}']")
+        if not _select_radio(page, "comservice", last["value"]):
+            state.add_log(f"Community service (home city): couldn't select '{last['value']}' — not submitting.")
+            return
         state.add_log(f"Community service (home city): {last['value']}")
     else:
         options = soup.find_all("input", attrs={"name": "csinothercities", "type": "radio"})
@@ -2254,12 +2287,12 @@ def handle_community_service(action: Action, state: GameState):
             state.add_log("No community service options found (away city) — away action set to None.")
             return
         last = options[-1]
-        page.check(f"input[name='csinothercities'][value='{last['value']}']")
+        if not _select_radio(page, "csinothercities", last["value"]):
+            state.add_log(f"Community service (away city): couldn't select '{last['value']}' — not submitting.")
+            return
         state.add_log(f"Community service (away city): {last['value']}")
 
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
-    _refresh_state(state)
+    _submit_comservice_form(page, state, "Community service")
 
 
 _DOG_TRAIN_VALUES = {"walkdog", "throwstick", "givebone"}
@@ -2296,11 +2329,11 @@ def handle_do_dog_trains(action: Action, state: GameState):
 
     choice = random.choice(options)
     val = choice.get("value", "")
-    page.check(f"input[name='comservice'][value='{val}']")
+    if not _select_radio(page, "comservice", val):
+        state.add_log(f"Dog trains: couldn't select '{val}' — not submitting.")
+        return
     state.add_log(f"Dog trains: {val}")
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
-    _refresh_state(state)
+    _submit_comservice_form(page, state, "Dog trains")
 
 
 def handle_fire_duties(action: Action, state: GameState):
