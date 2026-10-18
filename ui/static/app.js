@@ -1013,8 +1013,8 @@ let _sellPlayersAt = 0;
 let _sellAcIdx = -1;
 
 function _loadSellPlayers() {
-  if (_sellPlayers.length && Date.now() - _sellPlayersAt < 5 * 60 * 1000) return;
-  fetch("/api/players/names")
+  if (_sellPlayers.length && Date.now() - _sellPlayersAt < 5 * 60 * 1000) return Promise.resolve();
+  return fetch("/api/players/names")
     .then(r => r.json())
     .then(d => { _sellPlayers = d.players || []; _sellPlayersAt = Date.now(); sellValidate(); })
     .catch(() => {});
@@ -1092,6 +1092,132 @@ function sellBuyerKey(e) {
 }
 
 function sellHideAc() { document.getElementById("sell-ac").hidden = true; }
+
+// ---------------------------------------------------------------------------
+// Banking → Transfer Money (recipient autocomplete shares the Sell dialog's
+// player list; the transfer itself runs on the bot thread via /api/interact)
+// ---------------------------------------------------------------------------
+
+let _txAcIdx = -1;
+let _txSending = false;
+
+function _txPlayerMatch() {
+  const v = document.getElementById("tx-name").value.trim().toLowerCase();
+  return v ? _sellPlayers.find(p => p.username.toLowerCase() === v) || null : null;
+}
+
+function _syncTransferEnabled() {
+  const off = !_botRunning || _txSending;
+  ["tx-name", "tx-amount"].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = off; });
+  if (!_botRunning) { txHideAc(); closeTxConfirm(); }
+  txValidate();
+}
+
+function txValidate() {
+  const nameEl = document.getElementById("tx-name");
+  const amtEl = document.getElementById("tx-amount");
+  if (!nameEl) return false;
+  const n = _parseSellPrice(amtEl.value);
+  const p = _txPlayerMatch();  // only living (active=1) players can receive transfers
+  nameEl.classList.toggle("input-good", !!p);
+  nameEl.classList.toggle("input-bad", !!nameEl.value.trim() && !p && _sellPlayers.length > 0);
+  amtEl.classList.toggle("input-good", !!n);
+  amtEl.classList.toggle("input-bad", !!amtEl.value.trim() && !n);
+  const ok = _botRunning && !_txSending && !!p && !!n;
+  document.getElementById("tx-send").disabled = !ok;
+  return ok;
+}
+
+function _renderTxAc() {
+  const ac = document.getElementById("tx-ac");
+  const v = document.getElementById("tx-name").value.trim().toLowerCase();
+  const hits = v ? _sellPlayers.filter(p => p.username.toLowerCase().startsWith(v)).slice(0, 8) : [];
+  if (!hits.length || (hits.length === 1 && hits[0].username.toLowerCase() === v)) { ac.hidden = true; _txAcIdx = -1; return; }
+  if (_txAcIdx >= hits.length) _txAcIdx = hits.length - 1;
+  ac.innerHTML = hits.map((p, i) =>
+    `<div class="sell-ac-item${i === _txAcIdx ? " sel" : ""}" data-name="${escHtml(p.username)}" onmousedown="event.preventDefault();txPickName(this.dataset.name)">` +
+    `<span>${escHtml(p.username)}</span><small>${escHtml([p.rank, p.homecity].filter(Boolean).join(" · "))}</small></div>`
+  ).join("");
+  ac.hidden = false;
+}
+
+function txNameInput() {
+  _txAcIdx = -1; _renderTxAc(); txValidate();
+  _loadSellPlayers().then(() => {
+    if (document.activeElement && document.activeElement.id === "tx-name") _renderTxAc();
+    txValidate();
+  });
+}
+
+function txPickName(name) {
+  document.getElementById("tx-name").value = name;
+  txHideAc();
+  txValidate();
+  document.getElementById("tx-amount").focus();
+}
+
+function txNameKey(e) {
+  const ac = document.getElementById("tx-ac");
+  const items = ac.hidden ? [] : ac.querySelectorAll(".sell-ac-item");
+  if (items.length && e.key === "ArrowDown") { _txAcIdx = (_txAcIdx + 1) % items.length; _renderTxAc(); e.preventDefault(); }
+  else if (items.length && e.key === "ArrowUp") { _txAcIdx = (_txAcIdx - 1 + items.length) % items.length; _renderTxAc(); e.preventDefault(); }
+  else if (items.length && (e.key === "Enter" || e.key === "Tab") && _txAcIdx >= 0) { txPickName(items[_txAcIdx].dataset.name); e.preventDefault(); }
+  else if (e.key === "Escape") { txHideAc(); }
+  else if (e.key === "Enter") { e.preventDefault(); txHideAc(); document.getElementById("tx-amount").focus(); }
+}
+
+function txHideAc() { const ac = document.getElementById("tx-ac"); if (ac) ac.hidden = true; _txAcIdx = -1; }
+
+function openTxConfirm() {
+  if (!txValidate()) return;
+  const name = _txPlayerMatch().username;
+  const amount = _parseSellPrice(document.getElementById("tx-amount").value);
+  document.getElementById("tx-confirm-amount").textContent = "$" + amount.toLocaleString("en-US");
+  document.getElementById("tx-confirm-name").textContent = name;
+  document.getElementById("tx-confirm-btn").disabled = false;
+  document.getElementById("tx-confirm").classList.add("active");
+}
+
+function closeTxConfirm() {
+  const ov = document.getElementById("tx-confirm");
+  if (ov) ov.classList.remove("active");
+}
+
+function _showTxResult(ok, message) {
+  const el = document.getElementById("tx-result");
+  el.textContent = message || (ok ? "Transfer sent." : "Transfer failed.");
+  el.className = "profile-sale-msg " + (ok ? "ok" : "bad");
+  el.hidden = false;
+}
+
+function submitTransfer() {
+  if (!txValidate()) { closeTxConfirm(); return; }
+  const target = _txPlayerMatch().username;
+  const amount = _parseSellPrice(document.getElementById("tx-amount").value);
+  document.getElementById("tx-confirm-btn").disabled = true;
+  closeTxConfirm();
+  _txSending = true;
+  const send = document.getElementById("tx-send");
+  send.textContent = "Sending…";
+  _syncTransferEnabled();
+  fetch("/api/interact", {method: "POST", headers: {"Content-Type": "application/json"},
+                          body: JSON.stringify({crime: "transfer", target, amount, active_only: true})})
+    .then(r => r.json())
+    .catch(e => ({ok: false, message: String(e)}))
+    .then(d => {
+      _showTxResult(!!d.ok, d.message);
+      if (d.ok) { document.getElementById("tx-name").value = ""; document.getElementById("tx-amount").value = ""; }
+    })
+    .finally(() => {
+      _txSending = false;
+      send.textContent = "Send";
+      _syncTransferEnabled();
+    });
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && document.getElementById("tx-confirm")?.classList.contains("active")) closeTxConfirm();
+});
 
 function openSellOverlay(ctx) {
   _sellCtx = ctx;
@@ -1698,6 +1824,7 @@ function updateBotState(running, paused) {
 
   dot.className = "dot " + (running ? (paused ? "paused" : "running") : "stopped");
   txt.textContent = running ? (paused ? "Paused" : "Running") : "Stopped";
+  _syncTransferEnabled();
 }
 
 let _gameClockSecs = null;

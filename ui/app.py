@@ -1510,6 +1510,14 @@ def api_interact():
     amount = int(data.get("amount") or 0)
     if not crime or not target:
         return jsonify({"ok": False, "message": "Missing crime or target."}), 400
+    if data.get("active_only"):
+        # Banking → Transfer Money: only living players (active=1) in the player list.
+        import player_db as _db
+        match = next((p["username"] for p in _db.get_active_player_names()
+                      if p["username"].lower() == target.lower()), None)
+        if not match:
+            return jsonify({"ok": False, "message": f"'{target}' isn't an active player in the player list."}), 400
+        target = match
     try:
         result = bot.request_interact(crime, target, amount)
         return jsonify(result)

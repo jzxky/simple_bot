@@ -2090,3 +2090,17 @@ body.setup-open { overflow: hidden; }
 }
 .ep-default { margin-top: 16px; max-width: 600px; }
 .ep-default select { width: 100%; height: 32px; }
+
+/* Banking → Transfer Money */
+.tx-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; max-width: 600px; }
+.tx-row .sell-field { position: relative; }
+.tx-name { flex: 1 1 200px; }
+.tx-amount { flex: 1 1 140px; }
+.tx-send { height: 34px; }
+.sell-field input:disabled { opacity: .5; cursor: not-allowed; }
+#tx-result { margin-top: 10px; max-width: 600px; }
+.tx-confirm-box { max-width: 340px; }
+.tx-confirm-amount { margin: 2px 0 0; font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+.tx-confirm-to { margin: 0 0 4px; }
+.tx-confirm-btn { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.tx-confirm-btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
