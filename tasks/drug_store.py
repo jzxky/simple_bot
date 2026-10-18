@@ -14,8 +14,8 @@ the bot thread, so a real second thread can't drive the browser). Each tick:
     post-purchase cooldown, refreshes drugstore.asp, which also refreshes
     game_state (clean money, city)
   - tops clean money up to the price of the most expensive wanted item by
-    withdrawing from the bank (Maintain Cash keeps a $1M floor while this task
-    is active so it doesn't deposit the reserve straight back)
+    withdrawing from the bank (Maintain Cash keeps that same amount on hand
+    while this task is active so it doesn't deposit the reserve straight back)
   - buys the first in-stock wanted item, following config priority_order (or
     wanted order if empty)
 
@@ -29,8 +29,6 @@ from tasks.base import Task
 from state import GameState
 
 DRUG_STORE_PRICES = {"Pseudoephedrine": 500, "Epipen": 25_000, "Medipack": 1_000_000}
-# Minimum clean cash Maintain Cash keeps on hand while the drug store task is active.
-DRUG_STORE_CASH_FLOOR = 1_000_000
 MIN_INTERVAL_SECS = 5
 PURCHASE_COOLDOWN_SECS = 30 * 60
 # After a withdrawal fails to reach the reserve (bank too low), don't retry for this long.
@@ -56,6 +54,14 @@ def drug_store_active(state: GameState) -> bool:
     if not cfg.load().get("drug_store", {}).get("enabled", False):
         return False
     return state.current_city.lower() == "auckland"
+
+
+def drug_store_cash_floor() -> int:
+    """Clean cash the drug store needs on hand: the price of the most
+    expensive wanted item (0 if nothing is wanted). Maintain Cash keeps at
+    least this much while the task is active."""
+    wanted = _ordered_wanted()
+    return max((DRUG_STORE_PRICES.get(i, 0) for i in wanted), default=0)
 
 
 def interval_secs() -> int:
@@ -289,7 +295,7 @@ class DrugStoreTask(Task):
         if state.current_city.lower() != "auckland":
             return  # next tick closes the tab
 
-        reserve = max(DRUG_STORE_PRICES.get(i, 0) for i in wanted)
+        reserve = drug_store_cash_floor()
         if self._top_up_cash(state, reserve):
             store = self._load_store(state)
             if store is None:

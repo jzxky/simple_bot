@@ -7,13 +7,13 @@ _INTERVAL = 30 * 60  # seconds
 
 
 def _min_cash(state: GameState) -> int:
-    """Configured min cash on hand, raised to the drug store's $1M floor while
-    that task is active (enabled + in Auckland) so its cash reserve isn't
-    deposited straight back. 0 (disabled) stays 0."""
-    from tasks.drug_store import drug_store_active, DRUG_STORE_CASH_FLOOR
+    """Configured min cash on hand, raised while the drug store task is active
+    (enabled + in Auckland) to the price of its most expensive wanted item, so
+    its cash reserve isn't deposited straight back. 0 (disabled) stays 0."""
+    from tasks.drug_store import drug_store_active, drug_store_cash_floor
     min_cash = int(cfg.load().get("misc", {}).get("min_cash_on_hand", 0))
     if min_cash and drug_store_active(state):
-        return max(min_cash, DRUG_STORE_CASH_FLOOR)
+        return max(min_cash, drug_store_cash_floor())
     return min_cash
 
 
