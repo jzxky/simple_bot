@@ -2633,7 +2633,7 @@ function restartBot() {
 }
 
 function _pollUntilBack() {
-  const MAX = 60;
+  const MAX = 120;  // restart waits up to 60s for the bot to stop first
   let attempts = 0;
   const interval = setInterval(() => {
     attempts++;
@@ -2644,7 +2644,7 @@ function _pollUntilBack() {
       clearInterval(interval);
       const btn = document.getElementById("restart-btn");
       if (btn) { btn.disabled = false; btn.textContent = "Restart"; }
-      alert("Server did not come back after 60 seconds.");
+      alert("Server did not come back after 2 minutes.");
     }
   }, 1000);
 }

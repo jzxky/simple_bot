@@ -559,7 +559,7 @@ def handle_earn_planner_check(action: Action, state: GameState):
 
     if planner.get("waiting_for_earns"):
         # Waiting (on the default earn, or with earns disabled). The timed
-        # recheck refreshes available_earns.json first; a check triggered by
+        # recheck refreshes the earn catalog first; a check triggered by
         # an earn-list refresh already has a fresh list.
         if action.params.get("refresh_catalog"):
             _scrape_earn_catalog(browser.page(), state)
@@ -601,7 +601,7 @@ def handle_earn_planner_check(action: Action, state: GameState):
 
 
 def handle_refresh_earn_catalog(action: Action, state: GameState):
-    """Scrape the earn page and update available_earns.json — no queue action."""
+    """Scrape the earn page and update the earn catalog — no queue action."""
     _scrape_earn_catalog(browser.page(), state)
 
 
@@ -729,7 +729,7 @@ def handle_clear_earn_queue(action: Action, state: GameState):
 
 def _load_earn_catalog():
     import paths, os, json as _json
-    path = os.path.join(paths.data_dir(), "available_earns.json")
+    path = paths.earn_catalog_path()
     if not os.path.exists(path):
         return list(_EARN_SEED)
     try:
@@ -850,7 +850,7 @@ def _ensure_manual_earn_mode(page, state: GameState):
 def _map_lastearn_to_catalog(lastearn_text: str, schedule_value: str):
     """Update the earn catalog so the lastearn display name maps to the schedule_value."""
     import paths, os, json as _json
-    path = os.path.join(paths.data_dir(), "available_earns.json")
+    path = paths.earn_catalog_path()
     if not os.path.exists(path):
         return
     try:
@@ -3089,7 +3089,7 @@ def _upsert_earn_catalog(auto_opts, manual_opts):
     """Merge scraped earn options into the persistent catalog JSON."""
     import paths, os, json as _json
 
-    path = os.path.join(paths.data_dir(), "available_earns.json")
+    path = paths.earn_catalog_path()
     if not os.path.exists(path):
         with open(path, "w", encoding="utf-8") as f:
             _json.dump(list(_EARN_SEED), f, indent=2)

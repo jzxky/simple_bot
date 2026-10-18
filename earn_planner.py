@@ -196,9 +196,9 @@ def completed_count(schedule_value: str, history: dict | None = None) -> int:
 
 
 def _load_catalog() -> list:
-    """Return the full earn catalog list from available_earns.json."""
+    """Return the full earn catalog list from earn_catalog.json."""
     import os, json, paths
-    path = os.path.join(paths.data_dir(), "available_earns.json")
+    path = paths.earn_catalog_path()
     if not os.path.exists(path):
         return []
     try:
@@ -232,7 +232,7 @@ QUEUE_SIZE = 200
 
 
 def catalog_available(schedule_value: str, catalog: list | None = None) -> bool:
-    """True if available_earns.json marks this earn as currently available."""
+    """True if the earn catalog marks this earn as currently available."""
     entries = catalog if catalog is not None else _load_catalog()
     return any(e.get("schedule_value") == schedule_value and e.get("available") is True
                for e in entries)
