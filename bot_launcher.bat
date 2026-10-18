@@ -57,6 +57,9 @@ if /i not "!DO_UPDATE!"=="Y" goto :launch
 if "!IS_GIT!"=="1" (
     echo.
     echo Pulling latest changes via git...
+    rem Older versions wrote the tracked seed at runtime; restore it once the
+    rem catalog lives in earn_catalog.json so it doesn't block the pull.
+    if exist "earn_catalog.json" git checkout -- available_earns.json
     git pull origin main
     if errorlevel 1 (
         echo.

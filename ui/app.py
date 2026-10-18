@@ -137,8 +137,7 @@ def _earn_catalog_grouped() -> list:
     """[(category, [(schedule_value, label), ...]), ...] for the setup earn list."""
     import json
     catalog = []
-    for base in (paths.data_dir(), paths.resource_dir()):
-        path = os.path.join(base, "available_earns.json")
+    for path in (paths.earn_catalog_path(), os.path.join(paths.resource_dir(), "available_earns.json")):
         try:
             with open(path, encoding="utf-8") as f:
                 catalog = json.load(f)
@@ -721,7 +720,7 @@ def clear_warrant_cooldown():
 @app.route("/earn_catalog", methods=["GET"])
 def earn_catalog_get():
     import json, os
-    path = os.path.join(paths.data_dir(), "available_earns.json")
+    path = paths.earn_catalog_path()
     if not os.path.exists(path):
         return jsonify([])
     try:
@@ -735,7 +734,7 @@ def earn_catalog_get():
 def earn_catalog_post():
     import json, os
     data = request.get_json() or []
-    path = os.path.join(paths.data_dir(), "available_earns.json")
+    path = paths.earn_catalog_path()
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -874,7 +873,7 @@ def _git_run(*args) -> "tuple[int, str]":
 
 def _get_earns_mtime() -> float:
     try:
-        return os.path.getmtime(os.path.join(paths.data_dir(), "available_earns.json"))
+        return os.path.getmtime(paths.earn_catalog_path())
     except Exception:
         return 0.0
 
@@ -1957,7 +1956,7 @@ def api_scheduler():
 @app.route("/api/available_earns")
 def api_available_earns():
     import json as _json
-    path = os.path.join(paths.data_dir(), "available_earns.json")
+    path = paths.earn_catalog_path()
     try:
         with open(path, encoding="utf-8") as f:
             return jsonify(_json.load(f))
@@ -2364,13 +2363,27 @@ def restart():
     def _do_restart():
         import time as _time
         bot.stop()
-        _time.sleep(2)
+        # Wait for the bot thread to close Chrome — a lingering browser keeps
+        # .browser_profile locked and the restarted bot can't launch.
+        if not bot.wait_stopped(60):
+            print("[restart] Bot thread did not stop within 60s — restarting anyway.")
+        _time.sleep(0.5)
+        # --noui: the open tab reloads itself once the server is back.
+        argv = [sys.executable] + [a for a in sys.argv if a != "--noui"] + ["--noui"]
         if sys.platform == "win32":
             import subprocess as _sp
-            _sp.Popen([sys.executable] + sys.argv)
+            _sp.Popen(argv)
             os._exit(0)
         else:
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            # Werkzeug marks its listening socket inheritable; left open across
+            # exec it keeps the port bound and the new server can't start.
+            server_fd = os.environ.pop("WERKZEUG_SERVER_FD", None)
+            if server_fd:
+                try:
+                    os.set_inheritable(int(server_fd), False)
+                except OSError:
+                    pass
+            os.execv(sys.executable, argv)
     _threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({"ok": True})
 
@@ -2398,9 +2411,25 @@ def apply_update():
         return jsonify({"error": "Not a git repository."}), 400
     if bot.is_running():
         return jsonify({"error": "Stop the bot before applying an update."}), 400
+    # Older versions wrote the tracked available_earns.json at runtime; once
+    # its contents live in earn_catalog.json, restore the seed so the dirty
+    # file doesn't block the pull.
+    if os.path.exists(paths.earn_catalog_path()):
+        _git_run("checkout", "--", "available_earns.json")
+    _, old_head = _git_run("rev-parse", "HEAD")
     rc, out = _git_run("pull", "--ff-only", "origin", "main")
     if rc != 0:
         return jsonify({"error": f"git pull failed: {out}"}), 500
+    rc, changed = _git_run("diff", "--name-only", old_head, "HEAD")
+    if rc != 0 or "requirements.txt" in changed.splitlines():
+        r = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+            capture_output=True, text=True, cwd=paths.resource_dir(),
+        )
+        pip_out = (r.stdout + r.stderr).strip()
+        if r.returncode != 0:
+            return jsonify({"error": f"Update pulled, but installing dependencies failed:\n{pip_out[-2000:]}"}), 500
+        out += "\n\nDependencies updated."
     return jsonify({"ok": True, "output": out})
 
 

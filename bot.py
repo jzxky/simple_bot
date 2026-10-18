@@ -867,6 +867,14 @@ def is_running() -> bool:
     return _thread is not None and _thread.is_alive()
 
 
+def wait_stopped(timeout: float) -> bool:
+    """Block until the bot thread exits (its finally closes the browsers).
+    Returns False if it is still alive after timeout."""
+    if _thread is not None:
+        _thread.join(timeout)
+    return not is_running()
+
+
 def is_paused() -> bool:
     return _pause_event.is_set()
 

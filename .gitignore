@@ -1,6 +1,7 @@
 .env
 config.json
 notifications.json
+earn_catalog.json
 .browser_profile/
 __pycache__/
 *.pyc
