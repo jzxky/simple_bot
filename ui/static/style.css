@@ -2104,3 +2104,11 @@ body.setup-open { overflow: hidden; }
 .tx-confirm-to { margin: 0 0 4px; }
 .tx-confirm-btn { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .tx-confirm-btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+/* City → Hospital */
+.hosp-desc { font-size: 12.5px; color: var(--muted); margin: 4px 0 8px; }
+.hosp-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 8px 0; }
+.hosp-actions button { width: auto; padding: 6px 16px; }
+.hosp-msg { margin-top: 8px; }
+#hosp_bionic_choice { width: 140px; }
+#city-hospital .settings-group + .settings-group { margin-top: 14px; }

@@ -1089,8 +1089,8 @@ def request_interact(crime: str, target: str, amount: int = 0, timeout: float = 
 
 
 def request_profile_task(kind: str, timeout: float = 90.0, **params) -> dict:
-    """Run a Profile-tab task (weapon/vehicle sales, apartment stash) on the
-    bot thread and return its result dict ({"ok": bool, "message": str, ...})."""
+    """Run an on-demand UI task (Profile-tab sales and apartment stash, City →
+    Hospital) on the bot thread and return its result dict ({"ok": bool, "message": str, ...})."""
     while not _profile_task_result.empty():
         _profile_task_result.get_nowait()
     _profile_task_request.put((kind, params), timeout=timeout)

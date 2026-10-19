@@ -228,6 +228,10 @@ def dispatch_journal_action(entry: dict, state: GameState):
         if "completed the repairs on your vehicle" in entry.get("text", "").lower():
             if _repair_complete_queue is not None:
                 _repair_complete_queue.put(True)
+    if entry.get("title") == "Surgery Completed":
+        if "sex change" in entry.get("text", "").lower():
+            from tasks.hospital import record_sex_change_completed
+            record_sex_change_completed(entry.get("time", ""), state)
     if "skill gained" in entry.get("title", "").lower():
         from tasks.skills_task import request_skill_rediscover
         request_skill_rediscover()
