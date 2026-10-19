@@ -3,13 +3,14 @@ Watches the Auckland drug store from its own browser tab and buys wanted items
 the moment they come into stock.
 
 The scheduler only opens the tab: run() fires when logged in, not in jail or
-hospital, in Auckland, enabled in config, and no tab is already open. From then
-on bot.py calls tick_drug_store() once per loop iteration (cooperatively, the
-same way the agg-crimes and snipe tabs work — patchright's sync API is bound to
-the bot thread, so a real second thread can't drive the browser). Each tick:
+hospital, in Auckland, enabled in config with at least one wanted item, and no
+tab is already open. From then on bot.py calls tick_drug_store() once per loop
+iteration (cooperatively, the same way the agg-crimes and snipe tabs work —
+patchright's sync API is bound to the bot thread, so a real second thread can't
+drive the browser). Each tick:
 
-  - closes the tab if the task was disabled, the bot left Auckland, or it is in
-    jail / hospital / logged out
+  - closes the tab if the task was disabled or its buylist emptied, the bot
+    left Auckland, or it is in jail / hospital / logged out
   - otherwise, once per configured interval (minimum 5s) and outside the 30-min
     post-purchase cooldown, refreshes drugstore.asp, which also refreshes
     game_state (clean money, city)
@@ -108,6 +109,8 @@ class DrugStoreTask(Task):
             return "in hospital"
         if not cfg.load().get("drug_store", {}).get("enabled", False):
             return "disabled"
+        if not _ordered_wanted():
+            return "no wanted items"
         if state.current_city.lower() != "auckland":
             return "not in Auckland"
         return None
@@ -132,6 +135,8 @@ class DrugStoreTask(Task):
             reasons.append("Not in Auckland")
         if not cfg.load().get("drug_store", {}).get("enabled", False):
             reasons.append("Not enabled")
+        elif not _ordered_wanted():
+            reasons.append("No wanted items")
         return reasons
 
     def run(self, state: GameState, executor):

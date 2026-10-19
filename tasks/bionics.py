@@ -2,8 +2,9 @@
 Checks the Chicago bionics store for wanted items and purchases them.
 
 Runs when: logged in, not in jail/hospital, in Chicago, enabled in config,
-enough wall-clock time has passed since last check, and (if use_time_window)
-in-game time is within the configured window.
+at least one wanted item configured, enough wall-clock time has passed since
+last check, and (if use_time_window) in-game time is within the configured
+window.
 
 Purchase order: heart → brain → eyes → legs → arms (most expensive first).
 Withdraws cash before each navigation to the store.
@@ -63,6 +64,8 @@ class BionicsTask(Task):
         b = cfg.load().get("bionics", {})
         if not b.get("enabled", False):
             return False
+        if not b.get("wanted_items"):
+            return False
 
         # Wake on the window/no-window interval. When the toggle is on but we're
         # outside the window, run() still fires (no-window cadence) so it can
@@ -86,6 +89,8 @@ class BionicsTask(Task):
         b = cfg.load().get("bionics", {})
         if not b.get("enabled", False):
             reasons.append("Not enabled")
+        elif not b.get("wanted_items"):
+            reasons.append("No wanted items")
         else:
             interval_secs = store_windows.interval_secs(b, state.ingame_mins)
             if self.last_checked_at > 0:

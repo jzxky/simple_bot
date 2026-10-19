@@ -2,8 +2,9 @@
 Checks the Auckland weapon store for wanted items and purchases them.
 
 Runs when: logged in, not in jail/hospital, in Auckland, enabled in config,
-enough wall-clock time has passed since last check, and (if use_time_window)
-in-game time is within the configured window.
+at least one wanted item configured, enough wall-clock time has passed since
+last check, and (if use_time_window) in-game time is within the configured
+window.
 
 Purchase order follows config priority_order; if empty, uses store appearance order
 for wanted items.
@@ -48,6 +49,8 @@ class WeaponStoreTask(Task):
         w = cfg.load().get("weapon_store", {})
         if not w.get("enabled", False):
             return False
+        if not w.get("wanted_items"):
+            return False
 
         # Wake on the window/no-window interval. When the toggle is on but we're
         # outside the window, run() still fires so it can detect the window
@@ -71,6 +74,8 @@ class WeaponStoreTask(Task):
         w = cfg.load().get("weapon_store", {})
         if not w.get("enabled", False):
             reasons.append("Not enabled")
+        elif not w.get("wanted_items"):
+            reasons.append("No wanted items")
         else:
             interval_secs = store_windows.interval_secs(w, state.ingame_mins)
             if self.last_checked_at > 0:
