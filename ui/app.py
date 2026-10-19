@@ -19,6 +19,7 @@ import consumable_limit_detector as cld
 import trait_requirements as tr
 import notifications_store
 import event_consumables as _ec_mod
+from tasks import hospital as _hospital
 import pathlib
 
 _APP_VERSION = pathlib.Path(os.path.dirname(os.path.dirname(__file__)), "VERSION").read_text().strip()
@@ -1063,6 +1064,8 @@ def status():
         "vehicle_health": s.vehicle_health,
         "char_history_updated_at": s.char_history_updated_at,
         "hospital_release_at": s.hospital_release_at,
+        "sex_change_available_at": _hospital.load_hospital_state().get("sex_change_available_at"),
+        "sex_change_cooldown_secs": _hospital.sex_change_cooldown_secs(s),
         "respect_pct": _get_respect_data().get("respect_pct"),
         "respect_last_check": _get_respect_data().get("last_check", 0.0),
         "notifications_unread_count": sum(1 for n in bot.state.notifications if n.get("status") == "unread"),
@@ -1759,6 +1762,31 @@ def apartment_money_route():
     if not amount or not 0 < int(amount) <= 99_999_999:
         return jsonify({"ok": False, "message": "Amount must be a whole number from 1 to 99,999,999."}), 400
     return _run_profile_task("apartment_money", mode=mode, amount=int(amount))
+
+
+@app.route("/hospital/check", methods=["POST"])
+def hospital_check_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    return _run_profile_task("hospital_check")
+
+
+@app.route("/hospital/bionics_install", methods=["POST"])
+def hospital_bionics_install_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    data = request.get_json(silent=True) or {}
+    bionic = (data.get("bionic") or "").strip()
+    if not re.fullmatch(r"[A-Za-z]{1,20}", bionic):
+        return jsonify({"ok": False, "message": "Choose a bionic — check the hospital first."}), 400
+    return _run_profile_task("hospital_bionics_install", bionic=bionic)
+
+
+@app.route("/hospital/sex_change", methods=["POST"])
+def hospital_sex_change_route():
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    return _run_profile_task("hospital_sex_change")
 
 
 @app.route("/apartment/drugs", methods=["POST"])

@@ -1524,6 +1524,110 @@ function _aptPost(url, body, onDone) {
     });
 }
 
+// ── City → Hospital ────────────────────────────────────────────────────────
+let _hospBusy = false;
+let _hospBionics = null;   // last check result {mode, options, cost}
+let _hospSexCd = {at: null, secs: null, anchorMs: 0};
+
+function _hospMsg(id, d) {
+  const el = document.getElementById(id);
+  if (!d) { el.hidden = true; return; }
+  el.hidden = false;
+  el.textContent = d.message || (d.ok ? "Done." : "Failed — see the log.");
+  el.className = "profile-sale-msg hosp-msg " + (d.ok ? "ok" : "bad");
+}
+
+function _hospPost(url, body) {
+  return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})})
+    .then(r => r.json())
+    .catch(e => ({ok: false, message: String(e)}));
+}
+
+function _hospSetBusy(busy) {
+  _hospBusy = busy;
+  document.getElementById("hosp-check-btn").disabled = busy;
+  const b = _hospBionics;
+  document.getElementById("hosp-bionic-btn").disabled = busy || !b || b.mode === "none";
+  _hospRenderSexCooldown();
+}
+
+function _hospRenderBionics() {
+  const wrap = document.getElementById("hosp-bionic-wrap");
+  const b = _hospBionics;
+  if (!b) wrap.innerHTML = '<span class="stat-value">--</span>';
+  else if (b.mode === "choice")
+    wrap.innerHTML = '<select id="hosp_bionic_choice" class="dropdown">' +
+      b.options.map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join("") + "</select>";
+  else if (b.mode === "single") wrap.innerHTML = `<span class="stat-value">${escHtml(b.options[0].label)}</span>`;
+  else wrap.innerHTML = '<span class="stat-value" style="color:var(--muted)">No bionics available to fit</span>';
+  document.getElementById("hosp-bionic-cost").textContent = (b && b.cost) || "--";
+}
+
+function hospCheck() {
+  if (_hospBusy) return;
+  _hospSetBusy(true);
+  _hospMsg("hosp-bionic-msg", null);
+  _hospPost("/hospital/check").then(d => {
+    _hospBionics = d.ok ? {mode: d.mode, options: d.options || [], cost: d.cost || ""} : null;
+    if (!d.ok) _hospMsg("hosp-bionic-msg", d);
+    _hospRenderBionics();
+    _hospSetBusy(false);
+  });
+}
+
+function hospInstallBionic() {
+  const b = _hospBionics;
+  if (_hospBusy || !b || b.mode === "none") return;
+  const sel = document.getElementById("hosp_bionic_choice");
+  const value = sel ? sel.value : b.options[0].value;
+  const label = (b.options.find(o => o.value === value) || {}).label || value;
+  if (!confirm(`Apply for bionic ${label} fitting?\n\nThe ${b.cost || "fitting"} fee is paid immediately and you'll be put on the hospital waiting list.`)) return;
+  _hospSetBusy(true);
+  _hospPost("/hospital/bionics_install", {bionic: value}).then(d => {
+    _hospMsg("hosp-bionic-msg", d);
+    _hospSetBusy(false);
+  });
+}
+
+function hospSexChange() {
+  if (_hospBusy) return;
+  if (!confirm("Apply for a sex change?\n\nThe fee is paid immediately. There's a 12-hour cooldown between sex changes.")) return;
+  _hospSetBusy(true);
+  _hospPost("/hospital/sex_change").then(d => {
+    _hospMsg("hosp-sex-msg", d);
+    _hospSetBusy(false);
+  });
+}
+
+function _hospSyncSexCooldown(at, secs) {
+  _hospSexCd = {at: at || null, secs: secs, anchorMs: Date.now()};
+  _hospRenderSexCooldown();
+}
+
+function _hospRenderSexCooldown() {
+  const el  = document.getElementById("hosp-sex-cooldown");
+  const btn = document.getElementById("hosp-sex-btn");
+  if (!el) return;
+  const cd = _hospSexCd;
+  let left = 0;
+  if (cd.at && cd.secs != null) left = Math.max(0, cd.secs - Math.floor((Date.now() - cd.anchorMs) / 1000));
+  if (cd.at && (left > 0 || cd.secs == null)) {
+    let txt = cd.at;
+    if (left > 0) {
+      const h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60);
+      txt += ` (in ${h ? h + "h " : ""}${m}m)`;
+    }
+    el.textContent = txt;
+    el.style.color = "";
+  } else {
+    el.textContent = "Ready";
+    el.style.color = "var(--success)";
+  }
+  btn.disabled = _hospBusy || left > 0;
+}
+
+setInterval(_hospRenderSexCooldown, 1000);
+
 function openRepairOverlay(condition) {
   document.getElementById("repair-overlay-condition").textContent = condition || "Unknown";
   document.getElementById("repair-overlay").classList.add("active");
@@ -1864,6 +1968,7 @@ function pollStatus() {
       window._lastStatus = d;
       updateBotState(d.running, d.paused);
       syncGameClock(d.server_time_now);
+      _hospSyncSexCooldown(d.sex_change_available_at, d.sex_change_cooldown_secs);
 
       // Cross-tab settings sync: a higher revision than we've seen means a
       // different tab (or the bot) changed the config — re-sync this tab.

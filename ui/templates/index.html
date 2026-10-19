@@ -1047,6 +1047,7 @@
           <button class="tab-btn" onclick="showTab('city-drugs', this)">Drug Store</button>
           <button class="tab-btn" onclick="showTab('city-gym', this)">Gym</button>
           <button class="tab-btn" onclick="showTab('city-casino', this)">Casino</button>
+          <button class="tab-btn" onclick="showTab('city-hospital', this)">Hospital</button>
           <button class="tab-btn" onclick="showTab('city-travel', this)">Travel</button>
         </div>
 
@@ -1293,6 +1294,40 @@
               <span class="stat-label">Next casino use</span>
               <span id="casino-timer" class="stat-value">--</span>
             </div>
+          </div>
+        </div>
+
+        <div id="city-hospital" class="tab-panel">
+          <div class="settings-group">
+            <h3>Bionic Implants</h3>
+            <p class="hosp-desc">Checks the hospital in your current city for bionics you can have fitted and the fitting fee.</p>
+            <div class="hosp-actions">
+              <button type="button" class="btn-secondary" id="hosp-check-btn" onclick="hospCheck()">⟳ Check Hospital</button>
+            </div>
+            <div class="setting-row">
+              <span class="stat-label">Bionics to fit</span>
+              <div id="hosp-bionic-wrap"><span class="stat-value">--</span></div>
+            </div>
+            <div class="setting-row">
+              <span class="stat-label">Fitting fee</span>
+              <span id="hosp-bionic-cost" class="stat-value">--</span>
+            </div>
+            <div class="hosp-actions">
+              <button type="button" class="profile-btn primary" id="hosp-bionic-btn" disabled onclick="hospInstallBionic()">Install Bionic</button>
+            </div>
+            <div id="hosp-bionic-msg" class="profile-sale-msg hosp-msg" hidden></div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Sex Change</h3>
+            <div class="setting-row">
+              <span class="stat-label">Cooldown ends</span>
+              <span id="hosp-sex-cooldown" class="stat-value">--</span>
+            </div>
+            <div class="hosp-actions">
+              <button type="button" class="profile-btn primary" id="hosp-sex-btn" onclick="hospSexChange()">Book Sex Change</button>
+            </div>
+            <div id="hosp-sex-msg" class="profile-sale-msg hosp-msg" hidden></div>
           </div>
         </div>
 

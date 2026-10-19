@@ -7436,6 +7436,149 @@ def handle_use_news_editor(action: Action, state: GameState):
         state.add_log(f"{skill_name} ({target}): {text}")
 
 
+# ---------------------------------------------------------------------------
+# Hospital (City → Hospital tab): bionic implant fitting, sex change
+# ---------------------------------------------------------------------------
+
+_HOSPITAL_BIONICS_URL   = "/localcity/hospital.asp?display=bionic"
+_HOSPITAL_SEXCHANGE_URL = "/localcity/hospital.asp?display=sexchange"
+_HOSPITAL_UNAVAILABLE   = "Hospital not available currently"
+
+
+def _open_hospital_page(path: str, state: GameState) -> "dict | None":
+    """Navigate to a hospital page. Returns a failure result dict when it
+    can't be used (jailed, session expired, redirected to local.asp), else None."""
+    if state.in_jail:
+        return {"ok": False, "message": "You're in jail."}
+    _nav(_u(path), state)
+    if not _check_session(state):
+        return {"ok": False, "message": "Session expired."}
+    if "/localcity/local.asp" in browser.current_url():
+        return {"ok": False, "message": _HOSPITAL_UNAVAILABLE}
+    return None
+
+
+def _hospital_cost(text: str, pattern: str) -> str:
+    m = re.search(pattern, text, re.I)
+    return m.group(1) if m else ""
+
+
+def _hospital_submit(label: str, state: GameState) -> dict:
+    """Click the B1 submit button and read the success/fail div on the next page."""
+    page = browser.page()
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+        page.click("input[name='B1']")
+    _refresh_state(state)
+    soup = BeautifulSoup(page.content(), "html.parser")
+    msg_div = soup.find("div", id="success") or soup.find("div", id="fail")
+    if msg_div:
+        ok = msg_div.get("id") == "success"
+        msg = re.sub(r"\s+", " ", msg_div.get_text(" ", strip=True))
+    else:
+        ok, msg = False, "No result message found on the page."
+    state.add_log(f"{label}: {msg}")
+    return {"ok": ok, "message": msg}
+
+
+def _parse_hospital_bionics(html: str) -> dict:
+    """Bionics on offer: several in the bionic_choice dropdown, or one named in
+    'You currently have bionic X that…', or none."""
+    soup = BeautifulSoup(html, "html.parser")
+    text = re.sub(r"\s+", " ", soup.get_text(" "))
+    cost = _hospital_cost(text, r"cost for this is currently\s*(\$[\d,]+)")
+    select = soup.find("select", attrs={"name": "bionic_choice"})
+    if select:
+        options = [{"value": o.get("value", ""), "label": o.get_text(strip=True).replace("\xa0", "").strip().title()}
+                   for o in select.find_all("option") if o.get("value")]
+        if options:
+            return {"mode": "choice", "options": options, "cost": cost}
+    m = re.search(r"You currently have bionic\s+(arms|legs|eyes|heart|brain)\s+that", text, re.I)
+    if m:
+        value = m.group(1).title()
+        return {"mode": "single", "options": [{"value": value, "label": value}], "cost": cost}
+    return {"mode": "none", "options": [], "cost": ""}
+
+
+def handle_hospital_check(action: Action, state: GameState):
+    """Read the bionics page: which bionics can be fitted and the fitting fee."""
+    result_q = action.params.get("result_queue")
+    result = _open_hospital_page(_HOSPITAL_BIONICS_URL, state)
+    if result is None:
+        result = {"ok": True, **_parse_hospital_bionics(browser.page().content())}
+        if result["mode"] == "none":
+            state.add_log("Hospital: no bionics available to fit.")
+        else:
+            names = ", ".join(o["label"] for o in result["options"])
+            state.add_log(f"Hospital: bionics to fit — {names}"
+                          + (f" (fee {result['cost']})" if result["cost"] else ""))
+    else:
+        state.add_log(f"Hospital check: {result['message']}")
+    if result_q is not None:
+        result_q.put(result)
+
+
+def handle_hospital_bionics_install(action: Action, state: GameState):
+    """Apply for bionic fitment (params: bionic — the chosen bionic_choice value)."""
+    result_q = action.params.get("result_queue")
+    choice = action.params.get("bionic", "")
+    label = f"Bionic fitting ({choice})" if choice else "Bionic fitting"
+    result = _open_hospital_page(_HOSPITAL_BIONICS_URL, state)
+    if result is None:
+        page = browser.page()
+        picker = page.locator("select[name='bionic_choice']")
+        if picker.count() > 0:
+            values = picker.locator("option").evaluate_all("els => els.map(e => e.value)")
+            if choice not in values:
+                result = {"ok": False, "message": f"{choice or 'That bionic'} is no longer offered — check the hospital again."}
+            else:
+                picker.select_option(choice)
+        if result is None and page.locator("input[name='B1']").count() == 0:
+            result = {"ok": False, "message": "No bionics available to fit."}
+        if result is None:
+            if page.locator("select option[value='YesBionics']").count() > 0:
+                page.select_option("select:has(option[value='YesBionics'])", "YesBionics")
+            result = _hospital_submit(label, state)
+        elif not result["ok"]:
+            state.add_log(f"{label}: {result['message']}")
+    else:
+        state.add_log(f"{label}: {result['message']}")
+    if result_q is not None:
+        result_q.put(result)
+
+
+def handle_hospital_sex_change(action: Action, state: GameState):
+    """Apply for a sex change, unless the 12h cooldown is still running."""
+    from tasks.hospital import sex_change_cooldown_secs, load_hospital_state
+    result_q = action.params.get("result_queue")
+    label = "Sex change"
+    remaining = sex_change_cooldown_secs(state)
+    if remaining:
+        result = {"ok": False, "message": "Sex change is on cooldown until "
+                  f"{load_hospital_state().get('sex_change_available_at')} (server time)."}
+        state.add_log(f"{label}: {result['message']}")
+    else:
+        result = _open_hospital_page(_HOSPITAL_SEXCHANGE_URL, state)
+        if result is None:
+            page = browser.page()
+            text = re.sub(r"\s+", " ", BeautifulSoup(page.content(), "html.parser").get_text(" "))
+            cost = _hospital_cost(text, r"sex change services for\s*(\$[\d,]+)")
+            if cost:
+                label = f"Sex change ({cost})"
+            if page.locator("select option[value='yessexchange']").count() > 0:
+                page.select_option("select:has(option[value='yessexchange'])", "yessexchange")
+                result = _hospital_submit(label, state)
+            else:
+                soup = BeautifulSoup(page.content(), "html.parser")
+                msg_div = soup.find("div", id="fail") or soup.find("div", id="success")
+                msg = re.sub(r"\s+", " ", msg_div.get_text(" ", strip=True)) if msg_div else ""
+                result = {"ok": False, "message": "Sex change not available" + (f": {msg}" if msg else ".")}
+                state.add_log(f"{label}: {result['message']}")
+        else:
+            state.add_log(f"{label}: {result['message']}")
+    if result_q is not None:
+        result_q.put(result)
+
+
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
@@ -7519,6 +7662,9 @@ HANDLERS = {
     "weapon_link": handle_weapon_link,
     "repair_vehicle_ui": handle_repair_vehicle_ui,
     "apartment_money": _in_apartment_tab(handle_apartment_money),
+    "hospital_check": handle_hospital_check,
+    "hospital_bionics_install": handle_hospital_bionics_install,
+    "hospital_sex_change": handle_hospital_sex_change,
     "stash_drugs": _in_apartment_tab(handle_stash_drugs),
     "fetch_game_options": handle_fetch_game_options,
     "save_game_options": handle_save_game_options,
