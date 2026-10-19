@@ -2,10 +2,12 @@
 Hospital (City → Hospital tab): bionic implant fitting and sex changes.
 
 The actions themselves are on-demand handlers in executor.py, triggered from the UI.
-This module holds the sex-change cooldown, which is set from the "Surgery Completed"
-journal (12 hours after the surgery, in server time) and persisted in config.
+This module holds the sex-change cooldown, persisted in config. It's set from the
+"Surgery Completed" journal (12 hours after the surgery, in server time), and reset
+from the sex change page's "must wait 12 hours" fail message.
 """
 
+import re
 from datetime import datetime, timedelta
 
 from state import GameState, SERVER_TIME_FMT
@@ -57,4 +59,17 @@ def record_sex_change_completed(time_str: str, state: GameState):
     available = done_at + SEX_CHANGE_COOLDOWN
     save_hospital_state({"sex_change_available_at": available.strftime(SERVER_TIME_FMT)})
     state.add_log(f"Hospital: sex change completed — next available at "
+                  f"{available.strftime(SERVER_TIME_FMT)} (server time).")
+
+
+def update_sex_change_cooldown_from_message(msg: str, state: GameState):
+    """Reset the cooldown from the sex change page's fail message:
+    'Your last sex change took place on 2026-10-20 08:52:06. You must wait 12 hours…'
+    The time it gives matches when the cooldown ends, so it's used as-is."""
+    m = re.search(r"last sex change took place on (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", msg)
+    if not m:
+        return
+    available = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
+    save_hospital_state({"sex_change_available_at": available.strftime(SERVER_TIME_FMT)})
+    state.add_log(f"Hospital: sex change cooldown updated — next available at "
                   f"{available.strftime(SERVER_TIME_FMT)} (server time).")

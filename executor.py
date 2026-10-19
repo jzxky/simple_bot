@@ -7547,34 +7547,31 @@ def handle_hospital_bionics_install(action: Action, state: GameState):
 
 
 def handle_hospital_sex_change(action: Action, state: GameState):
-    """Apply for a sex change, unless the 12h cooldown is still running."""
-    from tasks.hospital import sex_change_cooldown_secs, load_hospital_state
+    """Apply for a sex change. A 'must wait 12 hours' fail message resets the
+    bot's cooldown timer to the time the game gives."""
+    from tasks.hospital import update_sex_change_cooldown_from_message
     result_q = action.params.get("result_queue")
     label = "Sex change"
-    remaining = sex_change_cooldown_secs(state)
-    if remaining:
-        result = {"ok": False, "message": "Sex change is on cooldown until "
-                  f"{load_hospital_state().get('sex_change_available_at')} (server time)."}
-        state.add_log(f"{label}: {result['message']}")
-    else:
-        result = _open_hospital_page(_HOSPITAL_SEXCHANGE_URL, state)
-        if result is None:
-            page = browser.page()
-            text = re.sub(r"\s+", " ", BeautifulSoup(page.content(), "html.parser").get_text(" "))
-            cost = _hospital_cost(text, r"sex change services for\s*(\$[\d,]+)")
-            if cost:
-                label = f"Sex change ({cost})"
-            if page.locator("select option[value='yessexchange']").count() > 0:
-                page.select_option("select:has(option[value='yessexchange'])", "yessexchange")
-                result = _hospital_submit(label, state)
-            else:
-                soup = BeautifulSoup(page.content(), "html.parser")
-                msg_div = soup.find("div", id="fail") or soup.find("div", id="success")
-                msg = re.sub(r"\s+", " ", msg_div.get_text(" ", strip=True)) if msg_div else ""
-                result = {"ok": False, "message": "Sex change not available" + (f": {msg}" if msg else ".")}
-                state.add_log(f"{label}: {result['message']}")
+    result = _open_hospital_page(_HOSPITAL_SEXCHANGE_URL, state)
+    if result is None:
+        page = browser.page()
+        text = re.sub(r"\s+", " ", BeautifulSoup(page.content(), "html.parser").get_text(" "))
+        cost = _hospital_cost(text, r"sex change services for\s*(\$[\d,]+)")
+        if cost:
+            label = f"Sex change ({cost})"
+        if page.locator("select option[value='yessexchange']").count() > 0:
+            page.select_option("select:has(option[value='yessexchange'])", "yessexchange")
+            result = _hospital_submit(label, state)
         else:
+            soup = BeautifulSoup(page.content(), "html.parser")
+            msg_div = soup.find("div", id="fail") or soup.find("div", id="success")
+            msg = re.sub(r"\s+", " ", msg_div.get_text(" ", strip=True)) if msg_div else ""
+            result = {"ok": False, "message": msg or "Sex change not available."}
             state.add_log(f"{label}: {result['message']}")
+        if not result["ok"]:
+            update_sex_change_cooldown_from_message(result["message"], state)
+    else:
+        state.add_log(f"{label}: {result['message']}")
     if result_q is not None:
         result_q.put(result)
 
