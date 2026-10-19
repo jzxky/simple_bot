@@ -1047,7 +1047,7 @@
           <button class="tab-btn" onclick="showTab('city-drugs', this)">Drug Store</button>
           <button class="tab-btn" onclick="showTab('city-gym', this)">Gym</button>
           <button class="tab-btn" onclick="showTab('city-casino', this)">Casino</button>
-          <button class="tab-btn" onclick="showTab('city-hospital', this)">Hospital</button>
+          <button class="tab-btn" onclick="showTab('city-hospital', this); hospClearMsgs()">Hospital</button>
           <button class="tab-btn" onclick="showTab('city-travel', this)">Travel</button>
         </div>
 
@@ -1315,7 +1315,7 @@
             <div class="hosp-actions">
               <button type="button" class="profile-btn primary" id="hosp-bionic-btn" disabled onclick="hospInstallBionic()">Install Bionic</button>
             </div>
-            <div id="hosp-bionic-msg" class="profile-sale-msg hosp-msg" hidden></div>
+            <div id="hosp-bionic-msg" class="profile-sale-msg hosp-msg" title="Click to dismiss" onclick="this.hidden = true" hidden></div>
           </div>
 
           <div class="settings-group">
@@ -1327,7 +1327,7 @@
             <div class="hosp-actions">
               <button type="button" class="profile-btn primary" id="hosp-sex-btn" onclick="hospSexChange()">Book Sex Change</button>
             </div>
-            <div id="hosp-sex-msg" class="profile-sale-msg hosp-msg" hidden></div>
+            <div id="hosp-sex-msg" class="profile-sale-msg hosp-msg" title="Click to dismiss" onclick="this.hidden = true" hidden></div>
           </div>
         </div>
 

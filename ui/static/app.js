@@ -1623,7 +1623,12 @@ function _hospRenderSexCooldown() {
     el.textContent = "Ready";
     el.style.color = "var(--success)";
   }
-  btn.disabled = _hospBusy || left > 0;
+  btn.disabled = _hospBusy;
+}
+
+function hospClearMsgs() {
+  _hospMsg("hosp-bionic-msg", null);
+  _hospMsg("hosp-sex-msg", null);
 }
 
 setInterval(_hospRenderSexCooldown, 1000);
