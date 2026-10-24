@@ -57,8 +57,8 @@ def refresh() -> int:
     return count
 
 
-def _refresh_impl() -> "tuple[int, int]":
-    """Fetch from updateusers.php, update SQLite. Returns (active count, dead-marked count)."""
+def fetch_skins_raw() -> "list | None":
+    """Fetch the updateusers.php JSON list unchanged. None on failure."""
     try:
         browser.page().goto(
             urls.BASE_URL + "/skin/updateusers.php?q=1",
@@ -71,6 +71,14 @@ def _refresh_impl() -> "tuple[int, int]":
         err = str(e)
         if any(kw in err for kw in ("Timeout", "net::", "ERR_")):
             browser.record_nav_failure()
+        return None
+    return raw if isinstance(raw, list) else None
+
+
+def _refresh_impl() -> "tuple[int, int]":
+    """Fetch from updateusers.php, update SQLite. Returns (active count, dead-marked count)."""
+    raw = fetch_skins_raw()
+    if raw is None:
         return 0, 0
 
     seen = set()
