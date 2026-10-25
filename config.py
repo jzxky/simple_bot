@@ -73,6 +73,7 @@ DEFAULT_CONFIG = {
     "misc": {
         "logout_on_stop": True,
         "relog_on_session_expire": True,
+        "scheduled_browser_restart": True,
         "min_cash_on_hand": 0,
         "headless": False,
         "show_scheduler": False,

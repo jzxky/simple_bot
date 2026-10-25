@@ -7,6 +7,7 @@ Uses a persistent profile so Cloudflare trusts the session over time.
 import json
 import os
 import threading
+import time
 from contextlib import contextmanager
 import paths
 from patchright.sync_api import sync_playwright, Page, BrowserContext
@@ -27,6 +28,7 @@ _main_thread: "threading.Thread | None" = None
 
 _NAV_FAIL_THRESHOLD = 3
 _nav_fail_count = 0
+_started_at: float = 0.0
 
 
 def _clear_window_placement(profile_dir: str):
@@ -87,13 +89,14 @@ def launch_context(pw, profile_dir: str, headless: bool = False) -> BrowserConte
 
 
 def start(headless: bool = False):
-    global _playwright, _context, _page, _main_thread
+    global _playwright, _context, _page, _main_thread, _started_at
     _main_thread = threading.current_thread()
     _playwright = sync_playwright().start()
     _context = launch_context(_playwright, PROFILE_DIR, headless)
     _page = _context.pages[0] if _context.pages else _context.new_page()
     global _nav_fail_count
     _nav_fail_count = 0
+    _started_at = time.monotonic()
     print("[browser] Browser launched.")
 
 
@@ -133,6 +136,13 @@ def is_lost_error(err) -> bool:
     """True when an exception (or its message) indicates a dead browser/driver."""
     text = err if isinstance(err, str) else str(err)
     return any(marker in text for marker in BROWSER_LOST_MARKERS)
+
+
+def uptime_seconds() -> float:
+    """Seconds since the main browser was last (re)launched; 0 when not running."""
+    if _context is None:
+        return 0.0
+    return time.monotonic() - _started_at
 
 
 def is_alive() -> bool:

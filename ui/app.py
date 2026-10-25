@@ -449,6 +449,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c.setdefault("misc", {})
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
+    c["misc"]["scheduled_browser_restart"] = data.get("scheduled_browser_restart", True)
     c["misc"]["min_cash_on_hand"] = int(data.get("min_cash_on_hand", 0))
     c["misc"]["headless"] = data.get("headless", False)
     c.setdefault("communications", {})
