@@ -1921,6 +1921,10 @@
               <label class="inline-toggle setting-row">Re-log if auto-logged out
                 <label class="toggle-label"><input type="checkbox" id="relog_on_session_expire" {% if config.get('misc', {}).get('relog_on_session_expire', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+              <label class="inline-toggle setting-row">Restart browser every 24 hours
+                <label class="toggle-label"><input type="checkbox" id="scheduled_browser_restart" {% if config.get('misc', {}).get('scheduled_browser_restart', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <p class="setting-note">Relaunches Chrome after 24 hours of runtime to free leaked memory. Waits for any snipe or crime-tab run to finish, then re-logs in automatically.</p>
               <label class="inline-toggle setting-row">Show timers row above Status tabs
                 <label class="toggle-label"><input type="checkbox" id="show_timers_row" {% if config.get('misc', {}).get('show_timers_row', True) %}checked{% endif %} onchange="autoSave(); toggleTimersRow()"><span class="toggle"></span></label>
               </label>

@@ -95,6 +95,8 @@ _cancel_snipe_event = threading.Event()
 _cancel_agg_event = threading.Event()
 _reload_requested_at: float = 0.0
 _RELOAD_DEBOUNCE = 2.0  # seconds
+# Chrome slowly leaks memory over long runs — relaunch it after this much uptime.
+_SCHEDULED_RESTART_SECS = 24 * 60 * 60
 _consume_queue: queue.Queue = queue.Queue()
 _deposit_queue: queue.Queue = queue.Queue()
 _withdraw_queue: queue.Queue = queue.Queue()
@@ -181,6 +183,16 @@ def _restart_browser(state: GameState, c: dict) -> bool:
         state.add_log(f"Browser restart failed: {e}")
         state.last_error = str(e)
         return False
+
+
+def _scheduled_restart_due(state: GameState, c: dict) -> bool:
+    """True once the browser has been up for 24h and nothing is mid-run in the
+    side browsers (a snipe or crime run would be cut off by the re-login)."""
+    if not c.get("misc", {}).get("scheduled_browser_restart", True):
+        return False
+    if browser.uptime_seconds() < _SCHEDULED_RESTART_SECS:
+        return False
+    return not (state.snipe_active or state.agg_tab_active)
 
 
 def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
@@ -665,6 +677,13 @@ def _run(c: dict):
             if browser.should_restart_for_nav_failures():
                 state.add_log("Too many consecutive navigation failures — restarting browser.")
                 _restart_browser(state, c)
+            elif _scheduled_restart_due(state, c):
+                state.add_log("Browser has been running for 24 hours — restarting to free memory.")
+                # The side browsers are idle (checked above); close them too so
+                # their Chrome processes are recycled — they relaunch on next use.
+                side_browser.shutdown()
+                if not _restart_browser(state, c):
+                    time.sleep(30)
 
             _scheduler_snapshot = sched.snapshot(state)
 
