@@ -521,6 +521,7 @@ function _buildPayload() {
     event_boss_enabled: (document.getElementById("event_boss_enabled")||{checked:false}).checked,
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
+    scheduled_browser_restart: (document.getElementById("scheduled_browser_restart")||{checked:true}).checked,
     min_cash_on_hand: parseInt(document.getElementById("min_cash_on_hand").value) || 0,
     char_history_enabled: document.getElementById("char_history_enabled").checked,
     char_history_interval: parseInt(document.getElementById("char_history_interval").value) || 30,
