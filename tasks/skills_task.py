@@ -169,14 +169,30 @@ class BiometricVirusTask(Task):
 
 
 class AllSeeingEyeTask(Task):
+    """All Seeing Eye. With Player Hub configured, targets come from the hub's
+    respect target list (the first viable one in the bot's city); otherwise
+    from the configured local group."""
     priority = 25
     label = "All Seeing Eye"
+
+    _HUB_RETRY_SECONDS = 10 * 60
+
+    def __init__(self):
+        self._hub_retry_at: float = 0.0
+
+    @staticmethod
+    def _hub_mode() -> bool:
+        import sync_client
+        return bool(sync_client.hub_url())
 
     def can_run(self, state: GameState) -> bool:
         c = cfg.load().get("skills", {}).get("all_seeing_eye", {})
         if not c.get("enabled", False):
             return False
-        if not c.get("group", "").strip():
+        hub = self._hub_mode()
+        if not hub and not c.get("group", "").strip():
+            return False
+        if hub and time.monotonic() < self._hub_retry_at:
             return False
         if SKILL_IDS["all_seeing_eye"] not in state.available_skills:
             return False
@@ -189,10 +205,13 @@ class AllSeeingEyeTask(Task):
     def blocked_reasons(self, state):
         reasons = []
         c = cfg.load().get("skills", {}).get("all_seeing_eye", {})
+        hub = self._hub_mode()
         if not c.get("enabled", False):
             reasons.append("Not enabled")
-        elif not c.get("group", "").strip():
+        elif not hub and not c.get("group", "").strip():
             reasons.append("No group set")
+        if hub and time.monotonic() < self._hub_retry_at:
+            reasons.append(f"No hub target in city (retry {int((self._hub_retry_at - time.monotonic()) // 60)}m)")
         if SKILL_IDS["all_seeing_eye"] not in state.available_skills:
             reasons.append("Skill not unlocked")
         if not state.logged_in:
@@ -208,6 +227,9 @@ class AllSeeingEyeTask(Task):
         return reasons
 
     def run(self, state: GameState, executor):
+        if self._hub_mode():
+            self._run_hub(state, executor)
+            return
         import player_db
         c = cfg.load().get("skills", {}).get("all_seeing_eye", {})
         group = c["group"].strip()
@@ -223,6 +245,35 @@ class AllSeeingEyeTask(Task):
             skill_name="All Seeing Eye",
             update_respect=True,
         ), state)
+
+    def _run_hub(self, state: GameState, executor):
+        import sync_client
+        try:
+            targets = sync_client.respect_targets()
+        except Exception as e:
+            state.add_log(f"All Seeing Eye: could not fetch hub targets: {e}")
+            self._hub_retry_at = time.monotonic() + self._HUB_RETRY_SECONDS
+            return
+        city = state.current_city
+        local = state.local_players
+        in_city = [t for t in targets
+                   if t["username"] in local or (city and t.get("current_city") == city)]
+        for t in in_city:
+            claim_id = sync_client.respect_claim(t["username"])
+            if claim_id is None:
+                continue
+            executor.execute(Action(
+                "use_skill",
+                skill_id=SKILL_IDS["all_seeing_eye"],
+                target=t["username"],
+                skill_name="All Seeing Eye",
+                update_respect=True,
+                respect_claim_id=claim_id,
+            ), state)
+            return
+        state.add_log(f"All Seeing Eye: no hub target in {city or 'unknown city'} "
+                      f"({len(targets)} viable elsewhere).")
+        self._hub_retry_at = time.monotonic() + self._HUB_RETRY_SECONDS
 
 
 class NewsEditorTask(Task):

@@ -279,6 +279,9 @@ DEFAULT_CONFIG = {
         "sync_online_time": True,
         "sync_lists": True,
         "sync_groups": True,
+        "snapshot_enabled": True,
+        "update_interval_minutes": 10,
+        "profiles_per_update": 5,
     },
     "communications": {
         "enabled": False

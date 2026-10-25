@@ -75,6 +75,7 @@ from tasks.skills_task import DiscoverSkillsTask, CombatMedicTask, BiometricViru
 from tasks.drug_store import DrugStoreTask
 from tasks.startup_task import StartupTask
 from players import PlayerRefreshTask, SyncTask
+from tasks.hub_update import HubUpdateTask
 
 _thread: threading.Thread = None
 _bionics_task = None
@@ -362,6 +363,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     else:
         sched.add(StartupTask(_earns_task_ref, _char_history_task_ref, _player_refresh_task_ref))
     sched.add(SyncTask())
+    sched.add(HubUpdateTask())
     sched.add(CheckTopJobTask())
     global _snipe_task
     _snipe_task = SnipeTopJobTask()

@@ -161,3 +161,40 @@ def update_homecity(server_url: str, username: str, homecity: str) -> bool:
     except Exception as e:
         log.warning("sync update_homecity failed for %s: %s", username, e)
         return False
+
+
+# ---------------------------------------------------------------------------
+# Snapshot model — report what the bot sees; the hub works out player state.
+# ---------------------------------------------------------------------------
+
+def hub_url() -> str:
+    """Server URL when snapshot reporting is configured, else ''."""
+    sc = _sync_cfg()
+    if sc.get("enabled") and sc.get("api_key") and sc.get("server_url", "").strip():
+        return sc["server_url"].strip().rstrip("/")
+    return ""
+
+
+def send_update(payload: dict) -> dict:
+    """POST /api/sync/update. Raises on network/HTTP errors."""
+    return _post(hub_url() + "/api/sync/update", payload)
+
+
+def respect_targets() -> list:
+    """Viable All Seeing Eye targets, oldest check first."""
+    return _get(hub_url() + "/api/sync/respect/targets").get("targets", [])
+
+
+def respect_claim(username: str) -> "int | None":
+    """Claim a target before using the skill. None if the hub refused it."""
+    try:
+        return _post(hub_url() + "/api/sync/respect/claim", {"username": username}).get("claim_id")
+    except urllib.error.HTTPError as e:
+        if e.code == 409:
+            return None
+        raise
+
+
+def respect_report(payload: dict) -> dict:
+    """Report an All Seeing Eye journal entry, or {"claim_id": n, "ok": False}."""
+    return _post(hub_url() + "/api/sync/respect", payload)

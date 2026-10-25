@@ -7382,18 +7382,88 @@ def handle_use_skill(action: Action, state: GameState):
     result_soup = BeautifulSoup(state.page_html, "html.parser")
     success = result_soup.find("div", id="success")
     fail = result_soup.find("div", id="fail")
+    claim_id = action.params.get("respect_claim_id")
     if success:
         msg = success.get_text(strip=True)
         state.add_log(f"{skill_name} ({target}): {msg}")
-        if update_respect:
+        if claim_id is not None:
+            _report_respect_to_hub(target, claim_id, msg, state)
+        elif update_respect:
             import re
             import player_db
             player_db.update_respect(target, msg)
-    elif fail:
+        return
+    if fail:
         state.add_log(f"{skill_name} ({target}): {fail.get_text(strip=True)}")
     else:
         text = result_soup.get_text(" ", strip=True)[:200]
         state.add_log(f"{skill_name} ({target}): {text}")
+    if claim_id is not None:
+        _release_respect_claim(claim_id, state)
+
+
+_ASE_RE = re.compile(r"determine that (?P<username>\S+) has (?P<respect>\d+) respect", re.I)
+_JOURNAL_TS_FMT = "%m/%d/%Y %I:%M:%S %p"
+
+
+def _release_respect_claim(claim_id, state: GameState):
+    import sync_client
+    try:
+        sync_client.respect_report({"claim_id": claim_id, "ok": False})
+    except Exception as e:
+        state.add_log(f"All Seeing Eye: could not release hub claim: {e}")
+
+
+def _find_ase_journal_entry(target: str, state: GameState) -> "dict | None":
+    """Newest All Seeing Eye journal entry about `target`."""
+    from tasks.journal import _parse_journal_rows
+    _nav(_u("/journal/journal.asp"), state)
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    for e in _parse_journal_rows(soup):
+        if "all seeing eye" not in e.get("title", "").lower():
+            continue
+        m = _ASE_RE.search(e.get("text", ""))
+        if m and m.group("username").lower() == target.lower():
+            return e
+    return None
+
+
+def _report_respect_to_hub(target: str, claim_id, msg: str, state: GameState):
+    """Read the All Seeing Eye result from the journal and report it to Player Hub."""
+    import player_db
+    import sync_client
+    entry = None
+    try:
+        entry = _find_ase_journal_entry(target, state)
+    except Exception as e:
+        state.add_log(f"All Seeing Eye: journal read failed: {e}")
+    finally:
+        _nav(_u("/main.asp"), state)
+    text = entry["text"] if entry else msg
+    m = _ASE_RE.search(text)
+    if not m:
+        state.add_log(f"All Seeing Eye ({target}): respect not found in result; releasing hub claim.")
+        _release_respect_claim(claim_id, state)
+        return
+    journal_ts = entry["time"] if entry and entry.get("time") else ""
+    if not journal_ts:
+        est = state._estimated_server_time()
+        if est is None:
+            state.add_log(f"All Seeing Eye ({target}): no journal time; releasing hub claim.")
+            _release_respect_claim(claim_id, state)
+            return
+        journal_ts = est.strftime(_JOURNAL_TS_FMT)
+    respect = int(m.group("respect"))
+    player_db.update_respect(target, str(respect))
+    try:
+        result = sync_client.respect_report({
+            "claim_id": claim_id, "username": target, "respect": respect,
+            "journal_ts": journal_ts, "raw_text": text,
+        })
+        state.add_log(f"All Seeing Eye ({target}): respect {respect} reported to hub"
+                      f"{' (already recorded)' if result.get('duplicate') else ''}.")
+    except Exception as e:
+        state.add_log(f"All Seeing Eye ({target}): hub report failed: {e}")
 
 
 def handle_use_news_editor(action: Action, state: GameState):
