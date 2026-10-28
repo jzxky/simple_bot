@@ -4530,6 +4530,7 @@ let _plData     = [];
 let _plFiltered = [];
 let _plExpanded = {};
 let _plGroups   = [];
+let _plGroupsLocked = false;  // groups are one-way from Player Hub
 let _plSortCol  = "username";
 let _plSortAsc  = true;
 const _plColVisible = {rank:true, occupation:true, career_group:true, homecity:true, group:true, tags:true, character_age:true, jail_age:true, agg_crimes:true, case_work:true};
@@ -4799,6 +4800,8 @@ function loadPlayers() {
     .then(data => {
       _plData   = (data.players || []).map(p => ({ ...p, group: p.group_name ?? p.group ?? "" }));
       _plGroups = data.groups || [];
+      _plGroupsLocked = !!data.groups_locked;
+      _plApplyGroupsLock();
       _plRebuildFilters();
       plFilter();
       _plRenderGroupsTab(_plGroups);
@@ -5025,7 +5028,8 @@ function _plDetailHtml(p) {
   <div class="pl-detail-item"><span class="pl-detail-label">Jail Age</span>${_fmtAge(p.jail_age||0)}</div>
   <div class="pl-detail-item">
     <span class="pl-detail-label">Group</span>
-    <select onchange="plSetGroup(${escJsStr(p.username)}, this.value, this)" onclick="event.stopPropagation()">
+    <select onchange="plSetGroup(${escJsStr(p.username)}, this.value, this)" onclick="event.stopPropagation()"
+      ${_plGroupsLocked ? 'disabled title="Groups are managed on Player Hub"' : ''}>
       <option value="">— none —</option>${groupOpts}
     </select>
   </div>
@@ -5551,9 +5555,9 @@ function _plRenderGroupsTab(groups) {
         <select class="pl-filter-input" onchange="plUpdateGroupAssignment(${escJsStr(g.name)}, 'case_work', this.value)">${cwSel}</select>
       </td>
       <td>${g.member_count||0}</td>
-      <td style="white-space:nowrap">
+      <td style="white-space:nowrap">${_plGroupsLocked ? "" : `
         <button class="pl-icon-btn" title="Edit group" onclick="event.stopPropagation();plOpenEditGroupModal(${escJsStr(g.name)})">${EDIT}</button>
-        <button class="pl-icon-btn pl-icon-btn-danger" title="Delete group" onclick="event.stopPropagation();plOpenDeleteModal(${escJsStr(g.name)})">${TRASH}</button>
+        <button class="pl-icon-btn pl-icon-btn-danger" title="Delete group" onclick="event.stopPropagation();plOpenDeleteModal(${escJsStr(g.name)})">${TRASH}</button>`}
       </td>
     </tr>`);
 
@@ -5566,10 +5570,23 @@ function _plRenderGroupsTab(groups) {
     }
   });
   tbody.innerHTML = rows.join("");
+  if (_plGroupsLocked) {
+    tbody.querySelectorAll("select").forEach(el => {
+      el.disabled = true;
+      el.title = "Groups are managed on Player Hub";
+    });
+  }
   groups.forEach(g => { if (_plGroupExpanded[g.name]) _plLoadGroupMembers(g.name); });
 }
 
 
+
+function _plApplyGroupsLock() {
+  const toolbar = document.getElementById("pl-group-create-toolbar");
+  const note = document.getElementById("pl-groups-locked-note");
+  if (toolbar) toolbar.style.display = _plGroupsLocked ? "none" : "";
+  if (note) note.style.display = _plGroupsLocked ? "" : "none";
+}
 
 function plToggleGroup(name) {
   _plGroupExpanded[name] = !_plGroupExpanded[name];

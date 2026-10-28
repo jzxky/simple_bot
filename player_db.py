@@ -780,10 +780,11 @@ _EXTRA_PLAYER_FIELDS = [
 ]
 
 
-def apply_synced_players(rows: list):
+def apply_synced_players(rows: list, groups_from_hub: bool = False):
     """Merge pulled player rows without re-stamping timestamps (prevents echo loops).
     Ages use MAX; scrape fields use scraped_at gating; assignment fields use
-    assignments_updated_at gating. Extra profile fields follow scraped_at gating."""
+    assignments_updated_at gating. Extra profile fields follow scraped_at gating.
+    With groups_from_hub, group_name always takes the server's value."""
     with _lock:
         con = _conn()
         try:
@@ -855,6 +856,12 @@ def apply_synced_players(rows: list):
                              r.get("case_work", cur["case_work"]),
                              incoming_assign, name),
                         )
+                    elif groups_from_hub and "group_name" in r \
+                            and (r["group_name"] or "") != (cur["group_name"] or ""):
+                        con.execute(
+                            "UPDATE players SET group_name=? WHERE username=?",
+                            (r["group_name"] or "", name),
+                        )
 
                     new_char = max(cur["character_age"] or 0, r.get("character_age") or 0)
                     new_jail = max(cur["jail_age"] or 0, r.get("jail_age") or 0)
@@ -897,6 +904,57 @@ def apply_synced_groups(rows: list):
                          incoming_ts, name),
                     )
             con.commit()
+        finally:
+            con.close()
+
+
+def replace_groups_from_hub(groups: list) -> int:
+    """Make the local groups table match the hub exactly (hub is the source of truth).
+    Local-only groups are deleted and their members unassigned. Returns groups removed."""
+    with _lock:
+        con = _conn()
+        try:
+            wanted = {g["name"]: g for g in groups if g.get("name")}
+            removed = 0
+            for (name,) in con.execute("SELECT name FROM groups").fetchall():
+                if name not in wanted:
+                    con.execute("DELETE FROM groups WHERE name=?", (name,))
+                    con.execute("UPDATE players SET group_name='' WHERE group_name=?", (name,))
+                    removed += 1
+            for name, g in wanted.items():
+                con.execute(
+                    """INSERT INTO groups (name, color, type, agg_crimes, case_work, updated_at)
+                       VALUES (?,?,?,?,?,?)
+                       ON CONFLICT(name) DO UPDATE SET color=excluded.color, type=excluded.type,
+                           agg_crimes=excluded.agg_crimes, case_work=excluded.case_work,
+                           updated_at=excluded.updated_at""",
+                    (name, g.get("color") or "#3498db", g.get("type") or "neutral",
+                     g.get("agg_crimes") or "", g.get("case_work") or "", g.get("updated_at") or ""),
+                )
+            con.commit()
+            return removed
+        finally:
+            con.close()
+
+
+def replace_memberships_from_hub(members: dict) -> int:
+    """Set each player the hub knows ({username: group_name}) to the hub's group.
+    Players the hub doesn't list are left alone. Does not stamp
+    assignments_updated_at, so nothing echoes back on the next push.
+    Returns players changed."""
+    with _lock:
+        con = _conn()
+        try:
+            changed = 0
+            for name, cur in con.execute("SELECT username, group_name FROM players").fetchall():
+                if name not in members:
+                    continue
+                want = members[name] or ""
+                if (cur or "") != want:
+                    con.execute("UPDATE players SET group_name=? WHERE username=?", (want, name))
+                    changed += 1
+            con.commit()
+            return changed
         finally:
             con.close()
 
