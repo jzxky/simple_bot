@@ -61,12 +61,22 @@ def health_check(server_url: str) -> "dict | None":
         return None
 
 
+def groups_managed_by_hub() -> bool:
+    """Groups are one-way (hub -> bot) whenever the hub is configured for groups:
+    local group edits are blocked and the hub's groups replace local ones."""
+    return bool(hub_url()) and _sync_cfg().get("sync_groups", True)
+
+
 def push_changes(server_url: str):
     """Push all locally modified records since last push to Player Hub."""
     sc = _sync_cfg()
     since = _db.get_sync_meta(_PUSH_TS_KEY) or _EPOCH
     players = _db.get_players_since(since) if sc.get("sync_lists", True) else []
     groups  = _db.get_groups_since(since) if sc.get("sync_groups", True) else []
+    if groups_managed_by_hub():
+        groups = []
+        for p in players:
+            p.pop("group_name", None)
     career  = _db.get_career_since(since) if sc.get("sync_lists", True) else []
 
     if not players and not groups and not career:
@@ -81,6 +91,27 @@ def push_changes(server_url: str):
     result = _post(server_url.rstrip("/") + "/api/sync/push", payload)
     if result.get("ok"):
         _db.set_sync_meta(_PUSH_TS_KEY, result.get("server_time", _db._utcnow()))
+
+
+_MEMBERS_RECONCILE_SECONDS = 30 * 60
+_last_members_reconcile = 0.0
+
+
+def _replace_groups_from_hub(server_url: str):
+    """One-way: the hub's groups and memberships replace the local ones."""
+    global _last_members_reconcile
+    import time
+    data = _get(server_url.rstrip("/") + "/api/sync/groups/full")
+    _db.replace_groups_from_hub(data.get("groups", []))
+    if time.monotonic() - _last_members_reconcile < _MEMBERS_RECONCILE_SECONDS \
+            and _last_members_reconcile:
+        return
+    try:
+        players = _get(server_url.rstrip("/") + "/api/sync/players?since=0").get("players", [])
+    except urllib.error.HTTPError:
+        return  # hub without the read API; /pull still carries group_name changes
+    _db.replace_memberships_from_hub({p["username"]: p.get("group_name") or "" for p in players})
+    _last_members_reconcile = time.monotonic()
 
 
 def _reconcile_groups(server_url: str):
@@ -110,7 +141,10 @@ def pull_changes(server_url: str):
     """Pull records changed on the server since last pull and apply them locally."""
     sc = _sync_cfg()
 
-    if sc.get("sync_groups", True):
+    hub_groups = groups_managed_by_hub()
+    if hub_groups:
+        _replace_groups_from_hub(server_url)
+    elif sc.get("sync_groups", True):
         reconciled_url = _db.get_sync_meta(_GROUPS_RECONCILED_KEY)
         if reconciled_url != server_url:
             _reconcile_groups(server_url)
@@ -126,8 +160,8 @@ def pull_changes(server_url: str):
             for p in players:
                 p.pop("character_age", None)
                 p.pop("jail_age", None)
-        _db.apply_synced_players(players)
-    if data.get("groups") and sc.get("sync_groups", True):
+        _db.apply_synced_players(players, groups_from_hub=hub_groups)
+    if data.get("groups") and sc.get("sync_groups", True) and not hub_groups:
         _db.apply_synced_groups(data["groups"])
     if data.get("career") and sc.get("sync_lists", True):
         _db.apply_synced_career(data["career"])
