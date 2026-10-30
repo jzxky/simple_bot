@@ -780,11 +780,10 @@ _EXTRA_PLAYER_FIELDS = [
 ]
 
 
-def apply_synced_players(rows: list, groups_from_hub: bool = False):
+def apply_synced_players(rows: list):
     """Merge pulled player rows without re-stamping timestamps (prevents echo loops).
     Ages use MAX; scrape fields use scraped_at gating; assignment fields use
-    assignments_updated_at gating. Extra profile fields follow scraped_at gating.
-    With groups_from_hub, group_name always takes the server's value."""
+    assignments_updated_at gating. Extra profile fields follow scraped_at gating."""
     with _lock:
         con = _conn()
         try:
@@ -855,12 +854,6 @@ def apply_synced_players(rows: list, groups_from_hub: bool = False):
                              r.get("agg_crimes", cur["agg_crimes"]),
                              r.get("case_work", cur["case_work"]),
                              incoming_assign, name),
-                        )
-                    elif groups_from_hub and "group_name" in r \
-                            and (r["group_name"] or "") != (cur["group_name"] or ""):
-                        con.execute(
-                            "UPDATE players SET group_name=? WHERE username=?",
-                            (r["group_name"] or "", name),
                         )
 
                     new_char = max(cur["character_age"] or 0, r.get("character_age") or 0)
@@ -937,24 +930,71 @@ def replace_groups_from_hub(groups: list) -> int:
             con.close()
 
 
-def replace_memberships_from_hub(members: dict) -> int:
-    """Set each player the hub knows ({username: group_name}) to the hub's group.
-    Players the hub doesn't list are left alone. Does not stamp
-    assignments_updated_at, so nothing echoes back on the next push.
-    Returns players changed."""
+# Player fields the hub owns; the bot mirrors them verbatim from /api/sync/players.
+_HUB_PLAYER_FIELDS = (
+    "homecity", "occupation", "rank", "active", "born_at", "died_at", "pic_url",
+    "group_name", "agg_crimes", "case_work", "alias", "notes", "monitoring",
+    "respect", "respect_last_checked", "sex", "wealth", "scripting",
+)
+
+
+def apply_hub_players(rows: list, full: bool = False) -> "tuple[int, int]":
+    """Mirror hub player rows into the local DB. Hub-owned fields are copied
+    as-is; local-only fields (ages, scraped godfather/crew) are kept. With
+    full=True the rows are the hub's whole list and local players missing from
+    it are removed. Returns (upserted, removed)."""
     with _lock:
         con = _conn()
         try:
-            changed = 0
-            for name, cur in con.execute("SELECT username, group_name FROM players").fetchall():
-                if name not in members:
+            cols = _HUB_PLAYER_FIELDS
+            for r in rows:
+                name = r.get("username")
+                if not name:
                     continue
-                want = members[name] or ""
-                if (cur or "") != want:
-                    con.execute("UPDATE players SET group_name=? WHERE username=?", (want, name))
-                    changed += 1
+                vals = []
+                for c in cols:
+                    v = r.get(c)
+                    if c in ("active", "monitoring"):
+                        v = 1 if v else 0
+                    elif c == "respect_last_checked":
+                        v = float(v or 0)
+                    else:
+                        v = "" if v is None else str(v)
+                    vals.append(v)
+                con.execute(
+                    f"""INSERT INTO players (username, {', '.join(cols)}) VALUES (?, {', '.join('?' * len(cols))})
+                        ON CONFLICT(username) DO UPDATE SET {', '.join(f'{c}=excluded.{c}' for c in cols)}""",
+                    [name, *vals],
+                )
+            removed = 0
+            if full:
+                keep = {r.get("username") for r in rows if r.get("username")}
+                for (name,) in con.execute("SELECT username FROM players").fetchall():
+                    if name not in keep:
+                        con.execute("DELETE FROM players WHERE username=?", (name,))
+                        removed += 1
             con.commit()
-            return changed
+            return len(rows), removed
+        finally:
+            con.close()
+
+
+def apply_hub_career(rows: list) -> int:
+    """Append hub career rows (the hub writes them from skins lists)."""
+    with _lock:
+        con = _conn()
+        try:
+            added = 0
+            for r in rows:
+                cur = con.execute(
+                    """INSERT OR IGNORE INTO career_history (username, ts, rank, occupation, homecity)
+                       VALUES (?,?,?,?,?)""",
+                    (r.get("username", ""), r.get("ts", ""), r.get("rank", ""),
+                     r.get("occupation", ""), r.get("homecity", "")),
+                )
+                added += cur.rowcount
+            con.commit()
+            return added
         finally:
             con.close()
 

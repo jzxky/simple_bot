@@ -4530,7 +4530,7 @@ let _plData     = [];
 let _plFiltered = [];
 let _plExpanded = {};
 let _plGroups   = [];
-let _plGroupsLocked = false;  // groups are one-way from Player Hub
+let _plHubManaged = false;  // bot mirrors Player Hub: groups and assignments are read-only
 let _plSortCol  = "username";
 let _plSortAsc  = true;
 const _plColVisible = {rank:true, occupation:true, career_group:true, homecity:true, group:true, tags:true, character_age:true, jail_age:true, agg_crimes:true, case_work:true};
@@ -4800,7 +4800,7 @@ function loadPlayers() {
     .then(data => {
       _plData   = (data.players || []).map(p => ({ ...p, group: p.group_name ?? p.group ?? "" }));
       _plGroups = data.groups || [];
-      _plGroupsLocked = !!data.groups_locked;
+      _plHubManaged = !!data.hub_managed;
       _plApplyGroupsLock();
       _plRebuildFilters();
       plFilter();
@@ -4997,7 +4997,7 @@ function _plRenderTable() {
       <td style="white-space:nowrap">${jailAgeCell}</td>
       <td>${aggCell}</td>
       <td>${cwCell}</td>
-      <td style="text-align:center"><input type="checkbox" ${p.monitoring ? 'checked' : ''} onclick="event.stopPropagation();plToggleMonitoring(${escJsStr(p.username)}, this.checked)"></td>
+      <td style="text-align:center"><input type="checkbox" ${p.monitoring ? 'checked' : ''} onclick="event.stopPropagation();plToggleMonitoring(${escJsStr(p.username)}, this.checked)" ${_plHubManaged ? 'disabled title="Managed on Player Hub"' : ''}></td>
     </tr>`);
 
     if (expanded) {
@@ -5022,20 +5022,20 @@ function _plDetailHtml(p) {
   <div class="pl-detail-item"><span class="pl-detail-label">Status</span>${p.active?"Active":"Inactive"}</div>
   <div class="pl-detail-item">
     <span class="pl-detail-label">Alias</span>
-    <input type="text" value="${escHtml(p.alias||'')}" onchange="plSetField(${escJsStr(p.username)}, 'alias', this.value)" onclick="event.stopPropagation()" style="width:120px" class="pl-filter-input">
+    <input type="text" value="${escHtml(p.alias||'')}" onchange="plSetField(${escJsStr(p.username)}, 'alias', this.value)" onclick="event.stopPropagation()" style="width:120px" class="pl-filter-input" ${_plHubManaged ? 'disabled title="Managed on Player Hub"' : ''}>
   </div>
   <div class="pl-detail-item"><span class="pl-detail-label">Character Age</span>${_fmtAge(p.character_age||0)}</div>
   <div class="pl-detail-item"><span class="pl-detail-label">Jail Age</span>${_fmtAge(p.jail_age||0)}</div>
   <div class="pl-detail-item">
     <span class="pl-detail-label">Group</span>
     <select onchange="plSetGroup(${escJsStr(p.username)}, this.value, this)" onclick="event.stopPropagation()"
-      ${_plGroupsLocked ? 'disabled title="Groups are managed on Player Hub"' : ''}>
+      ${_plHubManaged ? 'disabled title="Managed on Player Hub"' : ''}>
       <option value="">— none —</option>${groupOpts}
     </select>
   </div>
   <div class="pl-detail-item">
     <span class="pl-detail-label">Agg Crimes</span>
-    <select onchange="plSetAssignment(${escJsStr(p.username)}, 'agg_crimes', this.value)" onclick="event.stopPropagation()">
+    <select onchange="plSetAssignment(${escJsStr(p.username)}, 'agg_crimes', this.value)" onclick="event.stopPropagation()" ${_plHubManaged ? 'disabled title="Managed on Player Hub"' : ''}>
       <option value="" ${!p.agg_crimes?'selected':''}>— none —</option>
       <option value="whitelist" ${p.agg_crimes==='whitelist'?'selected':''}>Whitelist</option>
       <option value="blacklist" ${p.agg_crimes==='blacklist'?'selected':''}>Blacklist</option>
@@ -5043,7 +5043,7 @@ function _plDetailHtml(p) {
   </div>
   <div class="pl-detail-item">
     <span class="pl-detail-label">Case Work</span>
-    <select onchange="plSetAssignment(${escJsStr(p.username)}, 'case_work', this.value)" onclick="event.stopPropagation()">
+    <select onchange="plSetAssignment(${escJsStr(p.username)}, 'case_work', this.value)" onclick="event.stopPropagation()" ${_plHubManaged ? 'disabled title="Managed on Player Hub"' : ''}>
       <option value="" ${!p.case_work?'selected':''}>— none —</option>
       <option value="whitelist" ${p.case_work==='whitelist'?'selected':''}>Whitelist</option>
       <option value="blacklist" ${p.case_work==='blacklist'?'selected':''}>Blacklist</option>
@@ -5061,7 +5061,7 @@ ${p.scraped_at ? `<div class="pl-detail-grid" style="margin-top:6px">
   <span class="pl-detail-label">Notes</span>
   <textarea rows="3" style="max-width:400px;width:100%;resize:vertical;font-size:0.85rem" class="pl-filter-input"
     onclick="event.stopPropagation()"
-    onchange="plSetField(${escJsStr(p.username)}, 'notes', this.value)">${escHtml(p.notes||'')}</textarea>
+    onchange="plSetField(${escJsStr(p.username)}, 'notes', this.value)" ${_plHubManaged ? 'disabled title="Managed on Player Hub"' : ''}>${escHtml(p.notes||'')}</textarea>
 </div>
 <div class="pl-history-toggle" onclick="plLoadHistory(${escJsStr(p.username)}, '${histId}', this); event.stopPropagation()">
   ▸ Show Career History
@@ -5382,6 +5382,7 @@ function plBoldsToggleChanged() {
 }
 
 function _plRunWhitelistBolds() {
+  if (_plHubManaged) return;  // whitelists are set on Player Hub
   fetch("/players/whitelist_bolds", {method: "POST"})
     .then(r => r.json())
     .then(d => { if (d.newly > 0) loadPlayers(); })
@@ -5555,7 +5556,7 @@ function _plRenderGroupsTab(groups) {
         <select class="pl-filter-input" onchange="plUpdateGroupAssignment(${escJsStr(g.name)}, 'case_work', this.value)">${cwSel}</select>
       </td>
       <td>${g.member_count||0}</td>
-      <td style="white-space:nowrap">${_plGroupsLocked ? "" : `
+      <td style="white-space:nowrap">${_plHubManaged ? "" : `
         <button class="pl-icon-btn" title="Edit group" onclick="event.stopPropagation();plOpenEditGroupModal(${escJsStr(g.name)})">${EDIT}</button>
         <button class="pl-icon-btn pl-icon-btn-danger" title="Delete group" onclick="event.stopPropagation();plOpenDeleteModal(${escJsStr(g.name)})">${TRASH}</button>`}
       </td>
@@ -5570,10 +5571,10 @@ function _plRenderGroupsTab(groups) {
     }
   });
   tbody.innerHTML = rows.join("");
-  if (_plGroupsLocked) {
+  if (_plHubManaged) {
     tbody.querySelectorAll("select").forEach(el => {
       el.disabled = true;
-      el.title = "Groups are managed on Player Hub";
+      el.title = "Managed on Player Hub";
     });
   }
   groups.forEach(g => { if (_plGroupExpanded[g.name]) _plLoadGroupMembers(g.name); });
@@ -5584,8 +5585,15 @@ function _plRenderGroupsTab(groups) {
 function _plApplyGroupsLock() {
   const toolbar = document.getElementById("pl-group-create-toolbar");
   const note = document.getElementById("pl-groups-locked-note");
-  if (toolbar) toolbar.style.display = _plGroupsLocked ? "none" : "";
-  if (note) note.style.display = _plGroupsLocked ? "" : "none";
+  if (toolbar) toolbar.style.display = _plHubManaged ? "none" : "";
+  if (note) note.style.display = _plHubManaged ? "" : "none";
+  const bolds = document.getElementById("pl-bolds-toggle");
+  if (bolds) {
+    bolds.disabled = _plHubManaged;
+    bolds.closest("label.inline-toggle")?.setAttribute("title", _plHubManaged
+      ? "Managed on Player Hub — set whitelists in the hub"
+      : "Auto-whitelist Boss / Don / Godfather / Capo di tutti capi on every list update");
+  }
 }
 
 function plToggleGroup(name) {

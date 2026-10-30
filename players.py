@@ -52,7 +52,13 @@ def load() -> dict:
 
 
 def refresh() -> int:
-    """Fetch from updateusers.php, update SQLite. Returns active player count."""
+    """Refresh the local player list. Returns active player count.
+    With Player Hub configured this mirrors the hub (which decides births and
+    deaths); otherwise it fetches updateusers.php and updates SQLite."""
+    import sync_client
+    if sync_client.hub_managed():
+        sync_client.mirror_from_hub()
+        return _db.get_active_count()
     count, _marked = _refresh_impl()
     return count
 
@@ -117,6 +123,11 @@ def _refresh_impl() -> "tuple[int, int]":
         marked = _db.mark_absent_dead(seen)
 
     return len(seen), marked
+
+
+def download_player_images(raw: list):
+    """Cache avatars for every entry in a raw updateusers.php list."""
+    _download_player_images([p.get("userPicLink", "") for p in raw if p.get("userPicLink")])
 
 
 def _download_player_images(pic_urls: list):
@@ -199,8 +210,11 @@ class PlayerRefreshTask(Task):
         self._last_run: float = 0.0
 
     def can_run(self, state) -> bool:
+        import sync_client
         if not cfg.load().get("players", {}).get("enabled", True):
             return False
+        if sync_client.hub_managed():
+            return False  # the hub decides births/deaths; SyncTask mirrors it
         return state.logged_in and time.monotonic() - self._last_run >= _refresh_interval()
 
     def run(self, state, executor):
@@ -232,6 +246,15 @@ class SyncTask(Task):
     def run(self, state, executor):
         import sync_client
         self._last_run = time.monotonic()
+        if sync_client.hub_managed():
+            try:
+                r = sync_client.mirror_from_hub()
+                if r["players"] or r["removed"] or r["career"] or r["groups_removed"]:
+                    state.add_log(f"Hub sync: {r['players']} player(s) updated, {r['removed']} removed, "
+                                  f"{r['career']} career row(s).")
+            except Exception as e:
+                state.add_log(f"Hub sync failed: {e}")
+            return
         sc = self._sync_cfg()
         url = sc.get("server_url", "").strip()
         try:

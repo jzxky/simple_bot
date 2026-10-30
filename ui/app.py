@@ -1151,6 +1151,9 @@ def clear_launder_cooldown():
 
 @app.route("/toggle-monitoring", methods=["POST"])
 def toggle_monitoring():
+    locked = _hub_locked_response()
+    if locked:
+        return locked
     data = request.get_json(silent=True) or {}
     username = data.get("username", "")
     on = data.get("on", False)
@@ -2118,7 +2121,7 @@ def api_players():
     return jsonify({
         "players": _db.get_all_players(),
         "groups": _db.get_groups(),
-        "groups_locked": sync_client.groups_managed_by_hub(),
+        "hub_managed": sync_client.hub_managed(),
         "last_updated": _db.get_last_updated(),
         "active_count": _db.get_active_count(),
     })
@@ -2231,6 +2234,9 @@ def players_refresh():
 
 @app.route("/players/assign", methods=["POST"])
 def players_assign():
+    locked = _hub_locked_response()
+    if locked:
+        return locked
     data = request.get_json()
     pl.set_assignment(data["username"], data["context"], data.get("value", ""))
     return jsonify({"ok": True})
@@ -2238,6 +2244,9 @@ def players_assign():
 
 @app.route("/players/set_field", methods=["POST"])
 def players_set_field():
+    locked = _hub_locked_response()
+    if locked:
+        return locked
     import player_db as _db
     data = request.get_json()
     _db.set_player_field(data["username"], data["field"], data.get("value", ""))
@@ -2255,17 +2264,18 @@ def promo_bar_threads():
         return jsonify({"error": str(e)}), 500
 
 
-def _groups_locked_response():
-    """Groups are one-way from Player Hub when it's configured; refuse local edits."""
+def _hub_locked_response():
+    """With Player Hub configured the bot mirrors the hub: groups and player
+    assignments are edited on the hub, so refuse local edits."""
     import sync_client
-    if sync_client.groups_managed_by_hub():
-        return jsonify({"ok": False, "error": "Groups are managed on Player Hub."}), 403
+    if sync_client.hub_managed():
+        return jsonify({"ok": False, "error": "Managed on Player Hub — edit it in the hub."}), 403
     return None
 
 
 @app.route("/players/groups/create", methods=["POST"])
 def players_groups_create():
-    locked = _groups_locked_response()
+    locked = _hub_locked_response()
     if locked:
         return locked
     data = request.get_json()
@@ -2275,7 +2285,7 @@ def players_groups_create():
 
 @app.route("/players/groups/delete", methods=["POST"])
 def players_groups_delete():
-    locked = _groups_locked_response()
+    locked = _hub_locked_response()
     if locked:
         return locked
     data = request.get_json()
@@ -2285,7 +2295,7 @@ def players_groups_delete():
 
 @app.route("/players/groups/update_color", methods=["POST"])
 def players_groups_update_color():
-    locked = _groups_locked_response()
+    locked = _hub_locked_response()
     if locked:
         return locked
     data = request.get_json(silent=True) or {}
@@ -2295,7 +2305,7 @@ def players_groups_update_color():
 
 @app.route("/players/groups/update_type", methods=["POST"])
 def players_groups_update_type():
-    locked = _groups_locked_response()
+    locked = _hub_locked_response()
     if locked:
         return locked
     data = request.get_json()
@@ -2306,7 +2316,7 @@ def players_groups_update_type():
 
 @app.route("/players/groups/update_assignment", methods=["POST"])
 def players_groups_update_assignment():
-    locked = _groups_locked_response()
+    locked = _hub_locked_response()
     if locked:
         return locked
     data = request.get_json()
@@ -2317,7 +2327,7 @@ def players_groups_update_assignment():
 
 @app.route("/players/groups/rename", methods=["POST"])
 def players_groups_rename():
-    locked = _groups_locked_response()
+    locked = _hub_locked_response()
     if locked:
         return locked
     data = request.get_json(silent=True) or {}
@@ -2338,6 +2348,9 @@ def api_players_by_group(group_name):
 
 @app.route("/players/whitelist_bolds", methods=["POST"])
 def players_whitelist_bolds():
+    locked = _hub_locked_response()
+    if locked:
+        return locked
     import player_db as _db
     BOLD_RANKS = {"Boss", "Don", "Godfather", "Capo di tutti capi"}
     all_players = _db.get_all_players()
@@ -2353,7 +2366,7 @@ def players_whitelist_bolds():
 
 @app.route("/players/set_group", methods=["POST"])
 def players_set_group():
-    locked = _groups_locked_response()
+    locked = _hub_locked_response()
     if locked:
         return locked
     data = request.get_json()
@@ -2363,6 +2376,9 @@ def players_set_group():
 
 @app.route("/players/group_mass_assign", methods=["POST"])
 def players_group_mass_assign():
+    locked = _hub_locked_response()
+    if locked:
+        return locked
     data = request.get_json()
     count = pl.group_mass_assign(data["group"], data["context"], data.get("assignment", ""))
     return jsonify({"ok": True, "count": count})
@@ -2370,6 +2386,9 @@ def players_group_mass_assign():
 
 @app.route("/players/import", methods=["POST"])
 def players_import():
+    locked = _hub_locked_response()
+    if locked:
+        return locked
     data = request.get_json()
     names = [n.strip() for n in data.get("names", []) if n.strip()]
     context = data.get("context", "agg_crimes")
