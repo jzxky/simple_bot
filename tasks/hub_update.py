@@ -66,6 +66,7 @@ class HubUpdateTask(Task):
         raw = players.fetch_skins_raw()
         if raw is not None:
             payload["skins_players"] = raw
+            players.download_player_images(raw)
         if state.online_players:
             payload["online_players"] = sorted(state.online_players)
         if state.current_city:

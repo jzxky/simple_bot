@@ -1,5 +1,9 @@
 """
-sync_client.py — Push local changes to and pull remote changes from Player Hub.
+sync_client.py — Player Hub client.
+
+With an API key configured the bot mirrors the hub (mirror_from_hub) and
+reports raw game data (send_update, respect_*). push_changes/pull_changes are
+the legacy two-way sync for servers without the snapshot API.
 
 Designed for use by the SyncTask background task in players.py.
 Does not re-stamp timestamps on pulled data to prevent echo loops.
@@ -61,10 +65,48 @@ def health_check(server_url: str) -> "dict | None":
         return None
 
 
-def groups_managed_by_hub() -> bool:
-    """Groups are one-way (hub -> bot) whenever the hub is configured for groups:
-    local group edits are blocked and the hub's groups replace local ones."""
-    return bool(hub_url()) and _sync_cfg().get("sync_groups", True)
+def hub_managed() -> bool:
+    """With Player Hub configured the bot is a read-only mirror: it reports raw
+    game data via /update and copies players, groups and career history from
+    the hub. Local edits to groups and player assignments are blocked."""
+    return bool(hub_url())
+
+
+_FULL_MIRROR_SECONDS = 6 * 60 * 60
+_HUB_REV_KEY = "hub_players_rev"
+_HUB_CAREER_KEY = "hub_career_id"
+_HUB_FULL_AT_KEY = "hub_full_mirror_at"
+
+
+def mirror_from_hub() -> dict:
+    """Copy the hub's groups, changed players and new career rows into the local
+    DB. Every 6 hours (and on first run) re-read every player so deletions on the
+    hub are mirrored too. Raises on network/HTTP errors."""
+    import time
+    base = hub_url()
+    groups = _get(base + "/api/sync/groups/full").get("groups", [])
+    groups_removed = _db.replace_groups_from_hub(groups)
+
+    last_full = float(_db.get_sync_meta(_HUB_FULL_AT_KEY) or 0)
+    full = time.time() - last_full >= _FULL_MIRROR_SECONDS
+    since = 0 if full else int(_db.get_sync_meta(_HUB_REV_KEY) or 0)
+    data = _get(base + f"/api/sync/players?since={since}")
+    players, removed = _db.apply_hub_players(data.get("players", []), full=full)
+    _db.set_sync_meta(_HUB_REV_KEY, str(data.get("rev", since)))
+    if full:
+        _db.set_sync_meta(_HUB_FULL_AT_KEY, str(time.time()))
+
+    career_id = int(_db.get_sync_meta(_HUB_CAREER_KEY) or 0)
+    career = 0
+    while True:
+        page = _get(base + f"/api/sync/career?since={career_id}")
+        career += _db.apply_hub_career(page.get("career", []))
+        career_id = page.get("last_id", career_id)
+        if not page.get("more"):
+            break
+    _db.set_sync_meta(_HUB_CAREER_KEY, str(career_id))
+    return {"players": players, "removed": removed, "groups": len(groups),
+            "groups_removed": groups_removed, "career": career, "full": full}
 
 
 def push_changes(server_url: str):
@@ -73,10 +115,6 @@ def push_changes(server_url: str):
     since = _db.get_sync_meta(_PUSH_TS_KEY) or _EPOCH
     players = _db.get_players_since(since) if sc.get("sync_lists", True) else []
     groups  = _db.get_groups_since(since) if sc.get("sync_groups", True) else []
-    if groups_managed_by_hub():
-        groups = []
-        for p in players:
-            p.pop("group_name", None)
     career  = _db.get_career_since(since) if sc.get("sync_lists", True) else []
 
     if not players and not groups and not career:
@@ -91,27 +129,6 @@ def push_changes(server_url: str):
     result = _post(server_url.rstrip("/") + "/api/sync/push", payload)
     if result.get("ok"):
         _db.set_sync_meta(_PUSH_TS_KEY, result.get("server_time", _db._utcnow()))
-
-
-_MEMBERS_RECONCILE_SECONDS = 30 * 60
-_last_members_reconcile = 0.0
-
-
-def _replace_groups_from_hub(server_url: str):
-    """One-way: the hub's groups and memberships replace the local ones."""
-    global _last_members_reconcile
-    import time
-    data = _get(server_url.rstrip("/") + "/api/sync/groups/full")
-    _db.replace_groups_from_hub(data.get("groups", []))
-    if time.monotonic() - _last_members_reconcile < _MEMBERS_RECONCILE_SECONDS \
-            and _last_members_reconcile:
-        return
-    try:
-        players = _get(server_url.rstrip("/") + "/api/sync/players?since=0").get("players", [])
-    except urllib.error.HTTPError:
-        return  # hub without the read API; /pull still carries group_name changes
-    _db.replace_memberships_from_hub({p["username"]: p.get("group_name") or "" for p in players})
-    _last_members_reconcile = time.monotonic()
 
 
 def _reconcile_groups(server_url: str):
@@ -141,10 +158,7 @@ def pull_changes(server_url: str):
     """Pull records changed on the server since last pull and apply them locally."""
     sc = _sync_cfg()
 
-    hub_groups = groups_managed_by_hub()
-    if hub_groups:
-        _replace_groups_from_hub(server_url)
-    elif sc.get("sync_groups", True):
+    if sc.get("sync_groups", True):
         reconciled_url = _db.get_sync_meta(_GROUPS_RECONCILED_KEY)
         if reconciled_url != server_url:
             _reconcile_groups(server_url)
@@ -160,8 +174,8 @@ def pull_changes(server_url: str):
             for p in players:
                 p.pop("character_age", None)
                 p.pop("jail_age", None)
-        _db.apply_synced_players(players, groups_from_hub=hub_groups)
-    if data.get("groups") and sc.get("sync_groups", True) and not hub_groups:
+        _db.apply_synced_players(players)
+    if data.get("groups") and sc.get("sync_groups", True):
         _db.apply_synced_groups(data["groups"])
     if data.get("career") and sc.get("sync_lists", True):
         _db.apply_synced_career(data["career"])
