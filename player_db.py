@@ -901,6 +901,104 @@ def apply_synced_groups(rows: list):
             con.close()
 
 
+def replace_groups_from_hub(groups: list) -> int:
+    """Make the local groups table match the hub exactly (hub is the source of truth).
+    Local-only groups are deleted and their members unassigned. Returns groups removed."""
+    with _lock:
+        con = _conn()
+        try:
+            wanted = {g["name"]: g for g in groups if g.get("name")}
+            removed = 0
+            for (name,) in con.execute("SELECT name FROM groups").fetchall():
+                if name not in wanted:
+                    con.execute("DELETE FROM groups WHERE name=?", (name,))
+                    con.execute("UPDATE players SET group_name='' WHERE group_name=?", (name,))
+                    removed += 1
+            for name, g in wanted.items():
+                con.execute(
+                    """INSERT INTO groups (name, color, type, agg_crimes, case_work, updated_at)
+                       VALUES (?,?,?,?,?,?)
+                       ON CONFLICT(name) DO UPDATE SET color=excluded.color, type=excluded.type,
+                           agg_crimes=excluded.agg_crimes, case_work=excluded.case_work,
+                           updated_at=excluded.updated_at""",
+                    (name, g.get("color") or "#3498db", g.get("type") or "neutral",
+                     g.get("agg_crimes") or "", g.get("case_work") or "", g.get("updated_at") or ""),
+                )
+            con.commit()
+            return removed
+        finally:
+            con.close()
+
+
+# Player fields the hub owns; the bot mirrors them verbatim from /api/sync/players.
+_HUB_PLAYER_FIELDS = (
+    "homecity", "occupation", "rank", "active", "born_at", "died_at", "pic_url",
+    "group_name", "agg_crimes", "case_work", "alias", "notes", "monitoring",
+    "respect", "respect_last_checked", "sex", "wealth", "scripting",
+)
+
+
+def apply_hub_players(rows: list, full: bool = False) -> "tuple[int, int]":
+    """Mirror hub player rows into the local DB. Hub-owned fields are copied
+    as-is; local-only fields (ages, scraped godfather/crew) are kept. With
+    full=True the rows are the hub's whole list and local players missing from
+    it are removed. Returns (upserted, removed)."""
+    with _lock:
+        con = _conn()
+        try:
+            cols = _HUB_PLAYER_FIELDS
+            for r in rows:
+                name = r.get("username")
+                if not name:
+                    continue
+                vals = []
+                for c in cols:
+                    v = r.get(c)
+                    if c in ("active", "monitoring"):
+                        v = 1 if v else 0
+                    elif c == "respect_last_checked":
+                        v = float(v or 0)
+                    else:
+                        v = "" if v is None else str(v)
+                    vals.append(v)
+                con.execute(
+                    f"""INSERT INTO players (username, {', '.join(cols)}) VALUES (?, {', '.join('?' * len(cols))})
+                        ON CONFLICT(username) DO UPDATE SET {', '.join(f'{c}=excluded.{c}' for c in cols)}""",
+                    [name, *vals],
+                )
+            removed = 0
+            if full:
+                keep = {r.get("username") for r in rows if r.get("username")}
+                for (name,) in con.execute("SELECT username FROM players").fetchall():
+                    if name not in keep:
+                        con.execute("DELETE FROM players WHERE username=?", (name,))
+                        removed += 1
+            con.commit()
+            return len(rows), removed
+        finally:
+            con.close()
+
+
+def apply_hub_career(rows: list) -> int:
+    """Append hub career rows (the hub writes them from skins lists)."""
+    with _lock:
+        con = _conn()
+        try:
+            added = 0
+            for r in rows:
+                cur = con.execute(
+                    """INSERT OR IGNORE INTO career_history (username, ts, rank, occupation, homecity)
+                       VALUES (?,?,?,?,?)""",
+                    (r.get("username", ""), r.get("ts", ""), r.get("rank", ""),
+                     r.get("occupation", ""), r.get("homecity", "")),
+                )
+                added += cur.rowcount
+            con.commit()
+            return added
+        finally:
+            con.close()
+
+
 def apply_synced_career(rows: list):
     """Merge career history rows — skip if last entry for that user already has same data."""
     with _lock:

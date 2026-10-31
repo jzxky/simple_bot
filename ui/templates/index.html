@@ -2401,7 +2401,10 @@
 
         <!-- Groups tab -->
         <div id="pl-tab-groups" class="tab-panel">
-          <div class="pl-toolbar" style="margin-bottom:10px">
+          <div id="pl-groups-locked-note" class="pl-toolbar" style="display:none;margin-bottom:10px;color:var(--muted);font-size:13px">
+            Groups, members and player assignments (whitelist/blacklist, alias, notes, monitoring) are managed on Player Hub and mirrored to this bot. Edit them in the hub.
+          </div>
+          <div id="pl-group-create-toolbar" class="pl-toolbar" style="margin-bottom:10px">
             <input type="text" id="pl-new-group-name" class="task-select" placeholder="Group name…"
               onkeydown="if(event.key==='Enter')plCreateGroup()" style="min-width:140px">
             <select id="pl-new-group-type" class="task-select">

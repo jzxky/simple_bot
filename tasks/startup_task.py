@@ -49,12 +49,17 @@ class StartupTask(Task):
 
         state.add_log("Startup: refreshing player list.")
         try:
-            from players import _refresh_impl
-            count, marked = _refresh_impl()
-            msg = f"Startup: player list refreshed: {count} active players."
-            if marked:
-                msg += f" Marked {marked} absent player(s) as dead."
-            state.add_log(msg)
+            import sync_client
+            if sync_client.hub_managed():
+                r = sync_client.mirror_from_hub()
+                state.add_log(f"Startup: player list mirrored from Player Hub ({r['players']} player(s)).")
+            else:
+                from players import _refresh_impl
+                count, marked = _refresh_impl()
+                msg = f"Startup: player list refreshed: {count} active players."
+                if marked:
+                    msg += f" Marked {marked} absent player(s) as dead."
+                state.add_log(msg)
         except Exception as e:
             state.add_log(f"Startup player refresh failed: {e}")
 

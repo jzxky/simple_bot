@@ -1,5 +1,9 @@
 """
-sync_client.py — Push local changes to and pull remote changes from Player Hub.
+sync_client.py — Player Hub client.
+
+With an API key configured the bot mirrors the hub (mirror_from_hub) and
+reports raw game data (send_update, respect_*). push_changes/pull_changes are
+the legacy two-way sync for servers without the snapshot API.
 
 Designed for use by the SyncTask background task in players.py.
 Does not re-stamp timestamps on pulled data to prevent echo loops.
@@ -59,6 +63,50 @@ def health_check(server_url: str) -> "dict | None":
     except Exception as e:
         log.warning("sync health check failed: %s", e)
         return None
+
+
+def hub_managed() -> bool:
+    """With Player Hub configured the bot is a read-only mirror: it reports raw
+    game data via /update and copies players, groups and career history from
+    the hub. Local edits to groups and player assignments are blocked."""
+    return bool(hub_url())
+
+
+_FULL_MIRROR_SECONDS = 6 * 60 * 60
+_HUB_REV_KEY = "hub_players_rev"
+_HUB_CAREER_KEY = "hub_career_id"
+_HUB_FULL_AT_KEY = "hub_full_mirror_at"
+
+
+def mirror_from_hub() -> dict:
+    """Copy the hub's groups, changed players and new career rows into the local
+    DB. Every 6 hours (and on first run) re-read every player so deletions on the
+    hub are mirrored too. Raises on network/HTTP errors."""
+    import time
+    base = hub_url()
+    groups = _get(base + "/api/sync/groups/full").get("groups", [])
+    groups_removed = _db.replace_groups_from_hub(groups)
+
+    last_full = float(_db.get_sync_meta(_HUB_FULL_AT_KEY) or 0)
+    full = time.time() - last_full >= _FULL_MIRROR_SECONDS
+    since = 0 if full else int(_db.get_sync_meta(_HUB_REV_KEY) or 0)
+    data = _get(base + f"/api/sync/players?since={since}")
+    players, removed = _db.apply_hub_players(data.get("players", []), full=full)
+    _db.set_sync_meta(_HUB_REV_KEY, str(data.get("rev", since)))
+    if full:
+        _db.set_sync_meta(_HUB_FULL_AT_KEY, str(time.time()))
+
+    career_id = int(_db.get_sync_meta(_HUB_CAREER_KEY) or 0)
+    career = 0
+    while True:
+        page = _get(base + f"/api/sync/career?since={career_id}")
+        career += _db.apply_hub_career(page.get("career", []))
+        career_id = page.get("last_id", career_id)
+        if not page.get("more"):
+            break
+    _db.set_sync_meta(_HUB_CAREER_KEY, str(career_id))
+    return {"players": players, "removed": removed, "groups": len(groups),
+            "groups_removed": groups_removed, "career": career, "full": full}
 
 
 def push_changes(server_url: str):
