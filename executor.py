@@ -2703,9 +2703,14 @@ def _get_public_business_owner(business_name: str, state: GameState) -> "str | N
     except Exception:
         state.add_log("Failed to parse users for public business payback.")
         return None
+    # The top-job title appears in userOccupation for most careers, but in
+    # userRank for Customs (occupation is the generic "Customs", so the
+    # Airport's Commissioner-General is only visible there) — match either.
     owner = next(
         (p["userName"] for p in data
-         if p.get("userHomeCity") == city and p.get("userOccupation") == job),
+         if (p.get("userHomeCity") or "").strip() == city
+         and ((p.get("userOccupation") or "").strip() == job
+              or (p.get("userRank") or "").strip() == job)),
         None,
     )
     if not owner:
