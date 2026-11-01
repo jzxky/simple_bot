@@ -7351,11 +7351,17 @@ def handle_discover_skills(action: Action, state: GameState):
     _nav(_u("/main.asp"), state)
 
 
+# A skill aimed at a player who isn't in the bot's city fails with a message
+# mentioning the city or location; All Seeing Eye then moves to the next target.
+_SKILL_OUT_OF_CITY_RE = re.compile(r"\bcity\b|same location|not (?:in|at) (?:your|the same)", re.I)
+
+
 def handle_use_skill(action: Action, state: GameState):
     skill_id = action.params.get("skill_id", "")
     target = action.params.get("target", "")
     skill_name = action.params.get("skill_name", skill_id)
     update_respect = action.params.get("update_respect", False)
+    state.last_skill_result = {"ok": False, "message": "", "out_of_city": False}
 
     _nav(_u("/income/charskills.asp"), state)
     if not _check_session(state):
@@ -7390,6 +7396,7 @@ def handle_use_skill(action: Action, state: GameState):
     claim_id = action.params.get("respect_claim_id")
     if success:
         msg = success.get_text(strip=True)
+        state.last_skill_result = {"ok": True, "message": msg, "out_of_city": False}
         state.add_log(f"{skill_name} ({target}): {msg}")
         if claim_id is not None:
             _report_respect_to_hub(target, claim_id, msg, state)
@@ -7399,10 +7406,13 @@ def handle_use_skill(action: Action, state: GameState):
             player_db.update_respect(target, msg)
         return
     if fail:
-        state.add_log(f"{skill_name} ({target}): {fail.get_text(strip=True)}")
+        text = fail.get_text(strip=True)
+        state.last_skill_result = {"ok": False, "message": text,
+                                   "out_of_city": bool(_SKILL_OUT_OF_CITY_RE.search(text))}
     else:
         text = result_soup.get_text(" ", strip=True)[:200]
-        state.add_log(f"{skill_name} ({target}): {text}")
+        state.last_skill_result = {"ok": False, "message": text, "out_of_city": False}
+    state.add_log(f"{skill_name} ({target}): {text}")
     if claim_id is not None:
         _release_respect_claim(claim_id, state)
 

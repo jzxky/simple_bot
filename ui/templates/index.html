@@ -920,22 +920,30 @@
               </div>
               <hr id="auto-skills-divider" class="stat-divider" style="display:none">
               <div id="auto-respect-check-section" style="display:none">
-                <label class="inline-toggle setting-row" style="margin-bottom:12px">
-                  Auto Respect Check
-                  <label class="toggle-label">
-                    <input type="checkbox" id="skill_all_seeing_eye_enabled"
-                      {% if config.get('skills', {}).get('all_seeing_eye', {}).get('enabled') %}checked{% endif %}
-                      onchange="autoSave()">
-                    <span class="toggle"></span>
+                <p id="ase-hub-off" class="placeholder" style="display:none">
+                  Auto Respect Check needs Player Hub. Turn on Sync with a server URL and API key, then add targets on the hub's Respect page.
+                </p>
+                <div id="ase-hub-on" style="display:none">
+                  <label class="inline-toggle setting-row" style="margin-bottom:12px">
+                    Auto Respect Check
+                    <label class="toggle-label">
+                      <input type="checkbox" id="skill_all_seeing_eye_enabled"
+                        {% if config.get('skills', {}).get('all_seeing_eye', {}).get('enabled') %}checked{% endif %}
+                        onchange="autoSave()">
+                      <span class="toggle"></span>
+                    </label>
                   </label>
-                </label>
-                <div class="setting-row">
-                  <label for="skill_all_seeing_eye_group">Player Group</label>
-                  <select id="skill_all_seeing_eye_group" style="width:200px" data-current="{{ config.get('skills', {}).get('all_seeing_eye', {}).get('group', '') }}" onchange="autoSave()">
-                    <option value="">-- select --</option>
-                  </select>
+                  <div style="overflow-x:auto">
+                    <table class="pl-table" id="ase-targets-table">
+                      <thead><tr>
+                        <th class="pl-th">Player</th><th class="pl-th">Respect</th><th class="pl-th">Last Checked</th>
+                        <th class="pl-th">Last Seen In</th><th class="pl-th">Status</th>
+                      </tr></thead>
+                      <tbody id="ase-targets-tbody"></tbody>
+                    </table>
+                  </div>
+                  <p class="placeholder">Targets come from Player Hub's Respect page. Every 3 hours the bot checks the target in its city with the oldest check.</p>
                 </div>
-                <p class="placeholder">Iterates through players in the selected group, checking respect level for the player with the oldest check.</p>
               </div>
             </div>
           </div>

@@ -233,6 +233,11 @@ def respect_targets() -> list:
     return _get(hub_url() + "/api/sync/respect/targets").get("targets", [])
 
 
+def respect_list() -> list:
+    """The hub's whole respect target list with current respect (for the UI)."""
+    return _get(hub_url() + "/api/sync/respect/list").get("targets", [])
+
+
 def respect_claim(username: str) -> "int | None":
     """Claim a target before using the skill. None if the hub refused it."""
     try:
