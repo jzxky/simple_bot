@@ -557,7 +557,6 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["skills"]["travel_expert"]["travel_timer_threshold"] = int(data.get("skill_travel_expert_threshold", 2) or 2)
     c["skills"].setdefault("all_seeing_eye", {})
     c["skills"]["all_seeing_eye"]["enabled"] = data.get("skill_all_seeing_eye_enabled", False)
-    c["skills"]["all_seeing_eye"]["group"] = data.get("skill_all_seeing_eye_group", "")
 
     c.setdefault("case_work", {})
     c["case_work"]["enabled"] = data.get("case_work_enabled", False)
@@ -1977,6 +1976,18 @@ def api_use_skill():
             params["update_respect"] = True
     bot.request_use_skill(params)
     return jsonify({"ok": True})
+
+
+@app.route("/api/respect_targets")
+def api_respect_targets():
+    """Player Hub's respect target list for the Skills tab's Auto Respect Check."""
+    import sync_client
+    if not sync_client.hub_managed():
+        return jsonify({"hub": False, "targets": []})
+    try:
+        return jsonify({"hub": True, "targets": sync_client.respect_list()})
+    except Exception as e:
+        return jsonify({"hub": True, "targets": [], "error": f"Could not reach Player Hub: {e}"})
 
 
 @app.route("/api/scheduler")

@@ -624,7 +624,6 @@ function _buildPayload() {
     skill_travel_expert_enabled: (document.getElementById("skill_travel_expert_enabled")||{checked:false}).checked,
     skill_travel_expert_threshold: parseInt((document.getElementById("skill_travel_expert_threshold")||{value:"2"}).value)||2,
     skill_all_seeing_eye_enabled: (document.getElementById("skill_all_seeing_eye_enabled")||{checked:false}).checked,
-    skill_all_seeing_eye_group: (document.getElementById("skill_all_seeing_eye_group")||{value:""}).value,
     ..._collectEventConsume(),
     ..._collectNotifSettings(),
   };
@@ -2410,6 +2409,7 @@ function pollStatus() {
         const autoDivider = document.getElementById("auto-skills-divider");
         if (travelSec) travelSec.style.display = hasTravel ? "" : "none";
         if (eyeSec) eyeSec.style.display = hasEye ? "" : "none";
+        if (hasEye) loadRespectTargets();
         if (autoDivider) autoDivider.style.display = (hasTravel && hasEye) ? "" : "none";
         if (autoGroup) autoGroup.style.display = (hasTravel || hasEye) ? "" : "none";
       }
@@ -3195,7 +3195,7 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleWarModeLink();
   syncAutoDetectLimitState();
   loadEarnPlanner();
-  _loadSkillsGroupDropdown();
+  loadRespectTargets();
   commsInit();
   // Capture the baseline the diff-based save compares against, once dynamic
   // tables/summaries have populated from the server-rendered values.
@@ -3243,19 +3243,44 @@ function _syncEarnPlannerOrder() {
   _earnPlannerLimits = ordered;
 }
 
-function _loadSkillsGroupDropdown() {
-  const sel = document.getElementById("skill_all_seeing_eye_group");
-  if (!sel) return;
-  const cur = sel.dataset.current || sel.value;
-  fetch("/api/player_groups").then(r => r.json()).then(groups => {
-    sel.innerHTML = '<option value="">-- select --</option>';
-    groups.forEach(g => {
-      const opt = document.createElement("option");
-      opt.value = g;
-      opt.textContent = g;
-      if (g === cur) opt.selected = true;
-      sel.appendChild(opt);
-    });
+function _fmtCheckedAt(ts) {
+  if (!ts) return "never";
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  return days < 1 ? "today" : days === 1 ? "1 day ago" : `${days} days ago`;
+}
+
+// Auto Respect Check: show the hub's respect targets, or explain the hub is needed.
+function loadRespectTargets() {
+  const on = document.getElementById("ase-hub-on");
+  const off = document.getElementById("ase-hub-off");
+  const tbody = document.getElementById("ase-targets-tbody");
+  if (!on || !off || !tbody) return;
+  fetch("/api/respect_targets").then(r => r.json()).then(d => {
+    on.style.display = d.hub ? "" : "none";
+    off.style.display = d.hub ? "none" : "";
+    if (!d.hub) return;
+    if (d.error) {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:8px;color:var(--muted)">${escHtml(d.error)}</td></tr>`;
+      return;
+    }
+    if (!d.targets.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:8px;color:var(--muted)">No targets yet — add them on Player Hub's Respect page.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = d.targets.map(t => {
+      const status = t.active === 0 ? "Dead"
+        : t.claimed_by ? `Checking (${escHtml(t.claimed_by)})`
+        : t.due ? "Due" : "Checked";
+      return `<tr>
+        <td>${escHtml(t.username)}</td>
+        <td>${t.respect !== "" && t.respect != null ? escHtml(t.respect) : "—"}</td>
+        <td>${escHtml(_fmtCheckedAt(t.respect_checked_at))}</td>
+        <td>${escHtml(t.current_city || "—")}</td>
+        <td>${status}</td>
+      </tr>`;
+    }).join("");
   }).catch(() => {});
 }
 
