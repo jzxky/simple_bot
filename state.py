@@ -86,6 +86,8 @@ class GameState:
     jail_players: set = field(default_factory=set)     # usernames flagged in jail (jail class)
     notifications: list = field(default_factory=list)
     available_skills: set = field(default_factory=set)
+    # Outcome of the last use_skill action: {"ok": bool, "message": str, "out_of_city": bool}
+    last_skill_result: dict = field(default_factory=dict)
     lawyer_cases_by_city: dict = field(default_factory=dict)
     lawyer_case_details: list = field(default_factory=list)
 

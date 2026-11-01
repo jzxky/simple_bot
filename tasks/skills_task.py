@@ -175,7 +175,8 @@ class AllSeeingEyeTask(Task):
     priority = 25
     label = "All Seeing Eye"
 
-    _HUB_RETRY_SECONDS = 10 * 60
+    _HUB_RETRY_SECONDS = 10 * 60   # hub unreachable
+    _NO_TARGET_REST_SECONDS = 30 * 60  # no target in this city (or all were elsewhere)
 
     def __init__(self):
         self._hub_retry_at: float = 0.0
@@ -211,7 +212,7 @@ class AllSeeingEyeTask(Task):
         elif not hub and not c.get("group", "").strip():
             reasons.append("No group set")
         if hub and time.monotonic() < self._hub_retry_at:
-            reasons.append(f"No hub target in city (retry {int((self._hub_retry_at - time.monotonic()) // 60)}m)")
+            reasons.append(f"Resting — no hub target in city ({int((self._hub_retry_at - time.monotonic()) // 60)}m)")
         if SKILL_IDS["all_seeing_eye"] not in state.available_skills:
             reasons.append("Skill not unlocked")
         if not state.logged_in:
@@ -254,14 +255,19 @@ class AllSeeingEyeTask(Task):
             state.add_log(f"All Seeing Eye: could not fetch hub targets: {e}")
             self._hub_retry_at = time.monotonic() + self._HUB_RETRY_SECONDS
             return
+        # A target only has to be in this city, not online: the hub's
+        # current_city is the last city each player was seen in, and anyone in
+        # this city's active list right now counts too.
         city = state.current_city
         local = state.local_players
         in_city = [t for t in targets
                    if t["username"] in local or (city and t.get("current_city") == city)]
+        elsewhere = 0
         for t in in_city:
             claim_id = sync_client.respect_claim(t["username"])
             if claim_id is None:
                 continue
+            state.last_skill_result = {}
             executor.execute(Action(
                 "use_skill",
                 skill_id=SKILL_IDS["all_seeing_eye"],
@@ -270,10 +276,18 @@ class AllSeeingEyeTask(Task):
                 update_respect=True,
                 respect_claim_id=claim_id,
             ), state)
-            return
-        state.add_log(f"All Seeing Eye: no hub target in {city or 'unknown city'} "
-                      f"({len(targets)} viable elsewhere).")
-        self._hub_retry_at = time.monotonic() + self._HUB_RETRY_SECONDS
+            result = state.last_skill_result
+            if result.get("out_of_city"):
+                elsewhere += 1  # hub's city was stale; try the next viable target
+                continue
+            return  # used, or failed for another reason (timer, page error)
+        if elsewhere:
+            state.add_log(f"All Seeing Eye: {elsewhere} target(s) weren't in {city}; "
+                          f"no other target here — resting 30 minutes.")
+        else:
+            state.add_log(f"All Seeing Eye: no hub target in {city or 'unknown city'} "
+                          f"({len(targets)} viable elsewhere) — resting 30 minutes.")
+        self._hub_retry_at = time.monotonic() + self._NO_TARGET_REST_SECONDS
 
 
 class NewsEditorTask(Task):
