@@ -999,6 +999,28 @@ def apply_hub_career(rows: list) -> int:
             con.close()
 
 
+def replace_career_from_hub(rows: list) -> "tuple[int, int]":
+    """Make local career history match the hub's full history: add rows the
+    bot lacks and delete rows the hub no longer has. Returns (added, removed)."""
+    def key(r):
+        return (r["username"] or "", r["ts"] or "", r["rank"] or "",
+                r["occupation"] or "", r["homecity"] or "")
+    wanted = {key(r) for r in rows}
+    with _lock:
+        con = _conn()
+        try:
+            removed = 0
+            for r in con.execute(
+                    "SELECT id, username, ts, rank, occupation, homecity FROM career_history").fetchall():
+                if key(r) not in wanted:
+                    con.execute("DELETE FROM career_history WHERE id=?", (r["id"],))
+                    removed += 1
+            con.commit()
+        finally:
+            con.close()
+    return apply_hub_career(rows), removed
+
+
 def apply_synced_career(rows: list):
     """Merge career history rows — skip if last entry for that user already has same data."""
     with _lock:
