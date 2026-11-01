@@ -249,9 +249,9 @@ class SyncTask(Task):
         if sync_client.hub_managed():
             try:
                 r = sync_client.mirror_from_hub()
-                if r["players"] or r["removed"] or r["career"] or r["groups_removed"]:
+                if r["players"] or r["removed"] or r["career"] or r["groups_removed"] or r["career_removed"]:
                     state.add_log(f"Hub sync: {r['players']} player(s) updated, {r['removed']} removed, "
-                                  f"{r['career']} career row(s).")
+                                  f"{r['career']} career row(s) added, {r['career_removed']} removed.")
             except Exception as e:
                 state.add_log(f"Hub sync failed: {e}")
             return

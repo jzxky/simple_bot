@@ -75,7 +75,7 @@ def hub_managed() -> bool:
 _FULL_MIRROR_SECONDS = 6 * 60 * 60
 _HUB_REV_KEY = "hub_players_rev"
 _HUB_CAREER_KEY = "hub_career_id"
-_HUB_FULL_AT_KEY = "hub_full_mirror_at"
+_HUB_FULL_AT_KEY = "hub_full_mirror_at_v2"  # renamed in 1.27.1: forces one full re-read (career cleanup)
 
 
 def mirror_from_hub() -> dict:
@@ -96,16 +96,24 @@ def mirror_from_hub() -> dict:
     if full:
         _db.set_sync_meta(_HUB_FULL_AT_KEY, str(time.time()))
 
-    career_id = int(_db.get_sync_meta(_HUB_CAREER_KEY) or 0)
-    career = 0
+    # Incremental runs append new career rows; a full run re-reads the hub's
+    # whole history and replaces the local copy, so rows the hub removed
+    # (e.g. its duplicate cleanup) disappear here too.
+    career_id = 0 if full else int(_db.get_sync_meta(_HUB_CAREER_KEY) or 0)
+    career_rows = []
     while True:
         page = _get(base + f"/api/sync/career?since={career_id}")
-        career += _db.apply_hub_career(page.get("career", []))
+        career_rows.extend(page.get("career", []))
         career_id = page.get("last_id", career_id)
         if not page.get("more"):
             break
+    if full:
+        career, career_removed = _db.replace_career_from_hub(career_rows)
+    else:
+        career, career_removed = _db.apply_hub_career(career_rows), 0
     _db.set_sync_meta(_HUB_CAREER_KEY, str(career_id))
     return {"players": players, "removed": removed, "groups": len(groups),
+            "career_removed": career_removed,
             "groups_removed": groups_removed, "career": career, "full": full}
 
 
