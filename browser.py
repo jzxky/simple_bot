@@ -51,7 +51,11 @@ def launch_context(pw, profile_dir: str, headless: bool = False) -> BrowserConte
     standard settings. Shared by the main browser and the side browser."""
     os.makedirs(profile_dir, exist_ok=True)
     _clear_window_placement(profile_dir)
-    args = ["--disable-notifications", "--disable-save-password-bubble", "--disable-wake-lock"]
+    # --disable-quic: Chrome's HTTP/3 (QUIC over UDP) connections to the
+    # Cloudflare-fronted site intermittently die with ERR_QUIC_PROTOCOL_ERROR;
+    # plain HTTP/2 over TCP is reliable.
+    args = ["--disable-notifications", "--disable-save-password-bubble", "--disable-wake-lock",
+            "--disable-quic"]
     DESKTOP_UA = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -214,16 +218,36 @@ def export_cookies() -> list:
 SCREENSHOT_PATH = os.path.join(paths.data_dir(), "last_screenshot.png")
 
 
-def navigate(url: str) -> str:
-    pg = page()
-    for attempt in range(2):
+# Network errors that are usually a one-off blip (dropped connection, protocol
+# hiccup) rather than a real problem with the page — worth one more try.
+_TRANSIENT_NAV_ERRORS = (
+    "ERR_ABORTED",
+    "ERR_QUIC_PROTOCOL_ERROR",
+    "ERR_HTTP2_PROTOCOL_ERROR",
+    "ERR_CONNECTION_RESET",
+    "ERR_CONNECTION_CLOSED",
+    "ERR_EMPTY_RESPONSE",
+    "ERR_NETWORK_CHANGED",
+)
+
+
+def _goto_with_retry(pg: Page, url: str):
+    attempts = 3
+    for attempt in range(attempts):
         try:
             pg.goto(url, wait_until="domcontentloaded", timeout=30000)
-            break
+            return
         except Exception as e:
-            if "ERR_ABORTED" in str(e) and attempt == 0:
+            err = str(e)
+            if attempt < attempts - 1 and any(code in err for code in _TRANSIENT_NAV_ERRORS):
+                time.sleep(1 + attempt)
                 continue
             raise
+
+
+def navigate(url: str) -> str:
+    pg = page()
+    _goto_with_retry(pg, url)
     record_nav_success()
     _wait_for_cloudflare_on(pg)
     if _on_main_thread():  # don't let the side browser race the main one for the file
@@ -269,14 +293,7 @@ def close_page(pg: Page):
 
 
 def navigate_page(pg: Page, url: str) -> str:
-    for attempt in range(2):
-        try:
-            pg.goto(url, wait_until="domcontentloaded", timeout=30000)
-            break
-        except Exception as e:
-            if "ERR_ABORTED" in str(e) and attempt == 0:
-                continue
-            raise
+    _goto_with_retry(pg, url)
     record_nav_success()
     _wait_for_cloudflare_on(pg)
     return pg.content()
