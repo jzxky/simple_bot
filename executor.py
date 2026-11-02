@@ -4397,6 +4397,8 @@ _MIDDLING_DRUGS = [
     {"name": "Cocaine",    "buy_field": "qtyCocaine",    "sell_field": "scocaine",    "key": "cocaine"},
 ]
 
+_SELL_FIELD_MAP = {d["key"]: d["sell_field"] for d in _MIDDLING_DRUGS}
+
 
 def _parse_middling_drug_name(raw: str) -> "str | None":
     """Map a raw drug name from the deals page to our config key."""
@@ -4415,6 +4417,102 @@ def _parse_middling_drug_name(raw: str) -> "str | None":
         if k in raw_lower:
             return v
     return None
+
+
+def _parse_drug_contacts(soup):
+    """Parse contact list from /income/deals.asp.  Returns [{name, link}]."""
+    contacts = []
+    seen = set()
+    for a in soup.find_all("a", href=re.compile(r"deals\.asp\?action=list")):
+        name = a.get_text(strip=True)
+        href = a.get("href", "")
+        if not name or not href or name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        if not href.startswith("/"):
+            href = "/income/" + href
+        contacts.append({"name": name, "link": href})
+    return contacts
+
+
+def _parse_int(text: str) -> int:
+    digits = re.sub(r"[^0-9]", "", text)
+    return int(digits) if digits else 0
+
+
+def _parse_contact_stock(soup):
+    """Parse drug stock table from a contact's deals page.
+    Returns [{key, name, price, available, owned, buy_field}]."""
+    stock = []
+    seen = set()
+    for row in soup.find_all("tr"):
+        # Direct cells only, and only rows led by a drug image — an outer layout row
+        # would otherwise match a drug name somewhere inside its nested table.
+        tds = row.find_all("td", recursive=False)
+        if len(tds) < 6 or tds[1].find("table"):
+            continue
+        img = tds[0].find("img")
+        if not img or "/drugs/" not in img.get("src", ""):
+            continue
+        raw_name = tds[1].get_text(strip=True).split("(")[0].strip()
+        drug_key = _parse_middling_drug_name(raw_name)
+        if not drug_key or drug_key in seen:
+            continue
+        input_el = tds[5].find("input")
+        if not input_el:
+            continue
+        seen.add(drug_key)
+        stock.append({
+            "key": drug_key,
+            "name": raw_name,
+            "price": _parse_int(tds[2].get_text(strip=True)),
+            "available": _parse_int(tds[3].get_text(strip=True)),
+            "owned": _parse_int(tds[4].get_text(strip=True)),
+            "buy_field": input_el.get("name", ""),
+        })
+    return stock
+
+
+def _submit_and_read_result(state, submit_selector):
+    """Click a submit button, wait for the response page, and read its #success/#fail div.
+    Returns (ok, message) — ok is None when the page showed no result div."""
+    page = browser.page()
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+        page.click(submit_selector)
+    if not _check_session(state):
+        return False, "Session expired"
+    _refresh_state(state)
+    div = _page_result_div(BeautifulSoup(page.content(), "html.parser"))
+    if div is None:
+        return None, "submitted, but the page showed no result message"
+    return div.get("id") == "success", div.get_text(" ", strip=True)
+
+
+def _submit_drug_buy(state, quantities):
+    """Fill the buy form on the current contact stock page and submit.  Returns (ok, message)."""
+    page = browser.page()
+    for field_name, qty in quantities.items():
+        if qty > 0:
+            page.fill(f"input[name='{field_name}']", str(qty))
+    return _submit_and_read_result(state, "input[type='submit'][value='Buy']")
+
+
+def _submit_drug_sell(state, buyer, price, drug_quantities):
+    """Navigate to the sell page, fill the offer form and submit.  Returns (ok, message)."""
+    _nav(_u("/income/drugtrade.asp?display=sell"), state)
+    if not _check_session(state):
+        return False, "Session expired"
+    page = browser.page()
+    if not page.query_selector("input[name='username']"):
+        div = _page_result_div(BeautifulSoup(page.content(), "html.parser"))
+        return False, div.get_text(" ", strip=True) if div else "sell form not found"
+    page.fill("input[name='username']", buyer)
+    page.fill("input[name='price']", str(price))
+    for d_key, qty in drug_quantities.items():
+        field = _SELL_FIELD_MAP.get(d_key, "")
+        if field and qty > 0:
+            page.fill(f"input[name='{field}']", str(qty))
+    return _submit_and_read_result(state, "input[type='submit'][value='Sell']")
 
 
 def handle_do_middling(action: Action, state: GameState):
@@ -4444,85 +4542,20 @@ def handle_do_middling(action: Action, state: GameState):
     _nav(_u("/income/deals.asp"), state)
     if not _check_session(state):
         return
-    soup = BeautifulSoup(state.page_html, "html.parser")
-
-    runner_link = None
-    contacts_table = soup.find("table", attrs={"width": "200", "class": "column_title"})
-    if not contacts_table:
-        for tbl in soup.find_all("table", attrs={"width": "200"}):
-            for td in tbl.find_all("td", class_="column_title"):
-                continue
-            runner_link_candidate = tbl.find("a", string=re.compile(re.escape(runner), re.IGNORECASE))
-            if runner_link_candidate:
-                runner_link = runner_link_candidate
-                break
-    else:
-        runner_link = contacts_table.find("a", string=re.compile(re.escape(runner), re.IGNORECASE))
-
-    if not runner_link:
-        for a in soup.find_all("a", href=re.compile(r"deals\.asp\?action=list")):
-            if a.get_text(strip=True).lower() == runner.lower():
-                runner_link = a
-                break
-
-    if not runner_link:
+    contacts = _parse_drug_contacts(BeautifulSoup(state.page_html, "html.parser"))
+    runner_contact = next((c for c in contacts if c["name"].lower() == runner.lower()), None)
+    if not runner_contact:
         state.add_log(f"Middling: deal failed — {runner} is not a contact.")
         return
 
-    runner_href = runner_link.get("href", "")
-    runner_id_match = re.search(r"id=(\d+)", runner_href)
-    if not runner_id_match:
-        state.add_log(f"Middling: deal failed — could not parse runner ID from link.")
-        return
-    runner_id = runner_id_match.group(1)
-
     # Step 2c: check runner's drug stock
-    _nav(_u(f"/income/deals.asp?action=list&id={runner_id}"), state)
+    _nav(_u(runner_contact["link"]), state)
     if not _check_session(state):
         return
-    soup = BeautifulSoup(state.page_html, "html.parser")
-
-    drug_stock = []
-    rows = soup.find_all("tr")
-    for row in rows:
-        tds = row.find_all("td")
-        if len(tds) < 6:
-            continue
-        drug_td = tds[1]
-        raw_name = drug_td.get_text(strip=True).split("(")[0].strip() if drug_td else ""
-        drug_key = _parse_middling_drug_name(raw_name)
-        if not drug_key:
-            continue
-
-        price_text = tds[2].get_text(strip=True)
-        try:
-            price = int(re.sub(r"[^0-9]", "", price_text))
-        except ValueError:
-            price = 0
-
-        qty_text = tds[3].get_text(strip=True)
-        try:
-            qty_available = int(re.sub(r"[^0-9]", "", qty_text))
-        except ValueError:
-            qty_available = 0
-
-        owned_text = tds[4].get_text(strip=True)
-        try:
-            qty_owned = int(re.sub(r"[^0-9]", "", owned_text))
-        except ValueError:
-            qty_owned = 0
-
-        input_el = tds[5].find("input")
-        buy_field = input_el.get("name", "") if input_el else ""
-
-        drug_stock.append({
-            "key": drug_key,
-            "name": raw_name,
-            "price": price,
-            "available": qty_available,
-            "owned": qty_owned,
-            "buy_field": buy_field,
-        })
+    drug_stock = _parse_contact_stock(BeautifulSoup(state.page_html, "html.parser"))
+    if not drug_stock:
+        state.add_log(f"Middling: deal failed — could not read {runner}'s stock table.")
+        return
 
     total_available = sum(d["available"] for d in drug_stock)
     if total_available == 0:
@@ -4571,56 +4604,19 @@ def handle_do_middling(action: Action, state: GameState):
     buy_summary = ", ".join(f"{v['qty']}x {k}" for k, v in buy_plan.items())
     state.add_log(f"Middling: buying from {runner}: {buy_summary} (total ${total_sell_price:,})")
 
-    page = browser.page()
-    for d_key, info in buy_plan.items():
-        page.fill(f"input[name='{info['field']}']", str(info["qty"]))
-    page.click("input[type='submit'][value='Buy']")
-    time.sleep(1)
-
-    if not _check_session(state):
+    ok, msg = _submit_drug_buy(state, {info["field"]: info["qty"] for info in buy_plan.values()})
+    if ok is False:
+        state.add_log(f"Middling: buy from {runner} failed — {msg}")
         return
-
-    soup = BeautifulSoup(state.page_html, "html.parser")
-    err_div = soup.find("div", class_="errormsg")
-    if err_div:
-        err_msg = err_div.get_text(strip=True)
-        state.add_log(f"Middling: buy from {runner} failed — {err_msg}")
-        return
-    success_div = soup.find("div", class_="successmsg")
-    if success_div:
-        state.add_log(f"Middling: buy from {runner} — {success_div.get_text(strip=True)}")
-    else:
-        state.add_log(f"Middling: buy from {runner} — no success/error message detected, proceeding cautiously")
+    state.add_log(f"Middling: buy from {runner} — {msg}")
 
     # Step 3b: sell to buyer
-    _nav(_u("/income/drugtrade.asp?display=sell"), state)
-    if not _check_session(state):
-        return
-
-    page = browser.page()
-    page.fill("input[name='username']", buyer)
-    page.fill("input[name='price']", str(total_sell_price))
-
-    sell_field_map = {d["key"]: d["sell_field"] for d in _MIDDLING_DRUGS}
-    for d_key, info in buy_plan.items():
-        sell_field = sell_field_map.get(d_key, "")
-        if sell_field:
-            page.fill(f"input[name='{sell_field}']", str(info["qty"]))
-
-    page.click("input[type='submit'][value='Sell']")
-    time.sleep(1)
-
-    if not _check_session(state):
-        return
-
-    soup = BeautifulSoup(state.page_html, "html.parser")
-    result_div = soup.find("div", class_="successmsg") or soup.find("div", class_="errormsg")
-    if result_div:
-        msg = result_div.get_text(strip=True)
-        state.add_log(f"Middling: sell to {buyer} result — {msg}")
+    ok, msg = _submit_drug_sell(state, buyer, total_sell_price,
+                                {k: v["qty"] for k, v in buy_plan.items()})
+    if ok is False:
+        state.add_log(f"Middling: sell to {buyer} failed — {msg}")
     else:
-        html_text = soup.get_text(" ", strip=True)[:200]
-        state.add_log(f"Middling: sell to {buyer} — {html_text}")
+        state.add_log(f"Middling: sell to {buyer} — {msg}")
 
 
 def handle_middling_load_stock(action: Action, state: GameState):
@@ -5064,7 +5060,8 @@ def handle_check_comms(action: Action, state: GameState):
             new_count = conv.get("message_count", 0)
             old_count = existing.get("message_count", 0)
 
-            if cid not in data or new_count != old_count or not existing.get("messages"):
+            is_new_conv = cid not in data
+            if is_new_conv or new_count != old_count or not existing.get("messages"):
                 thread_url = _u(f"/communications/comms.asp?display=viewconv&id={cid}")
                 _nav(thread_url, state)
                 if not _check_session(state):
@@ -5078,7 +5075,7 @@ def handle_check_comms(action: Action, state: GameState):
                 data[cid] = conv
                 changed = True
 
-                if cid not in existing or new_count > old_count:
+                if is_new_conv or new_count > old_count:
                     import config as cfg
                     c_snap = cfg.load()
                     if c_snap.get("notifications", {}).get("new_message", False):
@@ -5089,9 +5086,10 @@ def handle_check_comms(action: Action, state: GameState):
                         from tasks.middling import parse_middle_command, validate_middle_players, _middling_queue
                         msgs = conv.get("messages", [])
                         old_msg_count = existing.get("_middling_parsed_count", 0)
-                        if msgs and len(msgs) > old_msg_count:
-                            latest_msg = msgs[-1]
-                            m_sender = latest_msg.get("from", "Unknown")
+                        latest_msg = msgs[0] if msgs else {}  # game lists threads newest-first
+                        m_sender = latest_msg.get("from", "Unknown")
+                        if (msgs and len(msgs) > old_msg_count
+                                and m_sender.lower() != (state.own_name or "").lower()):
                             body_text = latest_msg.get("body", "")
                             first_line = body_text.split("\n", 1)[0].strip() if body_text else ""
                             state.add_log(f"Middling parser: new msg from {m_sender} — first line: {first_line!r}")
