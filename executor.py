@@ -2176,15 +2176,20 @@ def handle_payback(action: Action, state: GameState):
     page.click("input[name='B1']")
     page.wait_for_load_state("domcontentloaded")
 
+    # Let the game decide whether the bank holds enough — it reports the
+    # outcome in a success/fail div on the page after submitting.
     soup = BeautifulSoup(page.content(), "html.parser")
-    result_text = soup.get_text()
-
-    if "Your transfer was blocked due to possible spam!" in result_text:
-        state.add_log(f"Payback to {target} blocked as spam — skipping.")
-        return
-
     _refresh_state(state)
-    state.add_log(f"Payback sent: ${amount:,} to {target}.")
+    fail_div = soup.find("div", id="fail")
+    success_div = soup.find("div", id="success")
+    if fail_div:
+        state.add_log(f"Payback to {target} failed — {fail_div.get_text(' ', strip=True)}")
+    elif success_div:
+        state.add_log(f"Payback sent: ${amount:,} to {target} — {success_div.get_text(' ', strip=True)}")
+    elif "Your transfer was blocked due to possible spam!" in soup.get_text():
+        state.add_log(f"Payback to {target} blocked as spam — skipping.")
+    else:
+        state.add_log(f"Payback to {target}: submitted ${amount:,} (no result message found).")
 
 
 def handle_crossroad(action: Action, state: GameState):
