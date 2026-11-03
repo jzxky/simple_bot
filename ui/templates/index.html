@@ -955,7 +955,27 @@
           {% set mid_prices = mid_cfg.get('prices', {}) %}
           <div class="settings-groups">
 
-            <div class="settings-group" style="grid-column:1/-1">
+            <div class="settings-group" id="drugs-smuggling" style="grid-column:1/-1" hidden>
+              <h3>Smuggling</h3>
+              <p class="placeholder">Bribe a customs official to lower your chance of being caught with drugs when you travel.</p>
+              <div class="setting-row">
+                <label for="smuggle_official">Customs Official</label>
+                <select id="smuggle_official" class="input-wide"><option value="">No customs officials loaded</option></select>
+              </div>
+              <div class="setting-row">
+                <label for="smuggle_price">Price ($)</label>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  <input type="number" id="smuggle_price" class="input-narrow-wide" min="1000" max="99999" step="1" placeholder="1000" oninput="drugsSmugglePriceHint()">
+                  <span id="smuggle-price-hint" class="sell-hint" style="margin:0">$1,000 – $99,999</span>
+                </div>
+              </div>
+              <button class="btn btn-sm" onclick="drugsSendBlindEye(this)">Submit</button>
+              <div id="smuggle-result" class="sell-hint"></div>
+            </div>
+
+            <p class="placeholder" id="drugs-rank-note" style="grid-column:1/-1" hidden></p>
+
+            <div class="settings-group" id="drugs-middling" style="grid-column:1/-1" hidden>
               <h3>Drug Middling</h3>
               <label class="inline-toggle setting-row">
                 Enable Middling
@@ -989,52 +1009,54 @@
               </table>
             </div>
 
-            <div class="settings-group" style="grid-column:1/-1">
-              <h3>Manual Drug Trade</h3>
+            <div class="settings-group" id="drugs-trade" style="grid-column:1/-1" hidden>
+              <h3>Drug Trade</h3>
 
-              <h4>Buy from Contact</h4>
+              <h4>Contacts</h4>
               <div class="setting-row">
-                <label for="middling_contact_name">Contact name</label>
-                <input type="text" id="middling_contact_name" class="input-wide" placeholder="Enter contact name">
-                <button class="btn btn-sm" onclick="middlingLoadStock()">Load Stock</button>
+                <label for="drug_contact">Contact</label>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  <select id="drug_contact" class="input-wide"><option value="">Load contacts first</option></select>
+                  <button class="btn btn-sm" onclick="drugsLoadContacts(this)">Load Contacts</button>
+                  <button class="btn btn-sm" onclick="drugsLoadStock(this)">Load Stock</button>
+                </div>
               </div>
-              <div id="middling-stock-area" style="display:none; margin-top:8px">
-                <table class="stat-table" id="middling-stock-table" style="max-width:500px">
-                  <thead><tr><th>Drug</th><th>Price</th><th>Available</th><th>Buy Qty</th></tr></thead>
-                  <tbody></tbody>
-                </table>
-                <button class="btn btn-sm" style="margin-top:6px" onclick="middlingBuy()">Buy</button>
-                <span id="middling-buy-result" style="margin-left:8px"></span>
-              </div>
+              <div id="drug-contacts-result" class="sell-hint"></div>
 
               <hr class="stat-divider" style="margin:16px 0">
 
-              <h4>Sell to Player</h4>
-              <button class="btn btn-sm" style="margin-bottom:8px" onclick="middlingLoadSell()">Load Carrying</button>
+              <h4>Create Deal</h4>
+              <label class="inline-toggle setting-row">
+                Online local players only
+                <label class="toggle-label">
+                  <input type="checkbox" id="deal_local_only" onchange="drugsDealCustomerMode()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
               <div class="setting-row">
-                <label for="middling_sell_to">Sell to</label>
-                <input type="text" id="middling_sell_to" class="input-wide" placeholder="Player name">
+                <label for="deal_customer">Customer</label>
+                <div>
+                  <input type="text" id="deal_customer" class="input-wide" list="deal-customers" placeholder="Start typing a player name" autocomplete="off">
+                  <datalist id="deal-customers"></datalist>
+                  <select id="deal_customer_local" class="input-wide" hidden><option value="">No local players online</option></select>
+                </div>
               </div>
-              <div class="setting-row">
-                <label for="middling_sell_price">Price</label>
-                <input type="number" id="middling_sell_price" class="input-narrow" min="0" value="0">
-              </div>
-              <div id="middling-sell-area" style="margin-top:8px">
-                <table class="stat-table" id="middling-sell-table" style="max-width:440px">
-                  <thead><tr><th>Drug</th><th>Carrying</th><th>Sell Qty</th></tr></thead>
-                  <tbody>
-                    <tr><td>Marijuana</td><td id="middling-carry-marijuana">0</td><td><input type="number" class="input-narrow" id="middling_sell_marijuana" min="0" value="0"></td></tr>
-                    <tr><td>Ecstasy</td><td id="middling-carry-ecstasy">0</td><td><input type="number" class="input-narrow" id="middling_sell_ecstasy" min="0" value="0"></td></tr>
-                    <tr><td>Acid</td><td id="middling-carry-acid">0</td><td><input type="number" class="input-narrow" id="middling_sell_acid" min="0" value="0"></td></tr>
-                    <tr><td>Speed</td><td id="middling-carry-speed">0</td><td><input type="number" class="input-narrow" id="middling_sell_speed" min="0" value="0"></td></tr>
-                    <tr><td>P / ICE</td><td id="middling-carry-ice">0</td><td><input type="number" class="input-narrow" id="middling_sell_ice" min="0" value="0"></td></tr>
-                    <tr><td>Heroin</td><td id="middling-carry-heroin">0</td><td><input type="number" class="input-narrow" id="middling_sell_heroin" min="0" value="0"></td></tr>
-                    <tr><td>Cocaine</td><td id="middling-carry-cocaine">0</td><td><input type="number" class="input-narrow" id="middling_sell_cocaine" min="0" value="0"></td></tr>
-                  </tbody>
-                </table>
-                <button class="btn btn-sm" style="margin-top:6px" onclick="middlingSell()">Offer Deal</button>
-                <span id="middling-sell-result" style="margin-left:8px"></span>
-              </div>
+              <table class="stat-table" style="max-width:480px">
+                <thead><tr><th>Drug</th><th>Quantity</th><th>Price each ($)</th><th>Line total</th></tr></thead>
+                <tbody>
+                  {% for key, label in [('marijuana','Marijuana'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('ice','P / ICE'),('heroin','Heroin'),('cocaine','Cocaine')] %}
+                  <tr data-drug="{{ key }}">
+                    <td>{{ label }}</td>
+                    <td><input type="number" class="input-narrow deal-qty" min="0" max="999" step="1" value="0" oninput="drugsDealTotal()"></td>
+                    <td><input type="number" class="input-narrow-wide deal-price" min="0" step="1" value="0" oninput="drugsDealTotal()"></td>
+                    <td class="deal-line">$0</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+                <tfoot><tr><td colspan="3"><strong>Total price</strong></td><td><strong id="deal-total">$0</strong></td></tr></tfoot>
+              </table>
+              <button class="btn btn-sm" style="margin-top:6px" onclick="drugsCreateOffer(this)">Submit</button>
+              <div id="deal-result" class="sell-hint"></div>
             </div>
 
           </div>
@@ -2578,6 +2600,24 @@
 </div>
 
 <!-- Weapon / vehicle sale dialog -->
+<div id="drug-stock-overlay" class="pl-modal-overlay" onclick="if(event.target===this)drugsCloseStock()">
+  <div class="pl-modal-box" style="max-width:560px;flex-direction:column;align-items:stretch;gap:10px">
+    <h3 id="drug-stock-title" style="margin:0">Contact stock</h3>
+    <div class="apt-table-wrap">
+      <table class="apt-drugs">
+        <thead><tr><th>Drug</th><th>Price</th><th>On sale</th><th>You own</th><th>Qty to buy</th></tr></thead>
+        <tbody id="drug-stock-rows"></tbody>
+      </table>
+    </div>
+    <div id="drug-stock-cost" class="sell-hint"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button type="button" class="btn-secondary" onclick="drugsCloseStock()">Close</button>
+      <button type="button" class="action-btn" id="drug-stock-buy" onclick="drugsBuy(this)">Buy</button>
+    </div>
+    <div id="drug-stock-result" class="sell-hint"></div>
+  </div>
+</div>
+
 <div id="sell-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeSellOverlay()">
   <form class="pl-modal-box sell-modal" onsubmit="submitSell(event)" autocomplete="off">
     <h3 id="sell-overlay-title"></h3>

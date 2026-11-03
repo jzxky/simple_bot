@@ -800,81 +800,185 @@ function autobuyMarkDirty() {
   debouncedSave();
 }
 
-// ── Middling manual trade ────────────────────────────────────────────────────
+// ── Drugs tab: smuggling, contacts, deals ─────────────────────────────────────
 
-var _middlingContactId = "";
+const _DRUG_TRADE_RANKS = new Set(["piciotto", "enforcer", "dealer", "giovane d'honore"]);
+const _GANGSTER_RANKS = new Set(["dealer", "giovane d'honore", "enforcer", "piciotto", "sgarrista",
+  "capodecima", "caporegime", "boss", "don", "godfather", "capo di tutti capi"]);
+let _drugPlayersAt = 0;
+let _drugStockLink = "";
 
-function middlingLoadStock() {
-  var name = document.getElementById("middling_contact_name").value.trim();
-  if (!name) return;
-  fetch("/middling/load-stock", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({contact: name})
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.error) { alert(d.error); return; }
-    _middlingContactId = d.contact_id || "";
-    var tbody = document.querySelector("#middling-stock-table tbody");
-    tbody.innerHTML = "";
-    (d.stock || []).forEach(function(item) {
-      var tr = document.createElement("tr");
-      tr.innerHTML = "<td>" + item.name + "</td><td>$" + (item.price||0).toLocaleString() + "</td>" +
-        "<td>" + (item.available||0) + "</td>" +
-        "<td><input type='number' class='input-narrow' min='0' max='" + (item.available||0) +
-        "' value='0' data-field='" + item.buy_field + "'></td>";
-      tbody.appendChild(tr);
-    });
-    document.getElementById("middling-stock-area").style.display = "";
-    document.getElementById("middling-buy-result").textContent = "";
+function _drugNormRank(r) { return String(r || "").trim().toLowerCase().replace(/`/g, "'"); }
+function _drugMoney(n) { return "$" + (n || 0).toLocaleString(); }
+function _drugInt(el) { return parseInt(el.value, 10) || 0; }
+
+function _drugPost(url, body, btn) {
+  if (btn) btn.disabled = true;
+  return fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})})
+    .then(r => r.json())
+    .catch(() => ({ok: false, message: "Request failed — is the UI still running?"}))
+    .finally(() => { if (btn) btn.disabled = false; });
+}
+
+function _drugResult(id, d) {
+  _setSellHint(id, d.message || (d.ok ? "Done." : "Failed."), d.ok ? "good" : "bad");
+}
+
+function _drugFillSelect(id, names, emptyText) {
+  const sel = document.getElementById(id);
+  const keep = sel.value;
+  sel.replaceChildren(...(names.length ? names.map(n => new Option(n, n)) : [new Option(emptyText, "")]));
+  if (names.includes(keep)) sel.value = keep;
+}
+
+// Show Smuggling to gangsters and Middling/Drug Trade to dealing ranks; called on each status poll.
+function updateDrugsTab(d) {
+  const trade = document.getElementById("drugs-trade");
+  if (!trade) return;
+  const rank = _drugNormRank(d.rank);
+  const canTrade = _DRUG_TRADE_RANKS.has(rank);
+  const gangster = /gangster/i.test(d.occupation || "") || _GANGSTER_RANKS.has(rank);
+  trade.hidden = !canTrade;
+  document.getElementById("drugs-middling").hidden = !canTrade;
+  document.getElementById("drugs-smuggling").hidden = !gangster;
+  const note = document.getElementById("drugs-rank-note");
+  note.hidden = canTrade;
+  note.textContent = "Drug Middling and Drug Trade need rank Piciotto, Enforcer, Dealer or Giovane D'Honore"
+    + ` (current: ${d.rank || "unknown"}).`;
+  if ((canTrade || gangster) && Date.now() - _drugPlayersAt > 5 * 60 * 1000) drugsLoadPlayers();
+}
+
+function drugsLoadPlayers() {
+  _drugPlayersAt = Date.now();
+  fetch("/drugs/players").then(r => r.json()).then(d => {
+    _drugFillSelect("smuggle_official", d.customs || [], "No customs officials in the player database");
+    _drugFillSelect("deal_customer_local", d.local_online || [], "No local players online");
+    document.getElementById("deal-customers").replaceChildren(
+      ...(d.all_alive || []).map(n => Object.assign(document.createElement("option"), {value: n})));
+  }).catch(() => { _drugPlayersAt = 0; });
+}
+
+function drugsSmugglePriceHint() {
+  const v = _drugInt(document.getElementById("smuggle_price"));
+  if (!v) _setSellHint("smuggle-price-hint", "$1,000 – $99,999", "");
+  else if (v < 1000 || v > 99999) _setSellHint("smuggle-price-hint", `${_drugMoney(v)} — must be $1,000 – $99,999`, "bad");
+  else _setSellHint("smuggle-price-hint", _drugMoney(v), "good");
+}
+
+function drugsSendBlindEye(btn) {
+  const target = document.getElementById("smuggle_official").value;
+  const price = _drugInt(document.getElementById("smuggle_price"));
+  if (!target) return _setSellHint("smuggle-result", "Pick a customs official.", "bad");
+  if (price < 1000 || price > 99999) return _setSellHint("smuggle-result", "Price must be $1,000 – $99,999.", "bad");
+  _setSellHint("smuggle-result", `Bribing ${target} with ${_drugMoney(price)}…`, "");
+  _drugPost("/drugs/blind-eye", {target, price}, btn).then(d => _drugResult("smuggle-result", d));
+}
+
+function drugsLoadContacts(btn) {
+  _setSellHint("drug-contacts-result", "Loading contacts…", "");
+  _drugPost("/drugs/contacts", {}, btn).then(d => {
+    if (!d.ok) return _drugResult("drug-contacts-result", d);
+    const contacts = d.contacts || [];
+    document.getElementById("drug_contact").replaceChildren(...contacts.map(c => new Option(c.name, c.link)));
+    _setSellHint("drug-contacts-result", `${contacts.length} contact(s) loaded.`, "good");
   });
 }
 
-function middlingBuy() {
-  if (!_middlingContactId) { alert("Load stock first."); return; }
-  var quantities = {};
-  document.querySelectorAll("#middling-stock-table tbody input[data-field]").forEach(function(inp) {
-    var qty = parseInt(inp.value) || 0;
-    if (qty > 0) quantities[inp.dataset.field] = qty;
-  });
-  if (!Object.keys(quantities).length) { alert("Enter quantities to buy."); return; }
-  fetch("/middling/buy", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({contact_id: _middlingContactId, quantities: quantities})
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    document.getElementById("middling-buy-result").textContent = d.message || d.error || "Done";
+function drugsLoadStock(btn) {
+  const sel = document.getElementById("drug_contact");
+  if (!sel.value) return _setSellHint("drug-contacts-result", "Load contacts and pick one first.", "bad");
+  const link = sel.value;
+  const name = sel.options[sel.selectedIndex].text;
+  _setSellHint("drug-contacts-result", `Loading ${name}'s drugs…`, "");
+  _drugPost("/drugs/stock", {link}, btn).then(d => {
+    if (!d.ok) return _drugResult("drug-contacts-result", d);
+    _setSellHint("drug-contacts-result", "", "");
+    _drugStockLink = link;
+    document.getElementById("drug-stock-title").textContent = `${name}'s drugs`;
+    document.getElementById("drug-stock-rows").replaceChildren(...(d.stock || []).map(s => {
+      const tr = document.createElement("tr");
+      tr.dataset.drug = s.key;
+      tr.dataset.price = s.price;
+      [s.name, _drugMoney(s.price), s.available, s.owned].forEach((v, i) => {
+        const td = document.createElement("td");
+        td.textContent = v;
+        if (i === 0) td.className = "apt-drug-name";
+        tr.append(td);
+      });
+      const qty = Object.assign(document.createElement("input"), {
+        type: "number", min: 0, max: Math.min(s.available, 999), step: 1, value: 0,
+        className: "input-narrow", disabled: s.available <= 0, oninput: drugsStockCost,
+      });
+      const td = document.createElement("td");
+      td.append(qty);
+      tr.append(td);
+      return tr;
+    }));
+    drugsStockCost();
+    _setSellHint("drug-stock-result", "", "");
+    document.getElementById("drug-stock-overlay").classList.add("active");
   });
 }
 
-function middlingLoadSell() {
-  fetch("/middling/load-sell", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({})
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.error) { alert(d.error); return; }
-    var carrying = d.carrying || {};
-    ["marijuana","ecstasy","acid","speed","ice","heroin","cocaine"].forEach(function(k) {
-      var el = document.getElementById("middling-carry-" + k);
-      if (el) el.textContent = carrying[k] || 0;
-    });
+function drugsStockCost() {
+  let units = 0, cost = 0;
+  document.querySelectorAll("#drug-stock-rows tr").forEach(tr => {
+    const q = _drugInt(tr.querySelector("input"));
+    units += q;
+    cost += q * (parseInt(tr.dataset.price, 10) || 0);
   });
+  _setSellHint("drug-stock-cost", units ? `${units} unit(s) — ${_drugMoney(cost)}` : "Enter quantities to buy.", "");
 }
 
-function middlingSell() {
-  var buyer = document.getElementById("middling_sell_to").value.trim();
-  var price = parseInt(document.getElementById("middling_sell_price").value) || 0;
-  if (!buyer) { alert("Enter a buyer name."); return; }
-  if (!price) { alert("Enter a price."); return; }
-  var quantities = {};
-  ["marijuana","ecstasy","acid","speed","ice","heroin","cocaine"].forEach(function(k) {
-    var qty = parseInt((document.getElementById("middling_sell_" + k)||{value:0}).value) || 0;
-    if (qty > 0) quantities[k] = qty;
+function drugsCloseStock() {
+  document.getElementById("drug-stock-overlay").classList.remove("active");
+}
+
+function drugsBuy(btn) {
+  const drugs = [...document.querySelectorAll("#drug-stock-rows tr")]
+    .map(tr => ({drug: tr.dataset.drug, qty: _drugInt(tr.querySelector("input"))}))
+    .filter(r => r.qty > 0);
+  if (!drugs.length) return _setSellHint("drug-stock-result", "Enter at least one quantity.", "bad");
+  _setSellHint("drug-stock-result", "Buying…", "");
+  _drugPost("/drugs/buy", {link: _drugStockLink, drugs}, btn).then(d => _drugResult("drug-stock-result", d));
+}
+
+function drugsDealCustomerMode() {
+  const local = document.getElementById("deal_local_only").checked;
+  document.getElementById("deal_customer").hidden = local;
+  document.getElementById("deal_customer_local").hidden = !local;
+  if (local) drugsLoadPlayers();
+}
+
+function _drugDealRows() {
+  return [...document.querySelectorAll("#drugs-trade tr[data-drug]")].map(tr => ({
+    tr,
+    drug: tr.dataset.drug,
+    qty: _drugInt(tr.querySelector(".deal-qty")),
+    price: _drugInt(tr.querySelector(".deal-price")),
+  }));
+}
+
+function drugsDealTotal() {
+  let total = 0;
+  _drugDealRows().forEach(r => {
+    r.tr.querySelector(".deal-line").textContent = _drugMoney(r.qty * r.price);
+    total += r.qty * r.price;
   });
-  if (!Object.keys(quantities).length) { alert("Enter quantities to sell."); return; }
-  fetch("/middling/sell", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({buyer: buyer, price: price, quantities: quantities})
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    document.getElementById("middling-sell-result").textContent = d.message || d.error || "Done";
-  });
+  document.getElementById("deal-total").textContent = _drugMoney(total);
+  return total;
+}
+
+function drugsCreateOffer(btn) {
+  const local = document.getElementById("deal_local_only").checked;
+  const target = document.getElementById(local ? "deal_customer_local" : "deal_customer").value.trim();
+  const drugs = _drugDealRows().filter(r => r.qty > 0).map(({drug, qty, price}) => ({drug, qty, price}));
+  if (!target) return _setSellHint("deal-result", "Pick a customer.", "bad");
+  if (!drugs.length) return _setSellHint("deal-result", "Enter at least one drug quantity.", "bad");
+  const total = drugsDealTotal();
+  if (total <= 0) return _setSellHint("deal-result", "Set prices so the total is above $0.", "bad");
+  _setSellHint("deal-result", `Offering to ${target} for ${_drugMoney(total)}…`, "");
+  _drugPost("/drugs/offer", {target, drugs}, btn).then(d => _drugResult("deal-result", d));
 }
 
 // ── Collapse ──────────────────────────────────────────────────────────────────
@@ -2206,6 +2310,7 @@ function pollStatus() {
 
       // Case work auto-detect
       updateCaseWorkSection(d.occupation || "");
+      updateDrugsTab(d);
 
       // Journals live feed — refresh when journals_updated_at advances.
       // Always refresh the underlying data (cjRefreshData only re-renders when no
