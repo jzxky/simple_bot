@@ -1056,11 +1056,11 @@
                   <tbody>
                     {% for key, label in [('marijuana','Marijuana'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('ice','P / ICE'),('heroin','Heroin'),('cocaine','Cocaine')] %}
                     <tr data-drug="{{ key }}">
-                      <td>{{ label }}</td>
-                      <td class="deal-carry">—</td>
-                      <td><input type="number" class="deal-qty" min="0" max="999" step="1" value="0" style="width:100px" oninput="drugsDealTotal()"></td>
-                      <td><input type="number" class="deal-price" min="0" step="100" value="0" style="width:100px" oninput="drugsDealTotal()"></td>
-                      <td class="deal-line">$0</td>
+                      <td class="deal-name">{{ label }}</td>
+                      <td data-label="Carrying"><span class="deal-carry">—</span></td>
+                      <td data-label="Quantity"><input type="number" class="deal-qty" min="0" max="999" step="1" value="0" style="width:100px" oninput="drugsDealTotal()"></td>
+                      <td data-label="Price each"><input type="number" class="deal-price" min="0" step="100" value="0" style="width:100px" oninput="drugsDealTotal()"></td>
+                      <td data-label="Line total"><span class="deal-line">$0</span></td>
                     </tr>
                     {% endfor %}
                   </tbody>

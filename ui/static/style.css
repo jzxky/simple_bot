@@ -661,6 +661,24 @@ button {
 }
 .priority-table tr:last-child td { border-bottom: none; }
 .deal-table tfoot td { border-top: 1px solid var(--border); font-weight: 600; padding-top: 8px; }
+/* Mobile: each drug is a card — name on top, its fields side by side beneath, each labelled */
+@media (max-width: 600px) {
+  .deal-table, .deal-table tbody, .deal-table tfoot { display: block; }
+  .deal-table thead { display: none; }
+  .deal-table tbody tr {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 8px;
+    padding: 8px 0; border-bottom: 1px solid rgba(46,64,96,0.3);
+  }
+  .deal-table tbody td { padding: 0; border-bottom: none; min-width: 0; }
+  .deal-table td.deal-name { grid-column: 1 / -1; font-weight: 600; margin-bottom: 4px; }
+  .deal-table td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 3px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+  }
+  .deal-table td input { width: 100% !important; }
+  .deal-table td > span { display: block; padding: 8px 0; }   /* level with the text inside the inputs */
+  .deal-table tfoot tr { display: flex; justify-content: space-between; }
+}
 #income-drugs .settings-group { min-width: 0; }   /* let the grid item shrink so wide tables scroll instead of overflowing the card */
 /* Contact / player pickers: room for a 25-character name on desktop, full width on mobile */
 .setting-row .name-picker { width: calc(25ch + 44px); max-width: 100%; }
