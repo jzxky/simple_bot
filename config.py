@@ -299,6 +299,7 @@ DEFAULT_CONFIG = {
             "cocaine": 5000,
         }
     },
+    "drug_contacts": [],   # [{name, link}] from /income/deals.asp, refreshed by "Reload Contacts"
     "notifications": {
         "bionics_in_stock":        True,
         "bionics_purchased":       True,
@@ -475,6 +476,16 @@ def blind_eye_queue_add(name: str):
     q = cfg.get("blind_eye_queue", [])
     q.append(name)
     cfg["blind_eye_queue"] = q
+    save(cfg)
+
+
+def drug_contacts_get() -> list:
+    return load().get("drug_contacts", [])
+
+
+def drug_contacts_set(contacts: list):
+    cfg = load()
+    cfg["drug_contacts"] = contacts
     save(cfg)
 
 

@@ -1436,6 +1436,11 @@ def drugs_contacts():
     return _drug_task("load_drug_contacts")
 
 
+@app.route("/drugs/carrying", methods=["POST"])
+def drugs_carrying():
+    return _drug_task("load_carrying_stock")
+
+
 @app.route("/drugs/stock", methods=["POST"])
 def drugs_stock():
     link = ((request.get_json(silent=True) or {}).get("link") or "").strip()

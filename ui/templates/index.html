@@ -1016,8 +1016,10 @@
               <div class="setting-row">
                 <label for="drug_contact">Contact</label>
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                  <select id="drug_contact" class="input-wide"><option value="">Load contacts first</option></select>
-                  <button class="btn btn-sm" onclick="drugsLoadContacts(this)">Load Contacts</button>
+                  <select id="drug_contact" class="input-wide">
+                    {% for ct in config.get('drug_contacts', []) %}<option value="{{ ct.link }}">{{ ct.name }}</option>{% else %}<option value="">No saved contacts — reload to fetch them</option>{% endfor %}
+                  </select>
+                  <button class="btn btn-sm" onclick="drugsLoadContacts(this)">Reload Contacts</button>
                   <button class="btn btn-sm" onclick="drugsLoadStock(this)">Load Stock</button>
                 </div>
               </div>
@@ -1041,19 +1043,27 @@
                   <select id="deal_customer_local" class="input-wide" hidden><option value="">No local players online</option></select>
                 </div>
               </div>
-              <table class="stat-table" style="max-width:480px">
-                <thead><tr><th>Drug</th><th>Quantity</th><th>Price each ($)</th><th>Line total</th></tr></thead>
+              <div class="setting-row">
+                <label>Current stock</label>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  <button class="btn btn-sm" onclick="drugsRefreshCarrying(this)">Refresh Stock</button>
+                  <span id="deal-stock-hint" class="sell-hint" style="margin:0">Not loaded yet</span>
+                </div>
+              </div>
+              <table class="stat-table" style="max-width:560px">
+                <thead><tr><th>Drug</th><th>Carrying</th><th>Quantity</th><th>Price each ($)</th><th>Line total</th></tr></thead>
                 <tbody>
                   {% for key, label in [('marijuana','Marijuana'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('ice','P / ICE'),('heroin','Heroin'),('cocaine','Cocaine')] %}
                   <tr data-drug="{{ key }}">
                     <td>{{ label }}</td>
+                    <td class="deal-carry">—</td>
                     <td><input type="number" class="input-narrow deal-qty" min="0" max="999" step="1" value="0" oninput="drugsDealTotal()"></td>
                     <td><input type="number" class="input-narrow-wide deal-price" min="0" step="1" value="0" oninput="drugsDealTotal()"></td>
                     <td class="deal-line">$0</td>
                   </tr>
                   {% endfor %}
                 </tbody>
-                <tfoot><tr><td colspan="3"><strong>Total price</strong></td><td><strong id="deal-total">$0</strong></td></tr></tfoot>
+                <tfoot><tr><td colspan="4"><strong>Total price</strong></td><td><strong id="deal-total">$0</strong></td></tr></tfoot>
               </table>
               <button class="btn btn-sm" style="margin-top:6px" onclick="drugsCreateOffer(this)">Submit</button>
               <div id="deal-result" class="sell-hint"></div>

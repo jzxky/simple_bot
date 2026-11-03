@@ -807,6 +807,7 @@ const _GANGSTER_RANKS = new Set(["dealer", "giovane d'honore", "enforcer", "pici
   "capodecima", "caporegime", "boss", "don", "godfather", "capo di tutti capi"]);
 let _drugPlayersAt = 0;
 let _drugStockLink = "";
+let _drugCarrying = null;     // {drug: units carrying} from the last Refresh Stock
 
 function _drugNormRank(r) { return String(r || "").trim().toLowerCase().replace(/`/g, "'"); }
 function _drugMoney(n) { return "$" + (n || 0).toLocaleString(); }
@@ -875,12 +876,15 @@ function drugsSendBlindEye(btn) {
 }
 
 function drugsLoadContacts(btn) {
-  _setSellHint("drug-contacts-result", "Loading contacts…", "");
+  _setSellHint("drug-contacts-result", "Reloading contacts…", "");
   _drugPost("/drugs/contacts", {}, btn).then(d => {
-    if (!d.ok) return _drugResult("drug-contacts-result", d);
-    const contacts = d.contacts || [];
-    document.getElementById("drug_contact").replaceChildren(...contacts.map(c => new Option(c.name, c.link)));
-    _setSellHint("drug-contacts-result", `${contacts.length} contact(s) loaded.`, "good");
+    if (d.ok) {
+      const sel = document.getElementById("drug_contact");
+      const keep = sel.value;
+      sel.replaceChildren(...(d.contacts || []).map(c => new Option(c.name, c.link)));
+      if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+    }
+    _drugResult("drug-contacts-result", d);
   });
 }
 
@@ -950,6 +954,26 @@ function drugsDealCustomerMode() {
   if (local) drugsLoadPlayers();
 }
 
+function drugsRefreshCarrying(btn) {
+  _setSellHint("deal-stock-hint", "Checking the sell page…", "");
+  _drugPost("/drugs/carrying", {}, btn).then(d => {
+    if (!d.ok) return _drugResult("deal-stock-hint", d);
+    _drugCarrying = d.carrying || {};
+    _drugDealRows().forEach(r => {
+      const n = _drugCarrying[r.drug] || 0;
+      r.tr.querySelector(".deal-carry").textContent = n;
+      r.tr.querySelector(".deal-qty").max = Math.min(n, 999);
+    });
+    const at = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+    _setSellHint("deal-stock-hint", `${d.message} · updated ${at}`, "good");
+    drugsDealTotal();
+  });
+}
+
+function _drugOverCarrying(r) {
+  return _drugCarrying !== null && r.qty > (_drugCarrying[r.drug] || 0);
+}
+
 function _drugDealRows() {
   return [...document.querySelectorAll("#drugs-trade tr[data-drug]")].map(tr => ({
     tr,
@@ -963,6 +987,7 @@ function drugsDealTotal() {
   let total = 0;
   _drugDealRows().forEach(r => {
     r.tr.querySelector(".deal-line").textContent = _drugMoney(r.qty * r.price);
+    r.tr.querySelector(".deal-carry").style.color = _drugOverCarrying(r) ? "#f08c8c" : "";
     total += r.qty * r.price;
   });
   document.getElementById("deal-total").textContent = _drugMoney(total);
@@ -975,6 +1000,8 @@ function drugsCreateOffer(btn) {
   const drugs = _drugDealRows().filter(r => r.qty > 0).map(({drug, qty, price}) => ({drug, qty, price}));
   if (!target) return _setSellHint("deal-result", "Pick a customer.", "bad");
   if (!drugs.length) return _setSellHint("deal-result", "Enter at least one drug quantity.", "bad");
+  const over = _drugDealRows().find(_drugOverCarrying);
+  if (over) return _setSellHint("deal-result", `Only carrying ${_drugCarrying[over.drug] || 0} ${over.drug} — refresh stock or lower the quantity.`, "bad");
   const total = drugsDealTotal();
   if (total <= 0) return _setSellHint("deal-result", "Set prices so the total is above $0.", "bad");
   _setSellHint("deal-result", `Offering to ${target} for ${_drugMoney(total)}…`, "");
