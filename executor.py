@@ -4268,13 +4268,8 @@ def handle_check_drug_trade(action: Action, state: GameState):
 
     soup = BeautifulSoup(state.page_html, "html.parser")
 
-    # Collect offer IDs from the list page
-    offer_ids = []
-    for a in soup.find_all("a", class_="viewbutton_small"):
-        href = a.get("href", "")
-        m = re.search(r"offerid=(\d+)", href)
-        if m:
-            offer_ids.append(m.group(1))
+    # Only offers made to us — our own sent offers share the page and have View links too.
+    offer_ids = _received_offer_ids(soup)
 
     if not offer_ids:
         state.add_log("Drug trade: no offers found.")
@@ -4477,6 +4472,50 @@ def _parse_sell_form(soup):
     return rows
 
 
+_OFFERS_RECEIVED_RE = re.compile(r"offers\s+rec(ie|ei)ved", re.I)   # the game spells it "recieved"
+_OFFERS_SENT_RE = re.compile(r"offers\s+sent", re.I)
+
+
+def _drugtrade_section_links(soup, received: bool) -> list:
+    """Links in the "Offers recieved" or "Offers sent" section of /income/drugtrade.asp.
+    Both share the page, each starting at a <strong> heading; [] if the heading is missing."""
+    start = soup.find("strong", string=_OFFERS_RECEIVED_RE if received else _OFFERS_SENT_RE)
+    if start is None:
+        return []
+    links = []
+    for el in start.find_all_next(["a", "strong"]):
+        if el.name == "strong" and re.match(r"\s*offers\s", el.get_text(" ", strip=True), re.I):
+            break   # the other section's heading
+        if el.name == "a":
+            links.append(el)
+    return links
+
+
+def _received_offer_ids(soup) -> list:
+    """Offer IDs from the View buttons in the "Offers recieved" section only."""
+    ids = []
+    for a in _drugtrade_section_links(soup, received=True):
+        m = re.search(r"offerid=(\d+)", a.get("href", ""))
+        if m and "viewbutton_small" in (a.get("class") or []) and m.group(1) not in ids:
+            ids.append(m.group(1))
+    return ids
+
+
+def _drug_result_div(soup):
+    """The page's #success/#fail action result, skipping drugtrade.asp's empty-section
+    placeholders ("You have no offers from anyone!") that sit right under an
+    "Offers …:" heading."""
+    for div in soup.find_all("div", id=["success", "fail"]):
+        prev = div.find_previous_sibling()
+        if prev is not None and prev.name in ("p", "strong") and \
+                re.match(r"\s*offers\s", prev.get_text(" ", strip=True), re.I):
+            continue
+        if div.find_parent(class_=re.compile(r"^show")):
+            continue
+        return div
+    return None
+
+
 def _outgoing_offer_customers(soup) -> set:
     """Lower-cased customers of our own open offers on /income/drugtrade.asp — the rows
     with a Cancel link (only our outgoing offers can be cancelled)."""
@@ -4502,7 +4541,7 @@ def _submit_form(state, submit_selector) -> bool:
 
 def _read_result():
     """(ok, message) from the current page's #success/#fail div — ok is None if absent."""
-    div = _page_result_div(BeautifulSoup(browser.page().content(), "html.parser"))
+    div = _drug_result_div(BeautifulSoup(browser.page().content(), "html.parser"))
     if div is None:
         return None, "submitted, but the page showed no result message"
     return div.get("id") == "success", div.get_text(" ", strip=True)
@@ -4539,7 +4578,7 @@ def _create_offer(state, buyer, price, drugs):
     soup = BeautifulSoup(page.content(), "html.parser")
     form = _parse_sell_form(soup)
     if not form or not page.query_selector("input[name='username']"):
-        div = _page_result_div(soup)
+        div = _drug_result_div(soup)
         return False, div.get_text(" ", strip=True) if div else "sell form not found"
     for key, qty in drugs.items():
         row = form.get(key)
@@ -4630,7 +4669,7 @@ def handle_load_contact_stock(action: Action, state: GameState):
     soup = BeautifulSoup(state.page_html, "html.parser")
     stock = _parse_contact_stock(soup)
     if not stock:
-        div = _page_result_div(soup)
+        div = _drug_result_div(soup)
         return _drug_reply(action, state, label, False,
                            div.get_text(" ", strip=True) if div else "couldn't read the contact's drug list")
     _drug_reply(action, state, label, True, f"{len(stock)} drugs listed", stock=stock)
