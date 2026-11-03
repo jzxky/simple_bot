@@ -4569,14 +4569,34 @@ def _buy_drugs(state, stock, drugs):
     return _submit_and_read_result(state, "input[type='submit'][value='Buy']")
 
 
-def _create_offer(state, buyer, price, drugs):
-    """Offer drugs to a player from the sell page.  drugs: {key: qty}.  Returns (ok, message)."""
+def _on_sell_page() -> bool:
+    from urllib.parse import urlparse, parse_qs
+    u = urlparse(browser.current_url())
+    return u.path.lower() == "/income/drugtrade.asp" and parse_qs(u.query).get("display") == ["sell"]
+
+
+def _open_sell_form(state):
+    """(soup, form) for the sell page — reuses the current page when the bot is already
+    on it with the form loaded, otherwise navigates.  soup is None if logged out."""
+    page = browser.page()
+    if _on_sell_page():
+        soup = BeautifulSoup(page.content(), "html.parser")
+        form = _parse_sell_form(soup)
+        if form:
+            return soup, form
     _nav(_u("/income/drugtrade.asp?display=sell"), state)
     if not _check_session(state):
+        return None, {}
+    soup = BeautifulSoup(page.content(), "html.parser")
+    return soup, _parse_sell_form(soup)
+
+
+def _create_offer(state, buyer, price, drugs):
+    """Offer drugs to a player from the sell page.  drugs: {key: qty}.  Returns (ok, message)."""
+    soup, form = _open_sell_form(state)
+    if soup is None:
         return False, "Session expired"
     page = browser.page()
-    soup = BeautifulSoup(page.content(), "html.parser")
-    form = _parse_sell_form(soup)
     if not form or not page.query_selector("input[name='username']"):
         div = _drug_result_div(soup)
         return False, div.get_text(" ", strip=True) if div else "sell form not found"
@@ -4588,8 +4608,9 @@ def _create_offer(state, buyer, price, drugs):
             return False, f"only carrying {row['carrying']} {key} (offering {qty})"
     page.fill("input[name='username']", buyer)
     page.fill("input[name='price']", str(price))
-    for key, qty in drugs.items():
-        page.fill(f"input[name='{form[key]['field']}']", str(qty))
+    # Every drug field, so nothing typed on a reused page from an earlier attempt rides along.
+    for key, row in form.items():
+        page.fill(f"input[name='{row['field']}']", str(drugs.get(key, 0)))
     return _submit_and_read_result(state, "input[type='submit'][value='Sell']")
 
 
@@ -4650,8 +4671,34 @@ def handle_load_drug_contacts(action: Action, state: GameState):
         return _drug_reply(action, state, label, False, "Session expired")
     contacts = _parse_drug_contacts(BeautifulSoup(state.page_html, "html.parser"))
     if not contacts:
+        # Keep the saved list — an empty parse may just be a page that didn't load right.
         return _drug_reply(action, state, label, False, "No contacts available")
-    _drug_reply(action, state, label, True, f"{len(contacts)} loaded", contacts=contacts)
+    known = {c["name"].lower() for c in cfg.drug_contacts_get()}
+    new = [c["name"] for c in contacts if c["name"].lower() not in known]
+    cfg.drug_contacts_set(contacts)
+    msg = f"{len(contacts)} saved" + (f" — new: {', '.join(new)}" if new else " — no new contacts")
+    _drug_reply(action, state, label, True, msg, contacts=contacts)
+
+
+def handle_load_carrying_stock(action: Action, state: GameState):
+    """Drugs we're carrying, read from the sell page (always visited fresh)."""
+    from tasks.middling import drug_trade_blockers
+    label = "Drug stock"
+    blockers = drug_trade_blockers(state, home_city=False)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    _nav(_u("/income/drugtrade.asp?display=sell"), state)
+    if not _check_session(state):
+        return _drug_reply(action, state, label, False, "Session expired")
+    soup = BeautifulSoup(browser.page().content(), "html.parser")
+    form = _parse_sell_form(soup)
+    if not form:
+        div = _drug_result_div(soup)
+        return _drug_reply(action, state, label, False,
+                           div.get_text(" ", strip=True) if div else "sell form not found")
+    carrying = {k: v["carrying"] for k, v in form.items()}
+    total = sum(carrying.values())
+    _drug_reply(action, state, label, True, f"carrying {total} unit(s)", carrying=carrying)
 
 
 def handle_load_contact_stock(action: Action, state: GameState):
@@ -7721,6 +7768,7 @@ HANDLERS = {
     "send_blind_eye": handle_send_blind_eye,
     "load_drug_contacts": handle_load_drug_contacts,
     "load_contact_stock": handle_load_contact_stock,
+    "load_carrying_stock": handle_load_carrying_stock,
     "buy_contact_drugs": handle_buy_contact_drugs,
     "create_drug_offer": handle_create_drug_offer,
     "do_blind_eye": handle_blind_eye,
