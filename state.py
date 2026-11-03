@@ -15,6 +15,23 @@ import notifications_store
 
 SERVER_TIME_FMT = "%m/%d/%Y %I:%M:%S %p"
 
+GANGSTER_RANKS = {
+    "dealer", "giovane d'honore", "enforcer", "piciotto",
+    "sgarrista", "capodecima", "caporegime", "boss", "don", "godfather",
+    "capo di tutti capi",
+}
+
+
+def norm_rank(rank: str) -> str:
+    """Lowercase a rank and unify the game's two apostrophe styles (' and `)."""
+    return (rank or "").strip().lower().replace("`", "'")
+
+
+def is_gangster(occupation: str, rank: str = "") -> bool:
+    """Occupation contains 'gangster', or the rank is a gangster rank (the occupation
+    field sometimes shows the rank instead)."""
+    return "gangster" in (occupation or "").lower() or norm_rank(rank) in GANGSTER_RANKS
+
 
 @dataclass
 class GameState:

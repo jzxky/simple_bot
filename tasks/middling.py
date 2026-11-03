@@ -7,10 +7,28 @@ import queue
 import re
 
 from tasks.base import Task, Action
-from state import GameState
+from state import GameState, norm_rank
 
-MIDDLING_RANKS = {"Piciotto", "Enforcer", "Dealer", "Giovane D'Honore"}
-_HOME_CITY_REQUIRED_RANKS = {"Enforcer", "Dealer", "Giovane D'Honore"}
+MIDDLING_RANKS = {"piciotto", "enforcer", "dealer", "giovane d'honore"}
+_HOME_CITY_REQUIRED_RANKS = {"enforcer", "dealer", "giovane d'honore"}
+
+
+def drug_trade_blockers(state: GameState, rank: bool = True, home_city: bool = True) -> list:
+    """Reasons the character can't run a drug-dealing action right now (empty = OK).
+    rank: must be a middling rank. home_city: those ranks except Piciotto must be home."""
+    reasons = []
+    if not state.logged_in:
+        reasons.append("Not logged in")
+    if state.in_jail:
+        reasons.append("In jail")
+    if state.in_hospital:
+        reasons.append("In hospital")
+    r = norm_rank(state.rank)
+    if rank and r not in MIDDLING_RANKS:
+        reasons.append(f"Rank '{state.rank or 'unknown'}' can't deal drugs")
+    if home_city and r in _HOME_CITY_REQUIRED_RANKS and not state.in_home_city():
+        reasons.append("Not in home city")
+    return reasons
 
 _middling_queue: "queue.Queue | None" = None
 
@@ -55,29 +73,10 @@ class MiddlingTask(Task):
         self._queue = middling_queue
 
     def can_run(self, state: GameState) -> bool:
-        if not state.logged_in or state.in_jail or state.in_hospital:
-            return False
-        if state.rank not in MIDDLING_RANKS:
-            return False
-        if state.rank in _HOME_CITY_REQUIRED_RANKS and not state.in_home_city():
-            return False
-        import config as cfg
-        if not cfg.load().get("middling", {}).get("enabled", False):
-            return False
-        return not self._queue.empty()
+        return not self.blocked_reasons(state)
 
     def blocked_reasons(self, state):
-        reasons = []
-        if not state.logged_in:
-            reasons.append("Not logged in")
-        if state.in_jail:
-            reasons.append("In jail")
-        if state.in_hospital:
-            reasons.append("In hospital")
-        if state.rank not in MIDDLING_RANKS:
-            reasons.append(f"Rank '{state.rank}' cannot middle")
-        if state.rank in _HOME_CITY_REQUIRED_RANKS and not state.in_home_city():
-            reasons.append("Not in home city")
+        reasons = drug_trade_blockers(state)
         import config as cfg
         if not cfg.load().get("middling", {}).get("enabled", False):
             reasons.append("Middling disabled")
@@ -88,7 +87,6 @@ class MiddlingTask(Task):
     def run(self, state: GameState, executor):
         try:
             item = self._queue.get_nowait()
-        except Exception:
+        except queue.Empty:
             return
-        action_kind = item.get("action", "do_middling")
-        executor.execute(Action(action_kind, **item), state)
+        executor.execute(Action("do_middling", runner=item["runner"], buyer=item["buyer"]), state)

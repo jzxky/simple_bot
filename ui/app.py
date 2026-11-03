@@ -20,6 +20,7 @@ import trait_requirements as tr
 import notifications_store
 import event_consumables as _ec_mod
 from tasks import hospital as _hospital
+from state import is_gangster as _is_gangster
 import pathlib
 
 _APP_VERSION = pathlib.Path(os.path.dirname(os.path.dirname(__file__)), "VERSION").read_text().strip()
@@ -782,22 +783,6 @@ def banklaunder_bulk_add():
     return jsonify({"ok": True})
 
 
-_GANGSTER_RANKS = {
-    "dealer", "giovane d'honore", "giovane d`honore", "enforcer", "piciotto",
-    "sgarrista", "capodecima", "caporegime", "boss", "don", "godfather",
-    "capo di tutti capi",
-}
-
-
-def _is_gangster(occupation: str, rank: str = "") -> bool:
-    """Robust gangster check: occupation contains 'gangster' (handles whitespace/
-    casing) or the rank is a known gangster rank (in case occupation shows a rank)."""
-    occ = (occupation or "").lower()
-    if "gangster" in occ:
-        return True
-    return (rank or "").strip().lower() in _GANGSTER_RANKS
-
-
 @app.route("/jail/partner_candidates")
 def jail_partner_candidates():
     """Valid jail-break partners from the player-list DB (including offline players,
@@ -1366,101 +1351,123 @@ def _validate_player(name: str) -> tuple[bool, str]:
     return True, "OK"
 
 
-@app.route("/middling/load-stock", methods=["POST"])
-def middling_load_stock():
+_DRUG_KEYS = ("marijuana", "ecstasy", "acid", "speed", "ice", "heroin", "cocaine")
+_DEALS_LINK_RE = re.compile(r"/income/deals\.asp\?action=list&id=\d+")
+
+
+def _living_player(name: str):
+    """Exact username of a living player in the database, or None."""
+    import player_db as _db
+    name = (name or "").strip().lower()
+    return next((p["username"] for p in _db.get_active_player_names()
+                 if p["username"].lower() == name), None)
+
+
+def _whole_number(value):
+    """Non-negative int from a number or a "$1,500"-style string, else None."""
+    digits = re.sub(r"[$,\s]", "", str(value if value is not None else ""))
+    return int(digits) if digits.isdigit() else None
+
+
+def _drug_request_rows(rows, with_price=False):
+    """({drug: qty}, total_price, None) from [{drug, qty, price?}] request rows,
+    or (None, 0, error).  Rows with qty 0 are skipped; qty is capped at 999 like the game."""
+    quantities, total = {}, 0
+    if not isinstance(rows, list) or not all(isinstance(r, dict) for r in rows):
+        return None, 0, "Malformed drug list."
+    for r in rows:
+        drug = str(r.get("drug") or "").strip().lower()
+        qty = _whole_number(r.get("qty") or 0)
+        if drug not in _DRUG_KEYS or qty is None or qty > 999:
+            return None, 0, f"Bad quantity for {drug or 'a drug'}."
+        if not qty:
+            continue
+        if with_price:
+            unit = _whole_number(r.get("price") or 0)
+            if unit is None:
+                return None, 0, f"Bad price for {drug}."
+            total += qty * unit
+        quantities[drug] = qty
+    if not quantities:
+        return None, 0, "Enter at least one drug quantity."
+    return quantities, total, None
+
+
+def _drug_task(kind: str, **params):
     if not bot.is_running():
-        return jsonify({"error": "Bot is not running."}), 400
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    return _run_profile_task(kind, **params)
+
+
+@app.route("/drugs/players")
+def drugs_players():
+    """Customer and customs-official lists for the Drugs tab (living players, not us)."""
+    import player_db as _db
+    from state import norm_rank
+    s = bot.state
+    own = ((s.own_name if s else "") or "").lower()
+    alive = [p for p in _db.get_all_players()
+             if p.get("active") and p.get("username") and p["username"].lower() != own]
+    customs_ranks = {norm_rank(r) for r in _CAREER_GROUPS["Customs"]}
+    local = {n.lower() for n in ((s.local_players if s else None) or set())}
+    names = lambda pred: sorted((p["username"] for p in alive if pred(p)), key=str.lower)
+    return jsonify({
+        "customs": names(lambda p: "customs" in (p.get("occupation") or "").lower()
+                         or norm_rank(p.get("rank")) in customs_ranks),
+        "local_online": names(lambda p: p["username"].lower() in local),
+        "all_alive": names(lambda p: True),
+    })
+
+
+@app.route("/drugs/blind-eye", methods=["POST"])
+def drugs_blind_eye():
     data = request.get_json(silent=True) or {}
-    contact = data.get("contact", "").strip()
-    if not contact:
-        return jsonify({"error": "No contact name provided."}), 400
-    import queue as _q
-    result_q = _q.Queue()
-    bot._middling_queue.put({
-        "action": "middling_load_stock",
-        "contact": contact,
-        "_result_queue": result_q,
-    })
-    try:
-        result = result_q.get(timeout=30)
-    except _q.Empty:
-        return jsonify({"error": "Timed out waiting for stock data."}), 504
-    if "error" in result:
-        return jsonify(result), 400
-    return jsonify(result)
+    target = _living_player(data.get("target"))
+    if not target:
+        return jsonify({"ok": False, "message": "Pick a living customs official."}), 400
+    price = _whole_number(data.get("price"))
+    if price is None or not 1000 <= price <= 99999:
+        return jsonify({"ok": False, "message": "Bribe must be between $1,000 and $99,999."}), 400
+    return _drug_task("send_blind_eye", target=target, price=price)
 
 
-@app.route("/middling/buy", methods=["POST"])
-def middling_buy():
-    if not bot.is_running():
-        return jsonify({"error": "Bot is not running."}), 400
+@app.route("/drugs/contacts", methods=["POST"])
+def drugs_contacts():
+    return _drug_task("load_drug_contacts")
+
+
+@app.route("/drugs/stock", methods=["POST"])
+def drugs_stock():
+    link = ((request.get_json(silent=True) or {}).get("link") or "").strip()
+    if not _DEALS_LINK_RE.fullmatch(link):
+        return jsonify({"ok": False, "message": "Unknown contact — reload contacts."}), 400
+    return _drug_task("load_contact_stock", link=link)
+
+
+@app.route("/drugs/buy", methods=["POST"])
+def drugs_buy():
     data = request.get_json(silent=True) or {}
-    contact_id = data.get("contact_id", "")
-    quantities = data.get("quantities", {})
-    if not contact_id or not quantities:
-        return jsonify({"error": "Missing contact_id or quantities."}), 400
-    import queue as _q
-    result_q = _q.Queue()
-    bot._middling_queue.put({
-        "action": "middling_buy",
-        "contact_id": contact_id,
-        "quantities": quantities,
-        "_result_queue": result_q,
-    })
-    try:
-        result = result_q.get(timeout=30)
-    except _q.Empty:
-        return jsonify({"error": "Timed out waiting for buy result."}), 504
-    if "error" in result:
-        return jsonify(result), 400
-    return jsonify(result)
+    link = (data.get("link") or "").strip()
+    if not _DEALS_LINK_RE.fullmatch(link):
+        return jsonify({"ok": False, "message": "Unknown contact — reload contacts."}), 400
+    drugs, _, err = _drug_request_rows(data.get("drugs"))
+    if err:
+        return jsonify({"ok": False, "message": err}), 400
+    return _drug_task("buy_contact_drugs", link=link, drugs=drugs)
 
 
-@app.route("/middling/load-sell", methods=["POST"])
-def middling_load_sell():
-    if not bot.is_running():
-        return jsonify({"error": "Bot is not running."}), 400
-    import queue as _q
-    result_q = _q.Queue()
-    bot._middling_queue.put({
-        "action": "middling_load_sell",
-        "_result_queue": result_q,
-    })
-    try:
-        result = result_q.get(timeout=30)
-    except _q.Empty:
-        return jsonify({"error": "Timed out waiting for sell page data."}), 504
-    if "error" in result:
-        return jsonify(result), 400
-    return jsonify(result)
-
-
-@app.route("/middling/sell", methods=["POST"])
-def middling_sell():
-    if not bot.is_running():
-        return jsonify({"error": "Bot is not running."}), 400
+@app.route("/drugs/offer", methods=["POST"])
+def drugs_offer():
     data = request.get_json(silent=True) or {}
-    buyer = data.get("buyer", "").strip()
-    price = data.get("price", 0)
-    quantities = data.get("quantities", {})
-    if not buyer or not price:
-        return jsonify({"error": "Missing buyer or price."}), 400
-    import queue as _q
-    result_q = _q.Queue()
-    bot._middling_queue.put({
-        "action": "middling_sell",
-        "buyer": buyer,
-        "price": int(price),
-        "quantities": quantities,
-        "_result_queue": result_q,
-    })
-    try:
-        result = result_q.get(timeout=30)
-    except _q.Empty:
-        return jsonify({"error": "Timed out waiting for sell result."}), 504
-    if "error" in result:
-        return jsonify(result), 400
-    return jsonify(result)
+    target = _living_player(data.get("target"))
+    if not target:
+        return jsonify({"ok": False, "message": "Customer must be a living player in the player database."}), 400
+    drugs, total, err = _drug_request_rows(data.get("drugs"), with_price=True)
+    if err:
+        return jsonify({"ok": False, "message": err}), 400
+    if total <= 0:
+        return jsonify({"ok": False, "message": "Total price must be above $0."}), 400
+    return _drug_task("create_drug_offer", target=target, price=total, drugs=drugs)
 
 
 @app.route("/character_history")
