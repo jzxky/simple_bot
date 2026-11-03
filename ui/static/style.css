@@ -660,6 +660,7 @@ button {
   vertical-align: middle;
 }
 .priority-table tr:last-child td { border-bottom: none; }
+.deal-table tfoot td { border-top: 1px solid var(--border); font-weight: 600; padding-top: 8px; }
 .priority-move {
   display: flex;
   flex-direction: column;
