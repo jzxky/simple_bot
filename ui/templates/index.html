@@ -960,7 +960,7 @@
               <p class="placeholder">Bribe a customs official to lower your chance of being caught with drugs when you travel.</p>
               <div class="setting-row">
                 <label for="smuggle_official">Customs Official</label>
-                <select id="smuggle_official" class="input-wide"><option value="">No customs officials loaded</option></select>
+                <select id="smuggle_official" class="name-picker"><option value="">No customs officials loaded</option></select>
               </div>
               <div class="setting-row">
                 <label for="smuggle_price">Price ($)</label>
@@ -1016,7 +1016,7 @@
               <div class="setting-row">
                 <label for="drug_contact">Contact</label>
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                  <select id="drug_contact" class="input-wide">
+                  <select id="drug_contact" class="name-picker">
                     {% for ct in config.get('drug_contacts', []) %}<option value="{{ ct.link }}">{{ ct.name }}</option>{% else %}<option value="">No saved contacts — reload to fetch them</option>{% endfor %}
                   </select>
                   <button class="btn btn-sm" onclick="drugsLoadContacts(this)">Reload Contacts</button>
@@ -1038,9 +1038,9 @@
               <div class="setting-row">
                 <label for="deal_customer">Customer</label>
                 <div>
-                  <input type="text" id="deal_customer" class="input-wide" list="deal-customers" placeholder="Start typing a player name" autocomplete="off">
+                  <input type="text" id="deal_customer" class="name-picker" list="deal-customers" placeholder="Start typing a player name" autocomplete="off">
                   <datalist id="deal-customers"></datalist>
-                  <select id="deal_customer_local" class="input-wide" hidden><option value="">No local players online</option></select>
+                  <select id="deal_customer_local" class="name-picker" hidden><option value="">No local players online</option></select>
                 </div>
               </div>
               <div class="setting-row">
@@ -1050,21 +1050,23 @@
                   <span id="deal-stock-hint" class="sell-hint" style="margin:0">Not loaded yet</span>
                 </div>
               </div>
-              <table class="priority-table deal-table" style="max-width:640px">
-                <thead><tr><th>Drug</th><th>Carrying</th><th>Quantity</th><th>Price each</th><th>Line total</th></tr></thead>
-                <tbody>
-                  {% for key, label in [('marijuana','Marijuana'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('ice','P / ICE'),('heroin','Heroin'),('cocaine','Cocaine')] %}
-                  <tr data-drug="{{ key }}">
-                    <td>{{ label }}</td>
-                    <td class="deal-carry">—</td>
-                    <td><input type="number" class="deal-qty" min="0" max="999" step="1" value="0" style="width:100px" oninput="drugsDealTotal()"></td>
-                    <td><input type="number" class="deal-price" min="0" step="100" value="0" style="width:100px" oninput="drugsDealTotal()"></td>
-                    <td class="deal-line">$0</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-                <tfoot><tr><td colspan="4">Total price</td><td id="deal-total">$0</td></tr></tfoot>
-              </table>
+              <div class="apt-table-wrap">
+                <table class="priority-table deal-table" style="max-width:640px">
+                  <thead><tr><th>Drug</th><th>Carrying</th><th>Quantity</th><th>Price each</th><th>Line total</th></tr></thead>
+                  <tbody>
+                    {% for key, label in [('marijuana','Marijuana'),('ecstasy','Ecstasy'),('acid','Acid'),('speed','Speed'),('ice','P / ICE'),('heroin','Heroin'),('cocaine','Cocaine')] %}
+                    <tr data-drug="{{ key }}">
+                      <td>{{ label }}</td>
+                      <td class="deal-carry">—</td>
+                      <td><input type="number" class="deal-qty" min="0" max="999" step="1" value="0" style="width:100px" oninput="drugsDealTotal()"></td>
+                      <td><input type="number" class="deal-price" min="0" step="100" value="0" style="width:100px" oninput="drugsDealTotal()"></td>
+                      <td class="deal-line">$0</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                  <tfoot><tr><td colspan="4">Total price</td><td id="deal-total">$0</td></tr></tfoot>
+                </table>
+              </div>
               <button class="btn btn-sm" style="margin-top:6px" onclick="drugsCreateOffer(this)">Submit</button>
               <div id="deal-result" class="sell-hint"></div>
             </div>

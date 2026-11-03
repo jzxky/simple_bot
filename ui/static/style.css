@@ -661,6 +661,10 @@ button {
 }
 .priority-table tr:last-child td { border-bottom: none; }
 .deal-table tfoot td { border-top: 1px solid var(--border); font-weight: 600; padding-top: 8px; }
+#income-drugs .settings-group { min-width: 0; }   /* let the grid item shrink so wide tables scroll instead of overflowing the card */
+/* Contact / player pickers: room for a 25-character name on desktop, full width on mobile */
+.setting-row .name-picker { width: calc(25ch + 44px); max-width: 100%; }
+@media (max-width: 600px) { .setting-row .name-picker { width: 100% !important; } }   /* beats the mobile ".setting-row select { width: auto !important }" */
 .priority-move {
   display: flex;
   flex-direction: column;
