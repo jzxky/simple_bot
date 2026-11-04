@@ -680,6 +680,17 @@ button {
   .deal-table tfoot tr { display: flex; justify-content: space-between; }
 }
 #income-drugs .settings-group { min-width: 0; }   /* let the grid item shrink so wide tables scroll instead of overflowing the card */
+/* Drug contacts: one row per contact with its Check Stock button; green when they're in our city */
+.drug-contact-list { list-style: none; margin: 0 0 6px; padding: 0; max-width: 420px; font-size: 13px; }
+.drug-contact-list li {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 8px; border-bottom: 1px solid rgba(46,64,96,0.3); border-left: 3px solid transparent;
+}
+.drug-contact-list li:last-child { border-bottom: none; }
+.drug-contact-list li.in-city { background: rgba(58,158,95,.18); border-left-color: var(--success); }
+.drug-contact-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drug-contact-empty { color: var(--muted); font-style: italic; }
+@media (max-width: 600px) { .drug-contact-list { max-width: none; } }
 /* Contact / player pickers: room for a 25-character name on desktop, full width on mobile */
 .setting-row .name-picker { width: calc(25ch + 44px); max-width: 100%; }
 @media (max-width: 600px) { .setting-row .name-picker { width: 100% !important; } }   /* beats the mobile ".setting-row select { width: auto !important }" */

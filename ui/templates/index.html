@@ -1013,16 +1013,17 @@
               <h3>Drug Trade</h3>
 
               <h4>Contacts</h4>
-              <div class="setting-row">
-                <label for="drug_contact">Contact</label>
-                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                  <select id="drug_contact" class="name-picker">
-                    {% for ct in config.get('drug_contacts', []) %}<option value="{{ ct.link }}">{{ ct.name }}</option>{% else %}<option value="">No saved contacts — reload to fetch them</option>{% endfor %}
-                  </select>
-                  <button class="btn btn-sm" onclick="drugsLoadContacts(this)">Reload Contacts</button>
-                  <button class="btn btn-sm" onclick="drugsLoadStock(this)">Load Stock</button>
-                </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+                <button class="btn btn-sm" onclick="drugsLoadContacts(this)">Reload Contacts</button>
+                <span class="sell-hint" style="margin:0">Green = online in your city now</span>
               </div>
+              <ul id="drug-contact-list" class="drug-contact-list">
+                {% for ct in config.get('drug_contacts', []) %}
+                <li data-name="{{ ct.name }}" data-link="{{ ct.link }}"><span class="drug-contact-name">{{ ct.name }}</span><button class="btn btn-sm" onclick="drugsLoadStock(this)">Check Stock</button></li>
+                {% else %}
+                <li class="drug-contact-empty">No saved contacts — reload to fetch them</li>
+                {% endfor %}
+              </ul>
               <div id="drug-contacts-result" class="sell-hint"></div>
 
               <hr class="stat-divider" style="margin:16px 0">
