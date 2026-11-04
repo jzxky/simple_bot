@@ -4553,16 +4553,46 @@ def _submit_and_read_result(state, submit_selector):
     return _read_result()
 
 
-def _buy_drugs(state, stock, drugs):
-    """Buy from the contact page already loaded (stock = its parsed list).
-    drugs: {key: qty}.  Returns (ok, message)."""
+def _check_buy(stock, drugs):
+    """(cost, None) for buying drugs ({key: qty}) from a parsed stock list, or (0, error)."""
     by_key = {s["key"]: s for s in stock}
+    cost = 0
     for key, qty in drugs.items():
         s = by_key.get(key)
         if not s:
-            return False, f"{key} isn't on this contact's list"
+            return 0, f"{key} isn't on this contact's list"
         if qty > s["available"]:
-            return False, f"only {s['available']} {s['name']} on sale (asked for {qty})"
+            return 0, f"only {s['available']} {s['name']} on sale (asked for {qty})"
+        cost += qty * s["price"]
+    return cost, None
+
+
+def _buy_drugs(state, link, stock, drugs):
+    """Buy from the contact page already loaded (stock = its parsed list), first withdrawing
+    from the bank if cash on hand + dirty money won't cover it.  drugs: {key: qty}.
+    Returns (ok, message)."""
+    cost, err = _check_buy(stock, drugs)
+    if err:
+        return False, err
+    have = state.clean_money + state.dirty_money
+    if have < cost:
+        state.add_log(f"Drug buy: costs ${cost:,} but only ${have:,} on hand "
+                      f"(cash ${state.clean_money:,} + dirty ${state.dirty_money:,}) — "
+                      f"withdrawing ${cost - have:,} from the bank.")
+        handle_withdraw(Action("withdraw", amount=cost - have), state)
+        # Back to the contact's page: its header gives fresh cash/dirty figures (the withdraw
+        # handler doesn't wait for its result page) and what's on sale may have changed.
+        _nav(_u(link), state)
+        if not _check_session(state):
+            return False, "Session expired"
+        stock = _parse_contact_stock(BeautifulSoup(state.page_html, "html.parser"))
+        cost, err = _check_buy(stock, drugs)
+        if err:
+            return False, err
+        have = state.clean_money + state.dirty_money
+        if have < cost:
+            return False, f"not enough money — costs ${cost:,}, have ${have:,} after trying the bank"
+    by_key = {s["key"]: s for s in stock}
     page = browser.page()
     for key, qty in drugs.items():
         page.fill(f"input[name='{by_key[key]['buy_field']}']", str(qty))
@@ -4738,7 +4768,7 @@ def handle_buy_contact_drugs(action: Action, state: GameState):
     stock = _parse_contact_stock(BeautifulSoup(state.page_html, "html.parser"))
     if not stock:
         return _drug_reply(action, state, label, False, "couldn't read the contact's drug list")
-    ok, msg = _buy_drugs(state, stock, drugs)
+    ok, msg = _buy_drugs(state, link, stock, drugs)
     _drug_reply(action, state, label, ok, msg)
 
 
@@ -4758,8 +4788,8 @@ def handle_create_drug_offer(action: Action, state: GameState):
 
 
 def handle_do_middling(action: Action, state: GameState):
-    """!middle flow: buy 100 drugs from the runner (cocaine upwards) and offer them to
-    the buyer at cost."""
+    """!middle flow: buy up to 100 drugs from the runner (cocaine upwards — all of them if
+    fewer are on sale) and offer them to the buyer at cost."""
     runner = action.params.get("runner", "")
     buyer = action.params.get("buyer", "")
     if not runner or not buyer:
@@ -4799,15 +4829,8 @@ def handle_do_middling(action: Action, state: GameState):
         state.add_log(f"Middling: deal failed — {runner} has no drugs in stock.")
         return
 
-    total_held = sum(d["owned"] for d in drug_stock)
-    if total_held + 100 > max_on_hand:
-        state.add_log(
-            f"Middling: deal failed — too many drugs on hand "
-            f"({total_held} held + 100 = {total_held + 100} > {max_on_hand} max)."
-        )
-        return
-
-    # Plan 100 units from the bottom of the list (cocaine first)
+    # Plan up to 100 units from the bottom of the list (cocaine first); if fewer are on sale,
+    # take everything there is.
     buy_plan = {}
     remaining = 100
     for d in reversed(drug_stock):
@@ -4818,8 +4841,14 @@ def handle_do_middling(action: Action, state: GameState):
         qty = min(d["available"], remaining)
         buy_plan[d["key"]] = {"qty": qty, "price": d["price"], "name": d["name"]}
         remaining -= qty
-    if remaining > 0:
-        state.add_log(f"Middling: deal failed — only {100 - remaining} drugs available, need 100.")
+    units = 100 - remaining
+
+    total_held = sum(d["owned"] for d in drug_stock)
+    if total_held + units > max_on_hand:
+        state.add_log(
+            f"Middling: deal failed — too many drugs on hand "
+            f"({total_held} held + {units} = {total_held + units} > {max_on_hand} max)."
+        )
         return
 
     # Only the drugs actually being bought are held to the price limits
@@ -4837,7 +4866,7 @@ def handle_do_middling(action: Action, state: GameState):
     summary = ", ".join(f"{v['qty']}x {k}" for k, v in buy_plan.items())
     state.add_log(f"Middling: buying from {runner}: {summary} (total ${total_price:,})")
 
-    ok, msg = _buy_drugs(state, drug_stock, quantities)
+    ok, msg = _buy_drugs(state, runner_contact["link"], drug_stock, quantities)
     if ok is False:
         state.add_log(f"Middling: buy from {runner} failed — {msg}")
         return

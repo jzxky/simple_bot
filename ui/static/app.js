@@ -808,6 +808,7 @@ const _GANGSTER_RANKS = new Set(["dealer", "giovane d'honore", "enforcer", "pici
 let _drugPlayersAt = 0;
 let _drugStockLink = "";
 let _drugCarrying = null;     // {drug: units carrying} from the last Refresh Stock
+let _drugLocalPlayers = new Set();   // lower-cased names online in our city (from the status poll)
 
 function _drugNormRank(r) { return String(r || "").trim().toLowerCase().replace(/`/g, "'"); }
 function _drugMoney(n) { return "$" + (n || 0).toLocaleString(); }
@@ -840,6 +841,8 @@ function updateDrugsTab(d) {
   const canTrade = _DRUG_TRADE_RANKS.has(rank);
   const gangster = /gangster/i.test(d.occupation || "") || _GANGSTER_RANKS.has(rank);
   trade.hidden = !canTrade;
+  _drugLocalPlayers = new Set((d.local_players || []).map(n => String(n).toLowerCase()));
+  _drugMarkLocalContacts();
   document.getElementById("drugs-middling").hidden = !canTrade;
   document.getElementById("drugs-smuggling").hidden = !gangster;
   const note = document.getElementById("drugs-rank-note");
@@ -875,24 +878,45 @@ function drugsSendBlindEye(btn) {
   _drugPost("/drugs/blind-eye", {target, price}, btn).then(d => _drugResult("smuggle-result", d));
 }
 
+// Green-highlight contacts who are online in our current city.
+function _drugMarkLocalContacts() {
+  document.querySelectorAll("#drug-contact-list li[data-name]").forEach(li =>
+    li.classList.toggle("in-city", _drugLocalPlayers.has(li.dataset.name.toLowerCase())));
+}
+
+function _drugRenderContacts(contacts) {
+  const list = document.getElementById("drug-contact-list");
+  if (!contacts.length) {
+    const li = document.createElement("li");
+    li.className = "drug-contact-empty";
+    li.textContent = "No saved contacts — reload to fetch them";
+    return list.replaceChildren(li);
+  }
+  list.replaceChildren(...contacts.map(c => {
+    const li = document.createElement("li");
+    li.dataset.name = c.name;
+    li.dataset.link = c.link;
+    const name = Object.assign(document.createElement("span"), {className: "drug-contact-name", textContent: c.name});
+    const btn = Object.assign(document.createElement("button"), {className: "btn btn-sm", textContent: "Check Stock"});
+    btn.onclick = () => drugsLoadStock(btn);
+    li.append(name, btn);
+    return li;
+  }));
+  _drugMarkLocalContacts();
+}
+
 function drugsLoadContacts(btn) {
   _setSellHint("drug-contacts-result", "Reloading contacts…", "");
   _drugPost("/drugs/contacts", {}, btn).then(d => {
-    if (d.ok) {
-      const sel = document.getElementById("drug_contact");
-      const keep = sel.value;
-      sel.replaceChildren(...(d.contacts || []).map(c => new Option(c.name, c.link)));
-      if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
-    }
+    if (d.ok) _drugRenderContacts(d.contacts || []);
     _drugResult("drug-contacts-result", d);
   });
 }
 
 function drugsLoadStock(btn) {
-  const sel = document.getElementById("drug_contact");
-  if (!sel.value) return _setSellHint("drug-contacts-result", "Load contacts and pick one first.", "bad");
-  const link = sel.value;
-  const name = sel.options[sel.selectedIndex].text;
+  const li = btn.closest("li");
+  const link = li.dataset.link;
+  const name = li.dataset.name;
   _setSellHint("drug-contacts-result", `Loading ${name}'s drugs…`, "");
   _drugPost("/drugs/stock", {link}, btn).then(d => {
     if (!d.ok) return _drugResult("drug-contacts-result", d);
