@@ -6071,14 +6071,10 @@ def _eng_requester(radio) -> str:
 
 
 def _eng_is_own_job(radio, own_name: str) -> bool:
-    """True if this engineering job was requested by our own character.
-
-    Errs on the side of caution: if we don't know our own name, every
-    non-business job is treated as our own so it is never picked.
-    """
-    if not own_name:
-        return True
-    own = own_name.strip().lower()
+    """True if this engineering job was requested by our own character."""
+    own = (own_name or "").strip().lower()
+    if not own:
+        return False
     if radio.get("value", "").strip().lower() == own:
         return True
     if _eng_requester(radio).strip().lower() == own:
