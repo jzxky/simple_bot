@@ -6048,6 +6048,45 @@ _ENG_SECTION_KEYS = {
 }
 
 
+def _eng_requester(radio) -> str:
+    """Best-effort requester username for an engineering job radio.
+
+    Prefers a profile link (``username=...``) in the radio's table row, then
+    falls back to the first non-numeric cell text in that row.
+    """
+    row = radio.find_parent("tr") or radio.parent
+    if row is None:
+        return ""
+    import re as _re
+    for a in row.find_all("a", href=True):
+        m = _re.search(r"username=([^&#]+)", a["href"], _re.I)
+        if m:
+            return m.group(1).strip()
+    val = radio.get("value", "")
+    for td in row.find_all("td"):
+        txt = td.get_text(strip=True)
+        if txt and not txt.isdigit() and txt != val:
+            return txt
+    return ""
+
+
+def _eng_is_own_job(radio, own_name: str) -> bool:
+    """True if this engineering job was requested by our own character."""
+    own = (own_name or "").strip().lower()
+    if not own:
+        return False
+    if radio.get("value", "").strip().lower() == own:
+        return True
+    if _eng_requester(radio).strip().lower() == own:
+        return True
+    row = radio.find_parent("tr")
+    if row is not None:
+        for a in row.find_all("a"):
+            if a.get_text(strip=True).lower() == own:
+                return True
+    return False
+
+
 def _click_eng_submit(page, radio_name: str, radio_value: str):
     """Click the first submit button that follows the given radio in DOM order."""
     with page.expect_navigation(wait_until="domcontentloaded"):
@@ -6184,7 +6223,8 @@ def handle_check_engineering_cases(action: Action, state: GameState):
             radios = sec.find_all("input", {"type": "radio", "name": "Req_username"})
             for radio in radios:
                 username = radio.get("value", "")
-                if state.own_name and username.lower() == state.own_name.lower():
+                # Never build our own apartment.
+                if _eng_is_own_job(radio, state.own_name):
                     continue
                 if not _target_ok(username, typ):
                     continue
@@ -6197,16 +6237,9 @@ def handle_check_engineering_cases(action: Action, state: GameState):
             radios = sec.find_all("input", {"type": "radio", "name": "Req_id"})
             for radio in radios:
                 val = radio.get("value", "")
-                # Try to find the requester username from nearby text
-                parent = radio.parent
-                username = ""
-                if parent:
-                    for sib in parent.find_all("td"):
-                        txt = sib.get_text(strip=True)
-                        if txt and not txt.isdigit() and txt != val:
-                            username = txt
-                            break
-                if state.own_name and username.lower() == state.own_name.lower():
+                username = _eng_requester(radio)
+                # Never repair our own vehicle or build our own vault.
+                if _eng_is_own_job(radio, state.own_name):
                     continue
                 if username and not _target_ok(username, typ):
                     continue
