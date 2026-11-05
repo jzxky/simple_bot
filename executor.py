@@ -7118,8 +7118,29 @@ def _parse_whacks_survived(soup):
     return int(m.group(1)) if m else None
 
 
+_DEAD_STATUSES = {"murdered": "Murdered", "suicide": "Suicide"}
+
+
+def _profile_status_field(soup) -> str:
+    """Value of the profile's "Status:" field (e.g. Alive, Murdered, Suicide), or ""."""
+    for td in soup.find_all(["td", "th"]):
+        label = td.get_text(" ", strip=True).rstrip(":").strip().lower()
+        if label == "status":
+            val = td.find_next_sibling(["td", "th"])
+            if val:
+                return val.get_text(" ", strip=True)
+    return ""
+
+
+def _profile_death_cause(soup) -> str:
+    """"Murdered" or "Suicide" when the profile's Status field says so, else ""."""
+    return _DEAD_STATUSES.get(_profile_status_field(soup).strip().lower(), "")
+
+
 def _parse_profile_status(soup) -> str:
     """Detect player status from profile page: alive, in-jail, murdered."""
+    if _profile_death_cause(soup):
+        return "murdered"
     text = soup.get_text(" ", strip=True).lower()
     if "has been murdered" in text or "rest in peace" in text:
         return "murdered"
@@ -7191,6 +7212,12 @@ def handle_ws_monitor(action: Action, state: GameState):
             status = _parse_profile_status(soup)
             if status:
                 record["status"] = status
+            cause = _profile_death_cause(soup)
+            if cause:
+                # The hub marks them dead, archives them off the whack pro
+                # list and posts to the war log.
+                record["death_cause"] = cause
+                state.add_log(f"WS monitor: {name} is dead ({cause}).")
             last_activity = _parse_last_activity(soup)
             if last_activity:
                 record["last_activity"] = last_activity
