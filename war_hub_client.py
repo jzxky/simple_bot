@@ -70,7 +70,9 @@ def report_ws(records: list) -> bool:
     """Report WS changes (and optionally status/last_activity) for one or more names.
 
     Each record is a dict with at least "name" and "ws", and optionally
-    "status" (alive|in-jail|in-max-jail|murdered) and "last_activity".
+    "status" (alive|in-jail|in-max-jail|murdered), "death_cause" (Murdered|Suicide,
+    from the profile's Status field) and "last_activity". A murdered status
+    makes the hub mark the player dead and archive them off the war lists.
     The hub only records WS increases; decreases are ignored server-side.
     """
     if not is_configured() or not records:
