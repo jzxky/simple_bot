@@ -14,6 +14,7 @@ from tasks.base import Action
 from state import GameState, parse_state
 import browser
 import item_images
+import travel_parser
 from urllib.parse import quote, urljoin
 
 
@@ -5669,20 +5670,15 @@ def handle_travel(action: Action, state: GameState) -> int:
         _nav(_u(_TRAVEL_URL), state)
         if not _check_session(state):
             return 0
-        soup = BeautifulSoup(state.page_html, "html.parser")
-        dest_map = {}
-        for div in soup.find_all("div", class_="city-container"):
-            inner = div.find("div", class_="city-travel-container")
-            if not inner:
-                continue
-            city_name = inner.get("id", "")
-            link = inner.find("a", href=re.compile(r"depart\.asp\?destination="))
-            if city_name and link:
-                dest_map[city_name.lower()] = link["href"]
-        match_href = dest_map.get(target.lower())
-        if not match_href:
+        dest = travel_parser.find_destination(
+            travel_parser.parse_vehicle_destinations(state.page_html), target)
+        if not dest:
             state.add_log(f"Travel: {target} not available on travel.asp.")
             return 0
+        if not dest["open"]:
+            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
+            return 0
+        match_href = dest["href"]
         url = _u(match_href) if match_href.startswith("/") else urls.BASE_URL + "/travel/" + match_href
         _nav(url, state)
         if not _check_session(state):
@@ -5727,13 +5723,17 @@ def handle_travel(action: Action, state: GameState) -> int:
         state.add_log("Travel: could not find destination selector.")
         return 0
 
-    available = {o.get("value", ""): o for o in dest_select.find_all("option") if o.get("value") and o.get("value") != "0"}
-    match = next((v for v in available if v.lower() == target.lower()), None)
-    if not match:
+    dest = travel_parser.find_destination(
+        travel_parser.parse_airport_destinations(state.page_html), target)
+    if not dest:
         state.add_log(f"Travel: {target} not available in airport dropdown.")
         return 0
+    if not dest["open"]:
+        state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
+        return 0
 
-    minutes = available[match].get("data-minutes", "?")
+    match = dest["name"]
+    minutes = dest["minutes"] or "?"
     page = browser.page()
     page.select_option("select[name='destination']", match)
     page.click("input[name='action']")

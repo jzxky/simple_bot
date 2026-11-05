@@ -3757,7 +3757,7 @@ function onTravelMethodChange() {
       }
       _travelDests = d.destinations || [];
       destSel.innerHTML = '<option value="">— Select destination —</option>' +
-        _travelDests.map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join("");
+        _travelDests.map(o => `<option value="${escHtml(o.value)}"${o.open === false ? " disabled" : ""}>${escHtml(o.label)}</option>`).join("");
       destSel.onchange = _onTravelDestChange;
       _onTravelDestChange();
     })

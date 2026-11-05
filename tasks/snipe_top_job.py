@@ -189,23 +189,18 @@ class SnipeTopJobTask(Task):
             self._job.request_cancel(reason)
 
     def _inline_travel(self, pg, target_city: str, state: GameState) -> bool:
-        from bs4 import BeautifulSoup
+        import travel_parser
         try:
             html = browser.navigate_page(pg, urls.BASE_URL + "/travel/travel.asp")
-            soup = BeautifulSoup(html, "html.parser")
-            dest_map = {}
-            for div in soup.find_all("div", class_="city-container"):
-                inner = div.find("div", class_="city-travel-container")
-                if not inner:
-                    continue
-                city_name = inner.get("id", "")
-                link = inner.find("a", href=re.compile(r"depart\.asp\?destination="))
-                if city_name and link:
-                    dest_map[city_name.lower()] = link["href"]
-            href = dest_map.get(target_city.lower())
-            if not href:
+            dest = travel_parser.find_destination(
+                travel_parser.parse_vehicle_destinations(html), target_city)
+            if not dest:
                 state.add_log(f"SnipeTopJob: {target_city} not available on travel.asp.")
                 return False
+            if not dest["open"]:
+                state.add_log(f"SnipeTopJob: {target_city} is closed ({dest['reason']}).")
+                return False
+            href = dest["href"]
             depart_url = href if href.startswith("http") else urls.BASE_URL + "/travel/" + href
             browser.navigate_page(pg, depart_url)
             state.add_log(f"SnipeTopJob: departed to {target_city} by vehicle.")
