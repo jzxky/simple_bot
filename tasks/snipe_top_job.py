@@ -198,7 +198,8 @@ class SnipeTopJobTask(Task):
                 state.add_log(f"SnipeTopJob: {target_city} not available on travel.asp.")
                 return False
             if not dest["open"]:
-                if not dest["href"] or not cfg.load().get("travel", {}).get("ignore_closed", False):
+                is_home = target_city.lower() == (state.home_city or "").lower()
+                if not dest["href"] or not (is_home or cfg.load().get("travel", {}).get("ignore_closed", False)):
                     state.add_log(f"SnipeTopJob: {target_city} is closed ({dest['reason']}).")
                     return False
                 state.add_log(f"SnipeTopJob: {target_city} is closed ({dest['reason']}) — override on, travelling anyway.")

@@ -5616,7 +5616,11 @@ def handle_travel(action: Action, state: GameState) -> int:
     global _travel_warrant_cooldown_until
     target = action.params.get("target_city", "")
     method = action.params.get("method", "airport")
-    ignore_closed = bool(cfg.load().get("travel", {}).get("ignore_closed", False))
+    # A lockdown doesn't stop the character going to its own home city, and the
+    # user can choose to ignore lockdowns altogether.
+    is_home = bool(target) and target.lower() == (state.home_city or "").lower()
+    ignore_closed = is_home or bool(cfg.load().get("travel", {}).get("ignore_closed", False))
+    closed_ok_note = "home city, lockdown doesn't apply" if is_home else "override on"
 
     if not target:
         state.add_log("Travel: no target city specified.")
@@ -5737,7 +5741,7 @@ def handle_travel(action: Action, state: GameState) -> int:
             if not ignore_closed or not dest["href"]:
                 _closed_city_cooldown(state, target, dest["reason"])
                 return 0
-            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — override on, travelling anyway.")
+            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — {closed_ok_note}, travelling anyway.")
         match_href = dest["href"]
         url = _u(match_href) if match_href.startswith("/") else urls.BASE_URL + "/travel/" + match_href
         _nav(url, state)
@@ -5793,7 +5797,7 @@ def handle_travel(action: Action, state: GameState) -> int:
         if not ignore_closed or dest["reason"] == "disabled in dropdown":
             _closed_city_cooldown(state, target, dest["reason"])
             return 0
-        state.add_log(f"Travel: {target} is closed ({dest['reason']}) — override on, travelling anyway.")
+        state.add_log(f"Travel: {target} is closed ({dest['reason']}) — {closed_ok_note}, travelling anyway.")
 
     match = dest["name"]
     minutes = dest["minutes"] or "?"
