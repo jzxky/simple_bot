@@ -100,6 +100,10 @@ class AggCrimeTask(Task):
             return False
         if not state.logged_in or state.in_jail:
             return False
+        # Auto-disabled mid-session (crime not offered) — stop now rather than
+        # waiting for the scheduler rebuild.
+        if not cfg.load().get("aggravated_crimes", {}).get("enabled", False):
+            return False
         if state.cs_sentence > 0:
             return False
         # Back off aggravated crimes once fails hit the 30-min-window threshold.
@@ -128,6 +132,8 @@ class AggCrimeTask(Task):
             reasons.append("Not logged in")
         if state.in_jail:
             reasons.append("In jail")
+        if not cfg.load().get("aggravated_crimes", {}).get("enabled", False):
+            reasons.append("Not enabled")
         if state.cs_sentence > 0:
             reasons.append("CS sentence active")
         if state.agg_fail_count() >= 3:

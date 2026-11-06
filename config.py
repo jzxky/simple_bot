@@ -318,7 +318,7 @@ DEFAULT_CONFIG = {
         "targets_exhausted":   False,
         "mhs_protected":       True,
         "warrants_outstanding": True,
-        "agg_not_available":   False,
+        "agg_not_available":   True,
         "dog_trains_unavailable": False,
         "new_message":         False,
         "no_available_earns":  True,
