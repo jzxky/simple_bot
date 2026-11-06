@@ -80,7 +80,7 @@ class SmartTravelTask(Task):
             reasons.append("Lawyer travel guard (cases in city)")
         from executor import travel_warrant_cooldown_active, no_vehicle_cooldown_active
         if travel_warrant_cooldown_active():
-            reasons.append("Travel cooldown (warrants or closed city)")
+            reasons.append("Warrant travel cooldown")
         if no_vehicle_cooldown_active():
             reasons.append("No vehicle cooldown")
         remaining = _POLL_INTERVAL - (time.monotonic() - self._last)
@@ -103,7 +103,15 @@ class SmartTravelTask(Task):
             "casino_release_at": load_casino_release_at(),
             "lawyer_cases_by_city": state.lawyer_cases_by_city,
             "law_auto_travel": c.get("case_work", {}).get("law", {}).get("auto_travel", False),
+            "closed_cities": self._closed_cities(c),
         }
+
+    @staticmethod
+    def _closed_cities(c: dict) -> "set[str]":
+        if c.get("travel", {}).get("ignore_closed", False):
+            return set()
+        from executor import closed_city_cooldowns
+        return closed_city_cooldowns()
 
     def _try_travel_expert(self, state: GameState, executor) -> bool:
         from tasks.skills_task import SKILL_IDS

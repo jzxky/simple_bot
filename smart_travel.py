@@ -132,6 +132,7 @@ def decide_target_city(ctx: dict) -> dict:
         casino_release_at  : float
         lawyer_cases_by_city : dict
         law_auto_travel    : bool
+        closed_cities      : set of lower-cased cities to skip (found closed)
 
     Returns: {"target": <city or None>, "stay": bool, "reason": str}
     """
@@ -140,6 +141,11 @@ def decide_target_city(ctx: dict) -> dict:
 
     home_sel = smart.get("home", "home_city")
     home = ctx.get("home_city", "") if home_sel == "home_city" else home_sel
+
+    closed = ctx.get("closed_cities") or set()
+
+    def _is_closed(city: str) -> bool:
+        return (city or "").lower() in closed
 
     priority = smart.get("priority_order", DEFAULT_PRIORITY)
     if not priority:
@@ -150,7 +156,7 @@ def decide_target_city(ctx: dict) -> dict:
         if not checker:
             continue
         result = checker(ctx)
-        if result:
+        if result and not _is_closed(result[0]):
             target_city, reason = result
             return _plan(target_city, current, reason)
 
@@ -161,16 +167,20 @@ def decide_target_city(ctx: dict) -> dict:
     casino = ctx.get("casino", {})
     if current in (CHICAGO, BEIRUT) and current.lower() != (home or "").lower():
         best_city, best_secs = None, None
-        if gym.get("enabled", False) and gym.get("auto_travel", False) and current != CHICAGO:
+        if (gym.get("enabled", False) and gym.get("auto_travel", False) and current != CHICAGO
+                and not _is_closed(CHICAGO)):
             s = _secs_until_gym(now_ts, ctx.get("last_gym_use", 0.0))
             best_city, best_secs = CHICAGO, s
-        if casino.get("enabled", False) and casino.get("auto_travel", False) and current != BEIRUT:
+        if (casino.get("enabled", False) and casino.get("auto_travel", False) and current != BEIRUT
+                and not _is_closed(BEIRUT)):
             s = _secs_until_casino(now_ts, ctx.get("casino_release_at", 0.0))
             if best_secs is None or s < best_secs:
                 best_city, best_secs = BEIRUT, s
         if best_city is not None and best_secs is not None and best_secs <= TWO_HOURS:
             return _plan(best_city, current, f"next transient ({best_city}) due within 2h — chaining")
 
+    if _is_closed(home):
+        return {"target": None, "stay": True, "reason": f"home ({home}) is closed"}
     return _plan(home, current, "nothing pending — heading home")
 
 

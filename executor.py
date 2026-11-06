@@ -5585,13 +5585,30 @@ def handle_repair_vehicle(action: Action, state: GameState) -> bool:
     return True
 
 
+# City (lower-cased) -> monotonic time until which travel there is paused,
+# set when travel.asp / airport.asp shows the city closed (lockdown).
+_closed_city_until: "dict[str, float]" = {}
+_CLOSED_CITY_COOLDOWN = 3600
+
+
+def closed_city_cooldown_active(city: str) -> bool:
+    """True while travel to `city` is paused because it was found closed.
+    Only that city is paused; travel elsewhere is unaffected."""
+    return time.monotonic() < _closed_city_until.get((city or "").lower(), 0.0)
+
+
+def closed_city_cooldowns() -> "set[str]":
+    """Lower-cased cities currently paused because they were found closed."""
+    now = time.monotonic()
+    return {c for c, until in _closed_city_until.items() if now < until}
+
+
 def _closed_city_cooldown(state: GameState, target: str, reason: str):
-    """A closed destination blocks travel for 1 hour, the same cooldown as
-    outstanding warrants, so auto-travel tasks stop retrying every cycle."""
-    global _travel_warrant_cooldown_until
-    _travel_warrant_cooldown_until = time.monotonic() + 3600
+    """A closed destination pauses travel to that city for 1 hour, so
+    auto-travel tasks stop retrying it every cycle."""
+    _closed_city_until[target.lower()] = time.monotonic() + _CLOSED_CITY_COOLDOWN
     state.add_log(f"Travel: {target} is closed ({reason}) — not travelling, "
-                  f"pausing travel for 1 hour.")
+                  f"pausing travel to {target} for 1 hour.")
 
 
 def handle_travel(action: Action, state: GameState) -> int:
@@ -5609,9 +5626,13 @@ def handle_travel(action: Action, state: GameState) -> int:
         state.add_log(f"Travel: already in {target}.")
         return 1
 
+    if not ignore_closed and closed_city_cooldown_active(target):
+        state.add_log(f"Travel: {target} was closed — travel there paused (1 hour cooldown).")
+        return 0
+
     # Pre-travel warrant check
     if time.monotonic() < _travel_warrant_cooldown_until:
-        state.add_log("Travel: travel cooldown active (warrants or closed city) — skipping travel.")
+        state.add_log("Travel: warrant cooldown active — skipping travel.")
         return 0
 
     warrant_mode = cfg.load().get("jail", {}).get("auto_warrant_handling", "none")
