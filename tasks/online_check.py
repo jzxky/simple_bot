@@ -66,4 +66,5 @@ class OnlineCheckTask(Task):
         self._last = time.monotonic()
         online = list(state.local_players)
         war_hub_client.report_online(state.current_city, online)
-        state.add_log(f"Online check: reported {len(online)} player(s) in {state.current_city}.")
+        if cfg.load().get("misc", {}).get("debug_logging", False):
+            state.add_log(f"[DEBUG] Online check: reported {len(online)} player(s) in {state.current_city}.")

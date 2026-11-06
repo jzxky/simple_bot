@@ -1544,18 +1544,30 @@ def _check_cs_punishment(state: GameState) -> bool:
     return True
 
 
+def _disable_agg_crimes(state: GameState, msg: str):
+    """The selected agg crime isn't offered on agcrime.asp — turn aggravated
+    crimes off (so the task stops relaunching every tick), notify, and rebuild
+    the scheduler so the task is dropped."""
+    state.add_log(msg)
+    c = cfg.load()
+    c.setdefault("aggravated_crimes", {})["enabled"] = False
+    cfg.save(c)
+    import settings_rev; settings_rev.bump()
+    _notify(state, "agg_not_available", msg)
+    try:
+        import bot as _bot
+        _bot.request_reload()
+    except Exception:
+        pass
+
+
 def _nav_to_target_input(crime: str, state: GameState) -> bool:
     """Navigate to agcrime.asp, select crime, submit — returns True if text input found."""
     page = browser.page()
     _nav(_u("/income/agcrime.asp"), state)
     if not page.query_selector(f"input[name='agcrime'][value='{crime}']"):
-        msg = f"Agg crime '{crime}' not on the available list — disabling."
-        state.add_log(msg)
-        c = cfg.load()
-        c.setdefault("aggravated_crimes", {})["enabled"] = False
-        cfg.save(c)
-        if c.get("notifications", {}).get("agg_not_available", False):
-            state.push_notification("agg_not_available", msg)
+        if not _check_cs_punishment(state):
+            _disable_agg_crimes(state, f"Agg crime '{crime}' not on the available list — disabling aggravated crimes.")
         return False
     page.check(f"input[name='agcrime'][value='{crime}']")
     page.click("input[type='submit'][name='B1']")
@@ -2761,7 +2773,7 @@ def _armed_robbery_steps(action: Action, state: GameState):
         return
     if not page.query_selector("input[name='agcrime'][value='armed']"):
         if not _check_cs_punishment(state):
-            state.add_log("Armed crime option not available — aborting.")
+            _disable_agg_crimes(state, "Armed crime option not available — disabling aggravated crimes.")
         return
     page.check("input[name='agcrime'][value='armed']")
     page.click("input[type='submit'][name='B1']")
@@ -2894,7 +2906,7 @@ def _torch_business_steps(action: Action, state: GameState):
         return
     if not page.query_selector("input[name='agcrime'][value='torchbusiness']"):
         if not _check_cs_punishment(state):
-            state.add_log("Torch business option not available — aborting.")
+            _disable_agg_crimes(state, "Torch business option not available — disabling aggravated crimes.")
         return
     page.check("input[name='agcrime'][value='torchbusiness']")
     page.click("input[type='submit'][name='B1']")
@@ -3594,6 +3606,14 @@ def handle_deposit(action: Action, state: GameState):
     state.add_log(f"Deposit: deposited ${amount:,}.")
 
 
+def _disable_bank_invest(state: GameState, msg: str):
+    state.add_log(msg)
+    c = cfg.load()
+    c.setdefault("banking", {})["auto_invest_enabled"] = False
+    cfg.save(c)
+    import settings_rev; settings_rev.bump()
+
+
 def handle_bank_invest(action: Action, state: GameState):
     import re
     from datetime import datetime
@@ -3624,12 +3644,12 @@ def handle_bank_invest(action: Action, state: GameState):
             if bal_m:
                 closing_bal = int(bal_m.group(1).replace(",", ""))
             break
-    state.add_log(f"Banking: bank balance ${closing_bal:,} (refreshed).")
+    _dbg(state, f"Banking: bank balance ${closing_bal:,} (refreshed).")
 
-    amount = min(amount, 1500000, closing_bal)
-    if amount < 1:
-        state.add_log(f"Banking: bank balance too low to invest (${closing_bal:,}).")
+    if closing_bal < 1:
+        _disable_bank_invest(state, "Banking: bank balance is $0 — auto-invest turned off.")
         return
+    amount = min(amount, 1500000, closing_bal)
 
     page.goto(INVEST_URL, wait_until="domcontentloaded", timeout=15000)
 
@@ -3672,10 +3692,17 @@ def handle_bank_invest(action: Action, state: GameState):
                     mature_dt = datetime.strptime(date_text, "%m/%d/%Y %I:%M:%S %p")
                     save_mature_date(mature_dt.timestamp())
                     state.add_log(f"Banking: invested ${amount:,} at term {term}, matures at {date_text}.")
+                    return
                 except ValueError:
-                    state.add_log(f"Banking: invested ${amount:,} at term {term}.")
-                return
-    state.add_log(f"Banking: invested ${amount:,} at term {term}.")
+                    _disable_bank_invest(state, f"Banking: invested ${amount:,} at term {term} but couldn't read "
+                                                f"the mature date ('{date_text}') — auto-invest turned off.")
+                    return
+            break
+    # No mature date after submitting means the investment didn't go through
+    # (e.g. amount below the bank's minimum). Without a mature date the task
+    # would re-run every tick, so turn it off instead of looping.
+    _disable_bank_invest(state, f"Banking: investing ${amount:,} at term {term} didn't go through "
+                                f"(bank balance ${closing_bal:,}) — auto-invest turned off.")
 
 
 def _stash_held_weapon(state: GameState, label: str) -> bool:
@@ -7232,10 +7259,10 @@ def handle_ws_monitor(action: Action, state: GameState):
             war_hub_client.report_online(state.current_city, online)
         except Exception:
             pass
-    msg = f"WS monitor: checked {checked} name(s)."
     if whacked:
-        msg += f" {whacked} newly whacked."
-    state.add_log(msg)
+        state.add_log(f"WS monitor: checked {checked} name(s). {whacked} newly whacked.")
+    else:
+        _dbg(state, f"WS monitor: checked {checked} name(s).")
 
 
 def handle_scrape_businesses(action: Action, state: GameState):
