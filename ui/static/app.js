@@ -739,6 +739,23 @@ function _onForeignSettingsChange() {
   document.body.appendChild(bar);
 }
 
+// Store buy window from a known restock time (in-game). Matches the
+// auto-restock detection: next restock window is restock + 10:30 to + 13:30.
+function setWindowFromRestock(prefix) {
+  const input = document.getElementById(prefix + "_last_restock");
+  if (!input || !input.value) { if (input) input.focus(); return; }
+  const [h, m] = input.value.split(":").map(Number);
+  const fmt = mins => {
+    mins = ((mins % 1440) + 1440) % 1440;
+    return String(Math.floor(mins / 60)).padStart(2, "0") + ":" + String(mins % 60).padStart(2, "0");
+  };
+  const t = h * 60 + m;
+  document.getElementById(prefix + "_window_start").value = fmt(t + 10 * 60 + 30);
+  document.getElementById(prefix + "_window_end").value   = fmt(t + 13 * 60 + 30);
+  document.getElementById(prefix + "_use_time_window").checked = true;
+  autoSave();
+}
+
 function autoSave() {
   // Immediate save for checkboxes/selects.
   _doSave();
