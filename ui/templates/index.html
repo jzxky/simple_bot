@@ -1141,6 +1141,13 @@
                 <input type="time" id="bionics_window_end" value="{{ bionics_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
               </div>
             </div>
+            <div class="setting-row" title="In-game time the store last restocked. Sets the window to 10:15–13:30 after it and turns on 'Check during window only'.">
+              <label>Last restock</label>
+              <div style="display:flex;align-items:center;gap:8px">
+                <input type="time" id="bionics_last_restock">
+                <button type="button" class="btn-secondary" onclick="setWindowFromRestock('bionics')">Set window</button>
+              </div>
+            </div>
             <label class="inline-toggle setting-row">Auto-restock detection
               <label class="toggle-label">
                 <input type="checkbox" id="bionics_auto_restock" {% if bionics_cfg.get('auto_restock') %}checked{% endif %} onchange="autoSave()">
@@ -1220,6 +1227,13 @@
                 <input type="time" id="weapon_store_window_start" value="{{ weapon_store_cfg.get('window_start', '00:00') }}" onchange="autoSave()">
                 <span>to</span>
                 <input type="time" id="weapon_store_window_end" value="{{ weapon_store_cfg.get('window_end', '23:59') }}" onchange="autoSave()">
+              </div>
+            </div>
+            <div class="setting-row" title="In-game time the store last restocked. Sets the window to 10:15–13:30 after it and turns on 'Check during window only'.">
+              <label>Last restock</label>
+              <div style="display:flex;align-items:center;gap:8px">
+                <input type="time" id="weapon_store_last_restock">
+                <button type="button" class="btn-secondary" onclick="setWindowFromRestock('weapon_store')">Set window</button>
               </div>
             </div>
             <label class="inline-toggle setting-row">Auto-restock detection
