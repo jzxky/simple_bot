@@ -15,6 +15,7 @@ import bot
 import paths
 import players as pl
 import character_history as ch
+import action_log
 import consumable_limit_detector as cld
 import trait_requirements as tr
 import notifications_store
@@ -440,6 +441,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c.setdefault("jail", {})
     c["jail"]["enabled"] = data.get("jail_enabled", False)
     c["jail"]["duty"] = data.get("jail_duty", "laundry")
+    c["jail"]["duty_mode"] = "manual" if data.get("jail_duty_mode") == "manual" else "auto"
     c["jail"]["action"] = data.get("jail_action", "gym")
     c["jail"]["use_consumables"] = data.get("jail_use_consumables", False)
     c["jail"]["auto_jail_time"] = data.get("auto_jail_time", "off")
@@ -610,7 +612,8 @@ def save():
     base = data.pop("_base", None)
 
     c_live = cfg.load()
-    prev_duty = c_live.get("jail", {}).get("duty", "laundry")
+    prev_jail = dict(c_live.get("jail", {}))
+    prev_duty = prev_jail.get("duty", "laundry")
 
     if isinstance(base, dict) and base:
         # Partial/diff apply: only overwrite the leaves this client changed vs
@@ -659,11 +662,13 @@ def save():
                      pin=data.get("ui_pin"),
                      hide_credentials=True if enable_hide else None)
 
+    from tasks.jail_duties import duty_is_manual
     new_duty = c.get("jail", {}).get("duty", "laundry")
-    _MANUAL_DUTIES = {"makeshank", "digtunnel"}
-    if new_duty != prev_duty and bot.is_running():
+    was_manual = duty_is_manual(prev_jail)
+    now_manual = duty_is_manual(c.get("jail", {}))
+    if (new_duty != prev_duty or was_manual != now_manual) and bot.is_running():
         bot.request_clear_jail_duty_queue()
-        if prev_duty in _MANUAL_DUTIES and new_duty not in _MANUAL_DUTIES:
+        if was_manual and not now_manual:
             bot.request_run_jail_duties()
 
     cfg.save(c)
@@ -2041,6 +2046,101 @@ def api_earn_planner():
 @app.route("/players")
 def players_page():
     return render_template("players.html")
+
+
+# ── Action history ───────────────────────────────────────────────────────────
+
+_ACTION_FILTER_KEYS = ("character", "category", "kind", "result", "city", "q", "range", "since", "until")
+
+
+def _action_filters() -> dict:
+    return {k: request.args.get(k, "") for k in _ACTION_FILTER_KEYS}
+
+
+def _current_character() -> str:
+    return (bot.state.own_name if bot.state else "") or ""
+
+
+@app.route("/actions")
+def actions_page():
+    return render_template("actions.html", app_version=_APP_VERSION,
+                           category_labels=action_log.CATEGORY_LABELS)
+
+
+@app.route("/api/actions")
+def api_actions():
+    f = _action_filters()
+    return jsonify(action_log.query(f, request.args.get("page", 1, type=int),
+                                    request.args.get("per_page", 100, type=int)))
+
+
+@app.route("/api/actions/summary")
+def api_actions_summary():
+    return jsonify(action_log.summary(_action_filters()))
+
+
+@app.route("/api/actions/facets")
+def api_actions_facets():
+    return jsonify(action_log.facets(request.args.get("character", "")))
+
+
+@app.route("/api/actions/characters")
+def api_actions_characters():
+    current = _current_character()
+    chars = action_log.characters()
+    died = {}
+    try:
+        import player_db
+        with player_db._conn() as con:
+            for r in con.execute("SELECT username, died_at FROM players WHERE died_at != ''"):
+                died[r[0].lower()] = r[1]
+    except Exception:
+        pass
+    for c in chars:
+        c["current"] = c["name"] == current
+        c["died_at"] = died.get(c["name"].lower(), "")
+        if c["current"]:
+            c["status"] = "current"
+        elif c["died_at"]:
+            c["status"] = "dead"
+        elif c.get("status") == "active":
+            c["status"] = "inactive"
+        try:
+            c["has_history"] = ch.has_saved(c["name"])
+        except Exception:
+            c["has_history"] = False
+    return jsonify({"current": current, "characters": chars})
+
+
+@app.route("/api/actions/logs")
+def api_actions_logs():
+    import action_log_import
+    return jsonify({"logs": action_log_import.list_logs(), "current": _current_character()})
+
+
+@app.route("/api/actions/import", methods=["POST"])
+def api_actions_import():
+    import action_log_import
+    data = request.get_json(silent=True) or {}
+    files = [f for f in (data.get("files") or []) if isinstance(f, str)]
+    if not files:
+        return jsonify({"error": "Select at least one log file."}), 400
+    try:
+        result = action_log_import.run_import(files, data.get("character", ""),
+                                              dry_run=bool(data.get("dry_run")))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(result)
+
+
+@app.route("/api/actions/export.csv")
+def api_actions_export():
+    from flask import Response
+    data = action_log.export_csv(_action_filters())
+    name = request.args.get("character") or "all"
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", name)
+    return Response(data, mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=actions_{safe}.csv"})
 
 
 @app.route("/war")

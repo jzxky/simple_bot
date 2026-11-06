@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from tasks.base import Action
 from state import GameState, parse_state
 import browser
+import action_log
 import item_images
 import travel_parser
 from urllib.parse import quote, urljoin
@@ -459,6 +460,9 @@ def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
         with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
             page.click("button.mm-earn-add-btn")
         state.add_log(f"Earn queue: added {amount} x {value}.")
+        action_log.record(state, "earn_queue", _earn_display_name(value), "success",
+                          amount=None, message=f"Queued {amount} x {_earn_display_name(value)}",
+                          queued=amount, earn_id=value)
         return True
     except Exception as e:
         state.add_log(f"Earn queue: failed to add {value} ({e}).")
@@ -817,8 +821,11 @@ def _log_manual_earn_result(state: GameState, display_name: str, html: str, how:
     success, message = _game_result_message(html)
     if success is True:
         state.add_log(f"Manual earn ({how}): {display_name} — {message}")
+        action_log.record(state, "earn", display_name, "success",
+                          amount=action_log.parse_amount(message), message=message, how=how)
     elif success is False:
         state.add_log(f"Manual earn ({how}) failed: {display_name} — {message}")
+        action_log.record(state, "earn", display_name, "fail", message=message, how=how)
     else:
         state.add_log(f"Manual earn ({how}): {display_name} — no result message on the page.")
 
@@ -1164,6 +1171,7 @@ def _do_one_launder(pending, state: GameState) -> bool:
                 fail = soup2.find("div", id="fail")
                 msg = fail.get_text(strip=True) if fail else "no transfer form"
                 state.add_log(f"Banking {name}: launder produced no transfer ({msg}).")
+                action_log.record(state, "case_work", "banking", "fail", target=name, message=msg)
                 return False
             transfer_btn.click()
             page.wait_for_load_state("domcontentloaded")
@@ -1172,10 +1180,15 @@ def _do_one_launder(pending, state: GameState) -> bool:
             success = soup3.find("div", id="success")
             fail = soup3.find("div", id="fail")
             if success:
-                state.add_log(f"Banking {name}: {success.get_text(strip=True)}")
+                msg = success.get_text(strip=True)
+                state.add_log(f"Banking {name}: {msg}")
+                action_log.record(state, "case_work", "banking", "success", target=name,
+                                  amount=action_log.parse_amount(msg), message=msg)
                 return True
             elif fail:
-                state.add_log(f"Banking {name}: transfer failed — {fail.get_text(strip=True)}")
+                msg = fail.get_text(strip=True)
+                state.add_log(f"Banking {name}: transfer failed — {msg}")
+                action_log.record(state, "case_work", "banking", "fail", target=name, message=msg)
             else:
                 state.add_log(f"Banking {name}: transfer submitted (no result div).")
             return False
@@ -1384,12 +1397,18 @@ def _lawyer_defend_one(defendable, state):
             soup = BeautifulSoup(page.content(), "html.parser")
             success = soup.find("div", id="success")
             fail = soup.find("div", id="fail")
+            case_info = {"case_id": target["id"], "crime": target.get("crime", "")}
             if success:
-                state.add_log(f"Lawyer: defended case #{target['id']} ({target['crime']}) for {target['suspect']} — {success.get_text(strip=True)}")
+                msg = success.get_text(strip=True)
+                state.add_log(f"Lawyer: defended case #{target['id']} ({target['crime']}) for {target['suspect']} — {msg}")
+                action_log.record(state, "case_work", "lawyer", "success", target=target.get("suspect", ""),
+                                  amount=action_log.parse_amount(msg), message=msg, **case_info)
                 return True
             elif fail:
                 fail_text = fail.get_text(strip=True)
                 state.add_log(f"Lawyer: case #{target['id']} failed — {fail_text}")
+                action_log.record(state, "case_work", "lawyer", "fail", target=target.get("suspect", ""),
+                                  message=fail_text, **case_info)
                 if "victim" in fail_text.lower() or "another lawyer" in fail_text.lower():
                     _lawyer_blacklist_add(target["id"])
                     state.add_log(f"Lawyer: blacklisted case #{target['id']}, trying next.")
@@ -1401,14 +1420,25 @@ def _lawyer_defend_one(defendable, state):
                         soup2 = BeautifulSoup(browser.page().content(), "html.parser")
                         success2 = soup2.find("div", id="success")
                         if success2:
-                            state.add_log(f"Lawyer: defended case #{target['id']} after transfer — {success2.get_text(strip=True)}")
+                            msg2 = success2.get_text(strip=True)
+                            state.add_log(f"Lawyer: defended case #{target['id']} after transfer — {msg2}")
+                            action_log.record(state, "case_work", "lawyer", "success",
+                                              target=target.get("suspect", ""),
+                                              amount=action_log.parse_amount(msg2), message=msg2,
+                                              retry=True, **case_info)
                             return True
                         fail2 = soup2.find("div", id="fail")
-                        state.add_log(f"Lawyer: retry failed — {fail2.get_text(strip=True) if fail2 else 'unknown'}")
+                        msg2 = fail2.get_text(strip=True) if fail2 else "unknown"
+                        state.add_log(f"Lawyer: retry failed — {msg2}")
+                        action_log.record(state, "case_work", "lawyer", "fail",
+                                          target=target.get("suspect", ""), message=msg2,
+                                          retry=True, **case_info)
                     return False
                 return False
             else:
                 state.add_log(f"Lawyer: defended case #{target['id']} (no result div).")
+                action_log.record(state, "case_work", "lawyer", "success", target=target.get("suspect", ""),
+                                  message="Submitted (no result message)", **case_info)
                 return True
         except Exception as e:
             state.add_log(f"Lawyer: error defending case #{target['id']}: {e}")
@@ -1590,6 +1620,23 @@ _MOBILE_UA = (
 )
 
 
+def _log_agg(state: GameState, crime: str, result: str, target: str, message: str = "",
+             amount: "int | None" = None, **detail):
+    """Record one aggravated-crime attempt in the action history. Skipped
+    targets (recently survived, increased security, no money…) aren't real
+    attempts and aren't recorded."""
+    if result == "skip":
+        return
+    action_log.record(state, "agg", crime, result, target=target, amount=amount,
+                      message=message, energy=state.energy, **detail)
+
+
+def _agg_fail_result(fail_msg: str) -> str:
+    """A real failed attempt says 'failed'; anything else (recently survived,
+    no money, weapon needed…) is a skipped target."""
+    return "fail" if "failed" in (fail_msg or "").lower() else "skip"
+
+
 def handle_breaking_entering(action: Action, state: GameState):
     """Breaking & Entering — drains _breaking_entering_steps() to completion."""
     for _ in _breaking_entering_steps(action, state):
@@ -1692,6 +1739,7 @@ def _breaking_entering_steps(action: Action, state: GameState):
                 state.add_log(f"B&E success vs {victim}: {msg}")
                 amounts = re.findall(r"\$([\d,]+)", msg)
                 stolen = int(amounts[0].replace(",", "")) if amounts else 0
+                _log_agg(state, "breaking", "success", victim, msg, stolen or None)
                 if stolen > 0:
                     state._last_crime_victim = victim
                     state._last_crime_amount = stolen
@@ -1702,6 +1750,8 @@ def _breaking_entering_steps(action: Action, state: GameState):
             if fail_div:
                 fail_msg = fail_div.get_text(strip=True)
                 fail_counts[fail_msg] = fail_counts.get(fail_msg, 0) + 1
+                _log_agg(state, "breaking", _agg_fail_result(fail_msg),
+                         names_by_value.get(target, target), fail_msg)
 
                 if "failed" in fail_msg.lower():
                     state.record_agg_fail()
@@ -1807,6 +1857,7 @@ def _do_crime_steps(action: Action, state: GameState):
             state.add_log(f"Crime success vs {player}: {msg}")
             amounts = re.findall(r"\$([\d,]+)", msg)
             stolen = int(amounts[0].replace(",", "")) if amounts else 0
+            _log_agg(state, crime, "success", player, msg, stolen or None)
             if stolen > 0:
                 state._last_crime_victim = player
                 state._last_crime_amount = stolen
@@ -1819,6 +1870,7 @@ def _do_crime_steps(action: Action, state: GameState):
             if "failed" in fail_msg.lower():
                 state.record_agg_fail()
             fail_counts[fail_msg] = fail_counts.get(fail_msg, 0) + 1
+            _log_agg(state, crime, _agg_fail_result(fail_msg), player, fail_msg)
             if "weapon" in fail_msg.lower():
                 yield
                 continue
@@ -1857,6 +1909,7 @@ def _do_crime_steps(action: Action, state: GameState):
                     state.add_log(f"Crime success vs {player} (retry): {msg}")
                     amounts = re.findall(r"\$([\d,]+)", msg)
                     stolen = int(amounts[0].replace(",", "")) if amounts else 0
+                    _log_agg(state, crime, "success", player, msg, stolen or None, retry=True)
                     if stolen > 0:
                         state._last_crime_victim = player
                         state._last_crime_amount = stolen
@@ -1866,6 +1919,7 @@ def _do_crime_steps(action: Action, state: GameState):
                 if retry_fail:
                     retry_msg = retry_fail.get_text(strip=True)
                     fail_counts[retry_msg] = fail_counts.get(retry_msg, 0) + 1
+                    _log_agg(state, crime, _agg_fail_result(retry_msg), player, retry_msg, retry=True)
                 yield
                 continue
             if crime in ("pickpocket", "mugging", "breaking") and "recently survived" in fail_msg.lower():
@@ -2141,12 +2195,14 @@ def handle_consume(action: Action, state: GameState):
 
     successes = 0
     failures = 0
+    last_msg = ""
 
     for i in range(count):
         _nav(url, state)
 
         if "profile/default.asp" in browser.current_url():
             successes += 1
+            last_msg = f"You successfully consumed the {display_name}!"
             if count == 1:
                 state.add_log(f"Consume {display_name}: You successfully consumed the {display_name}!")
             continue
@@ -2154,6 +2210,7 @@ def handle_consume(action: Action, state: GameState):
         soup = BeautifulSoup(browser.page().content(), "html.parser")
         msg_div = soup.find("div", id="success") or soup.find("div", id="fail")
         msg = msg_div.get_text(strip=True) if msg_div else "No result."
+        last_msg = msg
         if msg_div and msg_div.get("id") == "success":
             successes += 1
         else:
@@ -2166,6 +2223,10 @@ def handle_consume(action: Action, state: GameState):
         if failures:
             summary += f" ({failures} failed)"
         state.add_log(f"Consume {display_name}: {summary}")
+    action_log.record(state, "consume", display_name, "success" if successes else "fail",
+                      message=last_msg if count == 1 else f"Consumed {successes} of {count}",
+                      count=count, consumed=successes, failed=failures,
+                      reason=action.params.get("reason", ""))
 
 
 def handle_refresh_state(action: Action, state: GameState):
@@ -2194,10 +2255,14 @@ def handle_payback(action: Action, state: GameState):
 
     if "Your transfer was blocked due to possible spam!" in result_text:
         state.add_log(f"Payback to {target} blocked as spam — skipping.")
+        action_log.record(state, "payback", "transfer", "fail", target=target,
+                          message="Transfer blocked as spam", attempted=amount)
         return
 
     _refresh_state(state)
     state.add_log(f"Payback sent: ${amount:,} to {target}.")
+    action_log.record(state, "payback", "transfer", "success", target=target, amount=amount,
+                      message=f"Paid back ${amount:,} to {target}")
 
 
 def handle_crossroad(action: Action, state: GameState):
@@ -2256,8 +2321,52 @@ def _select_radio(page, name: str, value: str) -> bool:
     return page.eval_on_selector(sel, "el => el.checked")
 
 
-def _submit_comservice_form(page, state: GameState, label: str):
-    """Submit the community service form and log the game's success/fail box."""
+def _radio_label(radio) -> str:
+    """Human-readable text for a radio option: its <label>, else the text of
+    the row it sits in, else its value."""
+    try:
+        rid = radio.get("id")
+        if rid:
+            lab = radio.find_parent().find("label", attrs={"for": rid}) if radio.find_parent() else None
+            if lab is None:
+                root = radio
+                while root.parent is not None:
+                    root = root.parent
+                lab = root.find("label", attrs={"for": rid})
+            if lab and lab.get_text(strip=True):
+                return lab.get_text(" ", strip=True)
+        lab = radio.find_parent("label")
+        if lab and lab.get_text(strip=True):
+            return lab.get_text(" ", strip=True)
+        # Text right after the radio, up to the next option or line break.
+        parts = []
+        for sib in radio.next_siblings:
+            name = getattr(sib, "name", None)
+            if name == "input" or (name and sib.find("input")):
+                break
+            if name == "br":
+                if parts:
+                    break
+                continue
+            text = sib.get_text(" ", strip=True) if name else str(sib).strip()
+            if text:
+                parts.append(text)
+        if parts:
+            return re.sub(r"\s+", " ", " ".join(parts))[:120]
+        # The table row holding only this option.
+        row = radio.find_parent("tr")
+        if row and len(row.find_all("input", attrs={"type": "radio"})) == 1 and row.get_text(strip=True):
+            return re.sub(r"\s+", " ", row.get_text(" ", strip=True))[:120]
+    except Exception:
+        pass
+    return radio.get("value", "")
+
+
+def _submit_comservice_form(page, state: GameState, label: str, category: str = "",
+                            service: str = "", **detail):
+    """Submit the community service form and log the game's success/fail box.
+    With `category`, the outcome is also recorded in the action history under
+    `service` (the option that was done)."""
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
@@ -2265,9 +2374,18 @@ def _submit_comservice_form(page, state: GameState, label: str):
     ok = soup.find("div", id="success")
     fail = soup.find("div", id="fail")
     if fail:
-        state.add_log(f"{label}: failed — {fail.get_text(' ', strip=True)}")
+        msg = fail.get_text(' ', strip=True)
+        state.add_log(f"{label}: failed — {msg}")
+        if category:
+            action_log.record(state, category, service, "fail", message=msg, **detail)
     elif ok:
-        state.add_log(f"{label}: {ok.get_text(' ', strip=True)}")
+        msg = ok.get_text(' ', strip=True)
+        state.add_log(f"{label}: {msg}")
+        if category:
+            action_log.record(state, category, service, "success", message=msg, **detail)
+    elif category:
+        action_log.record(state, category, service, "success",
+                          message="Submitted (no result message)", **detail)
 
 
 def handle_community_service(action: Action, state: GameState):
@@ -2289,7 +2407,9 @@ def handle_community_service(action: Action, state: GameState):
         if not _select_radio(page, "comservice", last["value"]):
             state.add_log(f"Community service (home city): couldn't select '{last['value']}' — not submitting.")
             return
-        state.add_log(f"Community service (home city): {last['value']}")
+        service = _radio_label(last)
+        where = "home"
+        state.add_log(f"Community service (home city): {service}")
     else:
         options = soup.find_all("input", attrs={"name": "csinothercities", "type": "radio"})
         if not options:
@@ -2303,9 +2423,13 @@ def handle_community_service(action: Action, state: GameState):
         if not _select_radio(page, "csinothercities", last["value"]):
             state.add_log(f"Community service (away city): couldn't select '{last['value']}' — not submitting.")
             return
-        state.add_log(f"Community service (away city): {last['value']}")
+        service = _radio_label(last)
+        where = "away"
+        state.add_log(f"Community service (away city): {service}")
 
-    _submit_comservice_form(page, state, "Community service")
+    _submit_comservice_form(page, state, "Community service", category="community_service",
+                            service=service, option=last["value"], where=where,
+                            punishment=state.cs_sentence > 0)
 
 
 _DOG_TRAIN_VALUES = {"walkdog", "throwstick", "givebone"}
@@ -2345,8 +2469,10 @@ def handle_do_dog_trains(action: Action, state: GameState):
     if not _select_radio(page, "comservice", val):
         state.add_log(f"Dog trains: couldn't select '{val}' — not submitting.")
         return
-    state.add_log(f"Dog trains: {val}")
-    _submit_comservice_form(page, state, "Dog trains")
+    service = _radio_label(choice)
+    state.add_log(f"Dog trains: {service}")
+    _submit_comservice_form(page, state, "Dog trains", category="dog_train",
+                            service=service, option=val, where=context)
 
 
 def handle_fire_duties(action: Action, state: GameState):
@@ -2835,6 +2961,7 @@ def _armed_robbery_steps(action: Action, state: GameState):
 
                 if state.in_hospital:
                     state.add_log("Armed robbery: redirected to hospital — injured by falling debris. Tasks paused until release.")
+                    _log_agg(state, "armed", "fail", name, "Hospitalised by falling debris", hospital=True)
                     return
 
                 result_soup = BeautifulSoup(page.content(), "html.parser")
@@ -2853,6 +2980,9 @@ def _armed_robbery_steps(action: Action, state: GameState):
                         if owner:
                             state._last_crime_victim = owner
                             state._last_crime_amount = stolen
+                        _log_agg(state, "armed", "success", name, msg, stolen, owner=owner or "")
+                    else:
+                        _log_agg(state, "armed", "success", name, msg)
                     return
 
                 fail_div = result_soup.find("div", id="fail")
@@ -2861,6 +2991,7 @@ def _armed_robbery_steps(action: Action, state: GameState):
                     if "failed" in fail_msg.lower():
                         state.record_agg_fail()
                     state.add_log(f"Armed robbery failed: {fail_msg}")
+                    _log_agg(state, "armed", _agg_fail_result(fail_msg), name, fail_msg)
                 else:
                     state.add_log("Armed robbery: unexpected result page.")
                 _nav(_u("/loggedin.asp?display=play"), state)
@@ -2963,6 +3094,7 @@ def _torch_business_steps(action: Action, state: GameState):
 
                 if state.in_hospital:
                     state.add_log("Torch business: redirected to hospital. Tasks paused until release.")
+                    _log_agg(state, "torch", "fail", name, "Redirected to hospital", hospital=True)
                     return
 
                 result_soup = BeautifulSoup(page.content(), "html.parser")
@@ -2983,6 +3115,9 @@ def _torch_business_steps(action: Action, state: GameState):
                             state._last_crime_victim = owner
                             state._last_crime_amount = stolen
                             state._last_crime_payback_mode = payback_mode
+                        _log_agg(state, "torch", "success", name, msg, stolen, owner=owner or "")
+                    else:
+                        _log_agg(state, "torch", "success", name, msg)
                     return
 
                 fail_div = result_soup.find("div", id="fail")
@@ -2991,6 +3126,7 @@ def _torch_business_steps(action: Action, state: GameState):
                     if "failed" in fail_msg.lower():
                         state.record_agg_fail()
                     state.add_log(f"Torch business failed: {fail_msg}")
+                    _log_agg(state, "torch", _agg_fail_result(fail_msg), name, fail_msg)
                 else:
                     state.add_log("Torch business: unexpected result page.")
                 _nav(_u("/loggedin.asp?display=play"), state)
@@ -3202,7 +3338,7 @@ def handle_check_hospital_cases(action: Action, state: GameState):
             href = link["href"]
             if not href.startswith("http"):
                 href = _u("/localcity/") + href
-            available[task_type] = (injury, href)
+            available[task_type] = (injury, href, patient_name)
 
     # Check for a separate DNA table — look for any heading containing "DNA"
     # followed by a table. Workflow is unknown; log and snapshot for investigation.
@@ -3232,33 +3368,49 @@ def handle_check_hospital_cases(action: Action, state: GameState):
     if not chosen:
         chosen = next(iter(available.values()))
 
-    label, url = chosen
+    label, url, patient = chosen
     state.add_log(f"Hospital case work: {label}.")
     _nav(url, state)
 
     soup = BeautifulSoup(browser.page().content(), "html.parser")
     success = soup.find("div", id="success")
     fail = soup.find("div", id="fail")
+    job = _hospital_injury_to_type(label)
     if success:
-        state.add_log(f"Hospital case work result: {success.get_text(strip=True)}")
+        msg = success.get_text(strip=True)
+        state.add_log(f"Hospital case work result: {msg}")
+        action_log.record(state, "case_work", "hospital", "success", target=patient,
+                          amount=action_log.parse_amount(msg), message=msg, job=job, injury=label)
     elif fail:
-        state.add_log(f"Hospital case work failed: {fail.get_text(strip=True)}")
+        msg = fail.get_text(strip=True)
+        state.add_log(f"Hospital case work failed: {msg}")
+        action_log.record(state, "case_work", "hospital", "fail", target=patient,
+                          message=msg, job=job, injury=label)
     else:
         state.add_log("Hospital case work: submitted.")
+        action_log.record(state, "case_work", "hospital", "success", target=patient,
+                          message="Submitted (no result message)", job=job, injury=label)
     _refresh_state(state)
 
 
-def _fire_result_log(state: GameState, page, label: str):
+def _fire_result_log(state: GameState, page, label: str, job: str = "", target: str = ""):
     """Read the success/fail div from the current page and log the outcome."""
     soup = BeautifulSoup(page.content(), "html.parser")
     success = soup.find("div", id="success")
     fail    = soup.find("div", id="fail")
     if success:
-        state.add_log(f"{label} result: {success.get_text(strip=True)}")
+        msg = success.get_text(strip=True)
+        state.add_log(f"{label} result: {msg}")
+        action_log.record(state, "case_work", "fire", "success", target=target,
+                          amount=action_log.parse_amount(msg), message=msg, job=job)
     elif fail:
-        state.add_log(f"{label} failed: {fail.get_text(strip=True)}")
+        msg = fail.get_text(strip=True)
+        state.add_log(f"{label} failed: {msg}")
+        action_log.record(state, "case_work", "fire", "fail", target=target, message=msg, job=job)
     else:
         state.add_log(f"{label}: submitted (no result div).")
+        action_log.record(state, "case_work", "fire", "success", target=target,
+                          message="Submitted (no result message)", job=job)
     _refresh_state(state)
 
 
@@ -3321,14 +3473,14 @@ def handle_check_fire_cases(action: Action, state: GameState):
             victim, url = attend_links[-1]
             state.add_log(f"Fire case work: attending fire for {victim}.")
             _nav(url, state)
-            _fire_result_log(state, page, "Fire case work")
+            _fire_result_log(state, page, "Fire case work", job="fire", target=victim)
 
         elif kind == "investigations":
             if not investigate_links:
                 continue
             state.add_log("Fire case work: performing investigation.")
             _nav(investigate_links[-1], state)  # last requested investigation
-            _fire_result_log(state, page, "Fire investigation")
+            _fire_result_log(state, page, "Fire investigation", job="investigation")
 
         elif kind == "inspections":
             _nav(_u("/localcity/firestation.asp?display=inspections"), state)
@@ -3352,7 +3504,7 @@ def handle_check_fire_cases(action: Action, state: GameState):
                 continue
             state.add_log("Fire case work: performing inspection.")
             _nav(inspect_link, state)
-            _fire_result_log(state, page, "Fire inspection")
+            _fire_result_log(state, page, "Fire inspection", job="inspection")
 
 
 def handle_clear_jail_duty_queue(action: Action, state: GameState):
@@ -3374,9 +3526,10 @@ def handle_clear_jail_duty_queue(action: Action, state: GameState):
     _refresh_state(state)
     state.add_log("Jail duty queue cleared.")
 
-    duty = cfg.load().get("jail", {}).get("duty", "laundry")
-    if duty in ("workshop", "kitchen", "laundry"):
-        handle_jail_duties(Action("jail_duties", duty=duty), state)
+    from tasks.jail_duties import duty_is_manual
+    jail_cfg = cfg.load().get("jail", {})
+    if not duty_is_manual(jail_cfg):
+        handle_jail_duties(Action("jail_duties", duty=jail_cfg.get("duty", "laundry")), state)
 
 
 # Jail-duty fallback order (highest tier → lowest). If the selected duty isn't
@@ -3395,10 +3548,15 @@ def _pick_jail_duty(duty: str, available: list) -> "str | None":
     return available[-1] if available else None
 
 
+_JAIL_DUTY_LABELS = {"makeshank": "Make Shank", "digtunnel": "Dig a tunnel",
+                     "workshop": "Workshop", "kitchen": "Kitchen", "laundry": "Laundry"}
+
+
 def _handle_jail_duty_manual(duty: str, state: GameState):
-    """Make Shank / Dig a tunnel are on the manual jail-duty form
-    (/jail/duties.asp). If the auto queue is active (manual panel hidden), clear
-    the queue and toggle to manual first, then submit one Work."""
+    """One Work on the manual jail-duty form (/jail/duties.asp) — used for Make
+    Shank / Dig a tunnel, and for every duty in manual duty mode. If the auto
+    queue is active (manual panel hidden), clear the queue and toggle to manual
+    first. Steps down to the next available duty like the auto queue does."""
     page = browser.page()
     _nav(_u("/jail/duties.asp"), state)
     if not _check_session(state):
@@ -3443,30 +3601,44 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
             pass
         state.add_log("Jail duties: switched to MANUAL mode.")
 
-    radio = page.query_selector(f"input[name='job'][value='{duty}']")
-    if not radio:
+    available = [r.get_attribute("value") or "" for r in
+                 page.query_selector_all("div.mm-earn-mode-manual input[name='job']")]
+    if not available:
+        available = [r.get_attribute("value") or "" for r in page.query_selector_all("input[name='job']")]
+    chosen = _pick_jail_duty(duty, [a for a in available if a])
+    if not chosen:
         state.add_log(f"Jail duties: '{duty}' option not found.")
         return
+    if chosen != duty:
+        state.add_log(f"Jail duties: '{duty}' unavailable — stepping down to '{chosen}'.")
+    duty = chosen
+    radio = page.query_selector(f"input[name='job'][value='{duty}']")
     radio.check()
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
-    label = {"makeshank": "Make Shank", "digtunnel": "Dig a tunnel"}.get(duty, duty)
+    label = _JAIL_DUTY_LABELS.get(duty, duty)
     soup = BeautifulSoup(page.content(), "html.parser")
     success = soup.find("div", id="success")
     fail    = soup.find("div", id="fail")
     if success:
-        state.add_log(f"Jail duty ({label}): {success.get_text(strip=True)}")
+        msg = success.get_text(strip=True)
+        state.add_log(f"Jail duty ({label}): {msg}")
+        action_log.record(state, "jail_duty", label, "success", message=msg)
     elif fail:
-        state.add_log(f"Jail duty ({label}) failed: {fail.get_text(strip=True)}")
+        msg = fail.get_text(strip=True)
+        state.add_log(f"Jail duty ({label}) failed: {msg}")
+        action_log.record(state, "jail_duty", label, "fail", message=msg)
     else:
         state.add_log(f"Jail duty ({label}): submitted.")
+        action_log.record(state, "jail_duty", label, "success", message="Submitted (no result message)")
 
 
 def handle_jail_duties(action: Action, state: GameState):
     duty = action.params["duty"]
-    if duty in ("makeshank", "digtunnel"):
+    from tasks.jail_duties import duty_is_manual
+    if duty_is_manual({**cfg.load().get("jail", {}), "duty": duty}):
         _handle_jail_duty_manual(duty, state)
         return
 
@@ -3544,10 +3716,13 @@ def handle_jail_action(action: Action, state: GameState):
     fail = soup.find("div", id="fail")
     if success:
         state.add_log(f"Jail action ({jail_action}): {success.get_text(strip=True)}")
+        action_log.record(state, "jail", jail_action, "success", message=success.get_text(strip=True))
     elif fail:
         state.add_log(f"Jail action ({jail_action}) failed: {fail.get_text(strip=True)}")
+        action_log.record(state, "jail", jail_action, "fail", message=fail.get_text(strip=True))
     else:
         state.add_log(f"Jail action ({jail_action}): submitted.")
+        action_log.record(state, "jail", jail_action, "success", message="Submitted (no result message)")
 
 
 _JAIL_CONSUME_PRIORITY = ["porn", "booze", "cigarettes"]
@@ -4239,6 +4414,8 @@ def handle_jailbreak_execute(action: Action, state: GameState):
     state.add_log(f"Jail break executed: {msg or 'submitted.'}")
     state.hold_action_timer = False
     _refresh_state(state)
+    action_log.record(state, "jail", "jailbreak", "fail" if "fail" in (msg or "").lower() else "success",
+                      message=msg or "Submitted (no result message)")
 
 
 def handle_jailbreak_calloff(action: Action, state: GameState):
@@ -5612,6 +5789,29 @@ def _closed_city_cooldown(state: GameState, target: str, reason: str):
 
 
 def handle_travel(action: Action, state: GameState) -> int:
+    """Travel, recording the outcome in the action history."""
+    target = action.params.get("target_city", "")
+    method = action.params.get("method", "airport")
+    from_city = state.current_city
+    money_before = state.clean_money
+    result = _handle_travel(action, state)
+    try:
+        if not target or (from_city or "").lower() == target.lower():
+            return result
+        # The travel code explains every outcome in its last log line.
+        last = re.sub(r"^\[[^\]]*\]\s*", "", state.log[-1]) if state.log else ""
+        spent = money_before - state.clean_money
+        moved = (state.current_city or "").lower() == target.lower()
+        action_log.record(state, "travel", method, "success" if result else "fail",
+                          target=target, amount=-spent if (moved and spent > 0) else None,
+                          message=last, from_city=from_city,
+                          arrived=moved)
+    except Exception:
+        pass
+    return result
+
+
+def _handle_travel(action: Action, state: GameState) -> int:
     from datetime import datetime
     global _travel_warrant_cooldown_until
     target = action.params.get("target_city", "")
@@ -5856,6 +6056,7 @@ def handle_gym(action: Action, state: GameState):
         if result == 0:
             _gym_travel_cooldown_until = time.monotonic() + 3600
             state.add_log("Gym: travel to Chicago failed — skipping gym for 1 hour.")
+            action_log.record(state, "gym", activity, "fail", message="Travel to Chicago failed")
             return
         if state.current_city != _CHICAGO:
             _gym_travel_cooldown_until = time.monotonic() + 3600
@@ -5888,6 +6089,8 @@ def handle_gym(action: Action, state: GameState):
             handle_withdraw(Action("withdraw", amount=needed), state)
             if state.clean_money < cost:
                 state.add_log("Gym: still insufficient funds after withdrawal — skipping.")
+                action_log.record(state, "gym", activity, "fail",
+                                  message=f"Not enough money for membership (${cost:,})")
                 return
 
         # Purchase membership
@@ -5897,6 +6100,8 @@ def handle_gym(action: Action, state: GameState):
         page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
         state.add_log(f"Gym: purchased membership (${cost:,}).")
+        action_log.record(state, "gym", "membership", "success", amount=-cost if cost else None,
+                          message=f"Purchased gym membership (${cost:,})")
 
         # Navigate back to gym activity page
         _nav(_u(_GYM_URL), state)
@@ -5910,6 +6115,7 @@ def handle_gym(action: Action, state: GameState):
         o.get("value") == activity for o in activity_select.find_all("option")
     ):
         state.add_log(f"Gym: activity '{activity}' not available on page.")
+        action_log.record(state, "gym", activity, "fail", message="Activity not available on gym page")
         return
 
     page = browser.page()
@@ -5919,6 +6125,9 @@ def handle_gym(action: Action, state: GameState):
     _refresh_state(state)
     save_last_gym_use(time.time())
     state.add_log(f"Gym: completed activity '{activity}'.")
+    gym_ok, gym_msg = _game_result_message(state.page_html or browser.page().content())
+    action_log.record(state, "gym", activity, "fail" if gym_ok is False else "success",
+                      message=gym_msg if gym_ok is not None else "Completed")
 
 
 def _casino_stopped(soup: "BeautifulSoup") -> bool:
@@ -6171,7 +6380,7 @@ def _click_eng_submit(page, radio_name: str, radio_value: str):
         }}""");
 
 
-def _finish_eng(state: GameState):
+def _finish_eng(state: GameState, job: str = "", target: str = ""):
     html = browser.page().content()
     _save_casework_snapshot("engineering_result", html)
     result_soup = BeautifulSoup(html, "html.parser")
@@ -6202,9 +6411,15 @@ def _finish_eng(state: GameState):
             break
     if result_div:
         prefix = "Engineering result" if is_success else "Engineering failed"
-        state.add_log(f"{prefix}: {result_div.get_text(strip=True)}")
+        msg = result_div.get_text(strip=True)
+        state.add_log(f"{prefix}: {msg}")
+        action_log.record(state, "case_work", "engineering", "success" if is_success else "fail",
+                          target=target, amount=action_log.parse_amount(msg) if is_success else None,
+                          message=msg, job=job)
     else:
         state.add_log("Engineering case work: submitted.")
+        action_log.record(state, "case_work", "engineering", "success", target=target,
+                          message="Submitted (no result message)", job=job)
     _refresh_state(state)
 
 
@@ -6283,7 +6498,7 @@ def handle_check_engineering_cases(action: Action, state: GameState):
             state.add_log(f"Engineering: repair business job #{val}.")
             page.check(f"input[type='radio'][name='Req_id'][value='{val}']")
             _click_eng_submit(page, "Req_id", val)
-            _finish_eng(state)
+            _finish_eng(state, job=f"repair business #{val}")
             return
 
         if typ == "construct_apartment":
@@ -6298,7 +6513,7 @@ def handle_check_engineering_cases(action: Action, state: GameState):
                 state.add_log(f"Engineering: construct apartment for '{username}'.")
                 page.check(f"input[type='radio'][name='Req_username'][value='{username}']")
                 _click_eng_submit(page, "Req_username", username)
-                _finish_eng(state)
+                _finish_eng(state, job="construct apartment", target=username)
                 return
         else:
             radios = sec.find_all("input", {"type": "radio", "name": "Req_id"})
@@ -6314,7 +6529,7 @@ def handle_check_engineering_cases(action: Action, state: GameState):
                 state.add_log(f"Engineering: {label} job #{val}" + (f" for '{username}'" if username else "") + ".")
                 page.check(f"input[type='radio'][name='Req_id'][value='{val}']")
                 _click_eng_submit(page, "Req_id", val)
-                _finish_eng(state)
+                _finish_eng(state, job=f"{label} #{val}", target=username or "")
                 return
 
 

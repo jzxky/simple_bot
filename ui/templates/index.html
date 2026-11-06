@@ -1750,6 +1750,13 @@
                 </select>
               </div>
               <div class="setting-row">
+                <label for="jail_duty_mode" title="Auto queues duties; Manual does one Work at a time so every result shows in the activity log">Duty Mode</label>
+                <select id="jail_duty_mode" style="width:160px" onchange="autoSave()">
+                  <option value="auto" {% if jail.get('duty_mode','auto') != 'manual' %}selected{% endif %}>Auto</option>
+                  <option value="manual" {% if jail.get('duty_mode') == 'manual' %}selected{% endif %}>Manual</option>
+                </select>
+              </div>
+              <div class="setting-row">
                 <label></label>
                 <button id="jail-clear-queue-btn" class="action-btn" style="justify-self:start" onclick="clearJailDutyQueue(event)" disabled>Clear Queue</button>
               </div>
@@ -2106,6 +2113,7 @@
         <div class="log-open-bar">
           <select id="log-file-select" class="log-file-select" onchange="onLogFileChange()"></select>
           <button id="log-open-btn" class="log-open-btn" onclick="openFullLog()">Open full log ↗</button>
+          <button class="log-open-btn" onclick="window.open('/actions', '_blank')">Action history ↗</button>
         </div>
         <div id="log-box"></div>
       </div>

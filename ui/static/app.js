@@ -506,6 +506,7 @@ function _buildPayload() {
     war_mode_jail_check_interval: parseInt((document.getElementById("war_mode_jail_check_interval")||{value:"5"}).value) || 5,
     jail_enabled: document.getElementById("jail_enabled").checked,
     jail_duty: document.getElementById("jail_duty").value,
+    jail_duty_mode: (document.getElementById("jail_duty_mode") || {value: "auto"}).value,
     jail_action: document.getElementById("jail_action").value,
     jail_use_consumables: document.getElementById("jail_use_consumables").checked,
     auto_jail_time: document.getElementById("auto_jail_time")?.value ?? "off",

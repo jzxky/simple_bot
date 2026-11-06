@@ -12,6 +12,7 @@ from typing import Optional
 from bs4 import BeautifulSoup
 import urls
 import notifications_store
+import action_log
 
 SERVER_TIME_FMT = "%m/%d/%Y %I:%M:%S %p"
 
@@ -176,6 +177,10 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
     s = existing
     s.page_html = html
     s.current_url = url
+    # Jail transitions are recorded in the action history; the very first parse
+    # (no server time yet) only establishes the starting state.
+    track_jail = s.server_time is not None
+    was_in_jail = s.in_jail
 
     # Server time
     st = soup.find("div", class_="serverTime")
@@ -210,6 +215,11 @@ def parse_state(html: str, url: str, existing: GameState) -> GameState:
         "Jail Rank" in d.get_text(strip=True)
         for d in soup.find_all("div", id="display_top")
     )
+    if track_jail and s.in_jail != was_in_jail:
+        if s.in_jail:
+            action_log.record(s, "jail", "jailed", "fail", message="Sent to jail")
+        else:
+            action_log.record(s, "jail", "released", "success", message="Released from jail")
 
     # Jail release countdown — find the div with data-date-end adjacent to donation_auctiontimer
     # that contains "until release" text. The span itself is JS-populated (empty in raw HTML).
