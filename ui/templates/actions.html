@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenBot — Action History</title>
+<link rel="stylesheet" href="/static/style.css?v={{ app_version }}">
+<style>
+  :root { --ok: #2f9c8a; --bad: #e0573f; --skip: #6a7f96; }
+  .ah-top { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .ah-top label { color:var(--muted); font-size:12px; width:auto; flex:0 0 auto; margin:0; }
+  .ah-top select { width:auto; min-width:320px; }
+  .ah-filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .ah-filters select, .ah-filters input { width:auto; font-size:12px; padding:4px 6px; }
+  .ah-filters input[type=search], .ah-filters input[type=date] { min-width:200px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); }
+  .ah-filters input[type=date] { min-width:0; color-scheme:dark; }
+  .ah-stats { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .ah-stat { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 14px; min-width:110px; }
+  .ah-stat .v { font-size:20px; font-weight:600; color:var(--text); }
+  .ah-stat .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .ah-grid { display:grid; grid-template-columns: 2fr 1fr; gap:14px; margin-bottom:14px; }
+  @media (max-width: 900px) { .ah-grid { grid-template-columns: 1fr; } }
+  .ah-panel { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px 12px; }
+  .ah-panel h3 { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:0 0 8px; font-weight:600; }
+  .ah-legend { display:flex; gap:14px; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .ah-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  #ah-chart { position:relative; }
+  #ah-chart svg { display:block; width:100%; height:180px; }
+  .ah-tip { position:absolute; pointer-events:none; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:6px 8px; font-size:12px; color:var(--text); white-space:nowrap; display:none; z-index:5; }
+  table.ah-table { width:100%; border-collapse:collapse; font-size:12px; }
+  table.ah-table th { text-align:left; color:var(--muted); font-weight:600; padding:5px 6px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  table.ah-table td { padding:5px 6px; border-bottom:1px solid rgba(46,64,96,.35); vertical-align:top; }
+  table.ah-table td.num, table.ah-table th.num { text-align:right; font-variant-numeric: tabular-nums; }
+  table.ah-table tr.ah-row { cursor:pointer; }
+  table.ah-table tr.ah-row:hover td { background:rgba(200,168,75,.06); }
+  tr.ah-detail td { background:var(--surface); color:var(--muted); white-space:pre-wrap; font-family:Consolas, monospace; font-size:11px; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; font-weight:600; color:#fff; }
+  .pill.success { background:var(--ok); } .pill.fail { background:var(--bad); }
+  .pill.skip, .pill.error { background:var(--skip); }
+  .ah-pager { display:flex; gap:10px; align-items:center; justify-content:flex-end; margin-top:10px; font-size:12px; color:var(--muted); }
+  .ah-empty { color:var(--muted); padding:20px; text-align:center; }
+  .ah-chars { display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:12px; }
+  .ah-char { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px; }
+  .ah-char h4 { margin:0 0 4px; font-size:15px; color:var(--accent); display:flex; justify-content:space-between; align-items:center; }
+  .ah-char .meta { font-size:12px; color:var(--muted); margin-bottom:8px; }
+  .ah-char .tot { font-size:12px; display:grid; grid-template-columns: 1fr auto auto; gap:2px 10px; margin-bottom:10px; }
+  .ah-char .tot span:nth-child(3n+2), .ah-char .tot span:nth-child(3n) { text-align:right; font-variant-numeric: tabular-nums; }
+  .ah-char .btns { display:flex; gap:8px; }
+  .status { font-size:10px; text-transform:uppercase; letter-spacing:.05em; padding:1px 6px; border-radius:3px; border:1px solid var(--border); color:var(--muted); }
+  .status.current { color:var(--accent); border-color:var(--accent); }
+  .status.dead { color:var(--bad); border-color:var(--bad); }
+  .ah-hist { margin-top:10px; font-size:12px; }
+  .ah-hist h5 { margin:8px 0 4px; font-size:11px; color:var(--muted); text-transform:uppercase; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header style="position:relative">
+    <h1><a href="/" style="color:var(--accent);text-decoration:none">← Back</a> &nbsp; Action History</h1>
+  </header>
+
+  <main>
+    <section class="card tabs-card">
+      <div class="card-body">
+        <div class="ah-top">
+          <label for="ah-char">Character</label>
+          <select id="ah-char" onchange="onCharChange()"></select>
+        </div>
+
+        <div class="tab-bar">
+          <button class="tab-btn active" id="tabbtn-history" onclick="ahShowTab('ah-tab-history', this)">History</button>
+          <button class="tab-btn" id="tabbtn-chars" onclick="ahShowTab('ah-tab-chars', this); loadCharacters()">Characters</button>
+        </div>
+
+        <!-- History tab -->
+        <div id="ah-tab-history" class="tab-panel active">
+          <div class="ah-filters">
+            <select id="f-range" onchange="onRangeChange()">
+              <option value="today">Today</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d" selected>Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="all">All time</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <span id="f-custom" style="display:none">
+              <input type="date" id="f-since" onchange="applyFilters()"> to
+              <input type="date" id="f-until" onchange="applyFilters()">
+            </span>
+            <select id="f-category" onchange="onCategoryChange()"><option value="">All categories</option></select>
+            <select id="f-kind" onchange="applyFilters()"><option value="">All kinds</option></select>
+            <select id="f-result" onchange="applyFilters()">
+              <option value="">All results</option>
+              <option value="success">Success</option>
+              <option value="fail">Fail</option>
+              <option value="skip">Skip</option>
+              <option value="error">Error</option>
+            </select>
+            <select id="f-city" onchange="applyFilters()"><option value="">All cities</option></select>
+            <input type="search" id="f-q" placeholder="Search target or message" oninput="debouncedApply()">
+            <button class="log-open-btn" onclick="exportCsv()">Export CSV</button>
+          </div>
+
+          <div class="ah-stats">
+            <div class="ah-stat"><div class="v" id="s-attempts">–</div><div class="l">Actions</div></div>
+            <div class="ah-stat"><div class="v" id="s-success">–</div><div class="l">Successes</div></div>
+            <div class="ah-stat"><div class="v" id="s-fail">–</div><div class="l">Fails</div></div>
+            <div class="ah-stat"><div class="v" id="s-rate">–</div><div class="l">Success rate</div></div>
+            <div class="ah-stat"><div class="v" id="s-amount">–</div><div class="l">Total $</div></div>
+            <div class="ah-stat"><div class="v" id="s-per">–</div><div class="l">$ per success</div></div>
+          </div>
+
+          <div class="ah-grid">
+            <div class="ah-panel">
+              <h3>Successes and fails per day</h3>
+              <div class="ah-legend"><span><i style="background:var(--ok)"></i>Success</span><span><i style="background:var(--bad)"></i>Fail</span></div>
+              <div id="ah-chart"><div class="ah-tip" id="ah-tip"></div></div>
+            </div>
+            <div class="ah-panel">
+              <h3 id="bk-fail-title">Most common fail reasons</h3>
+              <div id="bk-fails"></div>
+            </div>
+          </div>
+
+          <div class="ah-grid">
+            <div class="ah-panel">
+              <h3 id="bk-kind-title">By type</h3>
+              <div id="bk-kinds"></div>
+            </div>
+            <div class="ah-panel">
+              <h3 id="bk-target-title">Top targets</h3>
+              <div id="bk-targets"></div>
+            </div>
+          </div>
+
+          <div class="ah-panel">
+            <h3>Actions</h3>
+            <table class="ah-table">
+              <thead><tr>
+                <th>Time (UTC)</th><th>Game time</th><th>Category</th><th>Kind</th><th>Result</th>
+                <th>Target</th><th class="num">Amount</th><th>City</th>
+              </tr></thead>
+              <tbody id="ah-rows"></tbody>
+            </table>
+            <div class="ah-pager">
+              <span id="ah-page-info"></span>
+              <button class="log-open-btn" id="ah-prev" onclick="changePage(-1)">← Newer</button>
+              <button class="log-open-btn" id="ah-next" onclick="changePage(1)">Older →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Characters tab -->
+        <div id="ah-tab-chars" class="tab-panel">
+          <div id="ah-chars" class="ah-chars"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const CATEGORY_LABELS = {{ category_labels | tojson }};
+const PER_PAGE = 100;
+let ahPage = 1;
+let ahFacets = {kinds: {}, cities: []};
+let ahCharacters = [];
+let ahCurrent = "";
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function catLabel(c) { return CATEGORY_LABELS[c] || c; }
+function money(n) {
+  if (n === null || n === undefined || n === "") return "";
+  const v = Number(n);
+  return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString();
+}
+function fmtTs(ts) { return (ts || "").replace("T", " ").replace("Z", ""); }
+
+function ahShowTab(id, btn) {
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  btn.classList.add("active");
+}
+
+// ── Filters (kept in the URL so a view can be bookmarked) ───────────────────
+function currentFilters() {
+  const f = {
+    character: document.getElementById("ah-char").value,
+    category: document.getElementById("f-category").value,
+    kind: document.getElementById("f-kind").value,
+    result: document.getElementById("f-result").value,
+    city: document.getElementById("f-city").value,
+    q: document.getElementById("f-q").value.trim(),
+  };
+  const range = document.getElementById("f-range").value;
+  if (range === "custom") {
+    f.since = document.getElementById("f-since").value;
+    f.until = document.getElementById("f-until").value;
+  } else {
+    f.range = range;
+  }
+  return f;
+}
+function qs(f, extra) {
+  const p = new URLSearchParams();
+  Object.entries(Object.assign({}, f, extra || {})).forEach(([k, v]) => { if (v) p.set(k, v); });
+  return p.toString();
+}
+function syncUrl(f) {
+  const tab = document.getElementById("ah-tab-chars").classList.contains("active") ? "characters" : "";
+  history.replaceState(null, "", "/actions?" + qs(f, {tab}));
+}
+function restoreFromUrl() {
+  const p = new URLSearchParams(location.search);
+  const set = (id, k) => { if (p.has(k)) document.getElementById(id).value = p.get(k); };
+  if (p.has("since") || p.has("until")) {
+    document.getElementById("f-range").value = "custom";
+    document.getElementById("f-custom").style.display = "";
+    set("f-since", "since"); set("f-until", "until");
+  } else {
+    set("f-range", "range");
+  }
+  set("f-result", "result");
+  set("f-q", "q");
+  return p;
+}
+
+let _debounce;
+function debouncedApply() { clearTimeout(_debounce); _debounce = setTimeout(applyFilters, 300); }
+function onRangeChange() {
+  document.getElementById("f-custom").style.display =
+    document.getElementById("f-range").value === "custom" ? "" : "none";
+  applyFilters();
+}
+function onCategoryChange() { fillKinds(""); applyFilters(); }
+async function onCharChange() { await loadFacets(); applyFilters(); }
+
+function fillKinds(selected) {
+  const cat = document.getElementById("f-category").value;
+  const sel = document.getElementById("f-kind");
+  let kinds = [];
+  if (cat) kinds = ahFacets.kinds[cat] || [];
+  else Object.values(ahFacets.kinds).forEach(k => kinds = kinds.concat(k));
+  kinds = [...new Set(kinds.filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All kinds</option>' +
+    kinds.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join("");
+  if (selected && kinds.includes(selected)) sel.value = selected;
+}
+
+async function loadFacets(preset) {
+  const ch = document.getElementById("ah-char").value;
+  const r = await fetch("/api/actions/facets?" + qs({character: ch}));
+  ahFacets = await r.json();
+  const catSel = document.getElementById("f-category");
+  const prevCat = (preset && preset.category) || catSel.value;
+  const cats = Object.keys(ahFacets.kinds).sort();
+  catSel.innerHTML = '<option value="">All categories</option>' +
+    cats.map(c => `<option value="${esc(c)}">${esc(catLabel(c))}</option>`).join("");
+  if (cats.includes(prevCat)) catSel.value = prevCat;
+  fillKinds((preset && preset.kind) || document.getElementById("f-kind").value);
+  const citySel = document.getElementById("f-city");
+  const prevCity = (preset && preset.city) || citySel.value;
+  citySel.innerHTML = '<option value="">All cities</option>' +
+    ahFacets.cities.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  if (ahFacets.cities.includes(prevCity)) citySel.value = prevCity;
+}
+
+function applyFilters() { ahPage = 1; refresh(); }
+
+async function refresh() {
+  const f = currentFilters();
+  syncUrl(f);
+  const [rowsRes, sumRes] = await Promise.all([
+    fetch("/api/actions?" + qs(f, {page: ahPage, per_page: PER_PAGE})),
+    fetch("/api/actions/summary?" + qs(f)),
+  ]);
+  renderRows(await rowsRes.json());
+  renderSummary(await sumRes.json(), f);
+}
+
+// ── Rows ────────────────────────────────────────────────────────────────────
+function renderRows(data) {
+  const body = document.getElementById("ah-rows");
+  if (!data.rows.length) {
+    body.innerHTML = '<tr><td colspan="8" class="ah-empty">No actions match these filters.</td></tr>';
+  } else {
+    body.innerHTML = data.rows.map(r => {
+      const detail = Object.keys(r.detail || {}).length ? "\n" + JSON.stringify(r.detail, null, 2) : "";
+      const who = document.getElementById("ah-char").value ? "" : `[${r.character}] `;
+      return `<tr class="ah-row" onclick="toggleDetail(this)">
+        <td>${esc(fmtTs(r.ts))}</td><td>${esc(r.server_time)}</td>
+        <td>${esc(catLabel(r.category))}</td><td>${esc(r.kind)}</td>
+        <td><span class="pill ${esc(r.result)}">${esc(r.result)}</span></td>
+        <td>${esc(r.target)}</td><td class="num">${esc(money(r.amount))}</td><td>${esc(r.city)}</td>
+      </tr>
+      <tr class="ah-detail" style="display:none"><td colspan="8">${esc(who + (r.message || "(no message)") + detail)}</td></tr>`;
+    }).join("");
+  }
+  const pages = Math.max(1, Math.ceil(data.total / data.per_page));
+  document.getElementById("ah-page-info").textContent =
+    `${data.total.toLocaleString()} actions · page ${data.page} of ${pages}`;
+  document.getElementById("ah-prev").disabled = data.page <= 1;
+  document.getElementById("ah-next").disabled = data.page >= pages;
+}
+function toggleDetail(tr) {
+  const d = tr.nextElementSibling;
+  d.style.display = d.style.display === "none" ? "" : "none";
+}
+function changePage(delta) { ahPage = Math.max(1, ahPage + delta); refresh(); }
+
+// ── Summary, chart, breakdowns ──────────────────────────────────────────────
+function renderSummary(s, f) {
+  document.getElementById("s-attempts").textContent = s.attempts.toLocaleString();
+  document.getElementById("s-success").textContent = s.success.toLocaleString();
+  document.getElementById("s-fail").textContent = s.fail.toLocaleString();
+  document.getElementById("s-rate").textContent = s.success_rate === null ? "–" : s.success_rate + "%";
+  document.getElementById("s-amount").textContent = money(s.amount) || "$0";
+  document.getElementById("s-per").textContent = s.per_success ? money(s.per_success) : "–";
+  renderChart(s.daily);
+
+  const cat = f.category;
+  const targetTitle = {agg: "Top victims by $ taken", case_work: "Most frequent patients / suspects",
+                       travel: "Most visited cities", payback: "Paid back to"}[cat] || "Top targets";
+  document.getElementById("bk-target-title").textContent = targetTitle;
+  document.getElementById("bk-kind-title").textContent = cat ? `${catLabel(cat)} by type` : "By category and type";
+
+  document.getElementById("bk-kinds").innerHTML = s.by_kind.length ? table(
+    ["Type", "Count", "Success", "Fail", "Rate", "$"],
+    s.by_kind.map(k => [
+      (cat ? "" : catLabel(k.category) + " · ") + (k.kind || "–"),
+      k.n, k.success, k.fail,
+      (k.success + k.fail) ? Math.round(100 * k.success / (k.success + k.fail)) + "%" : "–",
+      money(k.amount),
+    ])) : '<div class="ah-empty">Nothing yet.</div>';
+
+  document.getElementById("bk-targets").innerHTML = s.top_targets.length ? table(
+    ["Target", "Count", "Success", "$"],
+    s.top_targets.map(t => [t.target, t.n, t.success, money(t.amount)])) : '<div class="ah-empty">Nothing yet.</div>';
+
+  document.getElementById("bk-fails").innerHTML = s.fail_reasons.length ? table(
+    ["Message", "Count"],
+    s.fail_reasons.map(r => [r.message, r.n])) : '<div class="ah-empty">No fails.</div>';
+}
+
+function table(headers, rows) {
+  return `<table class="ah-table"><thead><tr>${headers.map((h, i) =>
+    `<th class="${i ? "num" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r =>
+    `<tr>${r.map((c, i) => `<td class="${i ? "num" : ""}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+
+function renderChart(daily) {
+  const box = document.getElementById("ah-chart");
+  const tip = document.getElementById("ah-tip");
+  box.querySelectorAll("svg, .ah-empty").forEach(e => e.remove());
+  if (!daily.length) {
+    box.insertAdjacentHTML("beforeend", '<div class="ah-empty">No actions in this range.</div>');
+    return;
+  }
+  const W = 640, H = 180, padL = 34, padR = 6, padT = 8, padB = 22;
+  const max = Math.max(1, ...daily.map(d => (d.success || 0) + (d.fail || 0)));
+  const step = niceStep(max);
+  const top = Math.ceil(max / step) * step;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const slot = plotW / daily.length;
+  const bw = Math.max(2, Math.min(28, slot - 4));
+  const y = v => padT + plotH - (v / top) * plotH;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Successes and fails per day">`;
+  for (let v = 0; v <= top; v += step) {
+    svg += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(106,127,150,.18)" stroke-width="1"/>`;
+    svg += `<text x="${padL - 6}" y="${y(v) + 3}" text-anchor="end" font-size="10" fill="#6a7f96">${v}</text>`;
+  }
+  const labelEvery = Math.ceil(daily.length / 8);
+  daily.forEach((d, i) => {
+    const x = padL + i * slot + (slot - bw) / 2;
+    const s = d.success || 0, f = d.fail || 0;
+    const ys = y(s), yt = y(s + f);
+    const r = Math.min(4, bw / 2);
+    // success sits on the baseline; fail stacks above with a 2px surface gap
+    if (s) svg += barPath(x, ys, bw, y(0) - ys, f ? 0 : r, "#2f9c8a");
+    if (f) {
+      const base = s ? ys - 2 : y(0);
+      svg += barPath(x, yt, bw, Math.max(1, base - yt), r, "#e0573f");
+    }
+    svg += `<rect x="${padL + i * slot}" y="${padT}" width="${slot}" height="${plotH}" fill="transparent"
+             data-i="${i}" class="ah-hit"/>`;
+    if (i % labelEvery === 0) {
+      svg += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#6a7f96">${d.day.slice(5)}</text>`;
+    }
+  });
+  svg += "</svg>";
+  box.insertAdjacentHTML("beforeend", svg);
+  box.querySelectorAll(".ah-hit").forEach(el => {
+    el.addEventListener("mousemove", ev => {
+      const d = daily[+el.dataset.i];
+      const tot = (d.success || 0) + (d.fail || 0);
+      const rate = tot ? Math.round(100 * (d.success || 0) / tot) + "%" : "–";
+      tip.innerHTML = `<strong>${esc(d.day)}</strong><br>Success: ${d.success || 0}<br>Fail: ${d.fail || 0}<br>Rate: ${rate}`;
+      const rect = box.getBoundingClientRect();
+      tip.style.display = "block";
+      tip.style.left = Math.min(ev.clientX - rect.left + 12, rect.width - 110) + "px";
+      tip.style.top = (ev.clientY - rect.top - 10) + "px";
+    });
+    el.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+  });
+}
+// A bar with only its top corners rounded (data end), anchored on the baseline.
+function barPath(x, yTop, w, h, r, color) {
+  if (h <= 0) return "";
+  r = Math.min(r, h, w / 2);
+  const d = `M${x},${yTop + h} L${x},${yTop + r} Q${x},${yTop} ${x + r},${yTop} L${x + w - r},${yTop}
+             Q${x + w},${yTop} ${x + w},${yTop + r} L${x + w},${yTop + h} Z`;
+  return `<path d="${d}" fill="${color}"/>`;
+}
+function niceStep(max) {
+  const raw = max / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / mag;
+  return Math.max(1, (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag);
+}
+
+function exportCsv() { window.location = "/api/actions/export.csv?" + qs(currentFilters()); }
+
+// ── Characters ──────────────────────────────────────────────────────────────
+async function loadCharacterList() {
+  const r = await fetch("/api/actions/characters");
+  const data = await r.json();
+  ahCharacters = data.characters;
+  ahCurrent = data.current;
+  const sel = document.getElementById("ah-char");
+  const opts = ahCharacters.map(c => {
+    const span = `${c.first_seen.slice(0, 10)} to ${c.current ? "now" : c.last_seen.slice(0, 10)}`;
+    const tag = c.current ? "current" : c.status;
+    return `<option value="${esc(c.name)}">${esc(c.name)} (${esc(span)}, ${esc(tag)})</option>`;
+  });
+  sel.innerHTML = opts.join("") + '<option value="">All characters</option>';
+  return data;
+}
+
+function loadCharacters() {
+  syncUrl(currentFilters());
+  const box = document.getElementById("ah-chars");
+  if (!ahCharacters.length) {
+    box.innerHTML = '<div class="ah-empty">No characters recorded yet. Actions are logged once the bot is logged in.</div>';
+    return;
+  }
+  const order = ["agg", "case_work", "earn", "gym", "jail", "travel", "payback", "consume"];
+  box.innerHTML = ahCharacters.map((c, idx) => {
+    const cats = Object.keys(c.totals).sort((a, b) => (order.indexOf(a) + 99) % 99 - (order.indexOf(b) + 99) % 99);
+    const rows = cats.map(k => {
+      const t = c.totals[k];
+      const done = t.success + t.fail;
+      const rate = done ? Math.round(100 * t.success / done) + "%" : "–";
+      return `<span>${esc(catLabel(k))}</span><span>${t.n.toLocaleString()} · ${rate}</span><span>${t.amount ? esc(money(t.amount)) : ""}</span>`;
+    }).join("");
+    const where = [c.rank, c.occupation, c.home_city].filter(Boolean).join(" · ");
+    const status = c.current ? "current" : c.status;
+    return `<div class="ah-char">
+      <h4>${esc(c.name)} <span class="status ${esc(status)}">${esc(status)}</span></h4>
+      <div class="meta">${esc(where || "No rank recorded")}<br>
+        ${esc(c.first_seen.slice(0, 10))} to ${c.current ? "now" : esc(c.last_seen.slice(0, 10))}
+        · ${c.actions.toLocaleString()} actions${c.died_at ? " · died " + esc(c.died_at.slice(0, 10)) : ""}</div>
+      <div class="tot">${rows}</div>
+      <div class="btns">
+        <button class="log-open-btn" onclick="viewHistory(${idx})">View actions</button>
+        ${c.has_history ? `<button class="log-open-btn" onclick="toggleCharHistory(${idx}, this)">Character history</button>` : ""}
+      </div>
+      <div class="ah-hist" id="ah-hist-${idx}" style="display:none"></div>
+    </div>`;
+  }).join("");
+}
+
+async function viewHistory(idx) {
+  document.getElementById("ah-char").value = ahCharacters[idx].name;
+  ahShowTab("ah-tab-history", document.getElementById("tabbtn-history"));
+  await onCharChange();
+}
+
+async function toggleCharHistory(idx, btn) {
+  const box = document.getElementById("ah-hist-" + idx);
+  if (box.style.display !== "none") { box.style.display = "none"; return; }
+  box.style.display = "";
+  box.innerHTML = "Loading…";
+  const r = await fetch("/character_history?char=" + encodeURIComponent(ahCharacters[idx].name));
+  const h = await r.json();
+  let html = h.last_updated ? `<div class="meta">Saved ${esc(h.last_updated)}</div>` : "";
+  if ((h.promotion_history || []).length) {
+    html += "<h5>Promotions</h5>" + table(["Rank / occupation", "City", "Date"],
+      h.promotion_history.map(p => [`${p.rank} ${p.occupation ? "· " + p.occupation : ""}`, p.city, p.date]));
+  }
+  (h.earn_history || []).forEach(e => {
+    html += `<h5>Earns · ${esc(e.category)}</h5>` + table(["Earn", "Count"], e.entries.map(x => [x.type, x.count]));
+  });
+  (h.stat_sections || []).forEach(sec => {
+    html += `<h5>${esc(sec.title)}</h5>` + table(["", ""], sec.rows.map(x => [x.key, x.value]));
+  });
+  box.innerHTML = html || '<div class="ah-empty">No saved history.</div>';
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+(async function init() {
+  const p = restoreFromUrl();
+  await loadCharacterList();
+  const sel = document.getElementById("ah-char");
+  if (p.has("character")) sel.value = p.get("character");
+  else if (ahCurrent && ahCharacters.some(c => c.name === ahCurrent)) sel.value = ahCurrent;
+  await loadFacets({category: p.get("category"), kind: p.get("kind"), city: p.get("city")});
+  if (p.get("tab") === "characters") {
+    ahShowTab("ah-tab-chars", document.getElementById("tabbtn-chars"));
+    loadCharacters();
+  }
+  refresh();
+})();
+</script>
+</body>
+</html>

@@ -15,6 +15,7 @@ import bot
 import paths
 import players as pl
 import character_history as ch
+import action_log
 import consumable_limit_detector as cld
 import trait_requirements as tr
 import notifications_store
@@ -2041,6 +2042,80 @@ def api_earn_planner():
 @app.route("/players")
 def players_page():
     return render_template("players.html")
+
+
+# ── Action history ───────────────────────────────────────────────────────────
+
+_ACTION_FILTER_KEYS = ("character", "category", "kind", "result", "city", "q", "range", "since", "until")
+
+
+def _action_filters() -> dict:
+    return {k: request.args.get(k, "") for k in _ACTION_FILTER_KEYS}
+
+
+def _current_character() -> str:
+    return (bot.state.own_name if bot.state else "") or ""
+
+
+@app.route("/actions")
+def actions_page():
+    return render_template("actions.html", app_version=_APP_VERSION,
+                           category_labels=action_log.CATEGORY_LABELS)
+
+
+@app.route("/api/actions")
+def api_actions():
+    f = _action_filters()
+    return jsonify(action_log.query(f, request.args.get("page", 1, type=int),
+                                    request.args.get("per_page", 100, type=int)))
+
+
+@app.route("/api/actions/summary")
+def api_actions_summary():
+    return jsonify(action_log.summary(_action_filters()))
+
+
+@app.route("/api/actions/facets")
+def api_actions_facets():
+    return jsonify(action_log.facets(request.args.get("character", "")))
+
+
+@app.route("/api/actions/characters")
+def api_actions_characters():
+    current = _current_character()
+    chars = action_log.characters()
+    died = {}
+    try:
+        import player_db
+        with player_db._conn() as con:
+            for r in con.execute("SELECT username, died_at FROM players WHERE died_at != ''"):
+                died[r[0].lower()] = r[1]
+    except Exception:
+        pass
+    for c in chars:
+        c["current"] = c["name"] == current
+        c["died_at"] = died.get(c["name"].lower(), "")
+        if c["current"]:
+            c["status"] = "current"
+        elif c["died_at"]:
+            c["status"] = "dead"
+        elif c.get("status") == "active":
+            c["status"] = "inactive"
+        try:
+            c["has_history"] = ch.has_saved(c["name"])
+        except Exception:
+            c["has_history"] = False
+    return jsonify({"current": current, "characters": chars})
+
+
+@app.route("/api/actions/export.csv")
+def api_actions_export():
+    from flask import Response
+    data = action_log.export_csv(_action_filters())
+    name = request.args.get("character") or "all"
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", name)
+    return Response(data, mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=actions_{safe}.csv"})
 
 
 @app.route("/war")
