@@ -80,7 +80,7 @@ class SmartTravelTask(Task):
             reasons.append("Lawyer travel guard (cases in city)")
         from executor import travel_warrant_cooldown_active, no_vehicle_cooldown_active
         if travel_warrant_cooldown_active():
-            reasons.append("Warrant travel cooldown")
+            reasons.append("Travel cooldown (warrants or closed city)")
         if no_vehicle_cooldown_active():
             reasons.append("No vehicle cooldown")
         remaining = _POLL_INTERVAL - (time.monotonic() - self._last)

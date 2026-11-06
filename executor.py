@@ -5585,6 +5585,15 @@ def handle_repair_vehicle(action: Action, state: GameState) -> bool:
     return True
 
 
+def _closed_city_cooldown(state: GameState, target: str, reason: str):
+    """A closed destination blocks travel for 1 hour, the same cooldown as
+    outstanding warrants, so auto-travel tasks stop retrying every cycle."""
+    global _travel_warrant_cooldown_until
+    _travel_warrant_cooldown_until = time.monotonic() + 3600
+    state.add_log(f"Travel: {target} is closed ({reason}) — not travelling, "
+                  f"pausing travel for 1 hour.")
+
+
 def handle_travel(action: Action, state: GameState) -> int:
     from datetime import datetime
     global _travel_warrant_cooldown_until
@@ -5602,7 +5611,7 @@ def handle_travel(action: Action, state: GameState) -> int:
 
     # Pre-travel warrant check
     if time.monotonic() < _travel_warrant_cooldown_until:
-        state.add_log("Travel: warrant cooldown active — skipping travel.")
+        state.add_log("Travel: travel cooldown active (warrants or closed city) — skipping travel.")
         return 0
 
     warrant_mode = cfg.load().get("jail", {}).get("auto_warrant_handling", "none")
@@ -5705,7 +5714,7 @@ def handle_travel(action: Action, state: GameState) -> int:
             return 0
         if not dest["open"]:
             if not ignore_closed or not dest["href"]:
-                state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
+                _closed_city_cooldown(state, target, dest["reason"])
                 return 0
             state.add_log(f"Travel: {target} is closed ({dest['reason']}) — override on, travelling anyway.")
         match_href = dest["href"]
@@ -5761,7 +5770,7 @@ def handle_travel(action: Action, state: GameState) -> int:
     if not dest["open"]:
         # A disabled <option> can't be selected, so the override can't help there.
         if not ignore_closed or dest["reason"] == "disabled in dropdown":
-            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
+            _closed_city_cooldown(state, target, dest["reason"])
             return 0
         state.add_log(f"Travel: {target} is closed ({dest['reason']}) — override on, travelling anyway.")
 
