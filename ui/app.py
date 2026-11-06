@@ -512,6 +512,9 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["casino"]["bet_amount"] = max(100, min(99999, int(data.get("casino_bet_amount", 100) or 100)))
     c["casino"]["auto_travel"] = data.get("casino_auto_travel", False)
 
+    c.setdefault("travel", {})
+    c["travel"]["ignore_closed"] = bool(data.get("travel_ignore_closed", False))
+
     c.setdefault("smart_travel", {})
     c["smart_travel"]["enabled"] = data.get("smart_travel_enabled", False)
     c["smart_travel"]["priority_order"] = data.get("smart_travel_priority_order",

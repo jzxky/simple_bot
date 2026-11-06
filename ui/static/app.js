@@ -610,6 +610,7 @@ function _buildPayload() {
     banking_invest_amount: (document.getElementById("banking_invest_amount")||{value:0}).value,
     banking_auto_weed: (document.getElementById("banking_auto_weed")||{checked:false}).checked,
     banking_weed_queue_threshold: (document.getElementById("banking_weed_queue_threshold")||{value:5}).value,
+    travel_ignore_closed:        (document.getElementById("travel_ignore_closed")||{checked:false}).checked,
     smart_travel_enabled:        (document.getElementById("smart_travel_enabled")||{checked:false}).checked,
     smart_travel_priority_order: _serializePriorityItems("smart-travel-priority-body"),
     smart_travel_home:           (document.getElementById("smart_travel_home")||{value:"home_city"}).value,
@@ -3756,8 +3757,9 @@ function onTravelMethodChange() {
         return;
       }
       _travelDests = d.destinations || [];
+      const ignoreClosed = (document.getElementById("travel_ignore_closed") || {checked: false}).checked;
       destSel.innerHTML = '<option value="">— Select destination —</option>' +
-        _travelDests.map(o => `<option value="${escHtml(o.value)}"${o.open === false ? " disabled" : ""}>${escHtml(o.label)}</option>`).join("");
+        _travelDests.map(o => `<option value="${escHtml(o.value)}"${o.open === false && !ignoreClosed ? " disabled" : ""}>${escHtml(o.label)}</option>`).join("");
       destSel.onchange = _onTravelDestChange;
       _onTravelDestChange();
     })

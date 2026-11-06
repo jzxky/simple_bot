@@ -5590,6 +5590,7 @@ def handle_travel(action: Action, state: GameState) -> int:
     global _travel_warrant_cooldown_until
     target = action.params.get("target_city", "")
     method = action.params.get("method", "airport")
+    ignore_closed = bool(cfg.load().get("travel", {}).get("ignore_closed", False))
 
     if not target:
         state.add_log("Travel: no target city specified.")
@@ -5703,8 +5704,10 @@ def handle_travel(action: Action, state: GameState) -> int:
             state.add_log(f"Travel: {target} not available on travel.asp.")
             return 0
         if not dest["open"]:
-            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
-            return 0
+            if not ignore_closed or not dest["href"]:
+                state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
+                return 0
+            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — override on, travelling anyway.")
         match_href = dest["href"]
         url = _u(match_href) if match_href.startswith("/") else urls.BASE_URL + "/travel/" + match_href
         _nav(url, state)
@@ -5756,8 +5759,11 @@ def handle_travel(action: Action, state: GameState) -> int:
         state.add_log(f"Travel: {target} not available in airport dropdown.")
         return 0
     if not dest["open"]:
-        state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
-        return 0
+        # A disabled <option> can't be selected, so the override can't help there.
+        if not ignore_closed or dest["reason"] == "disabled in dropdown":
+            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
+            return 0
+        state.add_log(f"Travel: {target} is closed ({dest['reason']}) — override on, travelling anyway.")
 
     match = dest["name"]
     minutes = dest["minutes"] or "?"
