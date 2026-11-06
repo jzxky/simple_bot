@@ -82,6 +82,7 @@ class _Parser:
         self.fire_target = ""
         self.eng_job = ""
         self.eng_target = ""
+        self.cs = None  # (category, service, where) for the next result line
 
     def parse(self, msg: str) -> list:
         if msg.startswith("[Side] "):
@@ -181,6 +182,25 @@ class _Parser:
                       queued=int(m.group(1)))
             row["amount"] = None
             return [row]
+
+        # ── Community service / dog trains ────────────────────────────────
+        m = re.match(r"Community service \((home|away) city\): (.+)$", msg)
+        if m:
+            self.cs = ("community_service", m.group(2), m.group(1))
+            return []
+        # A result line follows its option line; any other dog-trains line is the option.
+        m = re.match(r"(Community service|Dog trains): (failed — )?(.*)$", msg)
+        if m and self.cs and self.cs[0] == ("dog_train" if m.group(1) == "Dog trains" else "community_service"):
+            cat, service, where = self.cs
+            self.cs = None
+            fn = _bad if m.group(2) else _ok
+            row = fn(cat, service, m.group(3), where=where)
+            row["amount"] = None
+            return [row]
+        m = re.match(r"Dog trains: (?!no dog|couldn't|away action|actions disabled|failed — )(.+)$", msg)
+        if m:
+            self.cs = ("dog_train", m.group(1), "")
+            return []
 
         # ── Gym ───────────────────────────────────────────────────────────
         m = re.match(r"Gym: completed activity '(.+)'\.$", msg)

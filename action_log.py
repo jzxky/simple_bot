@@ -39,6 +39,8 @@ CATEGORY_LABELS = {
     "travel": "Travel",
     "payback": "Payback",
     "consume": "Consume",
+    "community_service": "Community service",
+    "dog_train": "Dog trains",
 }
 
 _SCHEMA = """

@@ -2317,8 +2317,52 @@ def _select_radio(page, name: str, value: str) -> bool:
     return page.eval_on_selector(sel, "el => el.checked")
 
 
-def _submit_comservice_form(page, state: GameState, label: str):
-    """Submit the community service form and log the game's success/fail box."""
+def _radio_label(radio) -> str:
+    """Human-readable text for a radio option: its <label>, else the text of
+    the row it sits in, else its value."""
+    try:
+        rid = radio.get("id")
+        if rid:
+            lab = radio.find_parent().find("label", attrs={"for": rid}) if radio.find_parent() else None
+            if lab is None:
+                root = radio
+                while root.parent is not None:
+                    root = root.parent
+                lab = root.find("label", attrs={"for": rid})
+            if lab and lab.get_text(strip=True):
+                return lab.get_text(" ", strip=True)
+        lab = radio.find_parent("label")
+        if lab and lab.get_text(strip=True):
+            return lab.get_text(" ", strip=True)
+        # Text right after the radio, up to the next option or line break.
+        parts = []
+        for sib in radio.next_siblings:
+            name = getattr(sib, "name", None)
+            if name == "input" or (name and sib.find("input")):
+                break
+            if name == "br":
+                if parts:
+                    break
+                continue
+            text = sib.get_text(" ", strip=True) if name else str(sib).strip()
+            if text:
+                parts.append(text)
+        if parts:
+            return re.sub(r"\s+", " ", " ".join(parts))[:120]
+        # The table row holding only this option.
+        row = radio.find_parent("tr")
+        if row and len(row.find_all("input", attrs={"type": "radio"})) == 1 and row.get_text(strip=True):
+            return re.sub(r"\s+", " ", row.get_text(" ", strip=True))[:120]
+    except Exception:
+        pass
+    return radio.get("value", "")
+
+
+def _submit_comservice_form(page, state: GameState, label: str, category: str = "",
+                            service: str = "", **detail):
+    """Submit the community service form and log the game's success/fail box.
+    With `category`, the outcome is also recorded in the action history under
+    `service` (the option that was done)."""
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
@@ -2326,9 +2370,18 @@ def _submit_comservice_form(page, state: GameState, label: str):
     ok = soup.find("div", id="success")
     fail = soup.find("div", id="fail")
     if fail:
-        state.add_log(f"{label}: failed — {fail.get_text(' ', strip=True)}")
+        msg = fail.get_text(' ', strip=True)
+        state.add_log(f"{label}: failed — {msg}")
+        if category:
+            action_log.record(state, category, service, "fail", message=msg, **detail)
     elif ok:
-        state.add_log(f"{label}: {ok.get_text(' ', strip=True)}")
+        msg = ok.get_text(' ', strip=True)
+        state.add_log(f"{label}: {msg}")
+        if category:
+            action_log.record(state, category, service, "success", message=msg, **detail)
+    elif category:
+        action_log.record(state, category, service, "success",
+                          message="Submitted (no result message)", **detail)
 
 
 def handle_community_service(action: Action, state: GameState):
@@ -2350,7 +2403,9 @@ def handle_community_service(action: Action, state: GameState):
         if not _select_radio(page, "comservice", last["value"]):
             state.add_log(f"Community service (home city): couldn't select '{last['value']}' — not submitting.")
             return
-        state.add_log(f"Community service (home city): {last['value']}")
+        service = _radio_label(last)
+        where = "home"
+        state.add_log(f"Community service (home city): {service}")
     else:
         options = soup.find_all("input", attrs={"name": "csinothercities", "type": "radio"})
         if not options:
@@ -2364,9 +2419,13 @@ def handle_community_service(action: Action, state: GameState):
         if not _select_radio(page, "csinothercities", last["value"]):
             state.add_log(f"Community service (away city): couldn't select '{last['value']}' — not submitting.")
             return
-        state.add_log(f"Community service (away city): {last['value']}")
+        service = _radio_label(last)
+        where = "away"
+        state.add_log(f"Community service (away city): {service}")
 
-    _submit_comservice_form(page, state, "Community service")
+    _submit_comservice_form(page, state, "Community service", category="community_service",
+                            service=service, option=last["value"], where=where,
+                            punishment=state.cs_sentence > 0)
 
 
 _DOG_TRAIN_VALUES = {"walkdog", "throwstick", "givebone"}
@@ -2406,8 +2465,10 @@ def handle_do_dog_trains(action: Action, state: GameState):
     if not _select_radio(page, "comservice", val):
         state.add_log(f"Dog trains: couldn't select '{val}' — not submitting.")
         return
-    state.add_log(f"Dog trains: {val}")
-    _submit_comservice_form(page, state, "Dog trains")
+    service = _radio_label(choice)
+    state.add_log(f"Dog trains: {service}")
+    _submit_comservice_form(page, state, "Dog trains", category="dog_train",
+                            service=service, option=val, where=context)
 
 
 def handle_fire_duties(action: Action, state: GameState):
