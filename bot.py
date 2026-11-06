@@ -1138,37 +1138,30 @@ def request_use_skill(params: dict):
 
 
 def _fetch_travel_dests(method: str) -> list:
-    from bs4 import BeautifulSoup as _BS
     import urls as _urls
+    import travel_parser
     if method == "own_vehicle":
         html = browser.navigate(_urls.BASE_URL + "/travel/travel.asp")
-        soup = _BS(html, "html.parser")
-        results = []
-        for div in soup.find_all("div", class_="city-container"):
-            inner = div.find("div", class_="city-travel-container")
-            if not inner:
-                continue
-            city_name = inner.get("id", "")
-            import re as _re
-            link = inner.find("a", href=_re.compile(r"depart\.asp\?destination="))
-            if city_name and link:
-                results.append({"value": city_name, "label": city_name})
-        return results
-    else:
-        html = browser.navigate(_urls.BASE_URL + "/travel/airport.asp")
-        soup = _BS(html, "html.parser")
-        sel = soup.find("select", attrs={"name": "destination"})
-        if not sel:
-            return []
         return [
             {
-                "value": o["value"],
-                "label": o.get_text(strip=True),
-                "costs": o.get("data-costs", ""),
-                "minutes": o.get("data-minutes", ""),
+                "value": d["name"],
+                "label": d["name"] if d["open"] else f"{d['name']} (closed)",
+                "open": d["open"],
             }
-            for o in sel.find_all("option")
-            if o.get("value") and o.get("value") != "0"
+            for d in travel_parser.parse_vehicle_destinations(html)
+        ]
+    else:
+        html = browser.navigate(_urls.BASE_URL + "/travel/airport.asp")
+        return [
+            {
+                "value": d["name"],
+                "label": d["label"] if d["open"] or "closed" in d["label"].lower()
+                         else f"{d['label']} (closed)",
+                "open": d["open"],
+                "costs": d["costs"],
+                "minutes": d["minutes"],
+            }
+            for d in travel_parser.parse_airport_destinations(html)
         ]
 
 
