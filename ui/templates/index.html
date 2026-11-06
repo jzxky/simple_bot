@@ -1377,6 +1377,16 @@
         <div id="city-travel" class="tab-panel">
           {% set smart = config.get('smart_travel', {}) %}
           <div class="settings-group">
+            <h3>City Lockdown</h3>
+            <label class="inline-toggle setting-row">Travel to closed cities anyway
+              <label class="toggle-label"><input type="checkbox" id="travel_ignore_closed" {% if config.get('travel', {}).get('ignore_closed') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+            </label>
+            <p style="font-size:0.82rem;color:var(--muted);margin:6px 0 0">
+              By default the bot won't travel to a city whose lockdown status is Closed.
+              Turn this on to ignore the lockdown and travel anyway (entering a locked city violates the lockdown).
+            </p>
+          </div>
+          <div class="settings-group">
             <h3>
               Auto-Travel Home / Smart Travel
               <label class="toggle-label">

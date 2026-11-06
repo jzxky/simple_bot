@@ -154,6 +154,9 @@ DEFAULT_CONFIG = {
         "weed_queue_threshold": 5,
         "launder_queue_size": 0,
     },
+    "travel": {
+        "ignore_closed": False,            # travel to cities in lockdown (Closed) anyway
+    },
     "smart_travel": {
         "enabled": False,
         "priority_order": ["bionics_window", "weapon_window", "lawyer_cases", "gym", "casino"],

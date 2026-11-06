@@ -198,8 +198,10 @@ class SnipeTopJobTask(Task):
                 state.add_log(f"SnipeTopJob: {target_city} not available on travel.asp.")
                 return False
             if not dest["open"]:
-                state.add_log(f"SnipeTopJob: {target_city} is closed ({dest['reason']}).")
-                return False
+                if not dest["href"] or not cfg.load().get("travel", {}).get("ignore_closed", False):
+                    state.add_log(f"SnipeTopJob: {target_city} is closed ({dest['reason']}).")
+                    return False
+                state.add_log(f"SnipeTopJob: {target_city} is closed ({dest['reason']}) — override on, travelling anyway.")
             href = dest["href"]
             depart_url = href if href.startswith("http") else urls.BASE_URL + "/travel/" + href
             browser.navigate_page(pg, depart_url)
