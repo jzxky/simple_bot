@@ -50,6 +50,13 @@
   .status.current { color:var(--accent); border-color:var(--accent); }
   .status.dead { color:var(--bad); border-color:var(--bad); }
   .ah-hist { margin-top:10px; font-size:12px; }
+  .ah-note { color:var(--muted); font-size:12px; margin:0 0 10px; }
+  .ah-import-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .ah-import-bar label { color:var(--muted); font-size:12px; width:auto; min-width:0; margin:0; flex:0 0 auto; }
+  .ah-import-bar input[type=text] { width:240px; font-size:12px; padding:4px 6px; }
+  .ah-import-bar .ah-note { margin:0; }
+  #imp-logs input[type=checkbox], #imp-all { width:auto; }
+  .imp-err { color:var(--bad); }
   .ah-hist h5 { margin:8px 0 4px; font-size:11px; color:var(--muted); text-transform:uppercase; }
 </style>
 </head>
@@ -70,6 +77,7 @@
         <div class="tab-bar">
           <button class="tab-btn active" id="tabbtn-history" onclick="ahShowTab('ah-tab-history', this)">History</button>
           <button class="tab-btn" id="tabbtn-chars" onclick="ahShowTab('ah-tab-chars', this); loadCharacters()">Characters</button>
+          <button class="tab-btn" id="tabbtn-import" onclick="ahShowTab('ah-tab-import', this); loadLogs()">Import logs</button>
         </div>
 
         <!-- History tab -->
@@ -154,6 +162,32 @@
         <div id="ah-tab-chars" class="tab-panel">
           <div id="ah-chars" class="ah-chars"></div>
         </div>
+
+        <!-- Import tab -->
+        <div id="ah-tab-import" class="tab-panel">
+          <p class="ah-note">Rebuild history from the bot's activity log files. Pick the logs, enter the
+            character they belong to, then preview and import. Re-importing a log replaces what it
+            imported before, and lines from after the character's live recording started are skipped
+            so nothing is counted twice.</p>
+          <div class="ah-import-bar">
+            <label for="imp-char">Character</label>
+            <input type="text" id="imp-char" list="imp-char-list" placeholder="Character name" autocomplete="off">
+            <datalist id="imp-char-list"></datalist>
+            <button class="log-open-btn" onclick="runImport(true)">Preview</button>
+            <button class="log-open-btn" onclick="runImport(false)">Import selected</button>
+            <span id="imp-status" class="ah-note"></span>
+          </div>
+          <div id="imp-result"></div>
+          <div class="ah-panel">
+            <table class="ah-table">
+              <thead><tr>
+                <th><input type="checkbox" id="imp-all" onchange="toggleAllLogs(this.checked)" title="Select all"></th>
+                <th>Log file</th><th class="num">Size</th><th>Already imported as</th>
+              </tr></thead>
+              <tbody id="imp-logs"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -210,7 +244,8 @@ function qs(f, extra) {
   return p.toString();
 }
 function syncUrl(f) {
-  const tab = document.getElementById("ah-tab-chars").classList.contains("active") ? "characters" : "";
+  const tab = document.getElementById("ah-tab-chars").classList.contains("active") ? "characters"
+            : document.getElementById("ah-tab-import").classList.contains("active") ? "import" : "";
   history.replaceState(null, "", "/actions?" + qs(f, {tab}));
 }
 function restoreFromUrl() {
@@ -499,6 +534,65 @@ async function toggleCharHistory(idx, btn) {
   box.innerHTML = html || '<div class="ah-empty">No saved history.</div>';
 }
 
+// ── Import from activity logs ───────────────────────────────────────────────
+async function loadLogs() {
+  syncUrl(currentFilters());
+  const r = await fetch("/api/actions/logs");
+  const data = await r.json();
+  const inp = document.getElementById("imp-char");
+  if (!inp.value) inp.value = document.getElementById("ah-char").value || data.current || "";
+  document.getElementById("imp-char-list").innerHTML =
+    ahCharacters.map(c => `<option value="${esc(c.name)}">`).join("");
+  const body = document.getElementById("imp-logs");
+  document.getElementById("imp-all").checked = false;
+  if (!data.logs.length) {
+    body.innerHTML = '<tr><td colspan="4" class="ah-empty">No activity logs found.</td></tr>';
+    return;
+  }
+  body.innerHTML = data.logs.map(l => `<tr>
+      <td><input type="checkbox" class="imp-file" value="${esc(l.file)}"></td>
+      <td>${esc(l.file)}</td>
+      <td class="num">${(l.size / 1024).toFixed(0)} KB</td>
+      <td>${l.imported.map(i => `${esc(i.character)} (${i.rows})`).join(", ") || "–"}</td>
+    </tr>`).join("");
+}
+function toggleAllLogs(on) {
+  document.querySelectorAll(".imp-file").forEach(c => c.checked = on);
+}
+async function runImport(dryRun) {
+  const files = [...document.querySelectorAll(".imp-file:checked")].map(c => c.value);
+  const character = document.getElementById("imp-char").value.trim();
+  const status = document.getElementById("imp-status");
+  const out = document.getElementById("imp-result");
+  if (!files.length) { status.textContent = "Select at least one log."; return; }
+  if (!character) { status.textContent = "Enter the character name."; return; }
+  const existing = ahCharacters.some(c => c.name === character);
+  if (!dryRun && !existing &&
+      !confirm(`"${character}" isn't a character in the database yet. Import as a new character?`)) return;
+  status.textContent = dryRun ? "Reading logs…" : "Importing…";
+  const r = await fetch("/api/actions/import", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({files, character, dry_run: dryRun}),
+  });
+  const data = await r.json();
+  if (!r.ok) { status.innerHTML = `<span class="imp-err">${esc(data.error || "Import failed")}</span>`; return; }
+  status.textContent = (dryRun ? "Preview: " : "Imported ") +
+    `${data.total.toLocaleString()} actions for ${data.character}` + (dryRun ? " (nothing saved yet)" : ".");
+  out.innerHTML = '<div class="ah-panel" style="margin-bottom:12px">' + table(
+    ["Log file", "Actions", "Skipped (already live)", "By category"],
+    data.files.map(f => f.error ? [f.file, "–", "–", f.error] : [
+      f.file, f.rows, f.skipped_live,
+      Object.entries(f.by_category).map(([k, v]) => `${catLabel(k)} ${v}`).join(", ") || "none",
+    ])) + "</div>";
+  if (!dryRun) {
+    await loadCharacterList();
+    document.getElementById("ah-char").value = character;
+    await loadFacets();
+    loadLogs();
+    refresh();
+  }
+}
+
 // ── Init ────────────────────────────────────────────────────────────────────
 (async function init() {
   const p = restoreFromUrl();
@@ -510,6 +604,9 @@ async function toggleCharHistory(idx, btn) {
   if (p.get("tab") === "characters") {
     ahShowTab("ah-tab-chars", document.getElementById("tabbtn-chars"));
     loadCharacters();
+  } else if (p.get("tab") === "import") {
+    ahShowTab("ah-tab-import", document.getElementById("tabbtn-import"));
+    loadLogs();
   }
   refresh();
 })();

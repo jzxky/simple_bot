@@ -2108,6 +2108,27 @@ def api_actions_characters():
     return jsonify({"current": current, "characters": chars})
 
 
+@app.route("/api/actions/logs")
+def api_actions_logs():
+    import action_log_import
+    return jsonify({"logs": action_log_import.list_logs(), "current": _current_character()})
+
+
+@app.route("/api/actions/import", methods=["POST"])
+def api_actions_import():
+    import action_log_import
+    data = request.get_json(silent=True) or {}
+    files = [f for f in (data.get("files") or []) if isinstance(f, str)]
+    if not files:
+        return jsonify({"error": "Select at least one log file."}), 400
+    try:
+        result = action_log_import.run_import(files, data.get("character", ""),
+                                              dry_run=bool(data.get("dry_run")))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(result)
+
+
 @app.route("/api/actions/export.csv")
 def api_actions_export():
     from flask import Response

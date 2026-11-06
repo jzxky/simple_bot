@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS actions (
     amount      INTEGER,
     city        TEXT DEFAULT '',
     message     TEXT DEFAULT '',
-    detail      TEXT DEFAULT ''
+    detail      TEXT DEFAULT '',
+    source      TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS characters (
     name        TEXT PRIMARY KEY,
@@ -70,6 +71,13 @@ CREATE INDEX IF NOT EXISTS idx_actions_cat ON actions(category, kind, ts);
 CREATE INDEX IF NOT EXISTS idx_actions_target ON actions(target);
 """
 
+# Columns added after the first release — applied via ALTER TABLE if missing.
+# source: '' for rows the bot recorded live, 'import:<log file>' for rows
+# imported from an activity log.
+_MIGRATIONS = [
+    ("actions", "source", "TEXT DEFAULT ''"),
+]
+
 
 def _conn() -> sqlite3.Connection:
     c = sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False)
@@ -83,6 +91,11 @@ def _ensure():
         return
     with _conn() as c:
         c.executescript(_SCHEMA)
+        for table, col, decl in _MIGRATIONS:
+            cols = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+            if col not in cols:
+                c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_actions_source ON actions(character, source)")
     _initialized = True
 
 
@@ -156,6 +169,70 @@ def set_character_status(name: str, status: str):
                 c.execute("UPDATE characters SET status=? WHERE name=?", (status, name))
     except Exception as e:
         print(f"[action_log] set_character_status failed: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Importing from activity logs
+# ---------------------------------------------------------------------------
+
+def import_source(filename: str) -> str:
+    return f"import:{filename}"
+
+
+def live_start(character: str) -> "str | None":
+    """Timestamp of the character's first live (not imported) row, or None.
+    Log lines from then on are already in the database, so imports skip them."""
+    def run(c):
+        r = c.execute("SELECT MIN(ts) FROM actions WHERE character=? AND source=''",
+                      (character,)).fetchone()
+        return r[0] if r else None
+    return _read(run)
+
+
+def imported_files() -> dict:
+    """{log filename: [{"character": name, "rows": n}, ...]} for every imported log."""
+    def run(c):
+        out = {}
+        for r in c.execute("SELECT source, character, COUNT(*) n FROM actions"
+                           " WHERE source LIKE 'import:%' GROUP BY source, character"):
+            out.setdefault(r["source"][len("import:"):], []).append(
+                {"character": r["character"], "rows": r["n"]})
+        return out
+    return _read(run)
+
+
+def replace_imported(character: str, filename: str, rows: list) -> int:
+    """Store rows parsed from one log file for `character`, replacing anything
+    previously imported from that file for any character. Returns rows written."""
+    character = (character or "").strip()
+    if not character:
+        raise ValueError("character name is required")
+    source = import_source(filename)
+    with _lock:
+        _ensure()
+        with _conn() as c:
+            c.execute("DELETE FROM actions WHERE source=?", (source,))
+            c.executemany(
+                "INSERT INTO actions (ts, server_time, character, category, kind, result,"
+                " target, amount, city, message, detail, source)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                [(r["ts"], r.get("server_time", ""), character, r["category"], r.get("kind", ""),
+                  r["result"], r.get("target", ""), r.get("amount"), r.get("city", ""),
+                  (r.get("message") or "")[:1000],
+                  json.dumps(r["detail"], default=str) if r.get("detail") else "", source)
+                 for r in rows],
+            )
+            if rows:
+                first = min(r["ts"] for r in rows)
+                last = max(r["ts"] for r in rows)
+                c.execute(
+                    "INSERT INTO characters (name, first_seen, last_seen) VALUES (?,?,?)"
+                    " ON CONFLICT(name) DO UPDATE SET"
+                    " first_seen=MIN(characters.first_seen, excluded.first_seen),"
+                    " last_seen=MAX(characters.last_seen, excluded.last_seen)",
+                    (character, first, last),
+                )
+    return len(rows)
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +384,7 @@ def characters() -> list:
 
 
 CSV_COLUMNS = ["ts", "server_time", "character", "category", "kind", "result",
-               "target", "amount", "city", "message", "detail"]
+               "target", "amount", "city", "message", "detail", "source"]
 
 
 def export_csv(f: dict) -> str:
