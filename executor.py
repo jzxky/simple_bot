@@ -5585,12 +5585,42 @@ def handle_repair_vehicle(action: Action, state: GameState) -> bool:
     return True
 
 
+# City (lower-cased) -> monotonic time until which travel there is paused,
+# set when travel.asp / airport.asp shows the city closed (lockdown).
+_closed_city_until: "dict[str, float]" = {}
+_CLOSED_CITY_COOLDOWN = 3600
+
+
+def closed_city_cooldown_active(city: str) -> bool:
+    """True while travel to `city` is paused because it was found closed.
+    Only that city is paused; travel elsewhere is unaffected."""
+    return time.monotonic() < _closed_city_until.get((city or "").lower(), 0.0)
+
+
+def closed_city_cooldowns() -> "set[str]":
+    """Lower-cased cities currently paused because they were found closed."""
+    now = time.monotonic()
+    return {c for c, until in _closed_city_until.items() if now < until}
+
+
+def _closed_city_cooldown(state: GameState, target: str, reason: str):
+    """A closed destination pauses travel to that city for 1 hour, so
+    auto-travel tasks stop retrying it every cycle."""
+    _closed_city_until[target.lower()] = time.monotonic() + _CLOSED_CITY_COOLDOWN
+    state.add_log(f"Travel: {target} is closed ({reason}) — not travelling, "
+                  f"pausing travel to {target} for 1 hour.")
+
+
 def handle_travel(action: Action, state: GameState) -> int:
     from datetime import datetime
     global _travel_warrant_cooldown_until
     target = action.params.get("target_city", "")
     method = action.params.get("method", "airport")
-    ignore_closed = bool(cfg.load().get("travel", {}).get("ignore_closed", False))
+    # A lockdown doesn't stop the character going to its own home city, and the
+    # user can choose to ignore lockdowns altogether.
+    is_home = bool(target) and target.lower() == (state.home_city or "").lower()
+    ignore_closed = is_home or bool(cfg.load().get("travel", {}).get("ignore_closed", False))
+    closed_ok_note = "home city, lockdown doesn't apply" if is_home else "override on"
 
     if not target:
         state.add_log("Travel: no target city specified.")
@@ -5599,6 +5629,10 @@ def handle_travel(action: Action, state: GameState) -> int:
     if state.current_city.lower() == target.lower():
         state.add_log(f"Travel: already in {target}.")
         return 1
+
+    if not ignore_closed and closed_city_cooldown_active(target):
+        state.add_log(f"Travel: {target} was closed — travel there paused (1 hour cooldown).")
+        return 0
 
     # Pre-travel warrant check
     if time.monotonic() < _travel_warrant_cooldown_until:
@@ -5705,9 +5739,9 @@ def handle_travel(action: Action, state: GameState) -> int:
             return 0
         if not dest["open"]:
             if not ignore_closed or not dest["href"]:
-                state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
+                _closed_city_cooldown(state, target, dest["reason"])
                 return 0
-            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — override on, travelling anyway.")
+            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — {closed_ok_note}, travelling anyway.")
         match_href = dest["href"]
         url = _u(match_href) if match_href.startswith("/") else urls.BASE_URL + "/travel/" + match_href
         _nav(url, state)
@@ -5761,9 +5795,9 @@ def handle_travel(action: Action, state: GameState) -> int:
     if not dest["open"]:
         # A disabled <option> can't be selected, so the override can't help there.
         if not ignore_closed or dest["reason"] == "disabled in dropdown":
-            state.add_log(f"Travel: {target} is closed ({dest['reason']}) — not travelling.")
+            _closed_city_cooldown(state, target, dest["reason"])
             return 0
-        state.add_log(f"Travel: {target} is closed ({dest['reason']}) — override on, travelling anyway.")
+        state.add_log(f"Travel: {target} is closed ({dest['reason']}) — {closed_ok_note}, travelling anyway.")
 
     match = dest["name"]
     minutes = dest["minutes"] or "?"

@@ -103,7 +103,16 @@ class SmartTravelTask(Task):
             "casino_release_at": load_casino_release_at(),
             "lawyer_cases_by_city": state.lawyer_cases_by_city,
             "law_auto_travel": c.get("case_work", {}).get("law", {}).get("auto_travel", False),
+            "closed_cities": self._closed_cities(c, state),
         }
+
+    @staticmethod
+    def _closed_cities(c: dict, state: GameState) -> "set[str]":
+        if c.get("travel", {}).get("ignore_closed", False):
+            return set()
+        from executor import closed_city_cooldowns
+        # The character's own home city is never off limits during a lockdown.
+        return closed_city_cooldowns() - {(state.home_city or "").lower()}
 
     def _try_travel_expert(self, state: GameState, executor) -> bool:
         from tasks.skills_task import SKILL_IDS

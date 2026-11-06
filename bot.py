@@ -630,7 +630,7 @@ def _run(c: dict):
             if not _travel_dests_request.empty():
                 try:
                     method = _travel_dests_request.get_nowait()
-                    _travel_dests_result.put(_fetch_travel_dests(method))
+                    _travel_dests_result.put(_fetch_travel_dests(method, state.home_city))
                 except Exception as e:
                     _travel_dests_result.put(e)
 
@@ -1137,16 +1137,20 @@ def request_use_skill(params: dict):
     _skill_queue.put(params)
 
 
-def _fetch_travel_dests(method: str) -> list:
+def _fetch_travel_dests(method: str, home_city: str = "") -> list:
     import urls as _urls
     import travel_parser
+
+    def _open(d) -> bool:
+        # A lockdown doesn't apply to the character's own home city.
+        return d["open"] or d["name"].lower() == (home_city or "").lower()
     if method == "own_vehicle":
         html = browser.navigate(_urls.BASE_URL + "/travel/travel.asp")
         return [
             {
                 "value": d["name"],
                 "label": d["name"] if d["open"] else f"{d['name']} (closed)",
-                "open": d["open"],
+                "open": _open(d),
             }
             for d in travel_parser.parse_vehicle_destinations(html)
         ]
@@ -1157,7 +1161,7 @@ def _fetch_travel_dests(method: str) -> list:
                 "value": d["name"],
                 "label": d["label"] if d["open"] or "closed" in d["label"].lower()
                          else f"{d['label']} (closed)",
-                "open": d["open"],
+                "open": _open(d),
                 "costs": d["costs"],
                 "minutes": d["minutes"],
             }
