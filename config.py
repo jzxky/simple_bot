@@ -210,6 +210,7 @@ DEFAULT_CONFIG = {
     "jail": {
         "enabled": False,
         "duty": "laundry",
+        "duty_mode": "auto",
         "action": "gym",
         "use_consumables": False,
         "consumable": "cigarettes",

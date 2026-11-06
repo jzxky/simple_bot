@@ -3526,9 +3526,10 @@ def handle_clear_jail_duty_queue(action: Action, state: GameState):
     _refresh_state(state)
     state.add_log("Jail duty queue cleared.")
 
-    duty = cfg.load().get("jail", {}).get("duty", "laundry")
-    if duty in ("workshop", "kitchen", "laundry"):
-        handle_jail_duties(Action("jail_duties", duty=duty), state)
+    from tasks.jail_duties import duty_is_manual
+    jail_cfg = cfg.load().get("jail", {})
+    if not duty_is_manual(jail_cfg):
+        handle_jail_duties(Action("jail_duties", duty=jail_cfg.get("duty", "laundry")), state)
 
 
 # Jail-duty fallback order (highest tier → lowest). If the selected duty isn't
@@ -3547,10 +3548,15 @@ def _pick_jail_duty(duty: str, available: list) -> "str | None":
     return available[-1] if available else None
 
 
+_JAIL_DUTY_LABELS = {"makeshank": "Make Shank", "digtunnel": "Dig a tunnel",
+                     "workshop": "Workshop", "kitchen": "Kitchen", "laundry": "Laundry"}
+
+
 def _handle_jail_duty_manual(duty: str, state: GameState):
-    """Make Shank / Dig a tunnel are on the manual jail-duty form
-    (/jail/duties.asp). If the auto queue is active (manual panel hidden), clear
-    the queue and toggle to manual first, then submit one Work."""
+    """One Work on the manual jail-duty form (/jail/duties.asp) — used for Make
+    Shank / Dig a tunnel, and for every duty in manual duty mode. If the auto
+    queue is active (manual panel hidden), clear the queue and toggle to manual
+    first. Steps down to the next available duty like the auto queue does."""
     page = browser.page()
     _nav(_u("/jail/duties.asp"), state)
     if not _check_session(state):
@@ -3595,30 +3601,44 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
             pass
         state.add_log("Jail duties: switched to MANUAL mode.")
 
-    radio = page.query_selector(f"input[name='job'][value='{duty}']")
-    if not radio:
+    available = [r.get_attribute("value") or "" for r in
+                 page.query_selector_all("div.mm-earn-mode-manual input[name='job']")]
+    if not available:
+        available = [r.get_attribute("value") or "" for r in page.query_selector_all("input[name='job']")]
+    chosen = _pick_jail_duty(duty, [a for a in available if a])
+    if not chosen:
         state.add_log(f"Jail duties: '{duty}' option not found.")
         return
+    if chosen != duty:
+        state.add_log(f"Jail duties: '{duty}' unavailable — stepping down to '{chosen}'.")
+    duty = chosen
+    radio = page.query_selector(f"input[name='job'][value='{duty}']")
     radio.check()
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
-    label = {"makeshank": "Make Shank", "digtunnel": "Dig a tunnel"}.get(duty, duty)
+    label = _JAIL_DUTY_LABELS.get(duty, duty)
     soup = BeautifulSoup(page.content(), "html.parser")
     success = soup.find("div", id="success")
     fail    = soup.find("div", id="fail")
     if success:
-        state.add_log(f"Jail duty ({label}): {success.get_text(strip=True)}")
+        msg = success.get_text(strip=True)
+        state.add_log(f"Jail duty ({label}): {msg}")
+        action_log.record(state, "jail_duty", label, "success", message=msg)
     elif fail:
-        state.add_log(f"Jail duty ({label}) failed: {fail.get_text(strip=True)}")
+        msg = fail.get_text(strip=True)
+        state.add_log(f"Jail duty ({label}) failed: {msg}")
+        action_log.record(state, "jail_duty", label, "fail", message=msg)
     else:
         state.add_log(f"Jail duty ({label}): submitted.")
+        action_log.record(state, "jail_duty", label, "success", message="Submitted (no result message)")
 
 
 def handle_jail_duties(action: Action, state: GameState):
     duty = action.params["duty"]
-    if duty in ("makeshank", "digtunnel"):
+    from tasks.jail_duties import duty_is_manual
+    if duty_is_manual({**cfg.load().get("jail", {}), "duty": duty}):
         _handle_jail_duty_manual(duty, state)
         return
 

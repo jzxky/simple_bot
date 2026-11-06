@@ -441,6 +441,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c.setdefault("jail", {})
     c["jail"]["enabled"] = data.get("jail_enabled", False)
     c["jail"]["duty"] = data.get("jail_duty", "laundry")
+    c["jail"]["duty_mode"] = "manual" if data.get("jail_duty_mode") == "manual" else "auto"
     c["jail"]["action"] = data.get("jail_action", "gym")
     c["jail"]["use_consumables"] = data.get("jail_use_consumables", False)
     c["jail"]["auto_jail_time"] = data.get("auto_jail_time", "off")
@@ -611,7 +612,8 @@ def save():
     base = data.pop("_base", None)
 
     c_live = cfg.load()
-    prev_duty = c_live.get("jail", {}).get("duty", "laundry")
+    prev_jail = dict(c_live.get("jail", {}))
+    prev_duty = prev_jail.get("duty", "laundry")
 
     if isinstance(base, dict) and base:
         # Partial/diff apply: only overwrite the leaves this client changed vs
@@ -660,11 +662,13 @@ def save():
                      pin=data.get("ui_pin"),
                      hide_credentials=True if enable_hide else None)
 
+    from tasks.jail_duties import duty_is_manual
     new_duty = c.get("jail", {}).get("duty", "laundry")
-    _MANUAL_DUTIES = {"makeshank", "digtunnel"}
-    if new_duty != prev_duty and bot.is_running():
+    was_manual = duty_is_manual(prev_jail)
+    now_manual = duty_is_manual(c.get("jail", {}))
+    if (new_duty != prev_duty or was_manual != now_manual) and bot.is_running():
         bot.request_clear_jail_duty_queue()
-        if prev_duty in _MANUAL_DUTIES and new_duty not in _MANUAL_DUTIES:
+        if was_manual and not now_manual:
             bot.request_run_jail_duties()
 
     cfg.save(c)

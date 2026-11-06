@@ -219,6 +219,14 @@ class _Parser:
             return [_bad("gym", "", msg[len("Gym: "):])]
 
         # ── Jail ──────────────────────────────────────────────────────────
+        m = re.match(r"Jail duty \((.+?)\) failed: (.*)$", msg)
+        if m:
+            return [_bad("jail_duty", m.group(1), m.group(2))]
+        m = re.match(r"Jail duty \((.+?)\): (.*)$", msg)
+        if m:
+            text = m.group(2)
+            return [_ok("jail_duty", m.group(1),
+                        "Submitted (no result message)" if text == "submitted." else text)]
         m = re.match(r"Jail action \((.+?)\) failed: (.*)$", msg)
         if m:
             return [_bad("jail", m.group(1), m.group(2))]
