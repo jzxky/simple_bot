@@ -1622,7 +1622,11 @@ _MOBILE_UA = (
 
 def _log_agg(state: GameState, crime: str, result: str, target: str, message: str = "",
              amount: "int | None" = None, **detail):
-    """Record one aggravated-crime attempt in the action history."""
+    """Record one aggravated-crime attempt in the action history. Skipped
+    targets (recently survived, increased security, no money…) aren't real
+    attempts and aren't recorded."""
+    if result == "skip":
+        return
     action_log.record(state, "agg", crime, result, target=target, amount=amount,
                       message=message, energy=state.energy, **detail)
 
@@ -2257,7 +2261,7 @@ def handle_payback(action: Action, state: GameState):
 
     _refresh_state(state)
     state.add_log(f"Payback sent: ${amount:,} to {target}.")
-    action_log.record(state, "payback", "transfer", "success", target=target, amount=-amount,
+    action_log.record(state, "payback", "transfer", "success", target=target, amount=amount,
                       message=f"Paid back ${amount:,} to {target}")
 
 

@@ -109,12 +109,14 @@
             <button class="log-open-btn" onclick="exportCsv()">Export CSV</button>
           </div>
 
+          <p class="ah-note" id="ah-earn-note" style="display:none">Auto earns can't be tracked: the game runs the
+            auto earn queue on its own servers, so only manual earns and queue top-ups are recorded.</p>
           <div class="ah-stats">
             <div class="ah-stat"><div class="v" id="s-attempts">–</div><div class="l">Actions</div></div>
             <div class="ah-stat"><div class="v" id="s-success">–</div><div class="l">Successes</div></div>
             <div class="ah-stat"><div class="v" id="s-fail">–</div><div class="l">Fails</div></div>
             <div class="ah-stat"><div class="v" id="s-rate">–</div><div class="l">Success rate</div></div>
-            <div class="ah-stat"><div class="v" id="s-amount">–</div><div class="l">Total $</div></div>
+            <div class="ah-stat"><div class="v" id="s-amount">–</div><div class="l">Total earned</div></div>
             <div class="ah-stat"><div class="v" id="s-per">–</div><div class="l">$ per success</div></div>
           </div>
 
@@ -357,19 +359,25 @@ function renderSummary(s, f) {
   renderChart(s.daily);
 
   const cat = f.category;
+  document.getElementById("ah-earn-note").style.display =
+    (cat === "earn" || cat === "earn_queue") ? "" : "none";
   const targetTitle = {agg: "Top victims by $ taken", case_work: "Most frequent patients / suspects",
                        travel: "Most visited cities", payback: "Paid back to"}[cat] || "Top targets";
   document.getElementById("bk-target-title").textContent = targetTitle;
   document.getElementById("bk-kind-title").textContent = cat ? `${catLabel(cat)} by type` : "By category and type";
 
-  document.getElementById("bk-kinds").innerHTML = s.by_kind.length ? table(
+  document.getElementById("bk-kinds").innerHTML = !s.by_kind.length ? '<div class="ah-empty">Nothing yet.</div>'
+    : cat === "consume" ? table(
+    ["Item", "Times", "Used"],
+    s.by_kind.map(k => [k.kind || "–", k.n, k.units]))
+    : table(
     ["Type", "Count", "Success", "Fail", "Rate", "$"],
     s.by_kind.map(k => [
       (cat ? "" : catLabel(k.category) + " · ") + (k.kind || "–"),
       k.n, k.success, k.fail,
       (k.success + k.fail) ? Math.round(100 * k.success / (k.success + k.fail)) + "%" : "–",
       money(k.amount),
-    ])) : '<div class="ah-empty">Nothing yet.</div>';
+    ]));
 
   document.getElementById("bk-targets").innerHTML = s.top_targets.length ? table(
     ["Target", "Count", "Success", "$"],
@@ -488,7 +496,11 @@ function loadCharacters() {
       const t = c.totals[k];
       const done = t.success + t.fail;
       const rate = done ? Math.round(100 * t.success / done) + "%" : "–";
-      return `<span>${esc(catLabel(k))}</span><span>${t.n.toLocaleString()} · ${rate}</span><span>${t.amount ? esc(money(t.amount)) : ""}</span>`;
+      if (k === "consume") {
+        return `<span>${esc(catLabel(k))}</span><span>${t.units.toLocaleString()} used</span><span></span>`;
+      }
+      const label = k === "earn" ? "Earns (manual only)" : catLabel(k);
+      return `<span>${esc(label)}</span><span>${t.n.toLocaleString()} · ${rate}</span><span>${t.amount ? esc(money(t.amount)) : ""}</span>`;
     }).join("");
     const where = [c.rank, c.occupation, c.home_city].filter(Boolean).join(" · ");
     const status = c.current ? "current" : c.status;

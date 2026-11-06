@@ -311,6 +311,16 @@ def _row(r) -> dict:
     return d
 
 
+# Money a successful action brought in. Costs (negative amounts) and paybacks
+# are left out, so totals never show a net profit.
+_EARNED = "CASE WHEN result='success' AND amount > 0 AND category != 'payback' THEN amount END"
+# Amount shown per type/target: what was taken or earned, or for paybacks what was paid.
+_AMOUNT = "CASE WHEN result='success' AND amount > 0 THEN amount END"
+# Consumables used: the item count recorded with each consume (1 when not recorded).
+_UNITS = ("CASE WHEN category='consume' AND result='success' THEN"
+          " COALESCE(CASE WHEN detail != '' THEN json_extract(detail, '$.consumed') END, 1) END")
+
+
 def summary(f: dict) -> dict:
     """Totals, a daily success/fail series and per-category breakdowns for a filter."""
     where, args = _where(f)
@@ -320,7 +330,7 @@ def summary(f: dict) -> dict:
         t = c.execute(
             "SELECT COUNT(*) n,"
             " SUM(result='success') s, SUM(result='fail') fl,"
-            " COALESCE(SUM(CASE WHEN result='success' THEN amount END),0) amt"
+            f" COALESCE(SUM({_EARNED}),0) amt"
             f" FROM actions{where}", args).fetchone()
         n, s, fl, amt = t["n"] or 0, t["s"] or 0, t["fl"] or 0, t["amt"] or 0
         daily = [dict(r) for r in c.execute(
@@ -329,11 +339,11 @@ def summary(f: dict) -> dict:
         by_kind = [dict(r) for r in c.execute(
             "SELECT category, kind, COUNT(*) n, SUM(result='success') success,"
             " SUM(result='fail') fail,"
-            " COALESCE(SUM(CASE WHEN result='success' THEN amount END),0) amount"
+            f" COALESCE(SUM({_AMOUNT}),0) amount, COALESCE(SUM({_UNITS}),0) units"
             f" FROM actions{where} GROUP BY category, kind ORDER BY n DESC LIMIT 50", args)]
         top_targets = [dict(r) for r in c.execute(
             "SELECT target, COUNT(*) n, SUM(result='success') success,"
-            " COALESCE(SUM(CASE WHEN result='success' THEN amount END),0) amount"
+            f" COALESCE(SUM({_AMOUNT}),0) amount"
             f" FROM actions{where}{and_}target != '' GROUP BY target"
             " ORDER BY amount DESC, n DESC LIMIT 10", args)]
         fail_reasons = [dict(r) for r in c.execute(
@@ -374,10 +384,11 @@ def characters() -> list:
             for t in c.execute(
                     "SELECT category, COUNT(*) n, SUM(result='success') success,"
                     " SUM(result='fail') fail,"
-                    " COALESCE(SUM(CASE WHEN result='success' THEN amount END),0) amount"
+                    f" COALESCE(SUM({_AMOUNT}),0) amount, COALESCE(SUM({_UNITS}),0) units"
                     " FROM actions WHERE character=? GROUP BY category", (d["name"],)):
                 totals[t["category"]] = {"n": t["n"], "success": t["success"] or 0,
-                                         "fail": t["fail"] or 0, "amount": t["amount"] or 0}
+                                         "fail": t["fail"] or 0, "amount": t["amount"] or 0,
+                                         "units": t["units"] or 0}
             d["totals"] = totals
             d["actions"] = sum(v["n"] for v in totals.values())
             out.append(d)

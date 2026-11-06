@@ -67,8 +67,10 @@ def _expand_fail_summary(kind: str, text: str) -> list:
     rows = []
     for m in re.finditer(r"(\d+)x (.*?)(?=, \d+x |$)", body.strip()):
         msg = m.group(2).strip()
+        if _fail_result(msg) != "fail":
+            continue  # recently survived, increased security… aren't real attempts
         for _ in range(int(m.group(1))):
-            rows.append(_bad("agg", kind, msg, result=_fail_result(msg), summarised=True))
+            rows.append(_bad("agg", kind, msg, summarised=True))
     return rows
 
 
@@ -112,7 +114,9 @@ class _Parser:
         m = re.match(r"(Armed robbery|Torch business) failed: (.*)$", msg)
         if m:
             kind = "armed" if m.group(1) == "Armed robbery" else "torch"
-            return [_bad("agg", kind, m.group(2), result=_fail_result(m.group(2)))]
+            if _fail_result(m.group(2)) != "fail":
+                return []
+            return [_bad("agg", kind, m.group(2))]
 
         # ── Case work ─────────────────────────────────────────────────────
         m = re.match(r"Hospital case work result: (.*)$", msg)
@@ -238,7 +242,7 @@ class _Parser:
         m = re.match(r"Payback sent: \$([\d,]+) to (.+)\.$", msg)
         if m:
             row = _ok("payback", "transfer", msg, m.group(2))
-            row["amount"] = -int(m.group(1).replace(",", ""))
+            row["amount"] = int(m.group(1).replace(",", ""))
             return [row]
         m = re.match(r"Payback to (.+) blocked as spam", msg)
         if m:
