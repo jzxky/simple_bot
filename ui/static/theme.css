@@ -21,12 +21,10 @@ header h1 { letter-spacing: .02em; }
 /* Cards, tiles and bars */
 .card { border-radius: var(--r-card); box-shadow: var(--shadow); border-color: var(--card-border); padding: 18px 20px; }
 .card h2 { border-bottom-color: var(--hairline); }
-.status-bar, .main-tab-bar, .stats-grid .stat-item { border-radius: var(--r-card); border-color: var(--card-border); }
+.status-bar, .stats-grid .stat-item { border-radius: var(--r-card); border-color: var(--card-border); }
 .stats-grid .stat-item { background: var(--surface); box-shadow: var(--shadow); }
 .consumable-item { border-radius: 10px; background: var(--surface2); border-color: var(--hairline); }
 button, .btn-secondary, .action-btn { border-radius: 8px; }
-.tab-btn { border-radius: 8px 8px 0 0; }
-.main-tab.active { background: rgba(212,178,90,.10); }
 
 /* Status group tables become rounded cards with hairline dividers */
 .stat-groups-grid { gap: 12px; }
@@ -78,8 +76,6 @@ html[data-theme="graphite"] #pause-btn:disabled { background: #171a21; color: #5
 html[data-theme="graphite"] #screenshot-btn { background: #1f2430; color: var(--text); border-color: #2c3240; }
 html[data-theme="graphite"] #toggle-btn:not(.running) { background: var(--accent); border-color: var(--accent); }
 html[data-theme="graphite"] #toggle-btn:not(.running):hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-html[data-theme="graphite"] .main-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(91,140,255,.08); }
-html[data-theme="graphite"] .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(91,140,255,.08); }
 html[data-theme="graphite"] .dot.running { background: var(--success); box-shadow: 0 0 0 3px rgba(47,191,113,.2); }
 @media (max-width: 559px) {
   html[data-theme="graphite"] .stat-progress-cell::after, html[data-theme="graphite"] .stat-progress-bg { left:10px; bottom:7px; }
@@ -100,7 +96,7 @@ html[data-theme="daylight"] body { background: var(--bg); }
 html[data-theme="daylight"] input[type="time"],
 html[data-theme="daylight"] input[type="date"],
 html[data-theme="daylight"] input[type="datetime-local"] { color-scheme: light; }
-html[data-theme="daylight"] .status-bar, html[data-theme="daylight"] .main-tab-bar { background: #fff; }
+html[data-theme="daylight"] .status-bar { background: #fff; }
 html[data-theme="daylight"] #game-time-value { color: var(--text); }
 html[data-theme="daylight"] #pause-btn { background: #fff; border-color: #e2c98e; color: #8f6614; }
 html[data-theme="daylight"] #pause-btn:disabled { background: #f3f4f6; border-color: var(--border); color: #a0a7b2; }
@@ -109,7 +105,6 @@ html[data-theme="daylight"] .btn-secondary,
 html[data-theme="daylight"] .action-btn,
 html[data-theme="daylight"] .close-bot-btn { background: #fff; color: var(--text); border-color: var(--border); }
 html[data-theme="daylight"] .main-tab, html[data-theme="daylight"] .tab-btn { color: #7a8391; }
-html[data-theme="daylight"] .main-tab.active, html[data-theme="daylight"] .tab-btn.active { background: rgba(168,120,28,.08); }
 html[data-theme="daylight"] .stats-grid .stat-item,
 html[data-theme="daylight"] .consumable-item { background: #fff; }
 html[data-theme="daylight"] .stat-pct.pct-high { color: var(--accent); }
@@ -144,7 +139,6 @@ html[data-theme="daylight"] .gs-confirm-warning { color: #8f6614; border-color: 
 .theme-opt[data-theme-opt="refined"] i  { background: linear-gradient(135deg, #1f2a3c 50%, #d4b25a 50%); }
 .theme-opt[data-theme-opt="graphite"] i { background: linear-gradient(135deg, #15181e 50%, #5b8cff 50%); }
 .theme-opt[data-theme-opt="daylight"] i { background: linear-gradient(135deg, #ffffff 50%, #a8781c 50%); }
-html[data-theme="daylight"] .main-tab.active, html[data-theme="daylight"] .tab-btn.active { color: var(--accent); }
 html[data-theme="daylight"] .ep-unavailable { color: #7a5a12; border-color: #e2c98e; }
 
 /* Boxy toggles: rounded-rectangle track with a square knob */
@@ -153,3 +147,19 @@ html[data-theme="daylight"] .ep-unavailable { color: #7a5a12; border-color: #e2c
 .toggle-label input:checked + .toggle { box-shadow: none; }
 .toggle-label input:checked + .toggle::after { left: 17px; }
 .setting-row { border-bottom-color: var(--hairline); }
+
+/* ── Tabs: "Underline" style, shared by the main menu and section tabs ──
+   Plain text on a hairline; the active tab gets an accent underline. */
+.main-tab-bar { background: var(--bg); border: none; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--hairline); padding: 0; gap: 4px; }
+.main-tab { text-transform: none; letter-spacing: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; padding: 10px 12px; border-radius: 0; }
+.main-tab:hover, .tab-btn:hover { color: var(--text); background: none; }
+.main-tab.active { color: var(--text); border-bottom-color: var(--accent); background: none; }
+.main-tab.active .main-tab-icon { color: var(--accent); }
+.main-tab-label { font-size: 13.5px; font-weight: 600; }
+@media (min-width: 1100px) { .main-tab-label { display: inline; } }
+.tab-bar { border-bottom: 1px solid var(--hairline); gap: 4px; margin-bottom: 16px; }
+.tab-btn { text-transform: none; letter-spacing: 0; font-size: 13.5px; padding: 10px 12px; border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 0; background: none; }
+.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); background: none; }
+.in-jail .main-tab.active, .in-jail .tab-btn.active { color: #e0e0e0; border-bottom-color: #e0e0e0; background: none; }
+@media (max-width: 540px) { .main-tab { padding: 10px 4px; } }
+html[data-theme="daylight"] .main-tab.active, html[data-theme="daylight"] .tab-btn.active { color: var(--text); }
