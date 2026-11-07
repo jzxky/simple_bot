@@ -36,7 +36,6 @@ CATEGORY_LABELS = {
     "earn_queue": "Earn queue",
     "gym": "Gym",
     "jail": "Jail",
-    "travel": "Travel",
     "payback": "Payback",
     "consume": "Consume",
     "community_service": "Community service",
@@ -99,6 +98,8 @@ def _ensure():
             if col not in cols:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
         c.execute("CREATE INDEX IF NOT EXISTS idx_actions_source ON actions(character, source)")
+        # Travel is no longer tracked; clear rows recorded before that change.
+        c.execute("DELETE FROM actions WHERE category = 'travel'")
     _initialized = True
 
 
@@ -246,7 +247,13 @@ _RANGES = {"24h": 1, "7d": 7, "30d": 30}
 
 
 def _where(f: dict):
-    """Build a WHERE clause from a filter dict (all keys optional):
+    """(" WHERE ...", args) for a filter dict, or ("", []) with no filters."""
+    body, args = _conditions(f)
+    return ((" WHERE " + body) if body else ""), args
+
+
+def _conditions(f: dict):
+    """Build the conditions from a filter dict (all keys optional):
     character, category, kind, result, city, q, range (today|24h|7d|30d|all),
     since, until (YYYY-MM-DD)."""
     clauses, args = [], []
@@ -276,8 +283,7 @@ def _where(f: dict):
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", until):
         clauses.append("ts <= ?")
         args.append(until + "T23:59:59Z")
-    sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-    return sql, args
+    return " AND ".join(clauses), args
 
 
 def _read(fn):
@@ -285,22 +291,6 @@ def _read(fn):
         _ensure()
     with _conn() as c:
         return fn(c)
-
-
-def query(f: dict, page: int = 1, per_page: int = 100) -> dict:
-    where, args = _where(f)
-    page = max(1, int(page or 1))
-    per_page = max(1, min(int(per_page or 100), 1000))
-
-    def run(c):
-        total = c.execute(f"SELECT COUNT(*) FROM actions{where}", args).fetchone()[0]
-        rows = c.execute(
-            f"SELECT * FROM actions{where} ORDER BY id DESC LIMIT ? OFFSET ?",
-            args + [per_page, (page - 1) * per_page],
-        ).fetchall()
-        return {"total": total, "page": page, "per_page": per_page,
-                "rows": [_row(r) for r in rows]}
-    return _read(run)
 
 
 def _row(r) -> dict:
@@ -341,37 +331,45 @@ def summary(f: dict) -> dict:
             "SELECT category, kind, COUNT(*) n, SUM(result='success') success,"
             " SUM(result='fail') fail,"
             f" COALESCE(SUM({_AMOUNT}),0) amount, COALESCE(SUM({_UNITS}),0) units"
-            f" FROM actions{where} GROUP BY category, kind ORDER BY n DESC LIMIT 50", args)]
+            f" FROM actions{where} GROUP BY category, kind ORDER BY n DESC", args)]
         top_targets = [dict(r) for r in c.execute(
             "SELECT target, COUNT(*) n, SUM(result='success') success,"
             f" COALESCE(SUM({_AMOUNT}),0) amount"
             f" FROM actions{where}{and_}target != '' GROUP BY target"
             " ORDER BY amount DESC, n DESC LIMIT 10", args)]
-        fail_reasons = [dict(r) for r in c.execute(
-            "SELECT message, COUNT(*) n"
-            f" FROM actions{where}{and_}result = 'fail' AND message != ''"
-            " GROUP BY message ORDER BY n DESC LIMIT 10", args)]
         return {
             "attempts": n, "success": s, "fail": fl,
             "success_rate": round(100.0 * s / (s + fl), 1) if (s + fl) else None,
             "amount": amt, "per_success": int(amt / s) if s else 0,
             "daily": daily, "by_kind": by_kind,
-            "top_targets": top_targets, "fail_reasons": fail_reasons,
+            "top_targets": top_targets,
         }
     return _read(run)
 
 
-def facets(character: str = "") -> dict:
-    """Distinct categories/kinds/cities present, for filter dropdowns."""
-    where, args = _where({"character": character})
+TABLE_COLUMNS = ["ts", "server_time", "character", "category", "kind", "result",
+                 "target", "amount", "city", "message", "source"]
+TABLE_FILTERABLE = ["character", "category", "kind", "result", "target", "city", "source"]
+
+
+def table(f: dict, args) -> dict:
+    """Rows (or one column's facet) for the all-actions table.
+
+    `f` scopes it (character and date range); `args` carries the table_query
+    contract the DataTable sends: f.<col>, sort, search, page, facet."""
+    import table_query
+    base, base_args = _conditions(f)
 
     def run(c):
-        kinds = {}
-        for r in c.execute(f"SELECT DISTINCT category, kind FROM actions{where}", args):
-            kinds.setdefault(r["category"], []).append(r["kind"])
-        cities = [r[0] for r in c.execute(
-            f"SELECT DISTINCT city FROM actions{where} ORDER BY city", args) if r[0]]
-        return {"kinds": {k: sorted(v) for k, v in kinds.items()}, "cities": cities}
+        out, err = table_query.paged_query(
+            c, "actions", args, TABLE_COLUMNS, filterable=TABLE_FILTERABLE,
+            search_cols=("target", "message", "kind"), default_sort=[("ts", "DESC")],
+            tiebreak="id", per_page_max=500, base_where=base or "1=1", base_params=base_args)
+        if err:
+            return err
+        if "rows" in out:
+            out["rows"] = [_row(r) for r in out["rows"]]
+        return out
     return _read(run)
 
 
