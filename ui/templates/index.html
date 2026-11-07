@@ -16,7 +16,6 @@
 <div class="container">
   <header>
     <h1>OpenBot</h1>
-    <a id="close-bot-link" onclick="openCloseBotModal()" href="#" style="position:absolute;top:12px;right:16px;font-size:0.75rem;color:var(--muted);text-decoration:none;opacity:0.6" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">Close Bot</a>
     <div class="status-row">
     <div class="status-bar">
       <span id="status-dot" class="dot stopped"></span>
@@ -26,6 +25,7 @@
       <button id="cancel-agg-btn" style="display:none; margin-left:8px; background:#d9534f; color:#fff; border:none; border-radius:4px; padding:2px 10px; cursor:pointer; font-size:12px;" onclick="cancelAggTab()">Cancel Crime Tab</button>
     </div>
     <span id="game-time-value" title="In-game time">--:--:--</span>
+    <button type="button" id="close-bot-btn" class="close-bot-btn" onclick="openCloseBotModal()" title="Shut down the bot and this control panel">Close Bot</button>
     </div>
   </header>
 
@@ -86,7 +86,7 @@
     <!-- Status -->
     <section class="card tabs-card main-section main-active" id="s-character">
       <h2>
-        <span id="stat-name">--</span><span id="stat-jail-badge" style="display:none"> <span class="jail-badge">JAIL</span></span>
+        <span>Status<span id="stat-name-wrap" style="display:none"> · <span id="stat-name"></span></span></span><span id="stat-jail-badge" style="display:none"> <span class="jail-badge">JAIL</span></span>
       </h2>
       <div class="card-body">
         <div class="tab-bar">
@@ -320,11 +320,9 @@
             <label for="earn_type">Earn</label>
             <select id="earn_type" style="width:280px" data-current="{{ config.earns.earn_type }}" onchange="autoSave()"></select>
           </div>
-          <div class="setting-row">
-            <button type="button" id="clear-earn-btn" class="btn-secondary" style="width:100%" onclick="clearEarnQueue()">Clear Queue</button>
-          </div>
-          <div class="setting-row">
-            <button type="button" class="btn-secondary" style="width:100%" onclick="openEarnCatalog()">Manage Categories</button>
+          <div class="setting-btn-row" style="padding:6px 0">
+            <button type="button" id="clear-earn-btn" class="btn-secondary" onclick="clearEarnQueue()">Clear Queue</button>
+            <button type="button" class="btn-secondary" onclick="openEarnCatalog()">Manage Categories</button>
           </div>
 
           <!-- Earn Planner -->
@@ -1705,25 +1703,30 @@
               ] %}
 
               {% for cat_name, cat_ranks in PROMO_CATS %}
-              <h4 style="margin:16px 0 6px;color:var(--muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #333;padding-bottom:4px;">{{ cat_name }}</h4>
-              {% for slug, rank_name, opt_a, opt_b, def_choice in cat_ranks %}
-              {% set chosen = choices.get(slug, def_choice) %}
-              <div class="promo-row">
-                <span class="promo-rank-name">{{ rank_name }}</span>
-                <div class="promo-options">
-                  <label class="promo-option">
-                    <input type="radio" name="promo_{{ slug }}" value="A"
-                      {% if chosen == 'A' %}checked{% endif %} onchange="autoSave()">
-                    <span>A: {{ opt_a }}</span>
-                  </label>
-                  <label class="promo-option">
-                    <input type="radio" name="promo_{{ slug }}" value="B"
-                      {% if chosen == 'B' %}checked{% endif %} onchange="autoSave()">
-                    <span>B: {{ opt_b }}</span>
-                  </label>
+              <details class="promo-cat">
+                <summary>
+                  <span class="promo-cat-name">{{ cat_name }}</span>
+                  <span class="promo-cat-picks">{% for slug, rank_name, opt_a, opt_b, def_choice in cat_ranks %}<span class="promo-pick" data-slug="{{ slug }}">{{ rank_name }} {{ choices.get(slug, def_choice) }}</span>{% endfor %}</span>
+                </summary>
+                {% for slug, rank_name, opt_a, opt_b, def_choice in cat_ranks %}
+                {% set chosen = choices.get(slug, def_choice) %}
+                <div class="promo-row" role="radiogroup" aria-label="{{ rank_name }}">
+                  <span class="promo-rank-name">{{ rank_name }}</span>
+                  <div class="promo-options">
+                    <label class="promo-option">
+                      <input type="radio" name="promo_{{ slug }}" value="A"
+                        {% if chosen == 'A' %}checked{% endif %} onchange="promoPickChanged(this); autoSave()">
+                      <span>A: {{ opt_a }}</span>
+                    </label>
+                    <label class="promo-option">
+                      <input type="radio" name="promo_{{ slug }}" value="B"
+                        {% if chosen == 'B' %}checked{% endif %} onchange="promoPickChanged(this); autoSave()">
+                      <span>B: {{ opt_b }}</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
-              {% endfor %}
+                {% endfor %}
+              </details>
               {% endfor %}
             </div>
           </div>
@@ -2021,11 +2024,13 @@
               <h3>Notifications</h3>
               <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification in the Notifications tab so you can see them when you return AFK.</p>
               {% set notif_cfg = config.get('notifications', {}) %}
-              {% for slug, label in notification_events %}
-              <label class="inline-toggle setting-row">{{ label }}
-                <label class="toggle-label"><input type="checkbox" id="notif_{{ slug }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-              </label>
-              {% endfor %}
+              <div class="toggle-grid">
+                {% for slug, label in notification_events %}
+                <label class="inline-toggle setting-row">{{ label }}
+                  <label class="toggle-label"><input type="checkbox" id="notif_{{ slug }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+                </label>
+                {% endfor %}
+              </div>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Developer Settings</h3>
@@ -2243,6 +2248,7 @@
             <option value="warrants">Manage Warrants</option>
           </select>
         </div>
+        <p id="task-empty-hint" class="placeholder">Pick a task to run it once, on demand: travel to another city, plan or run a jail break, archive old journals, or check your outstanding warrants.</p>
 
         <!-- Travel panel -->
         <div id="task-travel" class="task-panel" style="display:none;">
@@ -2385,7 +2391,7 @@
             </div>
             <button class="btn-secondary" onclick="plRefresh()" id="pl-refresh-btn">Refresh</button>
             <span id="pl-refresh-status" style="font-size:0.8rem;color:var(--error,#f87171)"></span>
-            <button class="btn-secondary" onclick="window.open('/players','_blank')" title="Open player list in new tab">↗</button>
+            <button class="btn-secondary" onclick="window.open('/players','_blank')" title="Open player list in new tab">Open in new tab ↗</button>
             <button class="btn-secondary" onclick="plScrapePlayers()" title="Scrape monitored player profiles">Scrape Monitored</button>
             </div>
             <label class="inline-toggle" style="white-space:nowrap">Active only
@@ -2415,29 +2421,29 @@
                   <th class="pl-th" style="width:24px" title="Monitor">Mon</th>
                 </tr>
                 <tr id="pl-filter-row">
-                  <th class="pl-filter-cell"><select id="pl-filter-online" class="pl-filter-input" onchange="plFilter()">
+                  <th class="pl-filter-cell" data-label="Status"><select id="pl-filter-online" class="pl-filter-input" onchange="plFilter()">
                     <option value="">All</option>
                     <option value="local">Local</option>
                     <option value="online">Online</option>
                     <option value="offline">Offline</option>
                   </select></th>
-                  <th class="pl-filter-cell"><input type="text" id="pl-search" class="pl-filter-input" placeholder="Name…" oninput="plFilter()"></th>
-                  <th class="pl-filter-cell"><input type="text" id="pl-filter-alias" class="pl-filter-input" placeholder="Alias…" oninput="plFilter()"></th>
-                  <th class="pl-filter-cell"><select id="pl-filter-rank" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-filter-occupation" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-filter-career-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-filter-homecity" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-filter-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"><select id="pl-filter-tag" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell" data-label="Name"><input type="text" id="pl-search" class="pl-filter-input" placeholder="Name…" oninput="plFilter()"></th>
+                  <th class="pl-filter-cell" data-label="Alias"><input type="text" id="pl-filter-alias" class="pl-filter-input" placeholder="Alias…" oninput="plFilter()"></th>
+                  <th class="pl-filter-cell" data-label="Rank"><select id="pl-filter-rank" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell" data-label="Occupation"><select id="pl-filter-occupation" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell" data-label="Career"><select id="pl-filter-career-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell" data-label="City"><select id="pl-filter-homecity" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell" data-label="Group"><select id="pl-filter-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
+                  <th class="pl-filter-cell" data-label="Tags"><select id="pl-filter-tag" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
                   <th class="pl-filter-cell"></th>
                   <th class="pl-filter-cell"></th>
-                  <th class="pl-filter-cell"><select id="pl-filter-agg" class="pl-filter-input" onchange="plFilter()">
+                  <th class="pl-filter-cell" data-label="Agg"><select id="pl-filter-agg" class="pl-filter-input" onchange="plFilter()">
                     <option value="">All</option>
                     <option value="__none__">None</option>
                     <option value="whitelist">Whitelist</option>
                     <option value="blacklist">Blacklist</option>
                   </select></th>
-                  <th class="pl-filter-cell"><select id="pl-filter-casework" class="pl-filter-input" onchange="plFilter()">
+                  <th class="pl-filter-cell" data-label="Case Work"><select id="pl-filter-casework" class="pl-filter-input" onchange="plFilter()">
                     <option value="">All</option>
                     <option value="__none__">None</option>
                     <option value="whitelist">Whitelist</option>

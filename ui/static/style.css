@@ -57,6 +57,17 @@ header h1 {
 .status-task { color: var(--muted); font-size: 12px; font-style: italic; }
 .status-row { display: flex; align-items: center; gap: 12px; }
 .status-row .status-bar { flex: 1; min-width: 0; }
+/* Close Bot: a small button at the end of the clock row. Destructive, so it
+   stays quiet until hovered; it still asks for confirmation. */
+.close-bot-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.close-bot-btn:hover { border-color: var(--red); color: #f08c8c; }
 #game-time-value { font-family: ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 14px; white-space: nowrap; }
 
 .card {
@@ -80,12 +91,9 @@ header h1 {
   align-items: center;
   gap: 10px;
 }
-#s-character > h2 {
-  font-size: 0.82rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: normal;
-}
+/* Status card title: "STATUS · Name" — the section name matches the other
+   cards, the character name keeps its own capitalisation. */
+#stat-name { text-transform: none; letter-spacing: normal; }
 
 .card h3 {
   font-size: 12px;
@@ -246,12 +254,21 @@ button {
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
+/* Button tiers — primary (the main action in a panel or modal), secondary
+   (everything else) and small (.btn-sm / .log-open-btn, inline tools).
+   .action-btn is the older name for secondary and looks the same. */
+.btn-primary { background: var(--accent); border: 1px solid var(--accent); color: var(--bg); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .btn-secondary {
-  background: #2e4060;
-  border: 1px solid #3a4d70;
+  background: var(--surface2);
+  border: 1px solid var(--border);
   color: var(--text);
+  padding: 7px 16px;
 }
-.btn-secondary:hover { background: #364a6e; border-color: var(--accent); color: var(--accent); }
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+.btn-primary:disabled, .btn-secondary:disabled { opacity: 0.5; cursor: default; }
+/* Buttons in a settings row sit at their natural width, not stretched. */
+.setting-row > button { justify-self: start; }
 
 #save-btn { background: var(--surface); border-color: var(--border); color: var(--text); }
 #save-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -599,7 +616,7 @@ button {
 .action-btn {
   background: var(--surface2);
   border: 1px solid var(--border);
-  color: var(--muted);
+  color: var(--text);
   padding: 7px 16px;
   font-size: 12px;
   font-weight: 700;
@@ -652,6 +669,12 @@ button {
 }
 .setting-row:last-child { border-bottom: none; }
 .setting-row .toggle-label { flex-shrink: 0; }
+.setting-row > select { justify-self: start; }
+/* Long lists of toggles: two columns on wider screens to halve the scrolling. */
+.toggle-grid { display: grid; grid-template-columns: 1fr; column-gap: 40px; }
+@media (min-width: 768px) {
+  .toggle-grid { grid-template-columns: 1fr 1fr; }
+}
 .setting-note {
   font-size: 0.8rem;
   color: var(--text-muted, #6b7e99);
@@ -845,6 +868,16 @@ button {
   color: var(--text);
   display: flex;
   flex-direction: column-reverse;
+}
+#log-box:empty { justify-content: center; align-items: center; }
+#log-box:empty::before {
+  content: "Nothing logged yet. Start the bot and everything it does will appear here, newest first.";
+  display: block;
+  padding: 12px;
+  color: var(--muted);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  text-align: center;
 }
 @media (max-width: 600px) {
   #log-box { height: 50vh; max-height: 420px; }
@@ -1181,34 +1214,92 @@ input.input-unsaved { color: var(--red) !important; }
 }
 .ch-earn-entry.ch-earn-summary .ch-earn-count { color: var(--accent); }
 
-/* Promotion choices */
+/* Promotion choices — one collapsible block per career */
+.promo-cat {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  background: var(--surface2);
+}
+.promo-cat > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+.promo-cat > summary::-webkit-details-marker { display: none; }
+.promo-cat > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 0.8rem;
+  width: 10px;
+  flex-shrink: 0;
+}
+.promo-cat[open] > summary::before { content: "▾"; }
+.promo-cat-name {
+  min-width: 130px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text);
+}
+.promo-cat-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  font-size: 0.76rem;
+  color: var(--muted);
+  min-width: 0;
+}
+.promo-cat[open] .promo-cat-picks { display: none; }
+.promo-cat > .promo-row { padding-left: 32px; padding-right: 10px; }
+@media (max-width: 600px) {
+  .promo-cat > summary { flex-wrap: wrap; row-gap: 4px; }
+  .promo-cat-name { min-width: 0; }
+  .promo-cat-picks { flex-basis: 100%; padding-left: 22px; }
+  .promo-cat > .promo-row { padding-left: 12px; }
+}
+.promo-cat > .promo-row:last-child { border-bottom: none; }
 .promo-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
   gap: 4px 10px;
   padding: 5px 0;
-  border-bottom: 1px solid #2a2a3a;
+  border-bottom: 1px solid rgba(46, 64, 96, 0.4);
 }
 .promo-rank-name {
   font-size: 0.88rem;
-  min-width: 140px;
+  min-width: 170px;
   flex-shrink: 0;
-  padding-top: 2px;
 }
 .promo-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 4px 8px;
 }
+/* Override the global column-style <label> so dot and text sit on one line
+   and the whole "A: off+25/def+25" text is the click target. */
 .promo-option {
-  display: flex;
+  flex-direction: row;
+  flex: none;
+  min-width: 0;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   cursor: pointer;
   font-size: 0.78rem;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
+.promo-option:hover { border-color: var(--border); color: var(--text); }
+.promo-option:has(input:checked) { border-color: rgba(200,168,75,0.5); color: var(--text); background: rgba(200,168,75,0.06); }
+.promo-option input { margin: 0; accent-color: var(--accent); }
 
 /* Promotion History */
 .ch-table-scroll { overflow-x: auto; }
@@ -1539,6 +1630,43 @@ input.input-unsaved { color: var(--red) !important; }
 .pl-row-expanded td { background: var(--surface2, rgba(255,255,255,0.04)); }
 
 .pl-detail-row td { padding: 0; border-bottom: 2px solid var(--accent, #89b4fa); }
+
+/* Players table on phones: sort headers become a row of chips, filters a
+   two-column grid, and each player a card with labelled fields — no sideways
+   scrolling through 13 columns. */
+@media (max-width: 600px) {
+  #pl-table, #pl-table thead, #pl-table tbody { display: block; }
+  #pl-table thead tr:first-child { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  #pl-table thead tr:first-child .pl-th {
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 8px;
+  }
+  #pl-table thead tr:first-child .pl-th:not([data-col]),
+  #pl-table thead tr:first-child .pl-th[data-col="online_status"] { display: none; }
+  #pl-filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  #pl-filter-row .pl-filter-cell { border: none; padding: 0; background: none; text-align: left; }
+  #pl-filter-row .pl-filter-cell:not([data-label]) { display: none; }
+  #pl-filter-row .pl-filter-cell::before {
+    content: attr(data-label); display: block; font-size: 0.68rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px;
+  }
+  #pl-filter-row .pl-filter-input { font-size: 0.85rem; padding: 6px 8px; }
+  #pl-tbody tr { display: block; }
+  #pl-tbody tr.pl-data-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px 10px; margin-bottom: 6px; background: var(--surface2);
+  }
+  #pl-tbody tr.pl-data-row td { display: block; border: none; padding: 2px 0; background: none; min-width: 0; }
+  #pl-tbody tr.pl-data-row td[data-label]::before {
+    content: attr(data-label); display: block; font-size: 0.66rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  #pl-tbody td.pl-cell-dot { display: none; }
+  #pl-tbody td.pl-cell-name { grid-column: 1 / -1; font-weight: 600; font-size: 0.95rem; }
+  #pl-tbody td[data-label="Monitor"] { text-align: left !important; }
+  #pl-tbody tr.pl-detail-row td { display: block; border-bottom: none; }
+  #pl-tbody tr.pl-detail-row { margin: -6px 0 8px; }
+}
 .pl-detail {
   padding: 12px 16px;
   background: var(--surface, #181825);
@@ -1714,15 +1842,14 @@ input.input-unsaved { color: var(--red) !important; }
 
 /* Danger button */
 .btn-danger {
-  background: #ef4444;
+  background: var(--red);
   color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 14px;
+  border: 1px solid var(--red);
+  border-radius: var(--radius);
+  padding: 7px 16px;
   cursor: pointer;
-  font-size: 0.85rem;
 }
-.btn-danger:hover { background: #dc2626; }
+.btn-danger:hover { background: var(--red-hover); border-color: var(--red-hover); }
 
 /* Colour select */
 .pl-color-select {

@@ -1212,6 +1212,20 @@ document.addEventListener("change", e => {
 });
 document.addEventListener("DOMContentLoaded", _updateIncomeTabColors);
 
+// Settings selects carry a fixed inline width (e.g. 110px) that cuts off longer
+// options ("Hack Bank A…"). Keep that width as a minimum and let the select
+// grow to fit its longest option, capped at the row's width.
+function _fitSelectWidths(root) {
+  (root || document).querySelectorAll('select[style*="width"]').forEach(sel => {
+    const w = sel.style.width;
+    if (!w || !w.endsWith("px")) return;
+    sel.style.minWidth = w;
+    sel.style.width = "auto";
+    sel.style.maxWidth = "100%";
+  });
+}
+document.addEventListener("DOMContentLoaded", () => _fitSelectWidths());
+
 let _lastEnergy = null;
 let _respectPct = null;
 
@@ -2251,7 +2265,9 @@ function pollStatus() {
       }
 
       // Character stats
-      document.getElementById("stat-name").textContent = d.own_name || "--";
+      // Status card title reads "Status · <name>" once the name is known.
+      document.getElementById("stat-name").textContent = d.own_name || "";
+      document.getElementById("stat-name-wrap").style.display = d.own_name ? "" : "none";
       _commsOwnName = d.own_name || "";
       document.getElementById("stat-next-rank").textContent = d.next_rank || "--";
       // Until the character page has been read (no name yet), energy, health
@@ -3239,6 +3255,13 @@ function _getLaunderContacts() {
   return Array.from(list.querySelectorAll(".launder-contact-item")).map(el => el.dataset.name);
 }
 
+// Keep a collapsed career block's "current picks" line in step with its radios.
+function promoPickChanged(radio) {
+  const slug = radio.name.replace(/^promo_/, "");
+  const pick = document.querySelector(`.promo-pick[data-slug="${slug}"]`);
+  if (pick) pick.textContent = pick.textContent.replace(/ [AB]$/, " " + radio.value);
+}
+
 function _collectPromoChoices() {
   const choices = {};
   document.querySelectorAll('input[type="radio"][name^="promo_"]').forEach(radio => {
@@ -3812,6 +3835,8 @@ function requestWithdraw() {
 function onTaskChange() {
   const val = document.getElementById("task-selector").value;
   document.querySelectorAll(".task-panel").forEach(p => p.style.display = "none");
+  const hint = document.getElementById("task-empty-hint");
+  if (hint) hint.style.display = val ? "none" : "";
   if (val === "travel") {
     document.getElementById("task-travel").style.display = "";
     onTravelMethodChange();
@@ -5258,20 +5283,20 @@ function _plRenderTable() {
     const ageCell   = p.character_age ? _fmtAge(p.character_age) : "—";
     const jailAgeCell = p.jail_age ? _fmtAge(p.jail_age) : "—";
     rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow(${escJsStr(p.username)})" style="cursor:pointer">
-      <td style="text-align:center">${dot}</td>
-      <td><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
-      <td>${escHtml(p.alias||"")}</td>
-      <td>${escHtml(p.rank||"—")}</td>
-      <td>${escHtml(p.occupation||"—")}</td>
-      <td>${escHtml(careerGrp)}</td>
-      <td>${escHtml(p.homecity||"—")}</td>
-      <td>${groupCell}</td>
-      <td>${tags||"—"}</td>
-      <td style="white-space:nowrap">${ageCell}</td>
-      <td style="white-space:nowrap">${jailAgeCell}</td>
-      <td>${aggCell}</td>
-      <td>${cwCell}</td>
-      <td style="text-align:center"><input type="checkbox" ${p.monitoring ? 'checked' : ''} onclick="event.stopPropagation();plToggleMonitoring(${escJsStr(p.username)}, this.checked)" ${_plHubManaged ? 'disabled title="Managed on Player Hub"' : ''}></td>
+      <td class="pl-cell-dot" style="text-align:center">${dot}</td>
+      <td class="pl-cell-name"><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
+      <td data-label="Alias">${escHtml(p.alias||"")}</td>
+      <td data-label="Rank">${escHtml(p.rank||"—")}</td>
+      <td data-label="Occupation">${escHtml(p.occupation||"—")}</td>
+      <td data-label="Career">${escHtml(careerGrp)}</td>
+      <td data-label="City">${escHtml(p.homecity||"—")}</td>
+      <td data-label="Group">${groupCell}</td>
+      <td data-label="Tags">${tags||"—"}</td>
+      <td data-label="Age" style="white-space:nowrap">${ageCell}</td>
+      <td data-label="Jail Age" style="white-space:nowrap">${jailAgeCell}</td>
+      <td data-label="Agg">${aggCell}</td>
+      <td data-label="Case Work">${cwCell}</td>
+      <td data-label="Monitor" style="text-align:center"><input type="checkbox" ${p.monitoring ? 'checked' : ''} onclick="event.stopPropagation();plToggleMonitoring(${escJsStr(p.username)}, this.checked)" ${_plHubManaged ? 'disabled title="Managed on Player Hub"' : ''}></td>
     </tr>`);
 
     if (expanded) {
