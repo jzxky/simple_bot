@@ -1,0 +1,148 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Themes. Loaded after style.css on every page.
+   "Refined" is the default (no data-theme attribute). "Graphite" and
+   "Daylight" are opt-in via <html data-theme="graphite|daylight">, set from
+   Settings → Misc → Appearance and remembered per browser (localStorage).
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ══ Refined (default): navy + gold, softer and roomier ══ */
+:root {
+  --bg:#161e2c; --surface:#1f2a3c; --surface2:#243147; --border:#2e3d57;
+  --text:#d6dfea; --muted:#7f93ab;
+  --accent:#d4b25a; --accent-hover:#c29f45; --success:#3fae6a; --radius:8px;
+  --r-card:12px; --hairline:rgba(127,147,171,.16); --hdr:#d4b25a; --card-border:#2b3a52;
+  --shadow:0 1px 2px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.18); --shadow-in:none;
+  --input-bg:#1a2435; --track:rgba(127,147,171,.18);
+  --text-muted:var(--muted);
+}
+body { background: radial-gradient(1200px 600px at 20% -10%, #22314a 0%, #161e2c 60%) fixed, var(--bg); }
+header h1 { letter-spacing: .02em; }
+
+/* Cards, tiles and bars */
+.card { border-radius: var(--r-card); box-shadow: var(--shadow); border-color: var(--card-border); padding: 18px 20px; }
+.card h2 { border-bottom-color: var(--hairline); }
+.status-bar, .main-tab-bar, .stats-grid .stat-item { border-radius: var(--r-card); border-color: var(--card-border); }
+.stats-grid .stat-item { background: var(--surface); box-shadow: var(--shadow); }
+.consumable-item { border-radius: 10px; background: var(--surface2); border-color: var(--hairline); }
+button, .btn-secondary, .action-btn { border-radius: 8px; }
+.tab-btn { border-radius: 8px 8px 0 0; }
+.main-tab.active { background: rgba(212,178,90,.10); }
+
+/* Status group tables become rounded cards with hairline dividers */
+.stat-groups-grid { gap: 12px; }
+.stat-group-table { border: none; border-radius: var(--r-card); background: var(--surface2); box-shadow: var(--shadow-in); }
+.stat-group-table td { border: none; border-top: 1px solid var(--hairline); background: transparent; padding: 10px 14px; padding-right: 56px; }
+.stat-group-table .stat-row-2 td + td, .stat-group-table .stat-row-3 td + td { border-left: 1px solid var(--hairline); }
+.stat-group-table .stat-sect-hdr td { background: transparent; border-top: none; color: var(--hdr); font-size: 11px; letter-spacing: .09em; padding: 10px 14px 4px; }
+.stat-label { font-size: 10.5px; letter-spacing: .07em; }
+.stat-value { font-size: 16px; font-weight: 600; margin-top: 2px; }
+.stat-progress-bg { top: auto; bottom: 0; height: 3px; border-radius: 0 3px 3px 0; }
+.stat-progress-bg.pct-low  { background: #e5534b; }
+.stat-progress-bg.pct-mid  { background: #e09b3d; }
+.stat-progress-bg.pct-high { background: var(--accent); }
+.stat-progress-bg.pct-full { background: var(--success); }
+.in-jail .stat-group-table .stat-sect-hdr td { color: #e0e0e0; }
+.in-hospital .stat-group-table .stat-sect-hdr td { color: #f8e8e8; }
+
+/* Secondary bot controls are outlined so Start/Stop stands out */
+#pause-btn { background: transparent; border-color: #8a6d1d; color: #d9b54f; }
+#pause-btn:hover { background: rgba(212,178,90,.10); border-color: #a8862a; }
+#pause-btn.paused { background: transparent; border-color: var(--success); color: var(--success); }
+#pause-btn:disabled { background: transparent; border-color: var(--border); color: var(--muted); }
+#screenshot-btn { background: transparent; }
+
+@media (max-width: 559px) {
+  .stat-group-table { table-layout: fixed; width: 100%; max-width: 100%; }
+  .stat-group-table td { padding: 8px 10px; padding-right: 12px; overflow: hidden; text-overflow: ellipsis; }
+  .stat-group-table td.stat-progress-cell { padding-bottom: 18px; }
+  .stat-value { font-size: 15px; }
+}
+
+/* ══ Graphite: neutral modern dark, blue accent, bigger numbers ══ */
+html[data-theme="graphite"] {
+  --bg:#0d0f13; --surface:#15181e; --surface2:#1a1e26; --border:#262b35; --text:#e7eaf0; --muted:#8a93a3;
+  --accent:#5b8cff; --accent-hover:#4a7af0; --success:#2fbf71; --red:#e5484d; --red-hover:#cf3a3f;
+  --r-card:14px; --hairline:#232833; --hdr:#8a93a3; --card-border:#20242d;
+  --shadow:none; --shadow-in:inset 0 0 0 1px #232833; --input-bg:#12151b; --track:#262b35;
+}
+html[data-theme="graphite"] body { background: var(--bg); font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
+html[data-theme="graphite"] header h1 { color: var(--text); font-weight: 800; letter-spacing: -.01em; }
+html[data-theme="graphite"] header h1::before { content:""; display:inline-block; width:10px; height:10px; border-radius:3px; background:var(--accent); margin-right:8px; vertical-align:middle; }
+html[data-theme="graphite"] .card h2 { color: var(--text); letter-spacing: .04em; }
+html[data-theme="graphite"] .stat-value { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+html[data-theme="graphite"] .stat-group-table .stat-sect-hdr td { font-weight: 600; }
+html[data-theme="graphite"] .stat-progress-cell::after { content:""; position:absolute; left:14px; right:14px; bottom:8px; height:4px; border-radius:4px; background:var(--track); }
+html[data-theme="graphite"] .stat-progress-bg { left:14px; bottom:8px; height:4px; border-radius:4px; z-index:1; max-width:calc(100% - 28px); }
+html[data-theme="graphite"] #pause-btn { background: #1f2430; border-color: #2c3240; color: var(--text); }
+html[data-theme="graphite"] #pause-btn:disabled { background: #171a21; color: #5c6473; border-color: #222731; }
+html[data-theme="graphite"] #screenshot-btn { background: #1f2430; color: var(--text); border-color: #2c3240; }
+html[data-theme="graphite"] #toggle-btn:not(.running) { background: var(--accent); border-color: var(--accent); }
+html[data-theme="graphite"] #toggle-btn:not(.running):hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+html[data-theme="graphite"] .main-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(91,140,255,.08); }
+html[data-theme="graphite"] .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(91,140,255,.08); }
+html[data-theme="graphite"] .dot.running { background: var(--success); box-shadow: 0 0 0 3px rgba(47,191,113,.2); }
+@media (max-width: 559px) {
+  html[data-theme="graphite"] .stat-progress-cell::after, html[data-theme="graphite"] .stat-progress-bg { left:10px; bottom:7px; }
+  html[data-theme="graphite"] .stat-progress-cell::after { right:10px; }
+  html[data-theme="graphite"] .stat-progress-bg { max-width:calc(100% - 20px); }
+}
+
+/* ══ Daylight: light theme, warm gold accent ══ */
+html[data-theme="daylight"] {
+  color-scheme: light;
+  --bg:#f3f4f6; --surface:#ffffff; --surface2:#f8f9fb; --border:#dfe3e8; --text:#1d2430; --muted:#6b7482;
+  --accent:#a8781c; --accent-hover:#8f6614; --success:#1f9d55; --red:#d93636; --red-hover:#bf2b2b;
+  --r-card:12px; --hairline:#eceef2; --hdr:#a8781c; --card-border:#e6e8ec;
+  --shadow:0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.05); --shadow-in:inset 0 0 0 1px #eceef2;
+  --input-bg:#ffffff; --track:#e6e8ec;
+}
+html[data-theme="daylight"] body { background: var(--bg); }
+html[data-theme="daylight"] input[type="time"],
+html[data-theme="daylight"] input[type="date"],
+html[data-theme="daylight"] input[type="datetime-local"] { color-scheme: light; }
+html[data-theme="daylight"] .status-bar, html[data-theme="daylight"] .main-tab-bar { background: #fff; }
+html[data-theme="daylight"] #game-time-value { color: var(--text); }
+html[data-theme="daylight"] #pause-btn { background: #fff; border-color: #e2c98e; color: #8f6614; }
+html[data-theme="daylight"] #pause-btn:disabled { background: #f3f4f6; border-color: var(--border); color: #a0a7b2; }
+html[data-theme="daylight"] #screenshot-btn,
+html[data-theme="daylight"] .btn-secondary,
+html[data-theme="daylight"] .action-btn,
+html[data-theme="daylight"] .close-bot-btn { background: #fff; color: var(--text); border-color: var(--border); }
+html[data-theme="daylight"] .main-tab, html[data-theme="daylight"] .tab-btn { color: #7a8391; }
+html[data-theme="daylight"] .main-tab.active, html[data-theme="daylight"] .tab-btn.active { background: rgba(168,120,28,.08); }
+html[data-theme="daylight"] .stats-grid .stat-item,
+html[data-theme="daylight"] .consumable-item { background: #fff; }
+html[data-theme="daylight"] .stat-pct.pct-high { color: var(--accent); }
+html[data-theme="daylight"] .stat-pct.pct-full { color: var(--success); }
+html[data-theme="daylight"] .consumable-qty { color: var(--text); }
+/* Panels in style.css that hard-code dark colours */
+html[data-theme="daylight"] .ch-earn-cat { background: #eef0f3; color: var(--text); }
+html[data-theme="daylight"] .sell-ac { background: #fff; }
+html[data-theme="daylight"] .profile-bar { background: #e6e8ec; }
+html[data-theme="daylight"] .profile-item-img,
+html[data-theme="daylight"] .apt-drug-img { background: repeating-linear-gradient(45deg, #eef0f3 0 6px, #e6e8ec 6px 12px); }
+html[data-theme="daylight"] .apt-amount-in,
+html[data-theme="daylight"] .apt-drugs input { background: #fff; }
+html[data-theme="daylight"] .cash-opt { background: #f3f4f6; color: var(--text); }
+html[data-theme="daylight"] .cash-opt:hover { background: #e6e8ec; }
+html[data-theme="daylight"] .pl-act-btn { background: #f3f4f6; border-color: var(--border); }
+html[data-theme="daylight"] .task-feedback-ok { background: #e8f6ee; color: #1f7a45; border-color: #b7e2c8; }
+html[data-theme="daylight"] .task-feedback-error { background: #fdecec; color: #b42323; border-color: #f3c2c2; }
+html[data-theme="daylight"] .earn-cat-modal { background: #fff; border-color: var(--border); }
+html[data-theme="daylight"] .earn-cat-header { background: #f3f4f6; }
+html[data-theme="daylight"] .earn-cat-header:hover { background: #eceef2; }
+html[data-theme="daylight"] .earn-cat-row select { background: #fff; color: var(--text); }
+html[data-theme="daylight"] .setup-btn:disabled,
+html[data-theme="daylight"] .gs-save:disabled { background: #e6e8ec; color: #a0a7b2; }
+html[data-theme="daylight"] .gs-confirm-warning { color: #8f6614; border-color: #e2c98e; }
+
+/* Theme picker swatches (Settings → Misc → Appearance) */
+.theme-pick { display: flex; gap: 8px; flex-wrap: wrap; }
+.theme-opt { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); font-size: 13px; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.theme-opt.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.theme-opt i { width: 18px; height: 18px; border-radius: 5px; display: inline-block; border: 1px solid rgba(127,127,127,.35); }
+.theme-opt[data-theme-opt="refined"] i  { background: linear-gradient(135deg, #1f2a3c 50%, #d4b25a 50%); }
+.theme-opt[data-theme-opt="graphite"] i { background: linear-gradient(135deg, #15181e 50%, #5b8cff 50%); }
+.theme-opt[data-theme-opt="daylight"] i { background: linear-gradient(135deg, #ffffff 50%, #a8781c 50%); }
+html[data-theme="daylight"] .main-tab.active, html[data-theme="daylight"] .tab-btn.active { color: var(--accent); }
+html[data-theme="daylight"] .ep-unavailable { color: #7a5a12; border-color: #e2c98e; }

@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="/static/style.css?v={{ app_version }}">
 <link rel="stylesheet" href="/static/datatable.css?v={{ app_version }}">
 <link rel="stylesheet" href="/static/actions.css?v={{ app_version }}">
+<link rel="stylesheet" href="/static/theme.css?v={{ app_version }}">
+<script>try{var t=localStorage.getItem('ob-theme');if(t&&t!=='refined')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body>
 
@@ -1984,6 +1986,18 @@
         </div>
         <div id="misc" class="tab-panel">
           <div class="settings-groups">
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Appearance</h3>
+              <div class="setting-row">
+                <span>Theme</span>
+                <div class="theme-pick" role="radiogroup" aria-label="Theme">
+                  <button type="button" class="theme-opt" data-theme-opt="refined" role="radio" onclick="setTheme('refined')"><i></i>Refined</button>
+                  <button type="button" class="theme-opt" data-theme-opt="graphite" role="radio" onclick="setTheme('graphite')"><i></i>Graphite</button>
+                  <button type="button" class="theme-opt" data-theme-opt="daylight" role="radio" onclick="setTheme('daylight')"><i></i>Daylight</button>
+                </div>
+              </div>
+              <p class="setting-note">Saved in this browser only, so your phone and desktop can use different themes.</p>
+            </div>
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>General</h3>
               <label class="inline-toggle setting-row">Communications
