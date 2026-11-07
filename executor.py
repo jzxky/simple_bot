@@ -7772,6 +7772,9 @@ def handle_discover_skills(action: Action, state: GameState):
 # A skill aimed at a player who isn't in the bot's city fails with a message
 # mentioning the city or location; All Seeing Eye then moves to the next target.
 _SKILL_OUT_OF_CITY_RE = re.compile(r"\bcity\b|same location|not (?:in|at) (?:your|the same)", re.I)
+# "Your target must be alive and not in jail!" — All Seeing Eye puts that
+# target on a cooldown and moves to the next one.
+_SKILL_TARGET_JAILED_RE = re.compile(r"alive and not in jail|target is in jail", re.I)
 
 
 def handle_use_skill(action: Action, state: GameState):
@@ -7825,8 +7828,9 @@ def handle_use_skill(action: Action, state: GameState):
         return
     if fail:
         text = fail.get_text(strip=True)
-        state.last_skill_result = {"ok": False, "message": text,
-                                   "out_of_city": bool(_SKILL_OUT_OF_CITY_RE.search(text))}
+        jailed = bool(_SKILL_TARGET_JAILED_RE.search(text))
+        state.last_skill_result = {"ok": False, "message": text, "target_jailed": jailed,
+                                   "out_of_city": not jailed and bool(_SKILL_OUT_OF_CITY_RE.search(text))}
     else:
         text = result_soup.get_text(" ", strip=True)[:200]
         state.last_skill_result = {"ok": False, "message": text, "out_of_city": False}
