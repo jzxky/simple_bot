@@ -177,9 +177,11 @@ class AllSeeingEyeTask(Task):
 
     _HUB_RETRY_SECONDS = 10 * 60   # hub unreachable
     _NO_TARGET_REST_SECONDS = 30 * 60  # no target in this city (or all were elsewhere)
+    _JAILED_TARGET_COOLDOWN = 30 * 60  # target was dead/in jail when we tried
 
     def __init__(self):
         self._hub_retry_at: float = 0.0
+        self._target_cooldown: dict = {}  # username -> monotonic time it's usable again
 
     @staticmethod
     def _hub_mode() -> bool:
@@ -241,7 +243,16 @@ class AllSeeingEyeTask(Task):
         local = state.local_players
         in_city = [t for t in targets
                    if t["username"] in local or (city and t.get("current_city") == city)]
+        # Skip targets currently flagged in jail on the online list, and any
+        # that recently failed with "must be alive and not in jail".
+        now = time.monotonic()
+        self._target_cooldown = {u: t for u, t in self._target_cooldown.items() if t > now}
+        jailed_now = state.jail_players or set()
+        in_city = [t for t in in_city
+                   if t["username"] not in jailed_now
+                   and t["username"] not in self._target_cooldown]
         elsewhere = 0
+        jailed = 0
         for t in in_city:
             claim_id = sync_client.respect_claim(t["username"])
             if claim_id is None:
@@ -259,9 +270,17 @@ class AllSeeingEyeTask(Task):
             if result.get("out_of_city"):
                 elsewhere += 1  # hub's city was stale; try the next viable target
                 continue
+            if result.get("target_jailed"):
+                jailed += 1
+                self._target_cooldown[t["username"]] = (
+                    time.monotonic() + self._JAILED_TARGET_COOLDOWN)
+                state.add_log(f"All Seeing Eye: {t['username']} is in jail or dead — "
+                              f"skipping them for 30 minutes.")
+                continue
             return  # used, or failed for another reason (timer, page error)
-        if elsewhere:
-            state.add_log(f"All Seeing Eye: {elsewhere} target(s) weren't in {city}; "
+        if elsewhere or jailed:
+            state.add_log(f"All Seeing Eye: {elsewhere} target(s) weren't in {city}, "
+                          f"{jailed} in jail/dead; "
                           f"no other target here — resting 30 minutes.")
         else:
             state.add_log(f"All Seeing Eye: no hub target in {city or 'unknown city'} "
