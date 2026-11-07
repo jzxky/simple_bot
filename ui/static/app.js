@@ -6683,3 +6683,24 @@ function gsDoQuit() {
     })
     .catch(e => _gsSetMsg("gs-quit-result", e.message, "err"));
 }
+
+// ── Theme picker (Settings → Misc → Appearance) ─────────────────────────────
+// The <head> of every page applies the saved theme before first paint.
+function _currentTheme() {
+  try { return localStorage.getItem('ob-theme') || 'refined'; } catch (e) { return 'refined'; }
+}
+function _markThemeOpts() {
+  const cur = _currentTheme();
+  document.querySelectorAll('.theme-opt').forEach(b => {
+    const on = b.dataset.themeOpt === cur;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+}
+function setTheme(name) {
+  try { localStorage.setItem('ob-theme', name); } catch (e) {}
+  if (name === 'refined') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', name);
+  _markThemeOpts();
+}
+document.addEventListener('DOMContentLoaded', _markThemeOpts);
