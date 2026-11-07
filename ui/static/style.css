@@ -139,6 +139,18 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--accent);
 }
 select option { background: var(--surface2); }
+/* Native time/date pickers render white unless told the page is dark. */
+input[type="time"],
+input[type="date"],
+input[type="datetime-local"] {
+  color-scheme: dark;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 13px;
+}
 
 /* Push toggles to the right edge when inside headings */
 .card h2 .toggle-label,
@@ -244,10 +256,11 @@ button {
 #save-btn { background: var(--surface); border-color: var(--border); color: var(--text); }
 #save-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-#toggle-btn { background: var(--red); border-color: var(--red); color: #fff; }
-#toggle-btn:hover { background: var(--red-hover); border-color: var(--red-hover); }
-#toggle-btn.running { background: #2e4060; border-color: #2e4060; color: var(--text); }
-#toggle-btn.running:hover { background: #263850; }
+/* Start is green; the button turns red only while it reads "Stop Bot". */
+#toggle-btn { background: var(--success); border-color: var(--success); color: #fff; }
+#toggle-btn:hover { background: #2f844e; border-color: #2f844e; }
+#toggle-btn.running { background: var(--red); border-color: var(--red); color: #fff; }
+#toggle-btn.running:hover { background: var(--red-hover); border-color: var(--red-hover); }
 
 #pause-btn { background: #7a6000; border-color: #7a6000; color: #fff; }
 #pause-btn:hover { background: #5a4500; border-color: #5a4500; }
@@ -258,6 +271,11 @@ button {
 #screenshot-btn { background: var(--surface); border-color: var(--border); color: var(--muted); }
 #screenshot-btn:hover { border-color: var(--accent); color: var(--accent); }
 #screenshot-btn:disabled { opacity: 0.5; cursor: default; }
+/* Keep START BOT / PAUSE / SCREENSHOT on one line each on phones. */
+@media (max-width: 600px) {
+  .controls { gap: 6px; }
+  .controls button { padding: 9px 6px; letter-spacing: 0.02em; white-space: nowrap; }
+}
 
 /* Character stats card */
 .stat-divider {
@@ -347,6 +365,7 @@ button {
 .stat-progress-bg.pct-mid  { background: rgba(220,150,40,0.22); }
 .stat-progress-bg.pct-high { background: rgba(200,168,75,0.20); }
 .stat-progress-bg.pct-full { background: rgba(60,180,80,0.22); }
+.stat-progress-bg.pct-none { background: transparent; }
 .stat-pct {
   display: none;
   font-size: 12px;
@@ -356,6 +375,7 @@ button {
 .stat-pct.pct-mid  { color: #dc9628; }
 .stat-pct.pct-high { color: var(--accent); }
 .stat-pct.pct-full { color: #3cb450; }
+.stat-pct.pct-none { color: var(--muted); }
 @media (min-width: 560px) {
   .stat-pct {
     display: block;
@@ -855,6 +875,29 @@ button {
 /* ── Unsaved input indicator ─────────────────────────────────────────────── */
 .input-unsaved { color: var(--red) !important; }
 input.input-unsaved { color: var(--red) !important; }
+
+/* ── Save status note ────────────────────────────────────────────────────── */
+.save-note {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1100;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.save-note.show { opacity: 1; transform: none; }
+.save-note.ok { color: var(--success); border-color: rgba(58,158,95,0.5); }
+.save-note.error { color: #dc9628; border-color: rgba(220,150,40,0.6); }
 
 /* ── Inline number-field save button ────────────────────────────────────── */
 .num-save-btn {
@@ -1763,9 +1806,20 @@ button, [onclick] { touch-action: manipulation; }
 .income-pills-row:empty { display: none; }
 
 /* ── Disabled tab coloring ───────────────────────── */
-.tab-btn.tab-disabled { color: var(--red); border-bottom-color: rgba(204,42,42,0.5); }
-.tab-btn.tab-disabled:hover { color: var(--red-hover); border-bottom-color: var(--red); }
-.tab-btn.tab-disabled.active { color: var(--red); border-bottom-color: var(--red); }
+/* A switched-off feature is a normal state, not an error: dim the label and
+   add a small grey dot instead of colouring it red. */
+.tab-btn.tab-disabled { opacity: 0.6; }
+.tab-btn.tab-disabled:hover,
+.tab-btn.tab-disabled.active { opacity: 0.85; }
+.tab-btn.tab-disabled::after {
+  content: "";
+  display: inline-block;
+  width: 6px; height: 6px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--muted);
+  vertical-align: middle;
+}
 
 /* ── Notifications tab ────────────────────────────── */
 .notif-tab-head {
@@ -1921,9 +1975,10 @@ button, [onclick] { touch-action: manipulation; }
 main > section.main-section { display: none; }
 main > section.main-section.main-active { display: block; }
 
-/* Mobile: tighter tab padding */
+/* Mobile: share the bar's width between all icons so none (e.g. Tasks) ends
+   up hidden off screen behind the invisible scrollbar. */
 @media (max-width: 540px) {
-  .main-tab { padding: 10px 10px; }
+  .main-tab { flex: 1 1 0; min-width: 30px; padding: 10px 4px; }
   .main-tab-icon { width: 18px; height: 18px; }
 }
 

@@ -1,5 +1,5 @@
 function _pctClass(pct) {
-  if (pct == null) return "pct-high";
+  if (pct == null) return "pct-none";
   if (pct < 25) return "pct-low";
   if (pct < 50) return "pct-mid";
   if (pct < 75) return "pct-high";
@@ -703,6 +703,41 @@ let _knownSettingsRev = 0;
 let _settingsRevInit = false;
 let _foreignChangePending = false;
 
+// ── Save status note ("Saved" / "Couldn't save, retrying") ─────────────────
+// Settings save on their own, so confirm each save and, when one fails (e.g.
+// while the UI restarts), keep retrying with the latest values until it lands.
+
+let _saveRetryTimer = null;
+let _saveRetryDelay = 0;
+let _saveNoteHideTimer = null;
+
+function _setSaveNote(kind) {
+  let el = document.getElementById("save-note");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "save-note";
+    el.className = "save-note";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    document.body.appendChild(el);
+  }
+  clearTimeout(_saveNoteHideTimer);
+  el.className = "save-note show " + kind;
+  el.textContent = kind === "error" ? "Couldn't save, retrying…" : "Saved";
+  if (kind === "ok") {
+    _saveNoteHideTimer = setTimeout(() => el.classList.remove("show"), 1500);
+  }
+}
+
+function _scheduleSaveRetry() {
+  if (_saveRetryTimer) return;
+  _saveRetryDelay = Math.min(_saveRetryDelay ? _saveRetryDelay * 2 : 2000, 30000);
+  _saveRetryTimer = setTimeout(() => {
+    _saveRetryTimer = null;
+    _doSave().catch(() => {});
+  }, _saveRetryDelay);
+}
+
 function _doSave() {
   const data = _buildPayload();
   const body = _savedConfig ? Object.assign({ _base: _savedConfig }, data) : data;
@@ -710,12 +745,28 @@ function _doSave() {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify(body),
-  }).then(r => r.json()).then(res => {
+  }).then(r => {
+    if (!r.ok) throw new Error("save failed: HTTP " + r.status);
+    return r.json();
+  }).then(res => {
     _savedConfig = data;
     if (res && res.settings_rev != null) {
       _knownSettingsRev = Math.max(_knownSettingsRev, res.settings_rev);
     }
+    _saveRetryDelay = 0;
+    clearTimeout(_saveRetryTimer);
+    _saveRetryTimer = null;
+    // Everything on the page went out in this save, so clear the unsaved-field
+    // highlight — unless another edit is still waiting on the debounce timer.
+    if (!_saveTimer) {
+      document.querySelectorAll(".input-unsaved").forEach(el => el.classList.remove("input-unsaved"));
+    }
+    _setSaveNote("ok");
     return res;
+  }).catch(err => {
+    _setSaveNote("error");
+    _scheduleSaveRetry();
+    throw err;
   });
 }
 
@@ -758,8 +809,8 @@ function setWindowFromRestock(prefix) {
 }
 
 function autoSave() {
-  // Immediate save for checkboxes/selects.
-  _doSave();
+  // Immediate save for checkboxes/selects. A failure shows a note and retries.
+  _doSave().catch(() => {});
   _updateIncomePills();
   _updateIncomeTabColors();
 }
@@ -785,9 +836,9 @@ function flushSave() {
   if (!_saveTimer) return;
   clearTimeout(_saveTimer);
   _saveTimer = null;
-  _doSave().then(() => {
-    document.querySelectorAll(".input-unsaved").forEach(el => el.classList.remove("input-unsaved"));
-  });
+  // _doSave clears the unsaved-field highlight once the save succeeds, and
+  // keeps it (and retries) when it fails.
+  _doSave().catch(() => {});
   _updateIncomePills();
   _updateIncomeTabColors();
 }
@@ -1129,19 +1180,37 @@ function _updateIncomePills() {
   _updateActionsPills();
 }
 
+// Tabs whose feature is switched off get a calm "off" style (dimmed label and
+// a small grey dot). A tab is off when every listed toggle is unchecked.
+const _TAB_ENABLE_TOGGLES = {
+  "income-earns":    ["earns_enabled"],
+  "income-crimes":   ["crimes_enabled"],
+  "income-actions":  ["action_enabled"],
+  "income-casework": ["case_work_enabled"],
+  "income-banking":  ["banking_auto_invest_enabled", "laundering_enabled"],
+  "income-skills":   ["skill_travel_expert_enabled", "skill_all_seeing_eye_enabled"],
+  "income-drugs":    ["middling_enabled"],
+  "city-bionics":    ["bionics_enabled"],
+  "city-weapons":    ["weapon_store_enabled"],
+  "city-drugs":      ["drug_store_enabled"],
+  "city-gym":        ["gym_enabled"],
+  "city-casino":     ["casino_enabled"],
+};
+
 function _updateIncomeTabColors() {
-  const tabs = [
-    ["income-tab-earns",      "earns_enabled"],
-    ["income-tab-crimes",     "crimes_enabled"],
-    ["income-tab-actions",    "action_enabled"],
-    ["income-tab-banking",    "banking_auto_invest_enabled"],
-  ];
-  tabs.forEach(([tabId, toggleId]) => {
-    const tab = document.getElementById(tabId);
-    const toggle = document.getElementById(toggleId);
-    if (tab && toggle) tab.classList.toggle("tab-disabled", !toggle.checked);
-  });
+  for (const [panelId, toggleIds] of Object.entries(_TAB_ENABLE_TOGGLES)) {
+    const tab = document.querySelector(`.tab-btn[onclick*="showTab('${panelId}'"]`);
+    const toggles = toggleIds.map(id => document.getElementById(id)).filter(Boolean);
+    if (!tab || !toggles.length) continue;
+    const off = toggles.every(t => !t.checked);
+    tab.classList.toggle("tab-disabled", off);
+    tab.title = off ? "Turned off" : "";
+  }
 }
+document.addEventListener("change", e => {
+  if (e.target && e.target.type === "checkbox") _updateIncomeTabColors();
+});
+document.addEventListener("DOMContentLoaded", _updateIncomeTabColors);
 
 let _lastEnergy = null;
 let _respectPct = null;
@@ -2185,7 +2254,11 @@ function pollStatus() {
       document.getElementById("stat-name").textContent = d.own_name || "--";
       _commsOwnName = d.own_name || "";
       document.getElementById("stat-next-rank").textContent = d.next_rank || "--";
-      _applyProgress(document.getElementById("stat-progress-bg"), document.getElementById("stat-rank-progress"), d.rank_progress);
+      // Until the character page has been read (no name yet), energy, health
+      // and rank progress are just State defaults (0 / 100 / 0): show them as
+      // unknown rather than in alarm colours.
+      const _known = !!d.own_name;
+      _applyProgress(document.getElementById("stat-progress-bg"), document.getElementById("stat-rank-progress"), _known ? d.rank_progress : null);
       document.getElementById("stat-city").textContent = d.city || "--";
       document.getElementById("stat-home-city").textContent = d.home_city || "--";
 
@@ -2203,13 +2276,13 @@ function pollStatus() {
         if (occupationItem) occupationItem.style.display = "";
       }
       // Vitals — HP, Respect, Energy with progress fills
-      const hp = d.health;
+      const hp = _known ? d.health : null;
       document.getElementById("stat-health").textContent = hp != null ? hp + "%" : "--";
       _applyProgress(document.getElementById("stat-hp-bg"), document.getElementById("stat-hp-pct"), hp);
 
       _currentEnergy = d.energy;
       _energyThreshold = d.energy_threshold;
-      const ePct = d.energy != null ? Math.round(d.energy) : null;
+      const ePct = (_known && d.energy != null) ? Math.round(d.energy) : null;
       const eThr = d.energy_threshold != null ? ` [${Math.round(d.energy_threshold)}%]` : "";
       document.getElementById("stat-energy").textContent = ePct != null ? ePct + "%" + eThr : "--";
       _applyProgress(document.getElementById("stat-energy-bg"), document.getElementById("stat-energy-pct"), ePct);
