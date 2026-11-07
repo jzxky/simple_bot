@@ -11,8 +11,6 @@ never stop a task. Rows are only written when the logged-in character's name
 old one's.
 """
 
-import csv
-import io
 import json
 import os
 import re
@@ -36,7 +34,6 @@ CATEGORY_LABELS = {
     "earn_queue": "Earn queue",
     "gym": "Gym",
     "jail": "Jail",
-    "payback": "Payback",
     "consume": "Consume",
     "community_service": "Community service",
     "dog_train": "Dog trains",
@@ -78,6 +75,9 @@ CREATE INDEX IF NOT EXISTS idx_actions_target ON actions(target);
 # imported from an activity log.
 _MIGRATIONS = [
     ("actions", "source", "TEXT DEFAULT ''"),
+    # paid_back: payback sent for this agg (paybacks belong to the agg they
+    # repay rather than being separate actions).
+    ("actions", "paid_back", "INTEGER"),
 ]
 
 
@@ -100,7 +100,31 @@ def _ensure():
         c.execute("CREATE INDEX IF NOT EXISTS idx_actions_source ON actions(character, source)")
         # Travel is no longer tracked; clear rows recorded before that change.
         c.execute("DELETE FROM actions WHERE category = 'travel'")
+        _fold_paybacks(c)
     _initialized = True
+
+
+# The agg a payback repays: the latest successful agg on that target (or the
+# business owner, for torches and armed robberies) not already paid back.
+_AGG_FOR_PAYBACK = (
+    "SELECT id FROM actions WHERE character=? AND category='agg' AND result='success'"
+    " AND paid_back IS NULL AND ts <= ?"
+    " AND (lower(target)=lower(?) OR (detail != '' AND lower(json_extract(detail, '$.owner'))=lower(?)))"
+    " ORDER BY ts DESC, id DESC LIMIT 1")
+
+
+def _fold_paybacks(c):
+    """Older versions stored paybacks as their own 'payback' rows. Move each
+    successful one onto the agg it repaid, then drop the payback rows."""
+    rows = c.execute("SELECT id, ts, character, target, amount, result FROM actions"
+                     " WHERE category='payback' ORDER BY ts, id").fetchall()
+    for r in rows:
+        if r["result"] == "success" and r["amount"]:
+            agg = c.execute(_AGG_FOR_PAYBACK, (r["character"], r["ts"], r["target"], r["target"])).fetchone()
+            if agg:
+                c.execute("UPDATE actions SET paid_back=? WHERE id=?", (r["amount"], agg["id"]))
+    if rows:
+        c.execute("DELETE FROM actions WHERE category='payback'")
 
 
 def _now() -> str:
@@ -162,6 +186,23 @@ def record(state, category: str, kind: str, result: str, target: str = "",
         print(f"[action_log] record failed: {e}")
 
 
+def record_payback(state, target: str, amount: int):
+    """Note a payback on the agg it repays (latest successful agg on `target`,
+    the victim or business owner, that hasn't been paid back yet)."""
+    try:
+        character = (getattr(state, "own_name", "") or "").strip()
+        if not character or not amount:
+            return
+        with _lock:
+            _ensure()
+            with _conn() as c:
+                agg = c.execute(_AGG_FOR_PAYBACK, (character, _now(), target, target)).fetchone()
+                if agg:
+                    c.execute("UPDATE actions SET paid_back=? WHERE id=?", (int(amount), agg["id"]))
+    except Exception as e:
+        print(f"[action_log] record_payback failed: {e}")
+
+
 def set_character_status(name: str, status: str):
     """Mark a character as e.g. 'quit' or 'dead'. No-op for unknown names."""
     if not name:
@@ -218,12 +259,13 @@ def replace_imported(character: str, filename: str, rows: list) -> int:
             c.execute("DELETE FROM actions WHERE source=?", (source,))
             c.executemany(
                 "INSERT INTO actions (ts, server_time, character, category, kind, result,"
-                " target, amount, city, message, detail, source)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                " target, amount, city, message, detail, source, paid_back)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [(r["ts"], r.get("server_time", ""), character, r["category"], r.get("kind", ""),
                   r["result"], r.get("target", ""), r.get("amount"), r.get("city", ""),
                   (r.get("message") or "")[:1000],
-                  json.dumps(r["detail"], default=str) if r.get("detail") else "", source)
+                  json.dumps(r["detail"], default=str) if r.get("detail") else "", source,
+                  r.get("paid_back"))
                  for r in rows],
             )
             if rows:
@@ -302,10 +344,7 @@ def _row(r) -> dict:
     return d
 
 
-# Money a successful action brought in. Costs (negative amounts) and paybacks
-# are left out, so totals never show a net profit.
-_EARNED = "CASE WHEN result='success' AND amount > 0 AND category != 'payback' THEN amount END"
-# Amount shown per type/target: what was taken or earned, or for paybacks what was paid.
+# Amount shown per type: what was taken or earned.
 _AMOUNT = "CASE WHEN result='success' AND amount > 0 THEN amount END"
 # Consumables used: the item count recorded with each consume (1 when not recorded).
 _UNITS = ("CASE WHEN category='consume' AND result='success' THEN"
@@ -313,42 +352,22 @@ _UNITS = ("CASE WHEN category='consume' AND result='success' THEN"
 
 
 def summary(f: dict) -> dict:
-    """Totals, a daily success/fail series and per-category breakdowns for a filter."""
+    """Per category and type counts for the character history summary."""
     where, args = _where(f)
-    and_ = " AND " if where else " WHERE "
 
     def run(c):
-        t = c.execute(
-            "SELECT COUNT(*) n,"
-            " SUM(result='success') s, SUM(result='fail') fl,"
-            f" COALESCE(SUM({_EARNED}),0) amt"
-            f" FROM actions{where}", args).fetchone()
-        n, s, fl, amt = t["n"] or 0, t["s"] or 0, t["fl"] or 0, t["amt"] or 0
-        daily = [dict(r) for r in c.execute(
-            "SELECT substr(ts,1,10) day, SUM(result='success') success, SUM(result='fail') fail"
-            f" FROM actions{where} GROUP BY day ORDER BY day DESC LIMIT 60", args)][::-1]
         by_kind = [dict(r) for r in c.execute(
             "SELECT category, kind, COUNT(*) n, SUM(result='success') success,"
             " SUM(result='fail') fail,"
-            f" COALESCE(SUM({_AMOUNT}),0) amount, COALESCE(SUM({_UNITS}),0) units"
+            f" COALESCE(SUM({_AMOUNT}),0) amount, COALESCE(SUM({_UNITS}),0) units,"
+            " COALESCE(SUM(paid_back),0) paid_back"
             f" FROM actions{where} GROUP BY category, kind ORDER BY n DESC", args)]
-        top_targets = [dict(r) for r in c.execute(
-            "SELECT target, COUNT(*) n, SUM(result='success') success,"
-            f" COALESCE(SUM({_AMOUNT}),0) amount"
-            f" FROM actions{where}{and_}target != '' GROUP BY target"
-            " ORDER BY amount DESC, n DESC LIMIT 10", args)]
-        return {
-            "attempts": n, "success": s, "fail": fl,
-            "success_rate": round(100.0 * s / (s + fl), 1) if (s + fl) else None,
-            "amount": amt, "per_success": int(amt / s) if s else 0,
-            "daily": daily, "by_kind": by_kind,
-            "top_targets": top_targets,
-        }
+        return {"by_kind": by_kind}
     return _read(run)
 
 
 TABLE_COLUMNS = ["ts", "server_time", "character", "category", "kind", "result",
-                 "target", "amount", "city", "message", "source"]
+                 "target", "amount", "paid_back", "city", "message", "source"]
 TABLE_FILTERABLE = ["character", "category", "kind", "result", "target", "city", "source"]
 
 
@@ -392,21 +411,4 @@ def characters() -> list:
             d["actions"] = sum(v["n"] for v in totals.values())
             out.append(d)
         return out
-    return _read(run)
-
-
-CSV_COLUMNS = ["ts", "server_time", "character", "category", "kind", "result",
-               "target", "amount", "city", "message", "detail", "source"]
-
-
-def export_csv(f: dict) -> str:
-    where, args = _where(f)
-
-    def run(c):
-        buf = io.StringIO()
-        w = csv.writer(buf)
-        w.writerow(CSV_COLUMNS)
-        for r in c.execute(f"SELECT {', '.join(CSV_COLUMNS)} FROM actions{where} ORDER BY id DESC", args):
-            w.writerow([r[k] if r[k] is not None else "" for k in CSV_COLUMNS])
-        return buf.getvalue()
     return _read(run)

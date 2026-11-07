@@ -6,6 +6,7 @@
 <title>OpenBot</title>
 <link rel="stylesheet" href="/static/style.css?v={{ app_version }}">
 <link rel="stylesheet" href="/static/datatable.css?v={{ app_version }}">
+<link rel="stylesheet" href="/static/actions.css?v={{ app_version }}">
 </head>
 <body>
 
@@ -2119,9 +2120,60 @@
         <div class="log-open-bar">
           <select id="log-file-select" class="log-file-select" onchange="onLogFileChange()"></select>
           <button id="log-open-btn" class="log-open-btn" onclick="openFullLog()">Open full log ↗</button>
-          <button class="log-open-btn" onclick="window.open('/actions', '_blank')">Action history ↗</button>
         </div>
         <div id="log-box"></div>
+
+        <!-- Action history (action_log.py) -->
+        <div id="action-history">
+          <div class="ah-title">Action History</div>
+          <div class="ah-top">
+            <label for="ah-char">Character</label>
+            <select id="ah-char" onchange="ahOnCharChange()"></select>
+          </div>
+          <div class="tab-bar">
+            <button class="tab-btn active" onclick="ahTab('main', 'actions', this)">Actions</button>
+            <button class="tab-btn" onclick="ahTab('main', 'import', this)">Import logs</button>
+          </div>
+
+          <div data-ah-group="main" data-ah-panel="actions">
+            <div class="tab-bar ah-subtabs">
+              <button class="tab-btn active" onclick="ahTab('actions', 'table', this)">Table</button>
+              <button class="tab-btn" onclick="ahTab('actions', 'summary', this)">Character history</button>
+            </div>
+            <div data-ah-group="actions" data-ah-panel="table"><div id="ah-dt"></div></div>
+            <div data-ah-group="actions" data-ah-panel="summary" class="ah-panel-hidden">
+              <p class="ah-note">Built from the bot's own action log, laid out like the game's character
+                history page. Counts are successful actions with the success rate beside them; tap a ▸ row
+                for a breakdown.</p>
+              <div id="ah-summary" class="ch-grid"></div>
+            </div>
+          </div>
+
+          <div data-ah-group="main" data-ah-panel="import" class="ah-panel-hidden">
+            <p class="ah-note">Rebuild history from the bot's activity log files. Pick the logs, enter the
+              character they belong to, then preview and import. Re-importing a log replaces what it
+              imported before, and lines from after the character's live recording started are skipped
+              so nothing is counted twice.</p>
+            <div class="ah-import-bar">
+              <label for="imp-char">Character</label>
+              <input type="text" id="imp-char" list="imp-char-list" placeholder="Character name" autocomplete="off">
+              <datalist id="imp-char-list"></datalist>
+              <button class="log-open-btn" onclick="ahRunImport(true)">Preview</button>
+              <button class="log-open-btn" onclick="ahRunImport(false)">Import selected</button>
+              <span id="imp-status" class="ah-note"></span>
+            </div>
+            <div id="imp-result"></div>
+            <div class="ah-box">
+              <table class="ah-table">
+                <thead><tr>
+                  <th><input type="checkbox" id="imp-all" onchange="ahToggleAllLogs(this.checked)" title="Select all"></th>
+                  <th>Log file</th><th class="num">Size</th><th>Already imported as</th>
+                </tr></thead>
+                <tbody id="imp-logs"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -2534,6 +2586,8 @@
 
 <script src="/static/datatable.js?v={{ app_version }}"></script>
 <script src="/static/app.js?v={{ app_version }}"></script>
+<script>window.ACTION_CATEGORY_LABELS = {{ action_category_labels | tojson }};</script>
+<script src="/static/actions.js?v={{ app_version }}"></script>
 {% if config.get('war_mode', {}).get('enabled', False) and config.get('war_mode', {}).get('mode', 'local') == 'local' %}
 <script src="/static/war.js?v={{ app_version }}"></script>
 {% endif %}

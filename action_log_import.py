@@ -239,14 +239,10 @@ class _Parser:
             return [fn("jail", "jailbreak", m.group(1))]
 
         # ── Payback / consume ─────────────────────────────────────────────
+        # Paybacks aren't actions of their own: parse_file() puts them on the agg they repay.
         m = re.match(r"Payback sent: \$([\d,]+) to (.+)\.$", msg)
         if m:
-            row = _ok("payback", "transfer", msg, m.group(2))
-            row["amount"] = int(m.group(1).replace(",", ""))
-            return [row]
-        m = re.match(r"Payback to (.+) blocked as spam", msg)
-        if m:
-            return [_bad("payback", "transfer", "Transfer blocked as spam", m.group(1))]
+            return [{"payback_to": m.group(2), "amount": int(m.group(1).replace(",", ""))}]
         m = re.match(r"Consume (.+?): (.*)$", msg)
         if m:
             text = m.group(2)
@@ -294,10 +290,26 @@ def parse_file(path: str, filename: str) -> list:
             ts = (start_utc + timedelta(seconds=offset)).strftime("%Y-%m-%dT%H:%M:%SZ")
             server_time = f"{m.group(1)}:{m.group(2)}:{m.group(3)}"
             for row in parser.parse(m.group(4)):
+                if "payback_to" in row:
+                    _attach_payback(rows, row["payback_to"], row["amount"])
+                    continue
                 row["ts"] = ts
                 row["server_time"] = server_time
                 rows.append(row)
     return rows
+
+
+def _attach_payback(rows: list, target: str, amount: int):
+    """Put a payback on the latest successful agg on that target (victim or
+    business owner) that isn't paid back yet; drop it if there's none."""
+    t = (target or "").lower()
+    for row in reversed(rows):
+        if row.get("category") != "agg" or row.get("result") != "success" or row.get("paid_back"):
+            continue
+        owner = str((row.get("detail") or {}).get("owner", "")).lower()
+        if (row.get("target") or "").lower() == t or (owner and owner == t):
+            row["paid_back"] = amount
+            return
 
 
 def run_import(files: list, character: str, dry_run: bool = False) -> dict:

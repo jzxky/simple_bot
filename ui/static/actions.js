@@ -1,0 +1,336 @@
+/* Action history — sits under the text log in the Activity Log section.
+ *
+ * Character picker, then two tabs:
+ *   Actions      → "Table" (player-hub DataTable: sort, filter, search) and
+ *                  "Character history" (a summary laid out like the game's
+ *                  character history page, built from the bot's own log)
+ *   Import logs  → rebuild history from activity log files
+ */
+(function () {
+  "use strict";
+  const CATEGORY_LABELS = window.ACTION_CATEGORY_LABELS || {};
+  let ahCharacters = [];
+  let ahCurrent = "";
+  let ahTable = null;
+  let loaded = false;
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  }
+  function catLabel(c) { return CATEGORY_LABELS[c] || c; }
+  function money(v) {
+    if (v === null || v === undefined || v === "") return "";
+    v = Number(v);
+    return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString();
+  }
+  function fmtTs(ts) { return (ts || "").replace("T", " ").replace("Z", ""); }
+  function character() { return document.getElementById("ah-char").value; }
+
+  // Tabs inside this panel only (the page's showTab() would reset the whole card).
+  function ahTab(group, name, btn) {
+    const root = document.getElementById("action-history");
+    root.querySelectorAll(`[data-ah-group="${group}"]`).forEach(p =>
+      p.classList.toggle("ah-panel-hidden", p.dataset.ahPanel !== name));
+    btn.parentElement.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
+    if (name === "import") loadLogs();
+    if (name === "summary") loadSummary();
+  }
+
+  // ── Characters ────────────────────────────────────────────────────────────
+  async function loadCharacterList() {
+    const r = await fetch("/api/actions/characters");
+    const data = await r.json();
+    ahCharacters = data.characters;
+    ahCurrent = data.current;
+    const sel = document.getElementById("ah-char");
+    const prev = sel.value;
+    sel.innerHTML = ahCharacters.map(c => {
+      const span = `${c.first_seen.slice(0, 10)} to ${c.current ? "now" : c.last_seen.slice(0, 10)}`;
+      const tag = c.current ? "current" : c.status;
+      return `<option value="${esc(c.name)}">${esc(c.name)} (${esc(span)}, ${esc(tag)})</option>`;
+    }).join("") + '<option value="">All characters</option>';
+    if (prev && ahCharacters.some(c => c.name === prev)) sel.value = prev;
+    else if (ahCurrent && ahCharacters.some(c => c.name === ahCurrent)) sel.value = ahCurrent;
+  }
+  function onCharChange() {
+    if (ahTable) { ahTable.state.page = 1; ahTable.reload(); }
+    loadSummary();
+  }
+
+  // ── Table (player-hub DataTable, server mode) ─────────────────────────────
+  function tableFetch(q) {
+    const ch = character();
+    return fetch("/api/actions/table" + q + (ch ? "&character=" + encodeURIComponent(ch) : "")).then(r => r.json());
+  }
+  function sourceLabel(v) { return v ? "Imported · " + v.replace(/^import:/, "") : "Live"; }
+  function buildTable() {
+    ahTable = new DataTable("ah-dt", {
+      id: "actions",
+      columns: [
+        {key: "ts", label: "Time (UTC)", filter: false, title: true, render: r => esc(fmtTs(r.ts))},
+        {key: "server_time", label: "Game time", filter: false},
+        {key: "character", label: "Character", hidden: true},
+        {key: "category", label: "Category", filterLabel: catLabel},
+        {key: "kind", label: "Type"},
+        {key: "result", label: "Result", render: r => `<span class="pill ${esc(r.result)}">${esc(r.result)}</span>`},
+        {key: "target", label: "Target"},
+        {key: "amount", label: "Amount", type: "number", filter: false, cls: "num", render: r => esc(money(r.amount))},
+        {key: "paid_back", label: "Paid back", type: "number", filter: false, cls: "num", render: r => esc(money(r.paid_back))},
+        {key: "city", label: "City"},
+        {key: "message", label: "Message", filter: false, sortable: false, cls: "ah-msg",
+         render: r => {
+           const d = Object.keys(r.detail || {}).length ? "\n" + JSON.stringify(r.detail, null, 2) : "";
+           return `<span title="${esc((r.message || "") + d)}">${esc(r.message)}</span>`;
+         }},
+        {key: "source", label: "Source", hidden: true, filterLabel: sourceLabel, render: r => esc(sourceLabel(r.source))},
+      ],
+      noun: "actions", nounOne: "action",
+      searchPlaceholder: "Search target, type or message…",
+      defaultSort: [{key: "ts", dir: "desc"}],
+      columnChooser: true,
+      perPage: 25,
+      emptyText: "No actions recorded yet.",
+      server: {load: tableFetch, facet: tableFetch},
+    });
+  }
+
+  // ── Character history summary ─────────────────────────────────────────────
+  async function loadSummary() {
+    const panel = document.querySelector('[data-ah-panel="summary"]');
+    if (!panel || panel.classList.contains("ah-panel-hidden")) return;
+    const ch = character();
+    const r = await fetch("/api/actions/summary" + (ch ? "?character=" + encodeURIComponent(ch) : ""));
+    renderSummaryGrid((await r.json()).by_kind);
+  }
+
+  // Structured like the game's character history page (same section names and
+  // row names), but counted from the bot's own action log, so it works for
+  // players who don't have character history. Counts are successful actions;
+  // the % beside a row is its success rate. Rows with a ▸ expand.
+  const CRIME_ROWS = [  // [action kind, character history row name]
+    ["pickpocket", "Pickpocketing"], ["mugging", "Muggings"], ["breaking", "Break & Enters"],
+    ["torch", "Torches"], ["armed", "Armed Robberies"], ["hack", "Hacking"],
+  ];
+  const CAREER_SECTIONS = [  // [case work kind, character history section]
+    ["banking", "Banking Work"], ["hospital", "Medical Work"], ["lawyer", "Law Work"],
+    ["engineering", "Engineering"], ["fire", "Fire Fighter"],
+  ];
+
+  function n(v) { return Number(v || 0).toLocaleString(); }
+  function rateCell(success, fail) {
+    const done = (success || 0) + (fail || 0);
+    if (!done) return '<td class="ah-rate"></td>';
+    const pct = Math.round(100 * success / done);
+    return `<td class="ah-rate ${pct >= 75 ? "good" : pct < 40 ? "poor" : ""}">${pct}%</td>`;
+  }
+  function sumOf(kinds, key) { return kinds.reduce((a, k) => a + (k[key] || 0), 0); }
+
+  // One key/value row. opts: rate [success, fail], money (value is $),
+  // cls, sub (child rows [{label, value, rate}] shown when tapped).
+  let _grp = 0;
+  function chRow(label, value, opts) {
+    opts = opts || {};
+    const rate = opts.rate ? rateCell(opts.rate[0], opts.rate[1]) : '<td class="ah-rate"></td>';
+    const val = `<td class="ch-val${opts.money ? " ch-money" : ""}">${opts.money ? esc(money(value) || "$0") : n(value)}</td>`;
+    if (!opts.sub || !opts.sub.length) {
+      return `<tr${opts.cls ? ` class="${opts.cls}"` : ""}><td class="ch-key">${esc(label)}</td>${val}${rate}</tr>`;
+    }
+    const g = "g" + (++_grp);
+    let html = `<tr class="ah-exp${opts.cls ? " " + opts.cls : ""}" data-group="${g}" onclick="ahToggleSummaryGroup(this)">
+      <td class="ch-key"><span class="ah-caret">▸</span> ${esc(label)}</td>${val}${rate}</tr>`;
+    for (const x of opts.sub) {
+      html += `<tr class="ah-sub" data-parent="${g}" style="display:none"><td class="ch-key">${esc(x.label)}</td>
+        <td class="ch-val">${x.units ? n(x.value) + " used" : n(x.value)}</td>
+        ${x.rate ? rateCell(x.rate[0], x.rate[1]) : '<td class="ah-rate"></td>'}</tr>`;
+    }
+    return html;
+  }
+  function chSection(title, rows, note) {
+    if (!rows) return "";
+    return `<div class="ch-grid-item"><div class="ch-section">
+      <div class="ch-section-head"><span class="ch-section-title">${esc(title)}</span></div>
+      <table class="ch-table">${rows}</table>
+      ${note ? `<div class="ah-sec-note">${esc(note)}</div>` : ""}</div></div>`;
+  }
+  function subRows(kinds, withRate) {
+    return kinds.slice().sort((a, b) => (b.success || 0) - (a.success || 0))
+      .map(k => ({label: k.kind || "–", value: k.success, rate: withRate ? [k.success, k.fail] : null}));
+  }
+
+  function renderSummaryGrid(byKind) {
+    _grp = 0;
+    const box = document.getElementById("ah-summary");
+    const byCat = {};
+    byKind.forEach(k => (byCat[k.category] = byCat[k.category] || []).push(k));
+    const cat = c => byCat[c] || [];
+    const kindOf = (c, kind) => cat(c).find(k => k.kind === kind);
+    let html = "";
+
+    // ── Character Information ──
+    let info = "";
+    const gym = cat("gym").filter(k => k.kind !== "membership");
+    if (gym.length) info += chRow("Gym Trains", sumOf(gym, "success"), {sub: subRows(gym)});
+    if (cat("community_service").length) {
+      info += chRow("Community Services", sumOf(cat("community_service"), "success"), {sub: subRows(cat("community_service"))});
+    }
+    if (cat("dog_train").length) {
+      info += chRow("Dog Trains", sumOf(cat("dog_train"), "success"), {sub: subRows(cat("dog_train"))});
+    }
+    if (cat("consume").length) {
+      info += chRow("Consumables Used", sumOf(cat("consume"), "units"),
+        {sub: cat("consume").slice().sort((a, b) => b.units - a.units).map(k => ({label: k.kind || "–", value: k.units, units: true}))});
+    }
+    const jailed = kindOf("jail", "jailed");
+    if (jailed) info += chRow("Times Jailed", jailed.n);
+    const jb = kindOf("jail", "jailbreak");
+    if (jb) info += chRow("Jailbreaks", jb.success, {rate: [jb.success, jb.fail]});
+    if (cat("jail_duty").length) {
+      const d = cat("jail_duty");
+      info += chRow("Jail Duties", sumOf(d, "success"), {rate: [sumOf(d, "success"), sumOf(d, "fail")], sub: subRows(d, true)});
+    }
+    html += chSection("Character Information", info);
+
+    // ── Crimes Committed ──
+    const aggs = cat("agg");
+    if (aggs.length) {
+      let rows = "";
+      const known = new Set(CRIME_ROWS.map(r => r[0]));
+      for (const [kind, label] of CRIME_ROWS) {
+        const k = kindOf("agg", kind);
+        if (k) rows += chRow(label, k.success, {rate: [k.success, k.fail]});
+      }
+      aggs.filter(k => !known.has(k.kind)).forEach(k => { rows += chRow(k.kind || "Other", k.success, {rate: [k.success, k.fail]}); });
+      rows += chRow("Total Aggravated", sumOf(aggs, "success"), {rate: [sumOf(aggs, "success"), sumOf(aggs, "fail")], cls: "ah-total"});
+      rows += chRow("Money Taken", sumOf(aggs, "amount"), {money: true, cls: "ah-total"});
+      if (sumOf(aggs, "paid_back")) rows += chRow("Paid Back", sumOf(aggs, "paid_back"), {money: true, cls: "ah-total"});
+      html += chSection("Crimes Committed", rows);
+    }
+
+    // ── Career sections (case work) ──
+    const cw = cat("case_work");
+    const careerKinds = new Set(CAREER_SECTIONS.map(c => c[0]));
+    const careers = CAREER_SECTIONS.concat(cw.filter(k => !careerKinds.has(k.kind)).map(k => [k.kind, k.kind || "Case Work"]));
+    for (const [kind, title] of careers) {
+      const k = kindOf("case_work", kind);
+      if (!k) continue;
+      let rows = chRow("Successful", k.success, {rate: [k.success, k.fail]});
+      rows += chRow("Failed", k.fail);
+      if (k.amount) rows += chRow("Earned", k.amount, {money: true});
+      html += chSection(title, rows);
+    }
+
+    // ── Earn History ──
+    const earns = cat("earn"), queue = cat("earn_queue");
+    if (earns.length || queue.length) {
+      let rows = "";
+      if (earns.length) {
+        rows += chRow("Manual Earns", sumOf(earns, "success"), {rate: [sumOf(earns, "success"), sumOf(earns, "fail")], sub: subRows(earns, true)});
+        if (sumOf(earns, "amount")) rows += chRow("Earned", sumOf(earns, "amount"), {money: true});
+      }
+      if (queue.length) rows += chRow("Earn Queue Top-ups", sumOf(queue, "success"), {sub: subRows(queue)});
+      html += chSection("Earn History", rows,
+        "Auto earns can't be tracked: the game runs the auto earn queue on its own servers.");
+    }
+
+    // Anything else the bot records later still shows up.
+    const shown = new Set(["gym", "community_service", "dog_train", "consume", "jail", "jail_duty",
+                           "agg", "case_work", "earn", "earn_queue"]);
+    Object.keys(byCat).filter(c => !shown.has(c)).forEach(c => {
+      html += chSection(catLabel(c), byCat[c].map(k => chRow(k.kind || "–", k.success, {rate: [k.success, k.fail]})).join(""));
+    });
+
+    box.innerHTML = html || '<div class="ah-empty" style="grid-column:1/-1">No actions recorded yet.</div>';
+  }
+
+  function toggleSummaryGroup(tr) {
+    const open = !tr.classList.contains("open");
+    tr.classList.toggle("open", open);
+    tr.closest("table").querySelectorAll(`tr.ah-sub[data-parent="${tr.dataset.group}"]`)
+      .forEach(r => r.style.display = open ? "" : "none");
+  }
+
+  function table(headers, rows) {
+    return `<table class="ah-table"><thead><tr>${headers.map((h, i) =>
+      `<th class="${i ? "num" : ""}">${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r =>
+      `<tr>${r.map((c, i) => `<td class="${i ? "num" : ""}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  }
+
+  // ── Import from activity logs ───────────────────────────────────────────────
+  async function loadLogs() {
+    const r = await fetch("/api/actions/logs");
+    const data = await r.json();
+    const inp = document.getElementById("imp-char");
+    if (!inp.value) inp.value = document.getElementById("ah-char").value || data.current || "";
+    document.getElementById("imp-char-list").innerHTML =
+      ahCharacters.map(c => `<option value="${esc(c.name)}">`).join("");
+    const body = document.getElementById("imp-logs");
+    document.getElementById("imp-all").checked = false;
+    if (!data.logs.length) {
+      body.innerHTML = '<tr><td colspan="4" class="ah-empty">No activity logs found.</td></tr>';
+      return;
+    }
+    body.innerHTML = data.logs.map(l => `<tr>
+        <td><input type="checkbox" class="imp-file" value="${esc(l.file)}"></td>
+        <td>${esc(l.file)}</td>
+        <td class="num">${(l.size / 1024).toFixed(0)} KB</td>
+        <td>${l.imported.map(i => `${esc(i.character)} (${i.rows})`).join(", ") || "–"}</td>
+      </tr>`).join("");
+  }
+  function toggleAllLogs(on) {
+    document.querySelectorAll(".imp-file").forEach(c => c.checked = on);
+  }
+  async function runImport(dryRun) {
+    const files = [...document.querySelectorAll(".imp-file:checked")].map(c => c.value);
+    const character = document.getElementById("imp-char").value.trim();
+    const status = document.getElementById("imp-status");
+    const out = document.getElementById("imp-result");
+    if (!files.length) { status.textContent = "Select at least one log."; return; }
+    if (!character) { status.textContent = "Enter the character name."; return; }
+    const existing = ahCharacters.some(c => c.name === character);
+    if (!dryRun && !existing &&
+        !confirm(`"${character}" isn't a character in the database yet. Import as a new character?`)) return;
+    status.textContent = dryRun ? "Reading logs…" : "Importing…";
+    const r = await fetch("/api/actions/import", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({files, character, dry_run: dryRun}),
+    });
+    const data = await r.json();
+    if (!r.ok) { status.innerHTML = `<span class="imp-err">${esc(data.error || "Import failed")}</span>`; return; }
+    status.textContent = (dryRun ? "Preview: " : "Imported ") +
+      `${data.total.toLocaleString()} actions for ${data.character}` + (dryRun ? " (nothing saved yet)" : ".");
+    out.innerHTML = '<div class="ah-box">' + table(
+      ["Log file", "Actions", "Skipped (already live)", "By category"],
+      data.files.map(f => f.error ? [f.file, "–", "–", f.error] : [
+        f.file, f.rows, f.skipped_live,
+        Object.entries(f.by_category).map(([k, v]) => `${catLabel(k)} ${v}`).join(", ") || "none",
+      ])) + "</div>";
+    if (!dryRun) {
+      await loadCharacterList();
+      document.getElementById("ah-char").value = character;
+      loadLogs();
+      onCharChange();
+    }
+  }
+
+  // ── Init: load when the Activity Log section is first opened ─────────────
+  async function init() {
+    if (loaded || !document.getElementById("action-history")) return;
+    loaded = true;
+    await loadCharacterList();
+    buildTable();
+  }
+  window.ahTab = ahTab;
+  window.ahOnCharChange = onCharChange;
+  window.ahToggleSummaryGroup = toggleSummaryGroup;
+  window.ahToggleAllLogs = toggleAllLogs;
+  window.ahRunImport = runImport;
+  window.ahInit = init;
+  document.addEventListener("click", e => {
+    const t = e.target.closest('.main-tab[data-section="s-log"]');
+    if (t) init();
+  });
+  document.addEventListener("DOMContentLoaded", () => {
+    const sec = document.getElementById("s-log");
+    if (sec && sec.classList.contains("main-active")) init();
+  });
+})();
