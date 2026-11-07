@@ -5789,6 +5789,29 @@ def _closed_city_cooldown(state: GameState, target: str, reason: str):
 
 
 def handle_travel(action: Action, state: GameState) -> int:
+    """Travel, recording the outcome in the action history."""
+    target = action.params.get("target_city", "")
+    method = action.params.get("method", "airport")
+    from_city = state.current_city
+    money_before = state.clean_money
+    result = _handle_travel(action, state)
+    try:
+        if not target or (from_city or "").lower() == target.lower():
+            return result
+        # The travel code explains every outcome in its last log line.
+        last = re.sub(r"^\[[^\]]*\]\s*", "", state.log[-1]) if state.log else ""
+        spent = money_before - state.clean_money
+        moved = (state.current_city or "").lower() == target.lower()
+        action_log.record(state, "travel", method, "success" if result else "fail",
+                          target=target, amount=-spent if (moved and spent > 0) else None,
+                          message=last, from_city=from_city,
+                          arrived=moved)
+    except Exception:
+        pass
+    return result
+
+
+def _handle_travel(action: Action, state: GameState) -> int:
     from datetime import datetime
     global _travel_warrant_cooldown_until
     target = action.params.get("target_city", "")
