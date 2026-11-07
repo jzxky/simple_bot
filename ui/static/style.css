@@ -1631,41 +1631,19 @@ input.input-unsaved { color: var(--red) !important; }
 
 .pl-detail-row td { padding: 0; border-bottom: 2px solid var(--accent, #89b4fa); }
 
-/* Players table on phones: sort headers become a row of chips, filters a
-   two-column grid, and each player a card with labelled fields — no sideways
-   scrolling through 13 columns. */
-@media (max-width: 600px) {
-  #pl-table, #pl-table thead, #pl-table tbody { display: block; }
-  #pl-table thead tr:first-child { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
-  #pl-table thead tr:first-child .pl-th {
-    border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 8px;
-  }
-  #pl-table thead tr:first-child .pl-th:not([data-col]),
-  #pl-table thead tr:first-child .pl-th[data-col="online_status"] { display: none; }
-  #pl-filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
-  #pl-filter-row .pl-filter-cell { border: none; padding: 0; background: none; text-align: left; }
-  #pl-filter-row .pl-filter-cell:not([data-label]) { display: none; }
-  #pl-filter-row .pl-filter-cell::before {
-    content: attr(data-label); display: block; font-size: 0.68rem; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px;
-  }
-  #pl-filter-row .pl-filter-input { font-size: 0.85rem; padding: 6px 8px; }
-  #pl-tbody tr { display: block; }
-  #pl-tbody tr.pl-data-row {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px;
-    border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 8px 10px; margin-bottom: 6px; background: var(--surface2);
-  }
-  #pl-tbody tr.pl-data-row td { display: block; border: none; padding: 2px 0; background: none; min-width: 0; }
-  #pl-tbody tr.pl-data-row td[data-label]::before {
-    content: attr(data-label); display: block; font-size: 0.66rem; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.04em;
-  }
-  #pl-tbody td.pl-cell-dot { display: none; }
-  #pl-tbody td.pl-cell-name { grid-column: 1 / -1; font-weight: 600; font-size: 0.95rem; }
-  #pl-tbody td[data-label="Monitor"] { text-align: left !important; }
-  #pl-tbody tr.pl-detail-row td { display: block; border-bottom: none; }
-  #pl-tbody tr.pl-detail-row { margin: -6px 0 8px; }
+/* Players list (DataTable): online dot, open-row edit panel, phone cards */
+#pl-dt td.pl-col-dot, #pl-dt th[data-key="online_status"] { width: 28px; text-align: center; }
+.pl-online-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+@media (min-width: 641px) { #pl-dt tr.pl-row-expanded > td { background: var(--surface2); } }
+#pl-dt tr.pl-detail-row > td { padding: 0; }
+@media (max-width: 640px) {
+  #pl-dt .dt-cards tr.pl-detail-row { display: block; padding: 0; margin: -6px 0 8px; border-top: none; border-radius: 0 0 6px 6px; }
+  #pl-dt .dt-cards tr.pl-detail-row > td { display: block; }
+  #pl-dt .dt-cards tr.pl-detail-row > td::before { display: none; }
+  #pl-dt .dt-cards td.pl-col-dot { display: none; }
+  #pl-dt .dt-cards td.dt-card-title { flex-direction: row; align-items: center; gap: 6px; }
+  #pl-dt .dt-cards td > span { align-self: flex-start; }
+  #pl-dt .dt-cards tr.pl-row-expanded > td { background: none; }
 }
 .pl-detail {
   padding: 12px 16px;

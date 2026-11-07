@@ -4826,14 +4826,9 @@ function cjDoAction(entryId, url, actionType) {
 const PL_SWATCH_COLORS = ["#e74c3c","#e67e22","#f1c40f","#2ecc71","#3498db","#9b59b6","#e91e8c","#1abc9c","#aaaaaa","#555555"];
 
 let _plData     = [];
-let _plFiltered = [];
 let _plExpanded = {};
 let _plGroups   = [];
 let _plHubManaged = false;  // bot mirrors Player Hub: groups and assignments are read-only
-let _plSortCol  = "username";
-let _plSortAsc  = true;
-const _plColVisible = {rank:true, occupation:true, career_group:true, homecity:true, group:true, tags:true, character_age:true, jail_age:true, agg_crimes:true, case_work:true};
-const _PL_COL_INDEX = {rank:2, occupation:3, career_group:4, homecity:5, group:6, tags:7, character_age:8, jail_age:9, agg_crimes:10, case_work:11};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -5101,7 +5096,6 @@ function loadPlayers() {
       _plGroups = data.groups || [];
       _plHubManaged = !!data.hub_managed;
       _plApplyGroupsLock();
-      _plRebuildFilters();
       plFilter();
       _plRenderGroupsTab(_plGroups);
       _updatePlayerPills();
@@ -5111,29 +5105,6 @@ function loadPlayers() {
       populateLaunderContactSelect();
     })
     .catch(() => {});
-}
-
-function _plRebuildFilters() {
-  const uniq = col => [...new Set(_plData.map(p => p[col] || "").filter(Boolean))].sort((a,b) => a.localeCompare(b));
-  const uniqTags = [...new Set(_plData.flatMap(p => p.tags || []))].sort();
-  const uniqCareer = [...new Set(_plData.map(p => _careerGroup(p.occupation)).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-
-  const specs = [
-    { id: "pl-filter-rank",         vals: uniq("rank") },
-    { id: "pl-filter-occupation",   vals: uniq("occupation") },
-    { id: "pl-filter-career-group", vals: uniqCareer },
-    { id: "pl-filter-homecity",     vals: uniq("homecity") },
-    { id: "pl-filter-group",        vals: uniq("group") },
-    { id: "pl-filter-tag",          vals: uniqTags },
-  ];
-  specs.forEach(({ id, vals }) => {
-    const sel = document.getElementById(id);
-    if (!sel) return;
-    const cur = sel.value;
-    sel.innerHTML = `<option value="">All</option>` +
-      vals.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join("");
-    if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
-  });
 }
 
 function _plUpdateSummary() {
@@ -5149,161 +5120,88 @@ function _plUpdateSummary() {
   if (el("pl-summary-dead")) el("pl-summary-dead").textContent = deadPlayers;
 }
 
-// ── Filter & sort ─────────────────────────────────────────────────────────────
+// ── Players table (player-hub DataTable, client mode) ────────────────────────
+// Sort, multi-value filters with counts, search, column chooser and phone cards
+// all come from DataTable. Clicking a row opens its edit panel underneath.
+
+const _PL_STATUS_LABEL = { local: "Online (local)", online: "Online", offline: "Offline" };
+const _PL_STATUS_ORDER = { local: 0, online: 1, offline: 2 };
+const _PL_ASSIGN_LABEL = v => v ? v[0].toUpperCase() + v.slice(1) : "";
+let _plTable = null;
+
+function _plStatusDot(username) {
+  const st = _onlineStatus(username);
+  if (st === "offline") return "";
+  const color = st === "local" ? "#32cd32" : "#f0c040";
+  return `<span class="pl-online-dot" title="${_PL_STATUS_LABEL[st]}" style="background:${color}"></span>`;
+}
+
+function _plEnsureTable() {
+  if (_plTable) return _plTable;
+  const host = document.getElementById("pl-dt");
+  if (!host || typeof DataTable === "undefined") return null;
+  _plTable = new DataTable(host, {
+    id: "players",
+    columns: [
+      {key: "online_status", label: "Online", cls: "pl-col-dot",
+       value: p => _onlineStatus(p.username), filterLabel: v => _PL_STATUS_LABEL[v] || v,
+       sortValue: p => _PL_STATUS_ORDER[_onlineStatus(p.username)], search: false,
+       render: p => _plStatusDot(p.username)},
+      {key: "username", label: "Name", title: true, filter: false,
+       render: p => `<span class="pl-chevron">${_plExpanded[p.username] ? "▾" : "▸"}</span> ${escHtml(p.username)}`},
+      {key: "alias", label: "Alias"},
+      {key: "rank", label: "Rank"},
+      {key: "occupation", label: "Occupation"},
+      {key: "career_group", label: "Career", value: p => _careerGroup(p.occupation)},
+      {key: "homecity", label: "City"},
+      {key: "group", label: "Group",
+       render: p => {
+         if (!p.group) return "";
+         const color = _plGroupColorMap()[p.group] || "#888";
+         return `<span class="pl-group-badge" style="background:${color}">${escHtml(p.group)}</span>`;
+       }},
+      {key: "tags", label: "Tags", hidden: true, value: p => (p.tags || []).join(", "),
+       render: p => (p.tags || []).map(t => `<span class="pl-tag">${escHtml(t)}</span>`).join(" ")},
+      {key: "character_age", label: "Age", type: "number", filter: false, search: false,
+       value: p => p.character_age || null, render: p => p.character_age ? _fmtAge(p.character_age) : ""},
+      {key: "jail_age", label: "Jail Age", type: "number", filter: false, search: false,
+       value: p => p.jail_age || null, render: p => p.jail_age ? _fmtAge(p.jail_age) : ""},
+      {key: "agg_crimes", label: "Agg", hidden: true, filterLabel: _PL_ASSIGN_LABEL,
+       render: p => p.agg_crimes ? `<span class="pl-assign-badge pl-assign-${escHtml(p.agg_crimes)}">${escHtml(p.agg_crimes)}</span>` : ""},
+      {key: "case_work", label: "Case Work", hidden: true, filterLabel: _PL_ASSIGN_LABEL,
+       render: p => p.case_work ? `<span class="pl-assign-badge pl-assign-${escHtml(p.case_work)}">${escHtml(p.case_work)}</span>` : ""},
+    ],
+    noun: "players", nounOne: "player",
+    searchPlaceholder: "Search name, alias, rank, city…",
+    defaultSort: [{key: "username", dir: "asc"}],
+    columnChooser: true,
+    perPage: 100,
+    emptyText: "No players yet. Use Refresh to load the player list.",
+    rowClass: p => _plExpanded[p.username] ? "pl-row-expanded" : "",
+    onRowClick: p => plToggleRow(p.username),
+    afterRender: rows => {
+      // Put each open player's edit panel directly under its row.
+      const span = _plTable ? _plTable._orderedCols().length : 1;
+      rows.forEach((p, i) => {
+        if (!_plExpanded[p.username]) return;
+        const tr = host.querySelector(`tbody tr[data-i="${i}"]`);
+        if (tr) tr.insertAdjacentHTML("afterend",
+          `<tr class="pl-detail-row"><td colspan="${span}"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
+      });
+    },
+  });
+  return _plTable;
+}
 
 function plFilter() {
-  const search    = (document.getElementById("pl-search")?.value || "").toLowerCase();
-  const aliasFlt  = (document.getElementById("pl-filter-alias")?.value || "").toLowerCase();
-  const onlineFlt = document.getElementById("pl-filter-online")?.value || "";
-  const rank      = document.getElementById("pl-filter-rank")?.value || "";
-  const occ       = document.getElementById("pl-filter-occupation")?.value || "";
-  const careerGrp = document.getElementById("pl-filter-career-group")?.value || "";
-  const city      = document.getElementById("pl-filter-homecity")?.value || "";
-  const group     = document.getElementById("pl-filter-group")?.value || "";
-  const tag       = document.getElementById("pl-filter-tag")?.value || "";
-  const agg       = document.getElementById("pl-filter-agg")?.value || "";
-  const cw        = document.getElementById("pl-filter-casework")?.value || "";
+  const t = _plEnsureTable();
+  if (!t) return;
   const activeOnly = document.getElementById("pl-filter-active")?.checked ?? true;
-
-  _plFiltered = _plData.filter(p => {
-    if (activeOnly && !p.active) return false;
-    if (search && !p.username.toLowerCase().includes(search)) return false;
-    if (aliasFlt && !(p.alias||"").toLowerCase().includes(aliasFlt)) return false;
-    if (onlineFlt && _onlineStatus(p.username) !== onlineFlt) return false;
-    if (rank  && p.rank !== rank) return false;
-    if (occ   && p.occupation !== occ) return false;
-    if (careerGrp && _careerGroup(p.occupation) !== careerGrp) return false;
-    if (city  && p.homecity !== city) return false;
-    if (group && p.group !== group) return false;
-    if (tag   && !(p.tags||[]).includes(tag)) return false;
-    if (agg === "__none__" && p.agg_crimes) return false;
-    if (agg && agg !== "__none__" && p.agg_crimes !== agg) return false;
-    if (cw === "__none__" && p.case_work) return false;
-    if (cw && cw !== "__none__" && p.case_work !== cw) return false;
-    return true;
-  });
-  _plApplySort();
-  _plRenderTable();
+  t.setRows(activeOnly ? _plData.filter(p => p.active) : _plData);
 }
-
-function plSort(col) {
-  if (_plSortCol === col) _plSortAsc = !_plSortAsc;
-  else { _plSortCol = col; _plSortAsc = true; }
-  _plApplySort();
-  _plRenderTable();
-}
-
-const _STATUS_ORDER = { local: 0, online: 1, offline: 2 };
-
-function _plSortVal(p, col) {
-  if (col === "career_group") return _careerGroup(p.occupation).toLowerCase();
-  if (col === "online_status") return String(_STATUS_ORDER[_onlineStatus(p.username)] ?? 2);
-  if (col === "character_age") return String(p.character_age || 0).padStart(10, "0");
-  if (col === "jail_age") return String(p.jail_age || 0).padStart(10, "0");
-  return (p[col] || "").toLowerCase();
-}
-
-function _plApplySort() {
-  const col = _plSortCol, asc = _plSortAsc ? 1 : -1;
-  _plFiltered = [..._plFiltered].sort((a, b) =>
-    asc * _plSortVal(a, col).localeCompare(_plSortVal(b, col))
-  );
-  document.querySelectorAll(".pl-th[data-col]").forEach(th => {
-    const icon = th.querySelector(".pl-sort-icon");
-    if (!icon) return;
-    if (th.dataset.col === col) {
-      icon.textContent = _plSortAsc ? "▲" : "▼";
-      th.classList.add("pl-th-sorted");
-    } else {
-      icon.textContent = "↕";
-      th.classList.remove("pl-th-sorted");
-    }
-  });
-}
-
-// ── Column visibility ─────────────────────────────────────────────────────────
-
-function togglePlColMenu() {
-  const m = document.getElementById("pl-col-menu");
-  if (m) m.style.display = m.style.display === "none" ? "block" : "none";
-}
-
-function plToggleColSection(hdr) {
-  const body = hdr.nextElementSibling;
-  const chevron = hdr.querySelector(".pl-col-chevron");
-  if (!body) return;
-  const collapsed = body.style.display === "none";
-  body.style.display = collapsed ? "" : "none";
-  if (chevron) chevron.textContent = collapsed ? "▾" : "▸";
-}
-document.addEventListener("click", e => {
-  const menu = document.getElementById("pl-col-menu");
-  const btn  = document.getElementById("pl-col-menu-btn");
-  if (menu && !menu.contains(e.target) && e.target !== btn) menu.style.display = "none";
-});
-
-function plToggleCol(col, visible) {
-  _plColVisible[col] = visible;
-  const idx = _PL_COL_INDEX[col];
-  if (idx == null) return;
-  document.querySelectorAll(`#pl-table th:nth-child(${idx + 1}), #pl-table td:nth-child(${idx + 1})`).forEach(cell => {
-    cell.style.display = visible ? "" : "none";
-  });
-}
-
-// ── Render player table ───────────────────────────────────────────────────────
 
 function _plRenderTable() {
-  const tbody = document.getElementById("pl-tbody");
-  if (!tbody) return;
-  const colorMap = _plGroupColorMap();
-
-  if (_plFiltered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="13" style="padding:12px;color:var(--muted);text-align:center">No players found.</td></tr>`;
-    return;
-  }
-
-  const rows = [];
-  _plFiltered.forEach(p => {
-    const color = colorMap[p.group] || null;
-    const groupCell = p.group
-      ? `<span class="pl-group-badge" style="background:${color||'#888'}">${escHtml(p.group)}</span>`
-      : `<span style="color:var(--muted)">—</span>`;
-    const tags    = (p.tags||[]).map(t => `<span class="pl-tag">${escHtml(t)}</span>`).join(" ");
-    const aggCell = p.agg_crimes ? `<span class="pl-assign-badge pl-assign-${p.agg_crimes}">${p.agg_crimes}</span>` : "—";
-    const cwCell  = p.case_work  ? `<span class="pl-assign-badge pl-assign-${p.case_work}">${p.case_work}</span>`   : "—";
-    const expanded = _plExpanded[p.username];
-    const isLocal  = _botState.local_players.has(p.username);
-    const isOnline = isLocal || _botState.online_players.has(p.username);
-    const dot = isLocal  ? `<span title="Online — local" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#32cd32"></span>`
-              : isOnline ? `<span title="Online" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f0c040"></span>`
-              : "";
-
-    const careerGrp = _careerGroup(p.occupation);
-    const ageCell   = p.character_age ? _fmtAge(p.character_age) : "—";
-    const jailAgeCell = p.jail_age ? _fmtAge(p.jail_age) : "—";
-    rows.push(`<tr class="pl-data-row${expanded?' pl-row-expanded':''}" onclick="plToggleRow(${escJsStr(p.username)})" style="cursor:pointer">
-      <td class="pl-cell-dot" style="text-align:center">${dot}</td>
-      <td class="pl-cell-name"><span class="pl-chevron">${expanded?'▾':'▸'}</span> ${escHtml(p.username)}</td>
-      <td data-label="Alias">${escHtml(p.alias||"")}</td>
-      <td data-label="Rank">${escHtml(p.rank||"—")}</td>
-      <td data-label="Occupation">${escHtml(p.occupation||"—")}</td>
-      <td data-label="Career">${escHtml(careerGrp)}</td>
-      <td data-label="City">${escHtml(p.homecity||"—")}</td>
-      <td data-label="Group">${groupCell}</td>
-      <td data-label="Tags">${tags||"—"}</td>
-      <td data-label="Age" style="white-space:nowrap">${ageCell}</td>
-      <td data-label="Jail Age" style="white-space:nowrap">${jailAgeCell}</td>
-      <td data-label="Agg">${aggCell}</td>
-      <td data-label="Case Work">${cwCell}</td>
-      <td data-label="Monitor" style="text-align:center"><input type="checkbox" ${p.monitoring ? 'checked' : ''} onclick="event.stopPropagation();plToggleMonitoring(${escJsStr(p.username)}, this.checked)" ${_plHubManaged ? 'disabled title="Managed on Player Hub"' : ''}></td>
-    </tr>`);
-
-    if (expanded) {
-      rows.push(`<tr class="pl-detail-row"><td colspan="14"><div class="pl-detail" id="pldetail-${escHtml(p.username)}">${_plDetailHtml(p)}</div></td></tr>`);
-    }
-  });
-  tbody.innerHTML = rows.join("");
+  if (_plTable) _plTable.render();
 }
 
 function plToggleRow(username) {
@@ -5686,16 +5584,6 @@ function _plRunWhitelistBolds() {
     .then(r => r.json())
     .then(d => { if (d.newly > 0) loadPlayers(); })
     .catch(() => {});
-}
-
-function plToggleMonitoring(username, on) {
-  fetch("/toggle-monitoring", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({username, on}),
-  }).then(() => {
-    const p = _plData.find(x => x.username === username);
-    if (p) p.monitoring = on ? 1 : 0;
-  }).catch(() => {});
 }
 
 function plScrapePlayers() {

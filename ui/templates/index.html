@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OpenBot</title>
 <link rel="stylesheet" href="/static/style.css?v={{ app_version }}">
+<link rel="stylesheet" href="/static/datatable.css?v={{ app_version }}">
 </head>
 <body>
 
@@ -2368,27 +2369,6 @@
           </div>
           <div class="pl-toolbar" style="flex-direction:column;align-items:stretch">
             <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-            <div style="position:relative">
-              <button class="btn-secondary" onclick="togglePlColMenu()" id="pl-col-menu-btn">Columns ▾</button>
-              <div id="pl-col-menu" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px 20px;z-index:1000;white-space:nowrap;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                  <strong>Columns</strong>
-                  <button class="btn-secondary" onclick="togglePlColMenu()" style="padding:2px 8px">✕</button>
-                </div>
-                <div class="pl-col-section-body">
-                  <label>Rank <input type="checkbox" checked onchange="plToggleCol('rank',this.checked)"></label>
-                  <label>Occupation <input type="checkbox" checked onchange="plToggleCol('occupation',this.checked)"></label>
-                  <label>Career <input type="checkbox" checked onchange="plToggleCol('career_group',this.checked)"></label>
-                  <label>City <input type="checkbox" checked onchange="plToggleCol('homecity',this.checked)"></label>
-                  <label>Age <input type="checkbox" checked onchange="plToggleCol('character_age',this.checked)"></label>
-                  <label>Jail Age <input type="checkbox" checked onchange="plToggleCol('jail_age',this.checked)"></label>
-                  <label>Group <input type="checkbox" checked onchange="plToggleCol('group',this.checked)"></label>
-                  <label>Tags <input type="checkbox" checked onchange="plToggleCol('tags',this.checked)"></label>
-                  <label>Agg <input type="checkbox" checked onchange="plToggleCol('agg_crimes',this.checked)"></label>
-                  <label>Case Work <input type="checkbox" checked onchange="plToggleCol('case_work',this.checked)"></label>
-                </div>
-              </div>
-            </div>
             <button class="btn-secondary" onclick="plRefresh()" id="pl-refresh-btn">Refresh</button>
             <span id="pl-refresh-status" style="font-size:0.8rem;color:var(--error,#f87171)"></span>
             <button class="btn-secondary" onclick="window.open('/players','_blank')" title="Open player list in new tab">Open in new tab ↗</button>
@@ -2401,60 +2381,7 @@
               </label>
             </label>
           </div>
-          <div style="overflow-x:auto;margin-top:8px">
-            <table class="pl-table" id="pl-table">
-              <thead>
-                <tr>
-                  <th class="pl-th pl-th-filter" onclick="plSort('online_status')" data-col="online_status" style="width:18px" title="Online status"><span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('username')" data-col="username">Name <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('alias')" data-col="alias">Alias <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('rank')" data-col="rank">Rank <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('occupation')" data-col="occupation">Occupation <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('career_group')" data-col="career_group">Career <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('homecity')" data-col="homecity">City <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('group')" data-col="group">Group <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter">Tags</th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('character_age')" data-col="character_age">Age <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('jail_age')" data-col="jail_age">Jail Age <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('agg_crimes')" data-col="agg_crimes">Agg <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th pl-th-filter" onclick="plSort('case_work')" data-col="case_work">Case Work <span class="pl-sort-icon">↕</span></th>
-                  <th class="pl-th" style="width:24px" title="Monitor">Mon</th>
-                </tr>
-                <tr id="pl-filter-row">
-                  <th class="pl-filter-cell" data-label="Status"><select id="pl-filter-online" class="pl-filter-input" onchange="plFilter()">
-                    <option value="">All</option>
-                    <option value="local">Local</option>
-                    <option value="online">Online</option>
-                    <option value="offline">Offline</option>
-                  </select></th>
-                  <th class="pl-filter-cell" data-label="Name"><input type="text" id="pl-search" class="pl-filter-input" placeholder="Name…" oninput="plFilter()"></th>
-                  <th class="pl-filter-cell" data-label="Alias"><input type="text" id="pl-filter-alias" class="pl-filter-input" placeholder="Alias…" oninput="plFilter()"></th>
-                  <th class="pl-filter-cell" data-label="Rank"><select id="pl-filter-rank" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell" data-label="Occupation"><select id="pl-filter-occupation" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell" data-label="Career"><select id="pl-filter-career-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell" data-label="City"><select id="pl-filter-homecity" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell" data-label="Group"><select id="pl-filter-group" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell" data-label="Tags"><select id="pl-filter-tag" class="pl-filter-input" onchange="plFilter()"><option value="">All</option></select></th>
-                  <th class="pl-filter-cell"></th>
-                  <th class="pl-filter-cell"></th>
-                  <th class="pl-filter-cell" data-label="Agg"><select id="pl-filter-agg" class="pl-filter-input" onchange="plFilter()">
-                    <option value="">All</option>
-                    <option value="__none__">None</option>
-                    <option value="whitelist">Whitelist</option>
-                    <option value="blacklist">Blacklist</option>
-                  </select></th>
-                  <th class="pl-filter-cell" data-label="Case Work"><select id="pl-filter-casework" class="pl-filter-input" onchange="plFilter()">
-                    <option value="">All</option>
-                    <option value="__none__">None</option>
-                    <option value="whitelist">Whitelist</option>
-                    <option value="blacklist">Blacklist</option>
-                  </select></th>
-                  <th class="pl-filter-cell"></th>
-                </tr>
-              </thead>
-              <tbody id="pl-tbody"></tbody>
-            </table>
-          </div>
+          <div id="pl-dt" style="margin-top:8px"></div>
         </div>
 
         <!-- Active players tab -->
@@ -2613,6 +2540,7 @@
   </main>
 </div>
 
+<script src="/static/datatable.js?v={{ app_version }}"></script>
 <script src="/static/app.js?v={{ app_version }}"></script>
 {% if config.get('war_mode', {}).get('enabled', False) and config.get('war_mode', {}).get('mode', 'local') == 'local' %}
 <script src="/static/war.js?v={{ app_version }}"></script>
