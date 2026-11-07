@@ -163,3 +163,5 @@ html[data-theme="daylight"] .ep-unavailable { color: #7a5a12; border-color: #e2c
 .in-jail .main-tab.active, .in-jail .tab-btn.active { color: #e0e0e0; border-bottom-color: #e0e0e0; background: none; }
 @media (max-width: 540px) { .main-tab { padding: 10px 4px; } }
 html[data-theme="daylight"] .main-tab.active, html[data-theme="daylight"] .tab-btn.active { color: var(--text); }
+/* Close Bot sits in the header's top-right corner, level with the title */
+header > .close-bot-btn { position: absolute; top: 0; right: 0; }
