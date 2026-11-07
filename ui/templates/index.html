@@ -2123,16 +2123,18 @@
         </div>
         <div id="log-box"></div>
 
-        <!-- Action history (action_log.py) -->
+        <!-- Bot history (action_log.py) -->
         <div id="action-history">
-          <div class="ah-title">Action History</div>
-          <div class="ah-top">
-            <label for="ah-char">Character</label>
-            <select id="ah-char" onchange="ahOnCharChange()"></select>
-          </div>
-          <div class="tab-bar">
-            <button class="tab-btn active" onclick="ahTab('main', 'actions', this)">Actions</button>
-            <button class="tab-btn" onclick="ahTab('main', 'import', this)">Import logs</button>
+          <div class="ah-title">Bot History</div>
+          <div class="ah-sticky">
+            <div class="ah-top">
+              <label for="ah-char">Character</label>
+              <select id="ah-char" onchange="ahOnCharChange()"></select>
+            </div>
+            <div class="tab-bar">
+              <button class="tab-btn active" onclick="ahTab('main', 'actions', this)">Actions</button>
+              <button class="tab-btn" onclick="ahTab('main', 'import', this)">Import logs</button>
+            </div>
           </div>
 
           <div data-ah-group="main" data-ah-panel="actions">
@@ -2145,6 +2147,7 @@
               <p class="ah-note">Built from the bot's own action log, laid out like the game's character
                 history page. Counts are successful actions with the success rate beside them; tap a ▸ row
                 for a breakdown.</p>
+              <div id="ah-totals" class="ah-totals"></div>
               <div id="ah-summary" class="ch-grid"></div>
             </div>
           </div>

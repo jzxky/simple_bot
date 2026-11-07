@@ -362,7 +362,32 @@ def summary(f: dict) -> dict:
             f" COALESCE(SUM({_AMOUNT}),0) amount, COALESCE(SUM({_UNITS}),0) units,"
             " COALESCE(SUM(paid_back),0) paid_back"
             f" FROM actions{where} GROUP BY category, kind ORDER BY n DESC", args)]
-        return {"by_kind": by_kind}
+        and_ = " AND " if where else " WHERE "
+        # Successful case work by type: the hospital/fire/engineering job, the
+        # lawyer case's crime, and for banking whose money it was (own or a client's).
+        case_types = {}
+        for r in c.execute(
+                "SELECT kind, CASE"
+                "  WHEN kind='banking' THEN CASE WHEN lower(target)=lower(character) THEN 'own' ELSE 'client' END"
+                "  WHEN kind='lawyer' THEN json_extract(detail, '$.crime')"
+                "  ELSE json_extract(detail, '$.job') END t,"
+                f" COUNT(*) n, COALESCE(SUM({_AMOUNT}),0) amount"
+                f" FROM actions{where}{and_}category='case_work' AND result='success'"
+                " AND (detail != '' OR kind='banking') GROUP BY kind, t", args):
+            # "repair business #12" and "repair business #40" are one type.
+            t = re.sub(r"\s*#\d+$", "", str(r["t"] or "")).strip() or "other"
+            key = (r["kind"], t)
+            cur = case_types.setdefault(key, {"kind": r["kind"], "type": t, "n": 0, "amount": 0})
+            cur["n"] += r["n"]
+            cur["amount"] += r["amount"]
+        # Why medical work failed: the game's fail messages, most common first.
+        hospital_fails = [dict(r) for r in c.execute(
+            "SELECT message, COUNT(*) n"
+            f" FROM actions{where}{and_}category='case_work' AND kind='hospital' AND result='fail'"
+            " GROUP BY message ORDER BY n DESC LIMIT 20", args)]
+        return {"by_kind": by_kind,
+                "case_types": sorted(case_types.values(), key=lambda x: -x["n"]),
+                "hospital_fails": hospital_fails}
     return _read(run)
 
 

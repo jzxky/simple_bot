@@ -62,6 +62,10 @@
     const ch = character();
     return fetch("/api/actions/table" + q + (ch ? "&character=" + encodeURIComponent(ch) : "")).then(r => r.json());
   }
+  // Agg and case work kinds under the game's own names.
+  function kindLabel(kind) {
+    return KIND_LABELS[kind] || kind || "";
+  }
   function sourceLabel(v) { return v ? "Imported · " + v.replace(/^import:/, "") : "Live"; }
   function buildTable() {
     ahTable = new DataTable("ah-dt", {
@@ -71,10 +75,10 @@
         {key: "server_time", label: "Game time", filter: false},
         {key: "character", label: "Character", hidden: true},
         {key: "category", label: "Category", filterLabel: catLabel},
-        {key: "kind", label: "Type"},
-        {key: "result", label: "Result", render: r => `<span class="pill ${esc(r.result)}">${esc(r.result)}</span>`},
+        {key: "kind", label: "Type", summary: true, filterLabel: v => kindLabel(v), render: r => esc(kindLabel(r.kind))},
+        {key: "result", label: "Result", summary: "head", render: r => `<span class="pill ${esc(r.result)}">${esc(r.result)}</span>`},
         {key: "target", label: "Target"},
-        {key: "amount", label: "Amount", type: "number", filter: false, cls: "num", render: r => esc(money(r.amount))},
+        {key: "amount", label: "Amount", type: "number", filter: false, cls: "num", summary: true, render: r => esc(money(r.amount))},
         {key: "paid_back", label: "Paid back", type: "number", filter: false, cls: "num", render: r => esc(money(r.paid_back))},
         {key: "city", label: "City"},
         {key: "message", label: "Message", filter: false, sortable: false, cls: "ah-msg",
@@ -100,7 +104,7 @@
     if (!panel || panel.classList.contains("ah-panel-hidden")) return;
     const ch = character();
     const r = await fetch("/api/actions/summary" + (ch ? "?character=" + encodeURIComponent(ch) : ""));
-    renderSummaryGrid((await r.json()).by_kind);
+    renderSummaryGrid(await r.json());
   }
 
   // Structured like the game's character history page (same section names and
@@ -115,7 +119,17 @@
     ["banking", "Banking Work"], ["hospital", "Medical Work"], ["lawyer", "Law Work"],
     ["engineering", "Engineering"], ["fire", "Fire Fighter"],
   ];
+  const KIND_LABELS = Object.fromEntries(CRIME_ROWS.concat(CAREER_SECTIONS));
 
+  const CASE_TYPE_LABELS = {
+    sex_change: "Sex Changes", bionics: "Bionic Surgery", flu: "Flu Treatment", recover: "Recovery",
+    dna: "DNA Processing", fire: "Fires", investigation: "Investigations", inspection: "Inspections",
+    unknown: "Other", other: "Other",
+  };
+  function caseTypeLabel(kind, t) {
+    if (CASE_TYPE_LABELS[t]) return CASE_TYPE_LABELS[t];
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
   function n(v) { return Number(v || 0).toLocaleString(); }
   function rateCell(success, fail) {
     const done = (success || 0) + (fail || 0);
@@ -145,19 +159,38 @@
     }
     return html;
   }
-  function chSection(title, rows, note) {
+  // Sections open on desktop and start collapsed on phones; a tap on the
+  // title flips one, and the choice survives re-renders.
+  const sectionOpen = {};
+  function isOpen(title) {
+    return title in sectionOpen ? sectionOpen[title] : !window.matchMedia("(max-width: 640px)").matches;
+  }
+  function chSection(title, rows, note, total) {
     if (!rows) return "";
-    return `<div class="ch-grid-item"><div class="ch-section">
-      <div class="ch-section-head"><span class="ch-section-title">${esc(title)}</span></div>
-      <table class="ch-table">${rows}</table>
-      ${note ? `<div class="ah-sec-note">${esc(note)}</div>` : ""}</div></div>`;
+    // Cards that never show a success rate don't need the % column.
+    if (!/class="ah-rate[^"]*">[^<]/.test(rows)) rows = rows.split('<td class="ah-rate"></td>').join("");
+    const open = isOpen(title);
+    return `<div class="ch-grid-item"><div class="ch-section ah-sec${open ? "" : " ah-collapsed"}" data-title="${esc(title)}">
+      <div class="ch-section-head ah-sec-head" onclick="ahToggleSection(this)">
+        <span class="ah-caret">▸</span><span class="ch-section-title">${esc(title)}</span>
+        ${total !== undefined && total !== "" ? `<span class="ah-sec-total">${esc(total)}</span>` : ""}
+      </div>
+      <div class="ah-sec-body"><table class="ch-table">${rows}</table>
+      ${note ? `<div class="ah-sec-note">${esc(note)}</div>` : ""}</div></div></div>`;
+  }
+  function toggleSection(head) {
+    const sec = head.closest(".ah-sec");
+    const open = sec.classList.toggle("ah-collapsed") === false;
+    sectionOpen[sec.dataset.title] = open;
   }
   function subRows(kinds, withRate) {
     return kinds.slice().sort((a, b) => (b.success || 0) - (a.success || 0))
       .map(k => ({label: k.kind || "–", value: k.success, rate: withRate ? [k.success, k.fail] : null}));
   }
 
-  function renderSummaryGrid(byKind) {
+  function renderSummaryGrid(summary) {
+    const byKind = summary.by_kind || [];
+    const caseTypes = summary.case_types || [];
     _grp = 0;
     const box = document.getElementById("ah-summary");
     const byCat = {};
@@ -202,21 +235,33 @@
       aggs.filter(k => !known.has(k.kind)).forEach(k => { rows += chRow(k.kind || "Other", k.success, {rate: [k.success, k.fail]}); });
       rows += chRow("Total Aggravated", sumOf(aggs, "success"), {rate: [sumOf(aggs, "success"), sumOf(aggs, "fail")], cls: "ah-total"});
       rows += chRow("Money Taken", sumOf(aggs, "amount"), {money: true, cls: "ah-total"});
-      if (sumOf(aggs, "paid_back")) rows += chRow("Paid Back", sumOf(aggs, "paid_back"), {money: true, cls: "ah-total"});
-      html += chSection("Crimes Committed", rows);
+      html += chSection("Crimes Committed", rows, "", n(sumOf(aggs, "success")));
     }
 
-    // ── Career sections (case work) ──
+    // ── Career sections (case work): successful work by type, no fails ──
     const cw = cat("case_work");
     const careerKinds = new Set(CAREER_SECTIONS.map(c => c[0]));
     const careers = CAREER_SECTIONS.concat(cw.filter(k => !careerKinds.has(k.kind)).map(k => [k.kind, k.kind || "Case Work"]));
     for (const [kind, title] of careers) {
       const k = kindOf("case_work", kind);
       if (!k) continue;
-      let rows = chRow("Successful", k.success, {rate: [k.success, k.fail]});
-      rows += chRow("Failed", k.fail);
-      if (k.amount) rows += chRow("Earned", k.amount, {money: true});
-      html += chSection(title, rows);
+      const types = caseTypes.filter(t => t.kind === kind);
+      let rows = "";
+      if (kind === "banking") {
+        const own = types.find(t => t.type === "own");
+        const client = types.find(t => t.type === "client");
+        rows += chRow("Launders for Clients", client ? client.n : 0);
+        rows += chRow("Own Money Laundered", own ? own.n : 0);
+        rows += chRow("Total Laundered", k.amount, {money: true, cls: "ah-total"});
+      } else {
+        for (const t of types) rows += chRow(caseTypeLabel(kind, t.type), t.n);
+        if (types.length !== 1) rows += chRow("Total", k.success, {cls: "ah-total"});
+        if (kind === "hospital" && k.fail) {
+          rows += chRow("Failures", k.fail, {sub: (summary.hospital_fails || []).map(f => ({label: f.message || "(no message)", value: f.n}))});
+        }
+        if (k.amount) rows += chRow("Earned", k.amount, {money: true, cls: "ah-total"});
+      }
+      html += chSection(title, rows, "", kind === "banking" ? money(k.amount) : n(k.success));
     }
 
     // ── Earn History ──
@@ -229,7 +274,8 @@
       }
       if (queue.length) rows += chRow("Earn Queue Top-ups", sumOf(queue, "success"), {sub: subRows(queue)});
       html += chSection("Earn History", rows,
-        "Auto earns can't be tracked: the game runs the auto earn queue on its own servers.");
+        "Auto earns can't be tracked: the game runs the auto earn queue on its own servers.",
+        n(sumOf(earns, "success")));
     }
 
     // Anything else the bot records later still shows up.
@@ -239,6 +285,17 @@
       html += chSection(catLabel(c), byCat[c].map(k => chRow(k.kind || "–", k.success, {rate: [k.success, k.fail]})).join(""));
     });
 
+    // Headline totals above the cards.
+    const caseWork = cat("case_work");
+    const made = sumOf(aggs, "amount") + sumOf(caseWork, "amount") + sumOf(earns, "amount");
+    const tiles = [
+      ["Aggs", n(sumOf(aggs, "success"))],
+      ["Case Work", n(sumOf(caseWork, "success"))],
+      ["Manual Earns", n(sumOf(earns, "success"))],
+      ["Money Made", money(made) || "$0"],
+    ];
+    document.getElementById("ah-totals").innerHTML = byKind.length ? tiles.map(([l, v]) =>
+      `<div class="ah-tile"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join("") : "";
     box.innerHTML = html || '<div class="ah-empty" style="grid-column:1/-1">No actions recorded yet.</div>';
   }
 
@@ -312,16 +369,26 @@
     }
   }
 
+  // The picker sticks just under the main menu, which is itself sticky.
+  function setStickyTop() {
+    const bar = document.getElementById("main-tab-bar");
+    const root = document.getElementById("action-history");
+    if (bar && root) root.style.setProperty("--ah-sticky-top", bar.offsetHeight + "px");
+  }
+
   // ── Init: load when the Activity Log section is first opened ─────────────
   async function init() {
     if (loaded || !document.getElementById("action-history")) return;
     loaded = true;
+    setStickyTop();
+    window.addEventListener("resize", setStickyTop);
     await loadCharacterList();
     buildTable();
   }
   window.ahTab = ahTab;
   window.ahOnCharChange = onCharChange;
   window.ahToggleSummaryGroup = toggleSummaryGroup;
+  window.ahToggleSection = toggleSection;
   window.ahToggleAllLogs = toggleAllLogs;
   window.ahRunImport = runImport;
   window.ahInit = init;
