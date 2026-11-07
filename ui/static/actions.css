@@ -51,3 +51,26 @@
   #ah-dt .dt-cards td.num { text-align: left; align-items: flex-start; }
   #ah-dt .dt-cards td > .pill { align-self: flex-start; }
 }
+
+/* Character picker and tabs stay in view while scrolling (below the main menu) */
+#action-history .ah-sticky { position: sticky; top: var(--ah-sticky-top, 0px); z-index: 20; background: var(--surface); padding-top: 6px; margin-top: -6px; }
+
+/* Headline totals */
+#action-history .ah-totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+#action-history .ah-tile { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; min-width: 0; }
+#action-history .ah-tile .v { font-size: 1.05rem; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#action-history .ah-tile .l { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+@media (max-width: 640px) { #action-history .ah-totals { grid-template-columns: repeat(2, 1fr); } }
+
+/* Collapsible summary cards: title and total, tap to open */
+#ah-summary .ah-sec-head { cursor: pointer; user-select: none; }
+#ah-summary .ah-sec-head .ah-caret { display: inline-block; width: 12px; color: var(--accent); transition: transform .15s; transform: rotate(90deg); }
+#ah-summary .ah-sec.ah-collapsed .ah-sec-head .ah-caret { transform: none; }
+#ah-summary .ah-sec.ah-collapsed .ah-sec-head { border-bottom: none; }
+#ah-summary .ah-sec.ah-collapsed .ah-sec-body { display: none; }
+#ah-summary .ah-sec-total { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.82rem; }
+#ah-summary .ah-sec.ah-collapsed { flex: 0 0 auto; }
+#ah-dt .dt-compact.dt-cards td.ah-msg { flex-basis: 100%; }
+/* .card clips overflow on phones; "clip" keeps that without making the card a
+   scroll container, so the sticky picker can still stick to the page. */
+#s-log { overflow: clip; }

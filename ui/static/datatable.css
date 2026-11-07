@@ -535,3 +535,24 @@
 
 .dt-mobile-only { display: none; }
 @media (max-width: 640px) { .dt-mobile-only { display: inline; } }
+
+/* Compact cards (column option summary): one summary line per row, tap to expand. From player-hub. */
+@media (max-width: 640px) {
+  .dt-compact.dt-cards tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 10px 12px; }
+  .dt-compact.dt-cards tr::after { content: ''; order: 2; flex-basis: 100%; height: 0; }
+  .dt-compact.dt-cards td.dt-selcell { order: -1; flex: none; }
+  .dt-compact.dt-cards td.dt-selcell::before { display: none; }
+  .dt-compact.dt-cards td.dt-card-title { order: 0; flex: 1 1 0; border: none; padding: 0; margin: 0; }
+  .dt-compact.dt-cards td.dt-head { order: 1; flex: none; flex-direction: row; }
+  .dt-compact.dt-cards td.dt-head::before, .dt-compact.dt-cards td.dt-sum::before { display: none; }
+  .dt-compact.dt-cards td.dt-sum { order: 3; flex: none; flex-direction: row; font-size: 13px; color: var(--muted); }
+  .dt-compact.dt-cards td.dt-sum:not(.dt-empty) ~ td.dt-sum:not(.dt-empty)::before {
+    display: inline; content: '·'; font-size: 13px; text-transform: none; letter-spacing: 0; margin-right: 8px;
+  }
+  .dt-compact.dt-cards td:not(.dt-card-title):not(.dt-head):not(.dt-sum):not(.dt-selcell) {
+    display: none; order: 5; flex: 1 1 calc(50% - 8px);
+  }
+  .dt-compact.dt-cards tr.dt-open td:not(.dt-card-title):not(.dt-head):not(.dt-sum):not(.dt-selcell):not(.dt-empty) { display: flex; }
+  .dt-compact.dt-cards tr.dt-open { border-color: var(--accent); }
+  .dt-compact.dt-cards td.dt-actions { flex-basis: 100% !important; }
+}
