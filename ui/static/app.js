@@ -5586,23 +5586,6 @@ function _plRunWhitelistBolds() {
     .catch(() => {});
 }
 
-function plScrapePlayers() {
-  if (!_botRunning) { alert("Bot is not running."); return; }
-  const overlay = document.getElementById("pl-scrape-overlay");
-  if (overlay) overlay.style.display = "flex";
-}
-
-function plScrapeConfirm() {
-  const overlay = document.getElementById("pl-scrape-overlay");
-  if (overlay) overlay.style.display = "none";
-  fetch("/scrape-players", {method: "POST"}).catch(() => {});
-}
-
-function plScrapeCancel() {
-  const overlay = document.getElementById("pl-scrape-overlay");
-  if (overlay) overlay.style.display = "none";
-}
-
 // ── Refresh & import ──────────────────────────────────────────────────────────
 
 // Relocate the jail General controls between the Settings→Jail tab and the

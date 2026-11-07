@@ -2372,7 +2372,6 @@
             <button class="btn-secondary" onclick="plRefresh()" id="pl-refresh-btn">Refresh</button>
             <span id="pl-refresh-status" style="font-size:0.8rem;color:var(--error,#f87171)"></span>
             <button class="btn-secondary" onclick="window.open('/players','_blank')" title="Open player list in new tab">Open in new tab ↗</button>
-            <button class="btn-secondary" onclick="plScrapePlayers()" title="Scrape monitored player profiles">Scrape Monitored</button>
             </div>
             <label class="inline-toggle" style="white-space:nowrap">Active only
               <label class="toggle-label">
@@ -2492,13 +2491,6 @@
           <div id="pl-topjobs-content" style="margin-top:8px">
             <p style="padding:12px;color:var(--text-muted);text-align:center">Click to load top jobs…</p>
           </div>
-        </div>
-      </div>
-      <div id="pl-scrape-overlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;border-radius:8px">
-        <div style="background:var(--surface);padding:20px;border-radius:8px;max-width:340px;text-align:center">
-          <p style="margin-bottom:12px">This will visit each monitored player's profile and could tie up the bot for a few minutes. Proceed?</p>
-          <button class="action-btn" onclick="plScrapeConfirm()">Confirm</button>
-          <button class="btn-secondary" onclick="plScrapeCancel()" style="margin-left:8px">Cancel</button>
         </div>
       </div>
     </section>
