@@ -100,7 +100,7 @@
     if (!panel || panel.classList.contains("ah-panel-hidden")) return;
     const ch = character();
     const r = await fetch("/api/actions/summary" + (ch ? "?character=" + encodeURIComponent(ch) : ""));
-    renderSummaryGrid((await r.json()).by_kind);
+    renderSummaryGrid(await r.json());
   }
 
   // Structured like the game's character history page (same section names and
@@ -116,6 +116,15 @@
     ["engineering", "Engineering"], ["fire", "Fire Fighter"],
   ];
 
+  const CASE_TYPE_LABELS = {
+    sex_change: "Sex Changes", bionics: "Bionic Surgery", flu: "Flu Treatment", recover: "Recovery",
+    dna: "DNA Processing", fire: "Fires", investigation: "Investigations", inspection: "Inspections",
+    unknown: "Other", other: "Other",
+  };
+  function caseTypeLabel(kind, t) {
+    if (CASE_TYPE_LABELS[t]) return CASE_TYPE_LABELS[t];
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
   function n(v) { return Number(v || 0).toLocaleString(); }
   function rateCell(success, fail) {
     const done = (success || 0) + (fail || 0);
@@ -157,7 +166,9 @@
       .map(k => ({label: k.kind || "–", value: k.success, rate: withRate ? [k.success, k.fail] : null}));
   }
 
-  function renderSummaryGrid(byKind) {
+  function renderSummaryGrid(summary) {
+    const byKind = summary.by_kind || [];
+    const caseTypes = summary.case_types || [];
     _grp = 0;
     const box = document.getElementById("ah-summary");
     const byCat = {};
@@ -202,20 +213,32 @@
       aggs.filter(k => !known.has(k.kind)).forEach(k => { rows += chRow(k.kind || "Other", k.success, {rate: [k.success, k.fail]}); });
       rows += chRow("Total Aggravated", sumOf(aggs, "success"), {rate: [sumOf(aggs, "success"), sumOf(aggs, "fail")], cls: "ah-total"});
       rows += chRow("Money Taken", sumOf(aggs, "amount"), {money: true, cls: "ah-total"});
-      if (sumOf(aggs, "paid_back")) rows += chRow("Paid Back", sumOf(aggs, "paid_back"), {money: true, cls: "ah-total"});
       html += chSection("Crimes Committed", rows);
     }
 
-    // ── Career sections (case work) ──
+    // ── Career sections (case work): successful work by type, no fails ──
     const cw = cat("case_work");
     const careerKinds = new Set(CAREER_SECTIONS.map(c => c[0]));
     const careers = CAREER_SECTIONS.concat(cw.filter(k => !careerKinds.has(k.kind)).map(k => [k.kind, k.kind || "Case Work"]));
     for (const [kind, title] of careers) {
       const k = kindOf("case_work", kind);
       if (!k) continue;
-      let rows = chRow("Successful", k.success, {rate: [k.success, k.fail]});
-      rows += chRow("Failed", k.fail);
-      if (k.amount) rows += chRow("Earned", k.amount, {money: true});
+      const types = caseTypes.filter(t => t.kind === kind);
+      let rows = "";
+      if (kind === "banking") {
+        const own = types.find(t => t.type === "own");
+        const client = types.find(t => t.type === "client");
+        rows += chRow("Launders for Clients", client ? client.n : 0);
+        rows += chRow("Own Money Laundered", own ? own.n : 0);
+        rows += chRow("Total Laundered", k.amount, {money: true, cls: "ah-total"});
+      } else {
+        for (const t of types) rows += chRow(caseTypeLabel(kind, t.type), t.n);
+        if (types.length !== 1) rows += chRow("Total", k.success, {cls: "ah-total"});
+        if (kind === "hospital" && k.fail) {
+          rows += chRow("Failures", k.fail, {sub: (summary.hospital_fails || []).map(f => ({label: f.message || "(no message)", value: f.n}))});
+        }
+        if (k.amount) rows += chRow("Earned", k.amount, {money: true, cls: "ah-total"});
+      }
       html += chSection(title, rows);
     }
 

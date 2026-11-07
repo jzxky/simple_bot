@@ -44,3 +44,10 @@
 #action-history table.ah-table td { padding: 5px 6px; border-bottom: 1px solid rgba(46,64,96,.35); vertical-align: top; }
 #action-history table.ah-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 #action-history #imp-logs input[type=checkbox], #action-history #imp-all { width: auto; }
+
+/* Phone cards: let the message wrap instead of cutting it off */
+@media (max-width: 640px) {
+  #ah-dt .dt-cards td.ah-msg { grid-column: 1 / -1; max-width: none; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+  #ah-dt .dt-cards td.num { text-align: left; align-items: flex-start; }
+  #ah-dt .dt-cards td > .pill { align-self: flex-start; }
+}
