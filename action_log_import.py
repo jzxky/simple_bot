@@ -238,14 +238,6 @@ class _Parser:
             fn = _bad if "fail" in m.group(1).lower() else _ok
             return [fn("jail", "jailbreak", m.group(1))]
 
-        # ── Travel ────────────────────────────────────────────────────────
-        m = re.match(r"Travel: departing to (.+) by vehicle\.$", msg)
-        if m:
-            return [_ok("travel", "own_vehicle", msg, m.group(1))]
-        m = re.match(r"Travel: flight to (.+) booked", msg)
-        if m:
-            return [_ok("travel", "airport", msg, m.group(1))]
-
         # ── Payback / consume ─────────────────────────────────────────────
         m = re.match(r"Payback sent: \$([\d,]+) to (.+)\.$", msg)
         if m:

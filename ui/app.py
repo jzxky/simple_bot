@@ -2067,21 +2067,17 @@ def actions_page():
                            category_labels=action_log.CATEGORY_LABELS)
 
 
-@app.route("/api/actions")
-def api_actions():
-    f = _action_filters()
-    return jsonify(action_log.query(f, request.args.get("page", 1, type=int),
-                                    request.args.get("per_page", 100, type=int)))
+@app.route("/api/actions/table")
+def api_actions_table():
+    """All-actions DataTable (server mode). The character and date range scope
+    it; column filters, sort and search follow the table_query contract."""
+    f = {k: request.args.get(k, "") for k in ("character", "range", "since", "until")}
+    return jsonify(action_log.table(f, request.args))
 
 
 @app.route("/api/actions/summary")
 def api_actions_summary():
     return jsonify(action_log.summary(_action_filters()))
-
-
-@app.route("/api/actions/facets")
-def api_actions_facets():
-    return jsonify(action_log.facets(request.args.get("character", "")))
 
 
 @app.route("/api/actions/characters")
