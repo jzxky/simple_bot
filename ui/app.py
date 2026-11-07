@@ -280,6 +280,7 @@ def index():
                            pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin(),
                            hide_credentials=hide_credentials,
                            app_version=_APP_VERSION, event_consumables=_ec_mod,
+                           action_category_labels=action_log.CATEGORY_LABELS,
                            setup=_setup_prefill(c) if needs_setup else None,
                            setup_earns=_earn_catalog_grouped() if needs_setup else [],
                            setup_actions=SETUP_ACTIONS, setup_fallbacks=SETUP_FALLBACKS,
@@ -2063,8 +2064,8 @@ def _current_character() -> str:
 
 @app.route("/actions")
 def actions_page():
-    return render_template("actions.html", app_version=_APP_VERSION,
-                           category_labels=action_log.CATEGORY_LABELS)
+    # The action history now lives under the Activity Log section.
+    return redirect("/")
 
 
 @app.route("/api/actions/table")
@@ -2127,16 +2128,6 @@ def api_actions_import():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify(result)
-
-
-@app.route("/api/actions/export.csv")
-def api_actions_export():
-    from flask import Response
-    data = action_log.export_csv(_action_filters())
-    name = request.args.get("character") or "all"
-    safe = re.sub(r"[^A-Za-z0-9_-]", "_", name)
-    return Response(data, mimetype="text/csv",
-                    headers={"Content-Disposition": f"attachment; filename=actions_{safe}.csv"})
 
 
 @app.route("/war")

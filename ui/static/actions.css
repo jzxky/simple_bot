@@ -1,0 +1,46 @@
+/* Action history — the panel under the Activity Log text log. */
+#action-history { --ok: #2f9c8a; --bad: #e0573f; --skip: #6a7f96; margin-top: 16px; }
+#action-history .ah-title { font-size: 0.8rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 10px; }
+#action-history .ah-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+#action-history .ah-top label { color: var(--muted); font-size: 12px; width: auto; flex: 0 0 auto; margin: 0; }
+#action-history .ah-top select { width: auto; min-width: 280px; max-width: 100%; }
+#action-history .ah-subtabs { margin-top: 2px; }
+#action-history .ah-subtabs .tab-btn { font-size: 0.72rem; }
+#action-history .ah-panel-hidden { display: none; }
+
+/* Result pills in the table */
+#ah-dt .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; border: none; }
+#ah-dt .pill.success { background: var(--ok); }
+#ah-dt .pill.fail { background: var(--bad); }
+#ah-dt .pill.skip, #ah-dt .pill.error { background: var(--skip); }
+#ah-dt td.ah-msg { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+#ah-dt td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Character history summary (built from the action log) */
+#ah-summary .ch-table td.ch-val { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#ah-summary .ch-table td.ah-rate { width: 1%; white-space: nowrap; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+#ah-summary .ch-table td.ah-rate.good { color: var(--ok); }
+#ah-summary .ch-table td.ah-rate.poor { color: var(--bad); }
+#ah-summary tr.ah-total td { font-weight: 600; color: var(--text); }
+#ah-summary tr.ah-exp { cursor: pointer; }
+#ah-summary tr.ah-exp:hover td { background: rgba(200,168,75,.06); }
+#ah-summary tr.ah-exp .ah-caret { display: inline-block; width: 12px; color: var(--accent); transition: transform .15s; }
+#ah-summary tr.ah-exp.open .ah-caret { transform: rotate(90deg); }
+#ah-summary tr.ah-sub td { background: var(--surface); font-size: .78rem; }
+#ah-summary tr.ah-sub td.ch-key { padding-left: 28px; }
+#action-history .ah-sec-note { padding: 4px 10px; font-size: .72rem; color: var(--muted); border-top: 1px solid var(--border); }
+#action-history .ah-empty { color: var(--muted); padding: 20px; text-align: center; font-size: 0.85rem; }
+
+/* Import logs */
+#action-history .ah-note { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+#action-history .ah-import-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+#action-history .ah-import-bar label { color: var(--muted); font-size: 12px; width: auto; min-width: 0; margin: 0; flex: 0 0 auto; }
+#action-history .ah-import-bar input[type=text] { width: 240px; font-size: 12px; padding: 4px 6px; }
+#action-history .ah-import-bar .ah-note { margin: 0; }
+#action-history .imp-err { color: var(--bad); }
+#action-history .ah-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 12px; }
+#action-history table.ah-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#action-history table.ah-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 5px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+#action-history table.ah-table td { padding: 5px 6px; border-bottom: 1px solid rgba(46,64,96,.35); vertical-align: top; }
+#action-history table.ah-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+#action-history #imp-logs input[type=checkbox], #action-history #imp-all { width: auto; }

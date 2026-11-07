@@ -11,8 +11,6 @@ never stop a task. Rows are only written when the logged-in character's name
 old one's.
 """
 
-import csv
-import io
 import json
 import os
 import re
@@ -302,9 +300,6 @@ def _row(r) -> dict:
     return d
 
 
-# Money a successful action brought in. Costs (negative amounts) and paybacks
-# are left out, so totals never show a net profit.
-_EARNED = "CASE WHEN result='success' AND amount > 0 AND category != 'payback' THEN amount END"
 # Amount shown per type/target: what was taken or earned, or for paybacks what was paid.
 _AMOUNT = "CASE WHEN result='success' AND amount > 0 THEN amount END"
 # Consumables used: the item count recorded with each consume (1 when not recorded).
@@ -313,37 +308,16 @@ _UNITS = ("CASE WHEN category='consume' AND result='success' THEN"
 
 
 def summary(f: dict) -> dict:
-    """Totals, a daily success/fail series and per-category breakdowns for a filter."""
+    """Per category and type counts for the character history summary."""
     where, args = _where(f)
-    and_ = " AND " if where else " WHERE "
 
     def run(c):
-        t = c.execute(
-            "SELECT COUNT(*) n,"
-            " SUM(result='success') s, SUM(result='fail') fl,"
-            f" COALESCE(SUM({_EARNED}),0) amt"
-            f" FROM actions{where}", args).fetchone()
-        n, s, fl, amt = t["n"] or 0, t["s"] or 0, t["fl"] or 0, t["amt"] or 0
-        daily = [dict(r) for r in c.execute(
-            "SELECT substr(ts,1,10) day, SUM(result='success') success, SUM(result='fail') fail"
-            f" FROM actions{where} GROUP BY day ORDER BY day DESC LIMIT 60", args)][::-1]
         by_kind = [dict(r) for r in c.execute(
             "SELECT category, kind, COUNT(*) n, SUM(result='success') success,"
             " SUM(result='fail') fail,"
             f" COALESCE(SUM({_AMOUNT}),0) amount, COALESCE(SUM({_UNITS}),0) units"
             f" FROM actions{where} GROUP BY category, kind ORDER BY n DESC", args)]
-        top_targets = [dict(r) for r in c.execute(
-            "SELECT target, COUNT(*) n, SUM(result='success') success,"
-            f" COALESCE(SUM({_AMOUNT}),0) amount"
-            f" FROM actions{where}{and_}target != '' GROUP BY target"
-            " ORDER BY amount DESC, n DESC LIMIT 10", args)]
-        return {
-            "attempts": n, "success": s, "fail": fl,
-            "success_rate": round(100.0 * s / (s + fl), 1) if (s + fl) else None,
-            "amount": amt, "per_success": int(amt / s) if s else 0,
-            "daily": daily, "by_kind": by_kind,
-            "top_targets": top_targets,
-        }
+        return {"by_kind": by_kind}
     return _read(run)
 
 
@@ -392,21 +366,4 @@ def characters() -> list:
             d["actions"] = sum(v["n"] for v in totals.values())
             out.append(d)
         return out
-    return _read(run)
-
-
-CSV_COLUMNS = ["ts", "server_time", "character", "category", "kind", "result",
-               "target", "amount", "city", "message", "detail", "source"]
-
-
-def export_csv(f: dict) -> str:
-    where, args = _where(f)
-
-    def run(c):
-        buf = io.StringIO()
-        w = csv.writer(buf)
-        w.writerow(CSV_COLUMNS)
-        for r in c.execute(f"SELECT {', '.join(CSV_COLUMNS)} FROM actions{where} ORDER BY id DESC", args):
-            w.writerow([r[k] if r[k] is not None else "" for k in CSV_COLUMNS])
-        return buf.getvalue()
     return _read(run)
