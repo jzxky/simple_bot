@@ -2255,14 +2255,11 @@ def handle_payback(action: Action, state: GameState):
 
     if "Your transfer was blocked due to possible spam!" in result_text:
         state.add_log(f"Payback to {target} blocked as spam — skipping.")
-        action_log.record(state, "payback", "transfer", "fail", target=target,
-                          message="Transfer blocked as spam", attempted=amount)
         return
 
     _refresh_state(state)
     state.add_log(f"Payback sent: ${amount:,} to {target}.")
-    action_log.record(state, "payback", "transfer", "success", target=target, amount=amount,
-                      message=f"Paid back ${amount:,} to {target}")
+    action_log.record_payback(state, target, amount)
 
 
 def handle_crossroad(action: Action, state: GameState):

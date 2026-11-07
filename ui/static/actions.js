@@ -75,6 +75,7 @@
         {key: "result", label: "Result", render: r => `<span class="pill ${esc(r.result)}">${esc(r.result)}</span>`},
         {key: "target", label: "Target"},
         {key: "amount", label: "Amount", type: "number", filter: false, cls: "num", render: r => esc(money(r.amount))},
+        {key: "paid_back", label: "Paid back", type: "number", filter: false, cls: "num", render: r => esc(money(r.paid_back))},
         {key: "city", label: "City"},
         {key: "message", label: "Message", filter: false, sortable: false, cls: "ah-msg",
          render: r => {
@@ -187,11 +188,6 @@
       const d = cat("jail_duty");
       info += chRow("Jail Duties", sumOf(d, "success"), {rate: [sumOf(d, "success"), sumOf(d, "fail")], sub: subRows(d, true)});
     }
-    if (cat("payback").length) {
-      const p = cat("payback");
-      info += chRow("Paybacks Sent", sumOf(p, "success"));
-      info += chRow("Paid Back", sumOf(p, "amount"), {money: true});
-    }
     html += chSection("Character Information", info);
 
     // ── Crimes Committed ──
@@ -206,6 +202,7 @@
       aggs.filter(k => !known.has(k.kind)).forEach(k => { rows += chRow(k.kind || "Other", k.success, {rate: [k.success, k.fail]}); });
       rows += chRow("Total Aggravated", sumOf(aggs, "success"), {rate: [sumOf(aggs, "success"), sumOf(aggs, "fail")], cls: "ah-total"});
       rows += chRow("Money Taken", sumOf(aggs, "amount"), {money: true, cls: "ah-total"});
+      if (sumOf(aggs, "paid_back")) rows += chRow("Paid Back", sumOf(aggs, "paid_back"), {money: true, cls: "ah-total"});
       html += chSection("Crimes Committed", rows);
     }
 
@@ -236,7 +233,7 @@
     }
 
     // Anything else the bot records later still shows up.
-    const shown = new Set(["gym", "community_service", "dog_train", "consume", "jail", "jail_duty", "payback",
+    const shown = new Set(["gym", "community_service", "dog_train", "consume", "jail", "jail_duty",
                            "agg", "case_work", "earn", "earn_queue"]);
     Object.keys(byCat).filter(c => !shown.has(c)).forEach(c => {
       html += chSection(catLabel(c), byCat[c].map(k => chRow(k.kind || "–", k.success, {rate: [k.success, k.fail]})).join(""));
