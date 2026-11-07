@@ -146,3 +146,10 @@ html[data-theme="daylight"] .gs-confirm-warning { color: #8f6614; border-color: 
 .theme-opt[data-theme-opt="daylight"] i { background: linear-gradient(135deg, #ffffff 50%, #a8781c 50%); }
 html[data-theme="daylight"] .main-tab.active, html[data-theme="daylight"] .tab-btn.active { color: var(--accent); }
 html[data-theme="daylight"] .ep-unavailable { color: #7a5a12; border-color: #e2c98e; }
+
+/* Boxy toggles: rounded-rectangle track with a square knob */
+.toggle { width: 40px; height: 22px; border-radius: 5px; background: var(--track); box-shadow: inset 0 0 0 1px rgba(127,147,171,.18); }
+.toggle::after { width: 16px; height: 16px; top: 3px; left: 3px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.toggle-label input:checked + .toggle { box-shadow: none; }
+.toggle-label input:checked + .toggle::after { left: 21px; }
+.setting-row { border-bottom-color: var(--hairline); }
