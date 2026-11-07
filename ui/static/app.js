@@ -6088,6 +6088,36 @@ function _updateNotifIndicators(count) {
   document.title = count > 0 ? `(${count}) OpenBot` : "OpenBot";
 }
 
+// Notification settings: folding groups with an "N of M on" count and an
+// All on / All off button in each header.
+function _notifGroupRefresh(group) {
+  const boxes = [...group.querySelectorAll('input[id^="notif_"]')];
+  const on = boxes.filter(b => b.checked).length;
+  group.querySelector(".nf-count").textContent = `${on} of ${boxes.length} on`;
+  group.querySelector(".nf-all").textContent = on === boxes.length ? "All off" : "All on";
+}
+
+function notifGroupChanged(el) {
+  const group = el.closest(".nf-group");
+  if (group) _notifGroupRefresh(group);
+  autoSave();
+}
+
+function notifGroupAll(ev, btn) {
+  ev.preventDefault();   // don't fold/unfold the group
+  ev.stopPropagation();
+  const group = btn.closest(".nf-group");
+  const boxes = [...group.querySelectorAll('input[id^="notif_"]')];
+  const target = !boxes.every(b => b.checked);
+  boxes.forEach(b => { b.checked = target; });
+  _notifGroupRefresh(group);
+  autoSave();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".nf-group").forEach(_notifGroupRefresh);
+});
+
 function _collectNotifSettings() {
   const out = {};
   document.querySelectorAll('input[id^="notif_"]').forEach(el => {

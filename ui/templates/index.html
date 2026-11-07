@@ -2052,11 +2052,34 @@
               <h3>Notifications</h3>
               <p class="setting-note" style="margin-bottom:10px">Choose which events create a notification in the Notifications tab so you can see them when you return AFK.</p>
               {% set notif_cfg = config.get('notifications', {}) %}
-              <div class="toggle-grid">
-                {% for slug, label in notification_events %}
-                <label class="inline-toggle setting-row">{{ label }}
-                  <label class="toggle-label"><input type="checkbox" id="notif_{{ slug }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
-                </label>
+              {% macro notif_toggle(slug, label) -%}
+                <label class="toggle-label" title="{{ label }}"><input type="checkbox" id="notif_{{ slug }}" aria-label="{{ label }}" {% if notif_cfg.get(slug, notif_defaults.get(slug, False)) %}checked{% endif %} onchange="notifGroupChanged(this)"><span class="toggle"></span></label>
+              {%- endmacro %}
+              <div class="nf-groups">
+                <details class="nf-group" open>
+                  <summary>Stores<span class="nf-count"></span><button type="button" class="nf-all" onclick="notifGroupAll(event, this)"></button></summary>
+                  <div class="nf-body">
+                    <table class="nf-matrix">
+                      <tr><th></th>{% for klabel, _ in notif_layout.kinds %}<th>{{ klabel }}</th>{% endfor %}</tr>
+                      {% for slabel, store in notif_layout.stores %}
+                      <tr><td>{{ slabel }}</td>
+                        {% for klabel, kind in notif_layout.kinds %}<td>{{ notif_toggle(store ~ '_' ~ kind, slabel ~ ' ' ~ klabel|lower) }}</td>{% endfor %}
+                      </tr>
+                      {% endfor %}
+                    </table>
+                  </div>
+                </details>
+                {% for title, events in notif_layout.groups %}
+                <details class="nf-group">
+                  <summary>{{ title }}<span class="nf-count"></span><button type="button" class="nf-all" onclick="notifGroupAll(event, this)"></button></summary>
+                  <div class="nf-body">
+                    {% for slug, label in events %}
+                    <label class="inline-toggle setting-row">{{ label }}
+                      {{ notif_toggle(slug, label) }}
+                    </label>
+                    {% endfor %}
+                  </div>
+                </details>
                 {% endfor %}
               </div>
             </div>
