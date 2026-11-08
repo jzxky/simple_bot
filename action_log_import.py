@@ -28,6 +28,20 @@ def logs_dir() -> str:
     return os.path.join(paths.data_dir(), "logs")
 
 
+def _start_date(name: str) -> str:
+    """Date the log was started, from its name (bot.py names them by start time)."""
+    st = _file_start(name)
+    return st.strftime("%Y-%m-%d") if st else ""
+
+
+def _file_end(path: str) -> str:
+    """Date the log was last written to."""
+    try:
+        return datetime.fromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d")
+    except OSError:
+        return ""
+
+
 def list_logs() -> list:
     """Every log file, newest first, with size and import status."""
     d = logs_dir()
@@ -42,7 +56,8 @@ def list_logs() -> list:
             size = os.path.getsize(os.path.join(d, name))
         except OSError:
             size = 0
-        out.append({"file": name, "size": size, "imported": imported.get(name, [])})
+        out.append({"file": name, "size": size, "imported": imported.get(name, []),
+                    "start": _start_date(name), "end": _file_end(os.path.join(d, name))})
     return out
 
 

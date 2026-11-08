@@ -2223,7 +2223,12 @@ def api_actions_characters():
 @app.route("/api/actions/logs")
 def api_actions_logs():
     import action_log_import
-    return jsonify({"logs": action_log_import.list_logs(), "current": _current_character()})
+    st = bot.state
+    now = st._estimated_server_time() if st else None
+    from datetime import datetime
+    game_date = (now or datetime.now()).strftime("%Y-%m-%d")
+    return jsonify({"logs": action_log_import.list_logs(), "current": _current_character(),
+                    "game_date": game_date})
 
 
 @app.route("/api/actions/import", methods=["POST"])
