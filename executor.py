@@ -30,6 +30,43 @@ def travel_warrant_cooldown_active() -> bool:
     return time.monotonic() < _travel_warrant_cooldown_until
 
 
+# Travel block set when the pre-travel drug house check finds drugs being carried
+# (Sgarrista and up). Overridden by config drug_house.allow_travel_with_stock.
+DRUG_STOCK_TRAVEL_BLOCK_SECS = 3600
+_drug_stock_travel_block_until: float = 0.0
+
+
+def _drug_stock_override() -> bool:
+    return bool(cfg.load().get("drug_house", {}).get("allow_travel_with_stock", False))
+
+
+def drug_stock_travel_block_active() -> bool:
+    """True while travel is blocked because drug house stock is being carried.
+    Auto-travel tasks check this so they don't retry travel every cycle."""
+    if time.monotonic() >= _drug_stock_travel_block_until:
+        return False
+    return not _drug_stock_override()
+
+
+def drug_stock_travel_block_remaining() -> int:
+    return max(0, int(_drug_stock_travel_block_until - time.monotonic())) \
+        if drug_stock_travel_block_active() else 0
+
+
+def _note_drug_house_stock(state, stock) -> int:
+    """Update the travel block from a fresh drug house parse: starts the 1-hour block
+    when anything is carried (Purchased > 0), lifts it when nothing is. Returns units."""
+    global _drug_stock_travel_block_until
+    carried = sum(s["owned"] for s in stock)
+    if carried <= 0:
+        _drug_stock_travel_block_until = 0.0
+    elif not _drug_stock_override() and not drug_stock_travel_block_active():
+        _drug_stock_travel_block_until = time.monotonic() + DRUG_STOCK_TRAVEL_BLOCK_SECS
+        state.add_log(f"Drug house: carrying {carried} unit(s) — travel blocked for "
+                      f"{DRUG_STOCK_TRAVEL_BLOCK_SECS // 60}m.")
+    return carried
+
+
 # Cooldown set when drug manufacturing returns a fail div.
 _drug_manufacture_cooldown_until: float = 0.0
 
@@ -80,6 +117,8 @@ def reset_all_cooldowns():
     global _no_vehicle_cooldown_until, _gym_travel_cooldown_until
     global _launder_cooldown_until, _launder_cooldown_city
     _travel_warrant_cooldown_until = 0.0
+    global _drug_stock_travel_block_until
+    _drug_stock_travel_block_until = 0.0
     _drug_manufacture_cooldown_until = 0.0
     _no_vehicle_cooldown_until = 0.0
     _gym_travel_cooldown_until = 0.0
@@ -362,12 +401,14 @@ def _parse_earn_queue_rows(soup) -> list:
     return rows
 
 
-def _save_earn_queue_cache(rows):
-    """Persist parsed queue rows so planner_view() can include queued counts."""
+def _save_earn_queue_cache(rows, character: str = ""):
+    """Persist parsed queue rows (and whose queue it is) so the planner can
+    count what's still queued."""
     import os, json, paths
     from datetime import datetime
     cache = {
         "cached_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "character": character or "",
         "rows": [{"name": n, "completed": c, "total": t} for n, c, t in rows],
     }
     path = os.path.join(paths.data_dir(), "earn_queue_cache.json")
@@ -445,6 +486,38 @@ def _ensure_auto_earn_mode(page, state: "GameState | None" = None) -> bool:
         return False
 
 
+def _snapshot_earn_queue(page, state: GameState) -> list:
+    """Parse the queue rows on the loaded earn page and save them as the
+    queue snapshot for the current character."""
+    try:
+        rows = _parse_earn_queue_rows(BeautifulSoup(page.content(), "html.parser"))
+    except Exception:
+        return []
+    try:
+        _save_earn_queue_cache(rows, state.own_name)
+    except Exception:
+        pass
+    return rows
+
+
+def _record_queue_cleared(rows, state: GameState):
+    """Log what a queue clear threw away (per earn), so action-log earn counts
+    don't treat cleared earns as completed."""
+    import earn_planner as _ep
+    values = _ep.known_values()
+    cleared = {}
+    for name, completed, total in rows or []:
+        value = _ep.value_for_name(name, values)
+        left = max(0, total - completed)
+        if value and left:
+            cleared[value] = cleared.get(value, 0) + left
+    for value, n in cleared.items():
+        label = _earn_display_name(value)
+        action_log.record(state, "earn_queue", label, "skip",
+                          message=f"Cleared {n} x {label} from the queue",
+                          cleared=n, earn_id=value)
+
+
 def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
     """Add `amount` of one auto-earn to the queue. Returns True on success."""
     try:
@@ -463,6 +536,8 @@ def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
         action_log.record(state, "earn_queue", _earn_display_name(value), "success",
                           amount=None, message=f"Queued {amount} x {_earn_display_name(value)}",
                           queued=amount, earn_id=value)
+        _settle_earn_page(page)
+        _snapshot_earn_queue(page, state)
         return True
     except Exception as e:
         state.add_log(f"Earn queue: failed to add {value} ({e}).")
@@ -536,6 +611,12 @@ def _planner_final_batch(page, state: GameState, active: str, decision: dict, do
     queue is now empty, so the retry won't clear again."""
     if not _clear_earn_queue(page, state, navigate=navigate):
         return False
+    if not cfg.load().get("character_history", {}).get("enabled"):
+        # Action-log counts: the clear just recorded exactly what was left in
+        # the queue, so recount instead of trusting the older queue snapshot.
+        import earn_planner as _ep
+        count = _ep.completed_count(active, _ep.load_counts(state.own_name))
+        decision = {**decision, "count": count, "remaining": max(0, decision["limit"] - count)}
     if decision["remaining"] > 0:
         if not _queue_earn(page, active, decision["remaining"], state):
             return False
@@ -553,14 +634,14 @@ def handle_earn_planner_check(action: Action, state: GameState):
     """Earn planner poll — runs after each character history update, and every
     10 minutes (silently) while waiting for an earn to become available."""
     import earn_planner as _ep
-    import character_history as _ch
+    _ep.sync_character(state.own_name)
     c = cfg.load()
     planner = c.get("earn_planner", {})
     limits = planner.get("limits", {})
     done = dict(planner.get("done", {}))
     if not limits:
         return
-    history = _ch.load()
+    history = _ep.load_counts(state.own_name, c)
 
     if planner.get("waiting_for_earns"):
         # Waiting (on the default earn, or with earns disabled). The timed
@@ -624,14 +705,16 @@ def handle_check_earns(action: Action, state: GameState):
 
     import earn_planner as _ep
     import character_history as _ch
+    _ep.sync_character(state.own_name)
     c = cfg.load()
     planner = c.get("earn_planner", {})
     planner_mode = bool(planner.get("enabled") and planner.get("limits")
-                        and c.get("character_history", {}).get("enabled")
                         and not planner.get("waiting_for_earns"))
+    history_on = bool(c.get("character_history", {}).get("enabled"))
 
-    # 1. Planner mode: refresh character history (the earn counts).
-    if planner_mode:
+    # 1. Planner mode: refresh character history (the earn counts). Without
+    #    it the counts come from the action log and the queue snapshot below.
+    if planner_mode and history_on:
         try:
             _ch.fetch_and_save(state.own_name or "")
         except Exception:
@@ -658,13 +741,13 @@ def handle_check_earns(action: Action, state: GameState):
 
     current_count = _queue_count(page)
     queue_rows = _parse_earn_queue_rows(BeautifulSoup(page.content(), "html.parser"))
-    _save_earn_queue_cache(queue_rows)
+    _save_earn_queue_cache(queue_rows, state.own_name)
 
     # 4a. Planner mode: decide on this page, before any top-up.
     if planner_mode:
         limits = planner.get("limits", {})
         done = dict(planner.get("done", {}))
-        history = _ch.load()
+        history = _ep.load_counts(state.own_name)
         decision = _ep.planner_decision("auto", earn_type, limits, done, history)
         if decision["action"] == "final_batch":
             if _planner_final_batch(page, state, earn_type, decision, done, navigate=False):
@@ -683,7 +766,7 @@ def handle_check_earns(action: Action, state: GameState):
     limit = planner.get("limits", {}).get(earn_type) if planner_mode else None
     if limit:
         # Never queue past the planner limit: completed (history) + already queued.
-        completed = _ep.completed_count(earn_type)
+        completed = _ep.completed_count(earn_type, _ep.load_counts(state.own_name))
         queued = _ep.queued_remaining(earn_type, queue_rows)
         amount = min(amount, int(limit) - completed - queued)
         if amount <= 0:
@@ -713,18 +796,65 @@ def _clear_earn_queue(page, state: GameState, navigate: bool = True) -> bool:
     if not btn:
         state.add_log("Clear queue button not found on earn page.")
         return False
+    before = _parse_earn_queue_rows(BeautifulSoup(page.content(), "html.parser"))
     with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
         btn.click()
     _refresh_state(state)
     state.add_log("Earn queue cleared.")
+    _record_queue_cleared(before, state)
+    _save_earn_queue_cache([], state.own_name)
     # Clearing the queue puts the game in MANUAL mode — switch back to AUTO.
     return _ensure_auto_earn_mode(page, state)
+
+
+def _planner_queue_wiped(state: GameState):
+    """The game queue was emptied outside the planner's own final batch, so
+    any final batch it handed off is gone: forget the hand-offs. Returns the
+    re-read planner config."""
+    c = cfg.load()
+    planner = c.get("earn_planner", {})
+    if planner.get("done"):
+        planner["done"] = {}
+        cfg.save(c)
+    return planner
+
+
+def _planner_reevaluate(state: GameState):
+    """Re-run the plan from the top after the queue was cleared: the first
+    available earn that hasn't reached its limit becomes the active earn
+    (earns are turned back on if the planner had turned them off); with none,
+    fall back to the default earn / disable earns."""
+    import earn_planner as _ep
+    _ep.sync_character(state.own_name)
+    planner = _planner_queue_wiped(state)
+    c = cfg.load()
+    if not (planner.get("enabled") and planner.get("limits")):
+        return
+    active = c.get("earns", {}).get("earn_type", "")
+    enabled = c.get("earns", {}).get("enabled", False)
+    turn_on = not enabled and planner.get("waiting_for_earns", False)
+    if not enabled and not turn_on:
+        return  # earns switched off by the user — leave them off
+    limits = planner["limits"]
+    counts = _ep.load_counts(state.own_name, c)
+    nxt = _ep.pick_next(limits, {}, counts)
+    if not nxt:
+        _planner_fall_back(state)
+        return
+    if nxt != active or planner.get("waiting_for_earns") or turn_on:
+        _planner_set_active(state, nxt, enable_earns=turn_on)
+        state.add_log(f"Earn planner: queue cleared — re-evaluated the plan, "
+                      f"active earn is {_earn_display_name(nxt)}.")
+    else:
+        state.add_log(f"Earn planner: queue cleared — re-evaluated the plan, "
+                      f"{_earn_display_name(nxt)} stays active.")
 
 
 def handle_clear_earn_queue(action: Action, state: GameState):
     page = browser.page()
     if not _clear_earn_queue(page, state):
         return
+    _planner_reevaluate(state)
 
     c = cfg.load()
     if c.get("earns", {}).get("enabled", False):
@@ -841,9 +971,13 @@ def _ensure_manual_earn_mode(page, state: GameState):
     if _queue_count(page) > 0:
         btn = page.query_selector("div.mm-earn-mode-auto button.mm-earn-queue-clear-btn")
         if btn:
+            before = _parse_earn_queue_rows(BeautifulSoup(page.content(), "html.parser"))
             with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
                 btn.click()
             state.add_log("Earn queue cleared — switched to MANUAL earn mode.")
+            _record_queue_cleared(before, state)
+            _save_earn_queue_cache([], state.own_name)
+            _planner_queue_wiped(state)
             _settle_earn_page(page)
             if _earn_panel_shown(page, "manual"):
                 return
@@ -4762,17 +4896,17 @@ def _check_buy(stock, drugs):
     for key, qty in drugs.items():
         s = by_key.get(key)
         if not s:
-            return 0, f"{key} isn't on this contact's list"
+            return 0, f"{key} isn't on sale here"
         if qty > s["available"]:
             return 0, f"only {s['available']} {s['name']} on sale (asked for {qty})"
         cost += qty * s["price"]
     return cost, None
 
 
-def _buy_drugs(state, link, stock, drugs):
-    """Buy from the contact page already loaded (stock = its parsed list), first withdrawing
-    from the bank if cash on hand + dirty money won't cover it.  drugs: {key: qty}.
-    Returns (ok, message)."""
+def _buy_drugs(state, link, stock, drugs, submit_selector="input[type='submit'][value='Buy']"):
+    """Buy from the page already loaded (a contact's list or the drug house; stock = its
+    parsed list), first withdrawing from the bank if cash on hand + dirty money won't cover
+    it.  drugs: {key: qty}.  Returns (ok, message)."""
     cost, err = _check_buy(stock, drugs)
     if err:
         return False, err
@@ -4798,7 +4932,7 @@ def _buy_drugs(state, link, stock, drugs):
     page = browser.page()
     for key, qty in drugs.items():
         page.fill(f"input[name='{by_key[key]['buy_field']}']", str(qty))
-    return _submit_and_read_result(state, "input[type='submit'][value='Buy']")
+    return _submit_and_read_result(state, submit_selector)
 
 
 def _on_sell_page() -> bool:
@@ -4987,6 +5121,253 @@ def handle_create_drug_offer(action: Action, state: GameState):
         return _drug_reply(action, state, label, False, "needs a customer, a price and at least one drug")
     ok, msg = _create_offer(state, target, price, drugs)
     _drug_reply(action, state, label, ok, msg)
+
+
+# ---------------------------------------------------------------------------
+# Drug house (supply side: Sgarrista and up)
+# ---------------------------------------------------------------------------
+
+_DRUG_HOUSE_PATH = "/income/drughouse.asp"
+
+
+def _drug_house_submit_selector(stock) -> str:
+    """The submit button of the form holding the drug house's qty inputs — matched by the
+    form rather than the button's label, so it works whatever the button says."""
+    return f"form:has(input[name='{stock[0]['buy_field']}']) input[type='submit']"
+
+
+def _load_drug_house(state):
+    """Open the drug house and parse it.  (stock, None) or (None, error message)."""
+    _nav(_u(_DRUG_HOUSE_PATH), state)
+    if not _check_session(state):
+        return None, "Session expired"
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    stock = _parse_contact_stock(soup)
+    if not stock:
+        div = _drug_result_div(soup)
+        return None, div.get_text(" ", strip=True) if div else "couldn't read the drug house's drug list"
+    return stock, None
+
+
+def handle_load_drug_house_stock(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    label = "Drug house stock"
+    blockers = drug_house_blockers(state)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    stock, err = _load_drug_house(state)
+    if err:
+        return _drug_reply(action, state, label, False, err)
+    in_stock = sum(s["available"] for s in stock)
+    _note_drug_house_stock(state, stock)
+    _drug_reply(action, state, label, True, f"{in_stock} unit(s) in stock", stock=stock)
+
+
+def handle_buy_drug_house(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    drugs = action.params.get("drugs", {})
+    label = "Drug house buy"
+    blockers = drug_house_blockers(state)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    if not drugs:
+        return _drug_reply(action, state, label, False, "needs at least one drug")
+    stock, err = _load_drug_house(state)
+    if err:
+        return _drug_reply(action, state, label, False, err)
+    ok, msg = _buy_drugs(state, _DRUG_HOUSE_PATH, stock, drugs,
+                         submit_selector=_drug_house_submit_selector(stock))
+    extra = {}
+    if ok is not False:
+        # Fresh figures for the table (stock and purchased change after a buy).
+        fresh, _ = _load_drug_house(state)
+        if fresh:
+            extra["stock"] = fresh
+            _note_drug_house_stock(state, fresh)
+    _drug_reply(action, state, label, ok, msg, **extra)
+
+
+def handle_add_drug_contact(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    name = (action.params.get("name") or "").strip()
+    label = f"Add drug contact {name}"
+    blockers = drug_house_blockers(state, home_city=False)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    if not name:
+        return _drug_reply(action, state, label, False, "needs a name")
+    _nav(_u("/income/contacts.asp"), state)
+    if not _check_session(state):
+        return _drug_reply(action, state, label, False, "Session expired")
+    page = browser.page()
+    if not page.query_selector("input[name='newcontact']"):
+        div = _drug_result_div(BeautifulSoup(state.page_html, "html.parser"))
+        return _drug_reply(action, state, label, False,
+                           div.get_text(" ", strip=True) if div else "new contact form not found")
+    page.fill("input[name='newcontact']", name)
+    ok, msg = _submit_and_read_result(
+        state, "form:has(input[name='newcontact']) input[type='submit']")
+    extra = {}
+    if ok:
+        _nav(_u(_CONTACTS_PATH), state)
+        if _check_session(state):
+            contacts = _save_dealer_contacts(BeautifulSoup(state.page_html, "html.parser"))
+            if contacts:
+                extra["contacts"] = contacts
+    _drug_reply(action, state, label, ok, msg, **extra)
+
+
+# ---------------------------------------------------------------------------
+# Dealer contacts and their prices (/income/contacts.asp, drug house ranks)
+# ---------------------------------------------------------------------------
+
+CONTACT_PRICES_LINK_RE = re.compile(r"/income/contacts\.asp\?action=prices&id=\d+")
+_CONTACTS_PATH = "/income/contacts.asp"
+
+
+def _parse_dealer_contacts(soup) -> list:
+    """Dealer contacts on /income/contacts.asp: [{name, link, deals}]. The game marks
+    names with a trailing '*'; it's dropped (the Notify link carries the bare name)."""
+    contacts, seen = [], set()
+    for a in soup.find_all("a", href=re.compile(r"contacts\.asp\?action=prices&id=\d+")):
+        name = a.get_text(strip=True).rstrip("*").strip()
+        m = re.search(r"action=prices&id=(\d+)", a.get("href", ""))
+        if not name or not m or name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        row = a.find_parent("tr")
+        tds = row.find_all("td", recursive=False) if row else []
+        deals = _parse_int(tds[2].get_text(strip=True)) if len(tds) > 2 else 0
+        contacts.append({"name": name, "link": f"{_CONTACTS_PATH}?action=prices&id={m.group(1)}",
+                         "deals": deals})
+    return contacts
+
+
+def _parse_contact_prices(soup) -> list:
+    """A dealer contact's price form: [{key, name, owned, price, min, max, field}]."""
+    rows = []
+    for key, tds in _drug_rows(soup, 4):
+        inp = tds[3].find("input", attrs={"type": "text"})
+        if not inp:
+            continue
+        rng = re.search(r"Min\.\s*\$([\d,]+)\s*-\s*Max\.\s*\$([\d,]+)", tds[3].get_text(" ", strip=True))
+        rows.append({
+            "key": key,
+            "name": tds[1].get_text(strip=True).split("(")[0].strip(),
+            "owned": _parse_int(tds[2].get_text(strip=True)),
+            "price": _parse_int(inp.get("value", "")),
+            "min": _parse_int(rng.group(1)) if rng else 0,
+            "max": _parse_int(rng.group(2)) if rng else 0,
+            "field": inp.get("name", ""),
+        })
+    return rows
+
+
+def _save_dealer_contacts(soup) -> list:
+    contacts = _parse_dealer_contacts(soup)
+    if contacts:
+        cfg.dealer_contacts_set(contacts)
+    return contacts
+
+
+def handle_load_dealer_contacts(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    label = "Dealer contacts"
+    blockers = drug_house_blockers(state, home_city=False)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    _nav(_u(_CONTACTS_PATH), state)
+    if not _check_session(state):
+        return _drug_reply(action, state, label, False, "Session expired")
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    contacts = _parse_dealer_contacts(soup)
+    if not contacts:
+        # An empty list is real only if the page is the contacts page — keep the saved
+        # list otherwise (redirect, page that didn't load right).
+        if soup.find("input", attrs={"name": "newcontact"}):
+            cfg.dealer_contacts_set([])
+            return _drug_reply(action, state, label, True, "no contacts yet", contacts=[])
+        return _drug_reply(action, state, label, False, "couldn't read the contacts page")
+    cfg.dealer_contacts_set(contacts)
+    _drug_reply(action, state, label, True, f"{len(contacts)} saved", contacts=contacts)
+
+
+def _open_contact_prices(state, link):
+    """Open a contact's price page.  (rows, None) or (None, error)."""
+    if not CONTACT_PRICES_LINK_RE.fullmatch(link or ""):
+        return None, "unknown contact link"
+    _nav(_u(link), state)
+    if not _check_session(state):
+        return None, "Session expired"
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    rows = _parse_contact_prices(soup)
+    if not rows:
+        div = _drug_result_div(soup)
+        return None, div.get_text(" ", strip=True) if div else "couldn't read the contact's price form"
+    return rows, None
+
+
+def handle_load_contact_prices(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    label = "Contact prices"
+    blockers = drug_house_blockers(state, home_city=False)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    rows, err = _open_contact_prices(state, action.params.get("link", ""))
+    if err:
+        return _drug_reply(action, state, label, False, err)
+    _drug_reply(action, state, label, True, f"{len(rows)} drugs", prices=rows)
+
+
+def handle_set_contact_prices(action: Action, state: GameState):
+    """Fill a contact's price form and submit it — for every contact at once when
+    everyone=True (the form's "All contacts" checkbox)."""
+    from tasks.middling import drug_house_blockers
+    prices = action.params.get("prices", {})
+    everyone = bool(action.params.get("everyone", False))
+    link = action.params.get("link", "")
+    label = "Update all contact prices" if everyone else "Update contact prices"
+    blockers = drug_house_blockers(state, home_city=False)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    if not prices:
+        return _drug_reply(action, state, label, False, "needs at least one price")
+    if everyone and not link:
+        saved = cfg.dealer_contacts_get()
+        if not saved:
+            _nav(_u(_CONTACTS_PATH), state)
+            if not _check_session(state):
+                return _drug_reply(action, state, label, False, "Session expired")
+            saved = _save_dealer_contacts(BeautifulSoup(state.page_html, "html.parser"))
+        if not saved:
+            return _drug_reply(action, state, label, False, "no contacts to update")
+        link = saved[0]["link"]
+    rows, err = _open_contact_prices(state, link)
+    if err:
+        return _drug_reply(action, state, label, False, err)
+    by_key = {r["key"]: r for r in rows}
+    for key, price in prices.items():
+        r = by_key.get(key)
+        if not r:
+            return _drug_reply(action, state, label, False, f"{key} isn't on the price form")
+        if r["max"] and not r["min"] <= price <= r["max"]:
+            return _drug_reply(action, state, label, False,
+                               f"{r['name']} must be ${r['min']:,} – ${r['max']:,} (got ${price:,})")
+    page = browser.page()
+    for key, price in prices.items():
+        page.fill(f"input[name='{by_key[key]['field']}']", str(price))
+    box = "input[type='checkbox'][name='everyone']"
+    if page.query_selector(box):
+        page.set_checked(box, everyone)
+    elif everyone:
+        return _drug_reply(action, state, label, False, "the All contacts checkbox wasn't on the form")
+    ok, msg = _submit_and_read_result(state, "input[type='submit'][value='Update Prices']")
+    extra = {}
+    if ok is not False and CONTACT_PRICES_LINK_RE.fullmatch(link):
+        fresh, _ = _open_contact_prices(state, link)
+        if fresh:
+            extra["prices"] = fresh
+    _drug_reply(action, state, label, ok, msg, **extra)
 
 
 def handle_do_middling(action: Action, state: GameState):
@@ -5785,6 +6166,33 @@ def _closed_city_cooldown(state: GameState, target: str, reason: str):
                   f"pausing travel to {target} for 1 hour.")
 
 
+def _drug_stock_travel_check(state: GameState) -> bool:
+    """Pre-travel check for drug house ranks: False (travel blocked) while carrying
+    drug house stock, unless the Drugs-tab override is on."""
+    from tasks.middling import DRUG_HOUSE_RANKS
+    from state import norm_rank
+    if norm_rank(state.rank) not in DRUG_HOUSE_RANKS or _drug_stock_override():
+        return True
+    if drug_stock_travel_block_active():
+        state.add_log(f"Travel: carrying drug house stock — travel blocked "
+                      f"({drug_stock_travel_block_remaining() // 60 + 1}m left).")
+        return False
+    _nav(_u(_DRUG_HOUSE_PATH), state)
+    if not _check_session(state):
+        return False
+    stock = _parse_contact_stock(BeautifulSoup(state.page_html, "html.parser"))
+    if not stock:
+        state.add_log("Travel: couldn't read the drug house to check for stock — travelling anyway.")
+        return True
+    carried = _note_drug_house_stock(state, stock)
+    if carried > 0:
+        msg = (f"Travel: carrying {carried} unit(s) of drug house stock — travel blocked for "
+               f"{DRUG_STOCK_TRAVEL_BLOCK_SECS // 60}m.")
+        _notify(state, "drug_stock_travel_block", msg)
+        return False
+    return True
+
+
 def handle_travel(action: Action, state: GameState) -> int:
     from datetime import datetime
     global _travel_warrant_cooldown_until
@@ -5811,6 +6219,9 @@ def handle_travel(action: Action, state: GameState) -> int:
     # Pre-travel warrant check
     if time.monotonic() < _travel_warrant_cooldown_until:
         state.add_log("Travel: warrant cooldown active — skipping travel.")
+        return 0
+
+    if not _drug_stock_travel_check(state):
         return 0
 
     warrant_mode = cfg.load().get("jail", {}).get("auto_warrant_handling", "none")
@@ -8120,6 +8531,12 @@ HANDLERS = {
     "load_carrying_stock": handle_load_carrying_stock,
     "buy_contact_drugs": handle_buy_contact_drugs,
     "create_drug_offer": handle_create_drug_offer,
+    "load_drug_house_stock": handle_load_drug_house_stock,
+    "buy_drug_house": handle_buy_drug_house,
+    "add_drug_contact": handle_add_drug_contact,
+    "load_dealer_contacts": handle_load_dealer_contacts,
+    "load_contact_prices": handle_load_contact_prices,
+    "set_contact_prices": handle_set_contact_prices,
     "do_blind_eye": handle_blind_eye,
     "check_warrants": handle_check_warrants,
     "turn_in_warrant": handle_turn_in_warrant,

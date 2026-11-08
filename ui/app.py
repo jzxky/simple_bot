@@ -43,6 +43,7 @@ NOTIFICATION_EVENTS = [
     ("targets_exhausted",   "Crime targets exhausted"),
     ("mhs_protected",       "MHS Protection Attempt"),
     ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
+    ("drug_stock_travel_block", "Carrying drug house stock (travel blocked)"),
     ("agg_not_available",   "Agg crime not available"),
     ("dog_trains_unavailable", "Dog trains unavailable"),
     ("no_available_earns",  "No available earns (earn planner)"),
@@ -333,6 +334,32 @@ def _merge_changed(target: dict, before: dict, after: dict):
                 target.pop(k, None)
 
 
+def _clean_planner_limits(raw: dict) -> dict:
+    """Keep known earns with a positive whole-number limit, in order."""
+    import earn_planner as _ep
+    valid_values = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
+    clean = {}
+    for k, v in raw.items():
+        if k not in valid_values:
+            continue
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            continue
+        if n > 0:
+            clean[k] = n
+    return clean
+
+
+def _planner_payload_ok(c: dict, data: dict) -> bool:
+    """Plans are per character: only accept a page's planner queue/default if
+    it was loaded for the character the saved plan now belongs to (a page
+    left open across a character change must not overwrite the new plan)."""
+    if "earn_planner_character" not in data:
+        return True
+    return (data.get("earn_planner_character") or "") == c.get("earn_planner", {}).get("character", "")
+
+
 def _apply_payload(c: dict, data: dict) -> dict:
     """Populate config dict `c` from a settings payload `data`. Pure — no env
     writes, no bot signals, no persistence (those are handled by save())."""
@@ -341,22 +368,10 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["earns"]["earn_mode"] = data.get("earn_mode", "auto")
     c["earns"]["show_all"] = data.get("earn_show_all", False)
 
-    if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
-        import earn_planner as _ep
-        valid_values = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
-        clean = {}
-        for k, v in data["earn_planner_limits"].items():
-            if k not in valid_values:
-                continue
-            try:
-                n = int(v)
-            except (TypeError, ValueError):
-                continue
-            if n > 0:
-                clean[k] = n
-        c.setdefault("earn_planner", {})["limits"] = clean
+    if _planner_payload_ok(c, data) and "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
+        c.setdefault("earn_planner", {})["limits"] = _clean_planner_limits(data["earn_planner_limits"])
     c.setdefault("earn_planner", {})["enabled"] = bool(data.get("earn_planner_enabled", False))
-    if "earn_planner_default" in data:
+    if _planner_payload_ok(c, data) and "earn_planner_default" in data:
         import earn_planner as _ep
         default = str(data.get("earn_planner_default") or "")
         valid = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
@@ -521,6 +536,12 @@ def _apply_payload(c: dict, data: dict) -> dict:
 
     c.setdefault("middling", {})
     c["middling"]["enabled"] = data.get("middling_enabled", False)
+    if isinstance(data.get("drug_house_default_prices"), dict):
+        c.setdefault("drug_house", {})["default_prices"] = {
+            k: int(v) for k, v in data["drug_house_default_prices"].items()
+            if k in _DRUG_KEYS and str(v).isdigit() and int(v) > 0}
+    if "drug_house_allow_travel" in data:
+        c.setdefault("drug_house", {})["allow_travel_with_stock"] = bool(data["drug_house_allow_travel"])
     c["middling"]["max_on_hand"] = int(data.get("middling_max_on_hand", 500) or 500)
     c["middling"].setdefault("prices", {})
     _MID_DRUGS = ["marijuana", "ecstasy", "acid", "speed", "ice", "heroin", "cocaine"]
@@ -650,20 +671,9 @@ def save():
         c = c_live
         # Earn planner limits are a self-contained dict — always write directly
         # to avoid diff-merge issues with mutable object references.
-        if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
-            import earn_planner as _ep
-            valid_values = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
-            clean = {}
-            for k, v in data["earn_planner_limits"].items():
-                if k not in valid_values:
-                    continue
-                try:
-                    n = int(v)
-                except (TypeError, ValueError):
-                    continue
-                if n > 0:
-                    clean[k] = n
-            c.setdefault("earn_planner", {})["limits"] = clean
+        if (_planner_payload_ok(c, data) and "earn_planner_limits" in data
+                and isinstance(data["earn_planner_limits"], dict)):
+            c.setdefault("earn_planner", {})["limits"] = _clean_planner_limits(data["earn_planner_limits"])
         creds_changed = (data.get("email") != base.get("email")
                          or data.get("password") != base.get("password"))
         pin_changed = (data.get("pin_required") != base.get("pin_required")
@@ -1441,7 +1451,10 @@ def drugs_players():
     own = ((s.own_name if s else "") or "").lower()
     alive = [p for p in _db.get_all_players()
              if p.get("active") and p.get("username") and p["username"].lower() != own]
+    from tasks.middling import MIDDLING_RANKS
     customs_ranks = {norm_rank(r) for r in _CAREER_GROUPS["Customs"]}
+    contacts = {(c.get("name") or "").lower()
+                for c in cfg.drug_contacts_get() + cfg.dealer_contacts_get()}
     local = {n.lower() for n in ((s.local_players if s else None) or set())}
     names = lambda pred: sorted((p["username"] for p in alive if pred(p)), key=str.lower)
     return jsonify({
@@ -1449,6 +1462,9 @@ def drugs_players():
                          or norm_rank(p.get("rank")) in customs_ranks),
         "local_online": names(lambda p: p["username"].lower() in local),
         "all_alive": names(lambda p: True),
+        # Dealing ranks a drug-house rank can take on as contacts, minus existing contacts.
+        "dealers": names(lambda p: norm_rank(p.get("rank")) in MIDDLING_RANKS
+                         and p["username"].lower() not in contacts),
     })
 
 
@@ -1506,6 +1522,74 @@ def drugs_offer():
     if total <= 0:
         return jsonify({"ok": False, "message": "Total price must be above $0."}), 400
     return _drug_task("create_drug_offer", target=target, price=total, drugs=drugs)
+
+
+@app.route("/drugs/house/stock", methods=["POST"])
+def drugs_house_stock():
+    return _drug_task("load_drug_house_stock")
+
+
+@app.route("/drugs/house/buy", methods=["POST"])
+def drugs_house_buy():
+    drugs, _, err = _drug_request_rows((request.get_json(silent=True) or {}).get("drugs"))
+    if err:
+        return jsonify({"ok": False, "message": err}), 400
+    return _drug_task("buy_drug_house", drugs=drugs)
+
+
+@app.route("/drugs/house/contact", methods=["POST"])
+def drugs_house_contact():
+    name = ((request.get_json(silent=True) or {}).get("name") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_ .'`-]{1,40}", name):
+        return jsonify({"ok": False, "message": "Enter a player name."}), 400
+    return _drug_task("add_drug_contact", name=_living_player(name) or name)
+
+
+_CONTACT_PRICES_LINK_RE = re.compile(r"/income/contacts\.asp\?action=prices&id=\d+")
+
+
+def _price_rows(rows):
+    """({drug: price}, None) from [{drug, price}] request rows, or (None, error)."""
+    if not isinstance(rows, list) or not all(isinstance(r, dict) for r in rows):
+        return None, "Malformed price list."
+    prices = {}
+    for r in rows:
+        drug = str(r.get("drug") or "").strip().lower()
+        price = _whole_number(r.get("price"))
+        if drug not in _DRUG_KEYS or price is None or price > 99999:
+            return None, f"Bad price for {drug or 'a drug'}."
+        prices[drug] = price
+    if not prices:
+        return None, "Enter at least one price."
+    return prices, None
+
+
+@app.route("/drugs/house/contacts", methods=["POST"])
+def drugs_house_contacts():
+    return _drug_task("load_dealer_contacts")
+
+
+@app.route("/drugs/house/prices", methods=["POST"])
+def drugs_house_prices():
+    link = ((request.get_json(silent=True) or {}).get("link") or "").strip()
+    if not _CONTACT_PRICES_LINK_RE.fullmatch(link):
+        return jsonify({"ok": False, "message": "Unknown contact — reload contacts."}), 400
+    return _drug_task("load_contact_prices", link=link)
+
+
+@app.route("/drugs/house/set-prices", methods=["POST"])
+def drugs_house_set_prices():
+    data = request.get_json(silent=True) or {}
+    everyone = bool(data.get("everyone"))
+    link = (data.get("link") or "").strip()
+    if link and not _CONTACT_PRICES_LINK_RE.fullmatch(link):
+        return jsonify({"ok": False, "message": "Unknown contact — reload contacts."}), 400
+    if not link and not everyone:
+        return jsonify({"ok": False, "message": "Pick a contact."}), 400
+    prices, err = _price_rows(data.get("prices"))
+    if err:
+        return jsonify({"ok": False, "message": err}), 400
+    return _drug_task("set_contact_prices", link=link, prices=prices, everyone=everyone)
 
 
 @app.route("/character_history")
@@ -2055,12 +2139,15 @@ def api_available_earns():
 @app.route("/api/earn_planner")
 def api_earn_planner():
     import earn_planner as _ep
+    _ep.sync_character(_current_character())
     c = cfg.load()
     planner = c.get("earn_planner", {})
     limits = planner.get("limits", {})
     active = c.get("earns", {}).get("earn_type", "")
-    view = _ep.planner_view(limits, active, done=planner.get("done", {}),
+    view = _ep.planner_view(limits, active, history=_ep.load_counts(c=c),
+                            done=planner.get("done", {}),
                             waiting=bool(planner.get("waiting_for_earns")))
+    view["character"] = planner.get("character", "")
     view["default_earn"] = planner.get("default_earn", "")
     view["earns_enabled"] = bool(c.get("earns", {}).get("enabled", False))
     view["history_enabled"] = bool(c.get("character_history", {}).get("enabled", False))

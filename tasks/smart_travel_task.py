@@ -55,6 +55,9 @@ class SmartTravelTask(Task):
             return False
         if no_vehicle_cooldown_active():
             return False
+        from executor import drug_stock_travel_block_active
+        if drug_stock_travel_block_active():
+            return False
         return time.monotonic() - self._last >= _POLL_INTERVAL
 
     def blocked_reasons(self, state):
@@ -83,6 +86,9 @@ class SmartTravelTask(Task):
             reasons.append("Warrant travel cooldown")
         if no_vehicle_cooldown_active():
             reasons.append("No vehicle cooldown")
+        from executor import drug_stock_travel_block_active
+        if drug_stock_travel_block_active():
+            reasons.append("Carrying drug house stock")
         remaining = _POLL_INTERVAL - (time.monotonic() - self._last)
         if remaining > 0:
             reasons.append(f"Poll interval ({int(remaining)}s)")

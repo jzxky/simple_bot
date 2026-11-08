@@ -417,6 +417,21 @@ def table(f: dict, args) -> dict:
     return _read(run)
 
 
+def earn_ledger(character: str) -> list:
+    """Earn rows for one character, grouped for the earn planner's counts:
+    [{category, kind, result, earn_id, queued, cleared, n}] over the 'earn'
+    (manual earns) and 'earn_queue' (top-ups = success, clears = skip) rows."""
+    def run(c):
+        return [dict(r) for r in c.execute(
+            "SELECT category, kind, result,"
+            " CASE WHEN detail != '' THEN json_extract(detail, '$.earn_id') END earn_id,"
+            " COALESCE(SUM(CASE WHEN detail != '' THEN json_extract(detail, '$.queued') END),0) queued,"
+            " COALESCE(SUM(CASE WHEN detail != '' THEN json_extract(detail, '$.cleared') END),0) cleared,"
+            " COUNT(*) n FROM actions WHERE character=? AND category IN ('earn','earn_queue')"
+            " GROUP BY category, kind, result, earn_id", (character,))]
+    return _read(run)
+
+
 def characters() -> list:
     """Every character, newest first, with lifetime totals."""
     def run(c):

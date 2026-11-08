@@ -54,7 +54,7 @@ class CasinoTask(Task):
                 return False
             # Don't keep retrying auto-travel while warrants block it
             import executor
-            if executor.travel_warrant_cooldown_active():
+            if executor.travel_warrant_cooldown_active() or executor.drug_stock_travel_block_active():
                 return False
         return time.time() >= load_casino_release_at()
 
@@ -79,6 +79,8 @@ class CasinoTask(Task):
                 import executor
                 if executor.travel_warrant_cooldown_active():
                     reasons.append("Warrant travel cooldown")
+                if executor.drug_stock_travel_block_active():
+                    reasons.append("Carrying drug house stock")
         release_at = load_casino_release_at()
         if time.time() < release_at:
             remaining = (release_at - time.time()) / 60

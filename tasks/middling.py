@@ -11,6 +11,9 @@ from state import GameState, norm_rank
 
 MIDDLING_RANKS = {"piciotto", "enforcer", "dealer", "giovane d'honore"}
 _HOME_CITY_REQUIRED_RANKS = {"enforcer", "dealer", "giovane d'honore"}
+# The supply side: these ranks buy from the drug house and take dealers on as contacts.
+DRUG_HOUSE_RANKS = {"sgarrista", "capodecima", "caporegime", "boss", "don", "godfather",
+                    "capo di tutti capi"}
 
 
 def drug_trade_blockers(state: GameState, rank: bool = True, home_city: bool = True) -> list:
@@ -29,6 +32,23 @@ def drug_trade_blockers(state: GameState, rank: bool = True, home_city: bool = T
     if home_city and r in _HOME_CITY_REQUIRED_RANKS and not state.in_home_city():
         reasons.append("Not in home city")
     return reasons
+
+
+def drug_house_blockers(state: GameState, home_city: bool = True) -> list:
+    """Reasons the character can't use the drug house or add a dealer contact (empty = OK)."""
+    reasons = []
+    if not state.logged_in:
+        reasons.append("Not logged in")
+    if state.in_jail:
+        reasons.append("In jail")
+    if state.in_hospital:
+        reasons.append("In hospital")
+    if norm_rank(state.rank) not in DRUG_HOUSE_RANKS:
+        reasons.append(f"Rank '{state.rank or 'unknown'}' can't use the drug house")
+    if home_city and not state.in_home_city():
+        reasons.append("Not in home city")
+    return reasons
+
 
 _middling_queue: "queue.Queue | None" = None
 

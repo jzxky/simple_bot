@@ -13,6 +13,15 @@ queue. After each character-history update the planner checks the active earn
 (planner_decision) and moves to the next available, unfinished earn
 (pick_next). earn_planner.done records {value: limit} for earns whose final
 batch has been handed off, so they aren't picked again at the same limit.
+
+Plans are per character: the top-level limits / done / default_earn /
+waiting_for_earns belong to earn_planner.character, and every other
+character's plan is parked in earn_planner.plans[name]. sync_character()
+swaps plans when a different character logs in.
+
+Earn counts come from Character History when it's enabled, otherwise from the
+bot's action log (load_counts / activity_log_counts), shaped like a character
+history so the rest of the planner works the same either way.
 """
 
 import re
@@ -165,14 +174,15 @@ def queued_remaining(schedule_value: str, rows) -> int:
 
 def is_available(history: dict | None = None) -> bool:
     """True if the cached character history has a non-empty Earn History,
-    which proves the character has access to the in-game feature."""
-    data = history if history is not None else ch.load()
-    return bool(data.get("earn_history"))
+    which proves the character has access to the in-game feature. Counts
+    built from the action log are always usable."""
+    data = history if history is not None else load_counts()
+    return data.get("source") == ACTIVITY_LOG or bool(data.get("earn_history"))
 
 
 def _completed_counts(history: dict | None = None) -> dict:
     """Return {_count_key(type_name): count} flattened across all earn-history categories."""
-    data = history if history is not None else ch.load()
+    data = history if history is not None else load_counts()
     counts = {}
     for cat in data.get("earn_history", []):
         for entry in cat.get("entries", []):
@@ -252,7 +262,7 @@ def pick_next(limits: dict, done: dict, history: dict | None = None,
               catalog: list | None = None, skip: tuple = ()) -> "str | None":
     """First earn in planner order that is available in the catalog and not
     finished — or None if there isn't one."""
-    data = history if history is not None else ch.load()
+    data = history if history is not None else load_counts()
     entries = catalog if catalog is not None else _load_catalog()
     for value, limit in (limits or {}).items():
         if value in skip:
@@ -288,7 +298,7 @@ def planner_decision(mode: str, active: str, limits: dict, done: dict,
 def planner_view(limits: dict, active_earn: str = "", history: dict | None = None,
                  done: dict | None = None, waiting: bool = False) -> dict:
     """Build the data the UI needs: availability + per-listed-earn completed counts."""
-    data = history if history is not None else ch.load()
+    data = history if history is not None else load_counts()
     counts = _completed_counts(data)
     catalog_entries = _load_catalog()
     catalog_labels = {e["schedule_value"]: e["label"] for e in catalog_entries if e.get("schedule_value")}
@@ -331,4 +341,152 @@ def planner_view(limits: dict, active_earn: str = "", history: dict | None = Non
         "active": active_earn,
         "catalog": catalog_by_cat,
         "waiting": waiting,
+        "source": data.get("source") or "character_history",
     }
+
+
+# ── Per-character plans ──────────────────────────────────────────────────────
+
+# Keys that make up one character's plan.
+PLAN_KEYS = ("limits", "done", "default_earn", "waiting_for_earns")
+
+
+def _empty_plan() -> dict:
+    return {"limits": {}, "done": {}, "default_earn": "", "waiting_for_earns": False}
+
+
+def swap_character(planner: dict, name: str) -> bool:
+    """Make `name` the planner's character, in place: park the current plan
+    under plans[old character] and load name's plan (empty if it has none).
+    A plan saved before plans were per-character (no character recorded)
+    is adopted by the first character seen. Returns True if anything changed."""
+    name = (name or "").strip()
+    if not name:
+        return False
+    current = planner.get("character", "")
+    if current == name:
+        return False
+    plans = planner.setdefault("plans", {})
+    if current:
+        plans[current] = {k: planner.get(k, _empty_plan()[k]) for k in PLAN_KEYS}
+        incoming = plans.pop(name, None) or _empty_plan()
+        for k in PLAN_KEYS:
+            planner[k] = incoming.get(k, _empty_plan()[k])
+    else:
+        saved = plans.pop(name, None)
+        if saved and not planner.get("limits"):
+            for k in PLAN_KEYS:
+                planner[k] = saved.get(k, _empty_plan()[k])
+    planner["character"] = name
+    return True
+
+
+def sync_character(name: str) -> bool:
+    """Swap the saved config to `name`'s plan if a different character is
+    playing. Returns True if the plan changed."""
+    import config as cfg
+    if not (name or "").strip():
+        return False
+    c = cfg.load()
+    planner = c.setdefault("earn_planner", {})
+    if planner.get("character", "") == name.strip():
+        return False
+    if not swap_character(planner, name):
+        return False
+    cfg.save(c)
+    return True
+
+
+def current_character() -> str:
+    import config as cfg
+    return cfg.load().get("earn_planner", {}).get("character", "")
+
+
+# ── Earn counts ──────────────────────────────────────────────────────────────
+
+ACTIVITY_LOG = "activity_log"
+
+
+def load_counts(name: str = "", c: dict | None = None) -> dict:
+    """Earn counts for a character, shaped like a character history.
+    Character History enabled → its cached history for `name`; otherwise
+    counts built from the bot's action log. `name` defaults to the planner's
+    current character."""
+    import config as cfg
+    c = c if c is not None else cfg.load()
+    name = name or c.get("earn_planner", {}).get("character", "")
+    if c.get("character_history", {}).get("enabled"):
+        try:
+            return ch.load(name) if name else ch.load()
+        except Exception:
+            return {}
+    return activity_log_counts(name)
+
+
+def known_values() -> list:
+    """Every auto-earn schedule_value the planner knows (mapping + catalog)."""
+    values = list(HISTORY_NAME)
+    for v in _catalog_labels():
+        if v not in HISTORY_NAME:
+            values.append(v)
+    return values
+
+
+def value_for_name(name: str, values: list | None = None) -> str:
+    """The schedule_value an earn name (queue row, log kind, history type or
+    the value itself) belongs to, or "" if none matches."""
+    key = _count_key(name)
+    if not key:
+        return ""
+    for v in values if values is not None else known_values():
+        if key == _count_key(v) or key in _queue_candidates(v):
+            return v
+    return ""
+
+
+def activity_log_counts(name: str) -> dict:
+    """Completed earns per auto-earn from the bot's action log, shaped like a
+    character history (one "Bot History" category).
+
+    The game runs auto earns on its own servers, so they're derived:
+      completed = queued by the bot − cleared from the queue − still queued
+    ("still queued" from the last queue snapshot taken for this character),
+    plus successful manual earns of the same type. Earns done before the bot
+    logged them, or queued/cleared outside the bot, aren't counted."""
+    out = {"source": ACTIVITY_LOG, "character": name,
+           "earn_history": [{"category": "Bot History", "entries": []}]}
+    if not name:
+        return out
+    try:
+        import action_log
+        ledger = action_log.earn_ledger(name)
+    except Exception:
+        return out
+    values = known_values()
+    labels = _catalog_labels()
+    manual, queued, cleared = {}, {}, {}
+    for r in ledger:
+        value = r.get("earn_id") or value_for_name(r.get("kind", ""), values)
+        if not value:
+            continue
+        if r["category"] == "earn":
+            if r["result"] == "success":
+                manual[value] = manual.get(value, 0) + int(r.get("n") or 0)
+        elif r["category"] == "earn_queue":
+            if r["result"] == "success":
+                queued[value] = queued.get(value, 0) + int(r.get("queued") or 0)
+            elif r["result"] == "skip":
+                cleared[value] = cleared.get(value, 0) + int(r.get("cleared") or 0)
+    cache = _load_queue_cache()
+    rows = []
+    if cache.get("character", "") == name:
+        rows = [(x.get("name", ""), int(x.get("completed", 0)), int(x.get("total", 0)))
+                for x in cache.get("rows", [])]
+    entries = out["earn_history"][0]["entries"]
+    for value in set(manual) | set(queued):
+        auto = max(0, queued.get(value, 0) - cleared.get(value, 0) - queued_remaining(value, rows))
+        count = manual.get(value, 0) + auto
+        if count:
+            entries.append({"type": HISTORY_NAME.get(value) or labels.get(value, value),
+                            "count": count})
+    return out

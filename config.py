@@ -290,6 +290,11 @@ DEFAULT_CONFIG = {
     "communications": {
         "enabled": False
     },
+    "drug_house": {
+        "allow_travel_with_stock": False,
+        # Default selling prices to dealer contacts (Contact Prices overlay / Update All)
+        "default_prices": {}
+    },
     "middling": {
         "enabled": False,
         "max_on_hand": 500,
@@ -490,6 +495,17 @@ def drug_contacts_get() -> list:
 def drug_contacts_set(contacts: list):
     cfg = load()
     cfg["drug_contacts"] = contacts
+    save(cfg)
+
+
+def dealer_contacts_get() -> list:
+    """Dealers a drug-house rank supplies (from /income/contacts.asp): [{name, link, deals}]."""
+    return load().get("dealer_contacts", [])
+
+
+def dealer_contacts_set(contacts: list):
+    cfg = load()
+    cfg["dealer_contacts"] = contacts
     save(cfg)
 
 
