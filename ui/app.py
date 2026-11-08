@@ -47,6 +47,7 @@ NOTIFICATION_EVENTS = [
     ("agg_not_available",   "Agg crime not available"),
     ("dog_trains_unavailable", "Dog trains unavailable"),
     ("no_available_earns",  "No available earns (earn planner)"),
+    ("earn_crime_blocked",  "Earns blocked by high city crime"),
 ]
 
 # Settings layout for the notification toggles: a stores grid plus folding
@@ -56,7 +57,7 @@ NOTIFICATION_STORE_KINDS = [("In stock", "in_stock"), ("Bought", "purchased"), (
 NOTIFICATION_GROUPS = [
     ("Career",         ["promotion_success", "auto_promo"]),
     ("Account & jail", ["session_expired", "jailed", "warrants_outstanding", "mhs_protected"]),
-    ("Crimes & earns", ["targets_exhausted", "agg_not_available", "dog_trains_unavailable", "no_available_earns"]),
+    ("Crimes & earns", ["targets_exhausted", "agg_not_available", "dog_trains_unavailable", "no_available_earns", "earn_crime_blocked"]),
 ]
 
 

@@ -27,6 +27,15 @@ _initialized = False
 
 RESULTS = ("success", "fail", "skip", "error")
 
+# The game refuses to run earns while crime in the city is high. That is a
+# non-result, not a failed earn, so it is never stored as an action.
+_CRIME_BLOCK_RE = re.compile(r"too afraid to go out to work", re.I)
+
+
+def is_crime_blocked(message: str) -> bool:
+    return bool(_CRIME_BLOCK_RE.search(message or ""))
+
+
 CATEGORY_LABELS = {
     "agg": "Agg crimes",
     "case_work": "Case work",
@@ -100,6 +109,8 @@ def _ensure():
         c.execute("CREATE INDEX IF NOT EXISTS idx_actions_source ON actions(character, source)")
         # Travel is no longer tracked; clear rows recorded before that change.
         c.execute("DELETE FROM actions WHERE category = 'travel'")
+        # High-crime earn refusals are non-results; clear any recorded as fails.
+        c.execute("DELETE FROM actions WHERE category = 'earn' AND message LIKE '%too afraid to go out to work%'")
         _fold_paybacks(c)
     _initialized = True
 

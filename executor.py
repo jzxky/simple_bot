@@ -946,13 +946,26 @@ def _try_quick_earn(page, display_name: str, schedule_value: str, state: GameSta
     return True
 
 
+_crime_block_city = ""  # city we last sent a "crime too high" earn notification for
+
+
 def _log_manual_earn_result(state: GameState, display_name: str, html: str, how: str):
     """Log the game's #success / #fail message after an earn."""
     success, message = _game_result_message(html)
+    global _crime_block_city
     if success is True:
+        _crime_block_city = ""
         state.add_log(f"Manual earn ({how}): {display_name} — {message}")
         action_log.record(state, "earn", display_name, "success",
                           amount=action_log.parse_amount(message), message=message, how=how)
+    elif success is False and action_log.is_crime_blocked(message):
+        # Not a failed earn: the game won't run earns while city crime is high.
+        # Notify once per city until an earn goes through again.
+        city = state.current_city or "the city"
+        state.add_log(f"Manual earn ({how}): {display_name} — no result, crime is too high in {city}. {message}")
+        if _crime_block_city != city:
+            _crime_block_city = city
+            _notify(state, "earn_crime_blocked", f"Earns blocked: crime is too high in {city}")
     elif success is False:
         state.add_log(f"Manual earn ({how}) failed: {display_name} — {message}")
         action_log.record(state, "earn", display_name, "fail", message=message, how=how)

@@ -191,9 +191,11 @@ class _Parser:
         # ── Earns ─────────────────────────────────────────────────────────
         m = re.match(r"Manual earn \((.+?)\) failed: (.+?) — (.*)$", msg)
         if m:
+            if action_log.is_crime_blocked(m.group(3)):
+                return []  # high city crime: a non-result, not a failed earn
             return [_bad("earn", m.group(2), m.group(3), how=m.group(1))]
         m = re.match(r"Manual earn \((.+?)\): (.+?) — (.*)$", msg)
-        if m and not m.group(3).startswith("no result message"):
+        if m and not m.group(3).startswith("no result"):
             return [_ok("earn", m.group(2), m.group(3), how=m.group(1))]
         m = re.match(r"Earn queue: added (\d+) x (.+)\.$", msg)
         if m:
