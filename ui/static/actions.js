@@ -1,10 +1,12 @@
-/* Action history — sits under the text log in the Activity Log section.
+/* Bot history — the "Database" tab of the Activity Log section.
  *
- * Character picker, then two tabs:
- *   Actions      → "Table" (player-hub DataTable: sort, filter, search) and
- *                  "Character history" (a summary laid out like the game's
- *                  character history page, built from the bot's own log)
- *   Import logs  → rebuild history from activity log files
+ * Character picker, then two sub-tabs:
+ *   Table              → player-hub DataTable (sort, filter, search) with
+ *                        quick category filters
+ *   Character history  → a summary laid out like the game's character
+ *                        history page, built from the bot's own log
+ * "Import logs…" at the bottom opens an overlay to rebuild history from
+ * activity log files, with a date range to tick logs quickly.
  */
 (function () {
   "use strict";
@@ -32,8 +34,18 @@
     root.querySelectorAll(`[data-ah-group="${group}"]`).forEach(p =>
       p.classList.toggle("ah-panel-hidden", p.dataset.ahPanel !== name));
     btn.parentElement.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
-    if (name === "import") loadLogs();
     if (name === "summary") loadSummary();
+  }
+
+  // Top-level Activity Log tabs: Text Log | Database.
+  function logTab(name) {
+    const sec = document.getElementById("s-log");
+    sec.querySelectorAll("[data-log-panel]").forEach(p =>
+      p.classList.toggle("ah-panel-hidden", p.dataset.logPanel !== name));
+    sec.querySelectorAll("[data-log-tab]").forEach(b =>
+      b.classList.toggle("active", b.dataset.logTab === name));
+    try { localStorage.setItem("ob-log-tab", name); } catch (e) { /* private mode */ }
+    if (name === "db") init();
   }
 
   // ── Characters ────────────────────────────────────────────────────────────
@@ -95,7 +107,23 @@
       perPage: 25,
       emptyText: "No actions recorded yet.",
       server: {load: tableFetch, facet: tableFetch},
+      onStateChange: syncQuick,
     });
+    document.querySelectorAll("#ah-quick .ah-chip").forEach(b =>
+      b.addEventListener("click", () => quickFilter(b.dataset.cat)));
+    syncQuick(ahTable.getState());
+  }
+
+  // Quick filters: one tap shows only that category; tap again to clear.
+  function quickFilter(cat) {
+    const cur = (ahTable.getState().filters || {}).category || [];
+    const only = cur.length === 1 && cur[0] === cat;
+    ahTable.setFilter("category", only ? [] : [cat]);
+  }
+  function syncQuick(st) {
+    const cur = (st.filters || {}).category || [];
+    document.querySelectorAll("#ah-quick .ah-chip").forEach(b =>
+      b.classList.toggle("on", cur.length === 1 && cur[0] === b.dataset.cat));
   }
 
   // ── Character history summary ─────────────────────────────────────────────
@@ -326,15 +354,46 @@
       body.innerHTML = '<tr><td colspan="4" class="ah-empty">No activity logs found.</td></tr>';
       return;
     }
+    const end = document.getElementById("imp-end");
+    if (!end.value) end.value = data.game_date || "";
     body.innerHTML = data.logs.map(l => `<tr>
-        <td><input type="checkbox" class="imp-file" value="${esc(l.file)}"></td>
+        <td><input type="checkbox" class="imp-file" value="${esc(l.file)}"
+                   data-start="${esc(l.start || "")}" data-end="${esc(l.end || l.start || "")}"></td>
         <td>${esc(l.file)}</td>
         <td class="num">${(l.size / 1024).toFixed(0)} KB</td>
         <td>${l.imported.map(i => `${esc(i.character)} (${i.rows})`).join(", ") || "–"}</td>
       </tr>`).join("");
+    if (document.getElementById("imp-start").value) selectRange();
   }
   function toggleAllLogs(on) {
     document.querySelectorAll(".imp-file").forEach(c => c.checked = on);
+    document.getElementById("imp-range-note").textContent = "";
+  }
+  // Tick every log that was written to between the start and end dates.
+  function selectRange() {
+    const start = document.getElementById("imp-start").value;
+    const end = document.getElementById("imp-end").value;
+    const note = document.getElementById("imp-range-note");
+    if (!start && !end) { note.textContent = ""; return; }
+    if (start && end && start > end) { note.textContent = "Start date is after the end date."; return; }
+    let n = 0;
+    document.querySelectorAll(".imp-file").forEach(c => {
+      const fs = c.dataset.start, fe = c.dataset.end || fs;
+      const on = !!fs && (!end || fs <= end) && (!start || fe >= start);
+      c.checked = on;
+      if (on) n++;
+    });
+    document.getElementById("imp-all").checked = false;
+    note.textContent = `${n} log${n === 1 ? "" : "s"} selected`;
+  }
+  function openImport() {
+    document.getElementById("ah-import-overlay").classList.add("active");
+    document.body.classList.add("ah-modal-open");
+    loadLogs();
+  }
+  function closeImport() {
+    document.getElementById("ah-import-overlay").classList.remove("active");
+    document.body.classList.remove("ah-modal-open");
   }
   async function runImport(dryRun) {
     const files = [...document.querySelectorAll(".imp-file:checked")].map(c => c.value);
@@ -386,18 +445,23 @@
     buildTable();
   }
   window.ahTab = ahTab;
+  window.ahLogTab = logTab;
+  window.ahSelectRange = selectRange;
+  window.ahOpenImport = openImport;
+  window.ahCloseImport = closeImport;
   window.ahOnCharChange = onCharChange;
   window.ahToggleSummaryGroup = toggleSummaryGroup;
   window.ahToggleSection = toggleSection;
   window.ahToggleAllLogs = toggleAllLogs;
   window.ahRunImport = runImport;
   window.ahInit = init;
-  document.addEventListener("click", e => {
-    const t = e.target.closest('.main-tab[data-section="s-log"]');
-    if (t) init();
+  // Load the database the first time its tab is shown.
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && document.getElementById("ah-import-overlay")?.classList.contains("active")) closeImport();
   });
   document.addEventListener("DOMContentLoaded", () => {
-    const sec = document.getElementById("s-log");
-    if (sec && sec.classList.contains("main-active")) init();
+    let tab = "text";
+    try { tab = localStorage.getItem("ob-log-tab") || "text"; } catch (e) { /* private mode */ }
+    if (tab === "db") logTab("db");
   });
 })();

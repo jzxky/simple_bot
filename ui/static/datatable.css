@@ -556,3 +556,8 @@
   .dt-compact.dt-cards tr.dt-open { border-color: var(--accent); }
   .dt-compact.dt-cards td.dt-actions { flex-basis: 100% !important; }
 }
+
+/* The page's global label style stacks label contents in a column; keep filter
+   options as one row: checkbox, label, count. */
+label.dt-check { flex-direction: row; flex: none; min-width: 0; color: var(--text); font-size: 13px; gap: 8px; }
+label.dt-check input[type="checkbox"] { width: 15px; margin: 0; }

@@ -1,12 +1,12 @@
 /* Action history — the panel under the Activity Log text log. */
-#action-history { --ok: #2f9c8a; --bad: #e0573f; --skip: #6a7f96; margin-top: 16px; }
+#action-history, #ah-import-overlay { --ok: #2f9c8a; --bad: #e0573f; --skip: #6a7f96; }
 #action-history .ah-title { font-size: 0.8rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.07em; margin: 0 0 10px; }
 #action-history .ah-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 #action-history .ah-top label { color: var(--muted); font-size: 12px; width: auto; flex: 0 0 auto; margin: 0; }
 #action-history .ah-top select { width: auto; min-width: 280px; max-width: 100%; }
-#action-history .ah-subtabs { margin-top: 2px; }
+#action-history .ah-subtabs { margin: 2px 0 10px; }
 #action-history .ah-subtabs .tab-btn { font-size: 0.72rem; }
-#action-history .ah-panel-hidden { display: none; }
+#s-log .ah-panel-hidden { display: none; }
 
 /* Result pills in the table */
 #ah-dt .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; border: none; }
@@ -32,18 +32,18 @@
 #action-history .ah-empty { color: var(--muted); padding: 20px; text-align: center; font-size: 0.85rem; }
 
 /* Import logs */
-#action-history .ah-note { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
-#action-history .ah-import-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
-#action-history .ah-import-bar label { color: var(--muted); font-size: 12px; width: auto; min-width: 0; margin: 0; flex: 0 0 auto; }
-#action-history .ah-import-bar input[type=text] { width: 240px; font-size: 12px; padding: 4px 6px; }
-#action-history .ah-import-bar .ah-note { margin: 0; }
-#action-history .imp-err { color: var(--bad); }
-#action-history .ah-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 12px; }
-#action-history table.ah-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-#action-history table.ah-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 5px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-#action-history table.ah-table td { padding: 5px 6px; border-bottom: 1px solid rgba(46,64,96,.35); vertical-align: top; }
-#action-history table.ah-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-#action-history #imp-logs input[type=checkbox], #action-history #imp-all { width: auto; }
+#ah-import-overlay .ah-note, #action-history .ah-note { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+#ah-import-overlay .ah-import-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+#ah-import-overlay .ah-import-bar label { color: var(--muted); font-size: 12px; width: auto; min-width: 0; margin: 0; flex: 0 0 auto; }
+#ah-import-overlay .ah-import-bar input[type=text] { width: 240px; font-size: 12px; padding: 4px 6px; }
+#ah-import-overlay .ah-import-bar .ah-note { margin: 0; }
+#ah-import-overlay .imp-err { color: var(--bad); }
+#ah-import-overlay .ah-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 12px; }
+#ah-import-overlay table.ah-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#ah-import-overlay table.ah-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 5px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+#ah-import-overlay table.ah-table td { padding: 5px 6px; border-bottom: 1px solid rgba(46,64,96,.35); vertical-align: top; }
+#ah-import-overlay table.ah-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+#imp-logs input[type=checkbox], #imp-all { width: auto; }
 
 /* Phone cards: let the message wrap instead of cutting it off */
 @media (max-width: 640px) {
@@ -74,3 +74,35 @@
 /* .card clips overflow on phones; "clip" keeps that without making the card a
    scroll container, so the sticky picker can still stick to the page. */
 #s-log { overflow: clip; }
+
+/* Activity Log top tabs: Text Log | Database */
+#s-log .log-tabs { margin-bottom: 12px; }
+
+/* Quick category filters above the table */
+#action-history .ah-quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+#action-history .ah-chip { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer; width: auto; }
+#action-history .ah-chip:hover { color: var(--text); border-color: var(--accent); }
+#action-history .ah-chip.on { background: rgba(200,168,75,.15); color: var(--accent); border-color: var(--accent); }
+
+/* Import logs: button at the bottom, form in an overlay */
+#action-history .ah-import-foot { display: flex; justify-content: flex-end; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+#ah-import-overlay .ah-import-box { max-width: 720px; max-height: 90vh; overflow-y: auto; }
+#ah-import-overlay .ah-import-box > div.ah-import-head { display: flex; justify-content: space-between; align-items: center; }
+#ah-import-overlay .ah-import-box > div.ah-import-bar { justify-content: flex-start; }
+#ah-import-overlay .ah-range { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; justify-content: flex-start; }
+#ah-import-overlay .ah-range label { flex: 0 0 auto; min-width: 0; }
+#ah-import-overlay .ah-range input[type=date] { width: 160px; }
+#ah-import-overlay .ah-range .ah-note { margin: 0 0 6px; }
+#ah-import-overlay .ah-log-list { max-height: 40vh; overflow-y: auto; margin-bottom: 0; }
+#ah-import-overlay #imp-status:empty, #ah-import-overlay #imp-result:empty { display: none; }
+body.ah-modal-open { overflow: hidden; }
+@media (max-width: 640px) {
+  #ah-import-overlay .ah-import-box { width: 96%; padding: 16px; }
+  #ah-import-overlay .ah-range label { flex: 1 1 140px; }
+  #ah-import-overlay .ah-range input[type=date] { width: 100%; }
+}
+#ah-import-overlay .ah-import-box > div.ah-log-list, #ah-import-overlay .ah-import-box > #imp-result, #ah-import-overlay .ah-import-box > #imp-status { display: block; }
+@media (max-width: 640px) { #ah-import-overlay .ah-import-bar input[type=text] { width: 100%; } }
+#imp-logs td:nth-child(2), #imp-logs td.num { white-space: nowrap; }
+@media (max-width: 640px) { #ah-import-overlay table.ah-table th:last-child, #imp-logs td:last-child { white-space: normal; } }
+#ah-import-overlay .ah-import-box > #imp-status:empty, #ah-import-overlay .ah-import-box > #imp-result:empty { display: none; }
