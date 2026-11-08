@@ -54,7 +54,7 @@ class GymTask(Task):
             if not gym_cfg.get("auto_travel", False):
                 return False
             import executor
-            if executor.travel_warrant_cooldown_active():
+            if executor.travel_warrant_cooldown_active() or executor.drug_stock_travel_block_active():
                 return False
             if executor.gym_travel_cooldown_active():
                 return False
@@ -82,6 +82,8 @@ class GymTask(Task):
                     reasons.append("Warrant travel cooldown")
                 if executor.gym_travel_cooldown_active():
                     reasons.append("Gym travel cooldown")
+                if executor.drug_stock_travel_block_active():
+                    reasons.append("Carrying drug house stock")
         elapsed_hours = (time.time() - load_last_gym_use()) / 3600
         if elapsed_hours < _GYM_COOLDOWN_HOURS:
             remaining = (_GYM_COOLDOWN_HOURS - elapsed_hours) * 60

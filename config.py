@@ -290,6 +290,9 @@ DEFAULT_CONFIG = {
     "communications": {
         "enabled": False
     },
+    "drug_house": {
+        "allow_travel_with_stock": False
+    },
     "middling": {
         "enabled": False,
         "max_on_hand": 500,

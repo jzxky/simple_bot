@@ -30,6 +30,43 @@ def travel_warrant_cooldown_active() -> bool:
     return time.monotonic() < _travel_warrant_cooldown_until
 
 
+# Travel block set when the pre-travel drug house check finds drugs being carried
+# (Sgarrista and up). Overridden by config drug_house.allow_travel_with_stock.
+DRUG_STOCK_TRAVEL_BLOCK_SECS = 3600
+_drug_stock_travel_block_until: float = 0.0
+
+
+def _drug_stock_override() -> bool:
+    return bool(cfg.load().get("drug_house", {}).get("allow_travel_with_stock", False))
+
+
+def drug_stock_travel_block_active() -> bool:
+    """True while travel is blocked because drug house stock is being carried.
+    Auto-travel tasks check this so they don't retry travel every cycle."""
+    if time.monotonic() >= _drug_stock_travel_block_until:
+        return False
+    return not _drug_stock_override()
+
+
+def drug_stock_travel_block_remaining() -> int:
+    return max(0, int(_drug_stock_travel_block_until - time.monotonic())) \
+        if drug_stock_travel_block_active() else 0
+
+
+def _note_drug_house_stock(state, stock) -> int:
+    """Update the travel block from a fresh drug house parse: starts the 1-hour block
+    when anything is carried (Purchased > 0), lifts it when nothing is. Returns units."""
+    global _drug_stock_travel_block_until
+    carried = sum(s["owned"] for s in stock)
+    if carried <= 0:
+        _drug_stock_travel_block_until = 0.0
+    elif not _drug_stock_override() and not drug_stock_travel_block_active():
+        _drug_stock_travel_block_until = time.monotonic() + DRUG_STOCK_TRAVEL_BLOCK_SECS
+        state.add_log(f"Drug house: carrying {carried} unit(s) — travel blocked for "
+                      f"{DRUG_STOCK_TRAVEL_BLOCK_SECS // 60}m.")
+    return carried
+
+
 # Cooldown set when drug manufacturing returns a fail div.
 _drug_manufacture_cooldown_until: float = 0.0
 
@@ -80,6 +117,8 @@ def reset_all_cooldowns():
     global _no_vehicle_cooldown_until, _gym_travel_cooldown_until
     global _launder_cooldown_until, _launder_cooldown_city
     _travel_warrant_cooldown_until = 0.0
+    global _drug_stock_travel_block_until
+    _drug_stock_travel_block_until = 0.0
     _drug_manufacture_cooldown_until = 0.0
     _no_vehicle_cooldown_until = 0.0
     _gym_travel_cooldown_until = 0.0
@@ -5025,6 +5064,7 @@ def handle_load_drug_house_stock(action: Action, state: GameState):
     if err:
         return _drug_reply(action, state, label, False, err)
     in_stock = sum(s["available"] for s in stock)
+    _note_drug_house_stock(state, stock)
     _drug_reply(action, state, label, True, f"{in_stock} unit(s) in stock", stock=stock)
 
 
@@ -5048,6 +5088,7 @@ def handle_buy_drug_house(action: Action, state: GameState):
         fresh, _ = _load_drug_house(state)
         if fresh:
             extra["stock"] = fresh
+            _note_drug_house_stock(state, fresh)
     _drug_reply(action, state, label, ok, msg, **extra)
 
 
@@ -5870,6 +5911,33 @@ def _closed_city_cooldown(state: GameState, target: str, reason: str):
                   f"pausing travel to {target} for 1 hour.")
 
 
+def _drug_stock_travel_check(state: GameState) -> bool:
+    """Pre-travel check for drug house ranks: False (travel blocked) while carrying
+    drug house stock, unless the Drugs-tab override is on."""
+    from tasks.middling import DRUG_HOUSE_RANKS
+    from state import norm_rank
+    if norm_rank(state.rank) not in DRUG_HOUSE_RANKS or _drug_stock_override():
+        return True
+    if drug_stock_travel_block_active():
+        state.add_log(f"Travel: carrying drug house stock — travel blocked "
+                      f"({drug_stock_travel_block_remaining() // 60 + 1}m left).")
+        return False
+    _nav(_u(_DRUG_HOUSE_PATH), state)
+    if not _check_session(state):
+        return False
+    stock = _parse_contact_stock(BeautifulSoup(state.page_html, "html.parser"))
+    if not stock:
+        state.add_log("Travel: couldn't read the drug house to check for stock — travelling anyway.")
+        return True
+    carried = _note_drug_house_stock(state, stock)
+    if carried > 0:
+        msg = (f"Travel: carrying {carried} unit(s) of drug house stock — travel blocked for "
+               f"{DRUG_STOCK_TRAVEL_BLOCK_SECS // 60}m.")
+        _notify(state, "drug_stock_travel_block", msg)
+        return False
+    return True
+
+
 def handle_travel(action: Action, state: GameState) -> int:
     from datetime import datetime
     global _travel_warrant_cooldown_until
@@ -5896,6 +5964,9 @@ def handle_travel(action: Action, state: GameState) -> int:
     # Pre-travel warrant check
     if time.monotonic() < _travel_warrant_cooldown_until:
         state.add_log("Travel: warrant cooldown active — skipping travel.")
+        return 0
+
+    if not _drug_stock_travel_check(state):
         return 0
 
     warrant_mode = cfg.load().get("jail", {}).get("auto_warrant_handling", "none")

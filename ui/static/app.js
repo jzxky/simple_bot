@@ -568,6 +568,7 @@ function _buildPayload() {
     autobuy_price_cocaine:   parseInt((document.getElementById("autobuy_price_cocaine")||{value:0}).value)||0,
     autobuy_qty_cocaine:     parseInt((document.getElementById("autobuy_qty_cocaine")||{value:0}).value)||0,
     middling_enabled: (document.getElementById("middling_enabled")||{checked:false}).checked,
+    drug_house_allow_travel: (document.getElementById("drug_house_allow_travel")||{checked:false}).checked,
     middling_max_on_hand: parseInt((document.getElementById("middling_max_on_hand")||{value:500}).value)||500,
     middling_price_marijuana: parseInt((document.getElementById("middling_price_marijuana")||{value:0}).value)||0,
     middling_price_ecstasy:   parseInt((document.getElementById("middling_price_ecstasy")||{value:0}).value)||0,

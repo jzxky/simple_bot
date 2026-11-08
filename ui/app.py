@@ -43,6 +43,7 @@ NOTIFICATION_EVENTS = [
     ("targets_exhausted",   "Crime targets exhausted"),
     ("mhs_protected",       "MHS Protection Attempt"),
     ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
+    ("drug_stock_travel_block", "Carrying drug house stock (travel blocked)"),
     ("agg_not_available",   "Agg crime not available"),
     ("dog_trains_unavailable", "Dog trains unavailable"),
     ("no_available_earns",  "No available earns (earn planner)"),
@@ -497,6 +498,8 @@ def _apply_payload(c: dict, data: dict) -> dict:
 
     c.setdefault("middling", {})
     c["middling"]["enabled"] = data.get("middling_enabled", False)
+    if "drug_house_allow_travel" in data:
+        c.setdefault("drug_house", {})["allow_travel_with_stock"] = bool(data["drug_house_allow_travel"])
     c["middling"]["max_on_hand"] = int(data.get("middling_max_on_hand", 500) or 500)
     c["middling"].setdefault("prices", {})
     _MID_DRUGS = ["marijuana", "ecstasy", "acid", "speed", "ice", "heroin", "cocaine"]

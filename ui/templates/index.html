@@ -991,6 +991,17 @@
               <h3>Drug House</h3>
               <p class="placeholder">Buy drugs from your drug house (home city only) and take dealers on as contacts.</p>
 
+              <label class="inline-toggle setting-row">
+                Allow travel while carrying stock
+                <label class="toggle-label">
+                  <input type="checkbox" id="drug_house_allow_travel"
+                    {% if config.get('drug_house', {}).get('allow_travel_with_stock') %}checked{% endif %}
+                    onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <p class="placeholder">Off: before any travel the bot checks the drug house, and if you're carrying any of its stock (Purchased above 0) travel is blocked for 1 hour.</p>
+
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
                 <button class="btn btn-sm" onclick="drugsHouseLoad(this)">Get Stock</button>
                 <span id="drug-house-hint" class="sell-hint" style="margin:0">Not loaded yet</span>
