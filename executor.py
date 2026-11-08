@@ -4762,17 +4762,17 @@ def _check_buy(stock, drugs):
     for key, qty in drugs.items():
         s = by_key.get(key)
         if not s:
-            return 0, f"{key} isn't on this contact's list"
+            return 0, f"{key} isn't on sale here"
         if qty > s["available"]:
             return 0, f"only {s['available']} {s['name']} on sale (asked for {qty})"
         cost += qty * s["price"]
     return cost, None
 
 
-def _buy_drugs(state, link, stock, drugs):
-    """Buy from the contact page already loaded (stock = its parsed list), first withdrawing
-    from the bank if cash on hand + dirty money won't cover it.  drugs: {key: qty}.
-    Returns (ok, message)."""
+def _buy_drugs(state, link, stock, drugs, submit_selector="input[type='submit'][value='Buy']"):
+    """Buy from the page already loaded (a contact's list or the drug house; stock = its
+    parsed list), first withdrawing from the bank if cash on hand + dirty money won't cover
+    it.  drugs: {key: qty}.  Returns (ok, message)."""
     cost, err = _check_buy(stock, drugs)
     if err:
         return False, err
@@ -4798,7 +4798,7 @@ def _buy_drugs(state, link, stock, drugs):
     page = browser.page()
     for key, qty in drugs.items():
         page.fill(f"input[name='{by_key[key]['buy_field']}']", str(qty))
-    return _submit_and_read_result(state, "input[type='submit'][value='Buy']")
+    return _submit_and_read_result(state, submit_selector)
 
 
 def _on_sell_page() -> bool:
@@ -4986,6 +4986,91 @@ def handle_create_drug_offer(action: Action, state: GameState):
     if not target or not drugs or price <= 0:
         return _drug_reply(action, state, label, False, "needs a customer, a price and at least one drug")
     ok, msg = _create_offer(state, target, price, drugs)
+    _drug_reply(action, state, label, ok, msg)
+
+
+# ---------------------------------------------------------------------------
+# Drug house (supply side: Sgarrista and up)
+# ---------------------------------------------------------------------------
+
+_DRUG_HOUSE_PATH = "/income/drughouse.asp"
+
+
+def _drug_house_submit_selector(stock) -> str:
+    """The submit button of the form holding the drug house's qty inputs — matched by the
+    form rather than the button's label, so it works whatever the button says."""
+    return f"form:has(input[name='{stock[0]['buy_field']}']) input[type='submit']"
+
+
+def _load_drug_house(state):
+    """Open the drug house and parse it.  (stock, None) or (None, error message)."""
+    _nav(_u(_DRUG_HOUSE_PATH), state)
+    if not _check_session(state):
+        return None, "Session expired"
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    stock = _parse_contact_stock(soup)
+    if not stock:
+        div = _drug_result_div(soup)
+        return None, div.get_text(" ", strip=True) if div else "couldn't read the drug house's drug list"
+    return stock, None
+
+
+def handle_load_drug_house_stock(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    label = "Drug house stock"
+    blockers = drug_house_blockers(state)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    stock, err = _load_drug_house(state)
+    if err:
+        return _drug_reply(action, state, label, False, err)
+    in_stock = sum(s["available"] for s in stock)
+    _drug_reply(action, state, label, True, f"{in_stock} unit(s) in stock", stock=stock)
+
+
+def handle_buy_drug_house(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    drugs = action.params.get("drugs", {})
+    label = "Drug house buy"
+    blockers = drug_house_blockers(state)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    if not drugs:
+        return _drug_reply(action, state, label, False, "needs at least one drug")
+    stock, err = _load_drug_house(state)
+    if err:
+        return _drug_reply(action, state, label, False, err)
+    ok, msg = _buy_drugs(state, _DRUG_HOUSE_PATH, stock, drugs,
+                         submit_selector=_drug_house_submit_selector(stock))
+    extra = {}
+    if ok is not False:
+        # Fresh figures for the table (stock and purchased change after a buy).
+        fresh, _ = _load_drug_house(state)
+        if fresh:
+            extra["stock"] = fresh
+    _drug_reply(action, state, label, ok, msg, **extra)
+
+
+def handle_add_drug_contact(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    name = (action.params.get("name") or "").strip()
+    label = f"Add drug contact {name}"
+    blockers = drug_house_blockers(state, home_city=False)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    if not name:
+        return _drug_reply(action, state, label, False, "needs a name")
+    _nav(_u("/income/contacts.asp"), state)
+    if not _check_session(state):
+        return _drug_reply(action, state, label, False, "Session expired")
+    page = browser.page()
+    if not page.query_selector("input[name='newcontact']"):
+        div = _drug_result_div(BeautifulSoup(state.page_html, "html.parser"))
+        return _drug_reply(action, state, label, False,
+                           div.get_text(" ", strip=True) if div else "new contact form not found")
+    page.fill("input[name='newcontact']", name)
+    ok, msg = _submit_and_read_result(
+        state, "form:has(input[name='newcontact']) input[type='submit']")
     _drug_reply(action, state, label, ok, msg)
 
 
@@ -8120,6 +8205,9 @@ HANDLERS = {
     "load_carrying_stock": handle_load_carrying_stock,
     "buy_contact_drugs": handle_buy_contact_drugs,
     "create_drug_offer": handle_create_drug_offer,
+    "load_drug_house_stock": handle_load_drug_house_stock,
+    "buy_drug_house": handle_buy_drug_house,
+    "add_drug_contact": handle_add_drug_contact,
     "do_blind_eye": handle_blind_eye,
     "check_warrants": handle_check_warrants,
     "turn_in_warrant": handle_turn_in_warrant,
