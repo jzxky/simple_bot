@@ -569,6 +569,7 @@ function _buildPayload() {
     autobuy_qty_cocaine:     parseInt((document.getElementById("autobuy_qty_cocaine")||{value:0}).value)||0,
     middling_enabled: (document.getElementById("middling_enabled")||{checked:false}).checked,
     drug_house_allow_travel: (document.getElementById("drug_house_allow_travel")||{checked:false}).checked,
+    drug_house_default_prices: _drugHouseDefaults(),
     middling_max_on_hand: parseInt((document.getElementById("middling_max_on_hand")||{value:500}).value)||500,
     middling_price_marijuana: parseInt((document.getElementById("middling_price_marijuana")||{value:0}).value)||0,
     middling_price_ecstasy:   parseInt((document.getElementById("middling_price_ecstasy")||{value:0}).value)||0,
@@ -1120,7 +1121,135 @@ function drugsHouseAddContact(btn) {
   _drugPost("/drugs/house/contact", {name}, btn).then(d => {
     _drugResult("drug-house-contact-result", d);
     if (d.ok) { input.value = ""; _drugPlayersAt = 0; }
+    if (d.contacts) _drugHouseRenderContacts(d.contacts);
   });
+}
+
+// ── Dealer contacts and their prices (drug house ranks) ──
+let _dealerPricesLink = "";
+
+function _drugHouseDefaults() {
+  const out = {};
+  document.querySelectorAll(".dh-default-price").forEach(i => {
+    const v = parseInt(i.value, 10);
+    if (v > 0) out[i.dataset.drug] = v;
+  });
+  return out;
+}
+
+function _drugHouseRenderContacts(contacts) {
+  const list = document.getElementById("dealer-contact-list");
+  if (!contacts.length) {
+    const li = Object.assign(document.createElement("li"), {className: "drug-contact-empty", textContent: "No contacts yet"});
+    return list.replaceChildren(li);
+  }
+  list.replaceChildren(...contacts.map(c => {
+    const li = document.createElement("li");
+    li.dataset.name = c.name;
+    li.dataset.link = c.link;
+    const name = Object.assign(document.createElement("span"), {className: "drug-contact-name", textContent: c.name + " "});
+    name.append(Object.assign(document.createElement("span"), {className: "muted", textContent: `· ${c.deals || 0} deal(s)`}));
+    const btn = Object.assign(document.createElement("button"), {className: "btn btn-sm", textContent: "Prices"});
+    btn.onclick = () => drugsHouseOpenPrices(btn);
+    li.append(name, btn);
+    return li;
+  }));
+}
+
+function drugsHouseLoadContacts(btn) {
+  _setSellHint("dealer-contacts-result", "Checking contacts…", "");
+  _drugPost("/drugs/house/contacts", {}, btn).then(d => {
+    if (d.ok) _drugHouseRenderContacts(d.contacts || []);
+    _drugResult("dealer-contacts-result", d);
+  });
+}
+
+function _drugHouseRenderPrices(rows) {
+  document.getElementById("contact-prices-rows").replaceChildren(...rows.map(r => {
+    const tr = document.createElement("tr");
+    tr.dataset.drug = r.key;
+    tr.dataset.min = r.min;
+    tr.dataset.max = r.max;
+    const name = Object.assign(document.createElement("td"), {className: "apt-drug-name", textContent: r.name});
+    const owned = Object.assign(document.createElement("td"), {textContent: r.owned});
+    const inp = Object.assign(document.createElement("input"), {
+      type: "number", min: r.min, max: r.max || 99999, step: 1, value: r.price,
+      className: "input-narrow", oninput: _drugHousePriceCheck,
+    });
+    const priceTd = document.createElement("td");
+    priceTd.append(inp);
+    const range = Object.assign(document.createElement("td"), {
+      className: "muted", textContent: r.max ? `${_drugMoney(r.min)} – ${_drugMoney(r.max)}` : "—"});
+    tr.append(name, owned, priceTd, range);
+    return tr;
+  }));
+  _drugHousePriceCheck();
+}
+
+function _drugHousePriceRows() {
+  return [...document.querySelectorAll("#contact-prices-rows tr[data-drug]")].map(tr => ({
+    tr, drug: tr.dataset.drug, price: _drugInt(tr.querySelector("input")),
+    min: parseInt(tr.dataset.min, 10) || 0, max: parseInt(tr.dataset.max, 10) || 0,
+  }));
+}
+
+function _drugHouseOutOfRange(r) { return r.max > 0 && (r.price < r.min || r.price > r.max); }
+
+function _drugHousePriceCheck() {
+  _drugHousePriceRows().forEach(r => {
+    r.tr.querySelector("input").style.color = _drugHouseOutOfRange(r) ? "#f08c8c" : "";
+  });
+}
+
+function drugsHouseOpenPrices(btn) {
+  const li = btn.closest("li");
+  const name = li.dataset.name;
+  _setSellHint("dealer-contacts-result", `Loading ${name}'s prices…`, "");
+  _drugPost("/drugs/house/prices", {link: li.dataset.link}, btn).then(d => {
+    if (!d.ok) return _drugResult("dealer-contacts-result", d);
+    _setSellHint("dealer-contacts-result", "", "");
+    _dealerPricesLink = li.dataset.link;
+    document.getElementById("contact-prices-title").textContent = `Drug prices for ${name}`;
+    _drugHouseRenderPrices(d.prices || []);
+    _setSellHint("contact-prices-result", "", "");
+    document.getElementById("contact-prices-overlay").classList.add("active");
+  });
+}
+
+function drugsHouseClosePrices() {
+  document.getElementById("contact-prices-overlay").classList.remove("active");
+}
+
+function drugsHouseUseDefaults() {
+  const defs = _drugHouseDefaults();
+  if (!Object.keys(defs).length) return _setSellHint("contact-prices-result", "No default prices set.", "bad");
+  _drugHousePriceRows().forEach(r => {
+    if (defs[r.drug]) r.tr.querySelector("input").value = defs[r.drug];
+  });
+  _drugHousePriceCheck();
+  _setSellHint("contact-prices-result", "Defaults filled in — press Update Prices to save them.", "");
+}
+
+function drugsHouseSavePrices(btn) {
+  const rows = _drugHousePriceRows();
+  const bad = rows.find(_drugHouseOutOfRange);
+  if (bad) return _setSellHint("contact-prices-result", `${bad.drug} must be ${_drugMoney(bad.min)} – ${_drugMoney(bad.max)}.`, "bad");
+  const prices = rows.map(({drug, price}) => ({drug, price}));
+  _setSellHint("contact-prices-result", "Updating prices…", "");
+  _drugPost("/drugs/house/set-prices", {link: _dealerPricesLink, prices}, btn).then(d => {
+    if (d.prices) _drugHouseRenderPrices(d.prices);
+    _drugResult("contact-prices-result", d);
+  });
+}
+
+function drugsHouseUpdateAll(btn) {
+  const defs = _drugHouseDefaults();
+  const prices = Object.entries(defs).map(([drug, price]) => ({drug, price}));
+  if (!prices.length) return _setSellHint("dealer-update-all-result", "Set at least one default price.", "bad");
+  const first = document.querySelector("#dealer-contact-list li[data-link]");
+  _setSellHint("dealer-update-all-result", "Updating prices for all contacts…", "");
+  _drugPost("/drugs/house/set-prices", {link: first ? first.dataset.link : "", prices, everyone: true}, btn)
+    .then(d => _drugResult("dealer-update-all-result", d));
 }
 
 function drugsDealCustomerMode() {

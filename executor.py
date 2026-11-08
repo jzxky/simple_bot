@@ -5112,7 +5112,167 @@ def handle_add_drug_contact(action: Action, state: GameState):
     page.fill("input[name='newcontact']", name)
     ok, msg = _submit_and_read_result(
         state, "form:has(input[name='newcontact']) input[type='submit']")
-    _drug_reply(action, state, label, ok, msg)
+    extra = {}
+    if ok:
+        _nav(_u(_CONTACTS_PATH), state)
+        if _check_session(state):
+            contacts = _save_dealer_contacts(BeautifulSoup(state.page_html, "html.parser"))
+            if contacts:
+                extra["contacts"] = contacts
+    _drug_reply(action, state, label, ok, msg, **extra)
+
+
+# ---------------------------------------------------------------------------
+# Dealer contacts and their prices (/income/contacts.asp, drug house ranks)
+# ---------------------------------------------------------------------------
+
+CONTACT_PRICES_LINK_RE = re.compile(r"/income/contacts\.asp\?action=prices&id=\d+")
+_CONTACTS_PATH = "/income/contacts.asp"
+
+
+def _parse_dealer_contacts(soup) -> list:
+    """Dealer contacts on /income/contacts.asp: [{name, link, deals}]. The game marks
+    names with a trailing '*'; it's dropped (the Notify link carries the bare name)."""
+    contacts, seen = [], set()
+    for a in soup.find_all("a", href=re.compile(r"contacts\.asp\?action=prices&id=\d+")):
+        name = a.get_text(strip=True).rstrip("*").strip()
+        m = re.search(r"action=prices&id=(\d+)", a.get("href", ""))
+        if not name or not m or name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        row = a.find_parent("tr")
+        tds = row.find_all("td", recursive=False) if row else []
+        deals = _parse_int(tds[2].get_text(strip=True)) if len(tds) > 2 else 0
+        contacts.append({"name": name, "link": f"{_CONTACTS_PATH}?action=prices&id={m.group(1)}",
+                         "deals": deals})
+    return contacts
+
+
+def _parse_contact_prices(soup) -> list:
+    """A dealer contact's price form: [{key, name, owned, price, min, max, field}]."""
+    rows = []
+    for key, tds in _drug_rows(soup, 4):
+        inp = tds[3].find("input", attrs={"type": "text"})
+        if not inp:
+            continue
+        rng = re.search(r"Min\.\s*\$([\d,]+)\s*-\s*Max\.\s*\$([\d,]+)", tds[3].get_text(" ", strip=True))
+        rows.append({
+            "key": key,
+            "name": tds[1].get_text(strip=True).split("(")[0].strip(),
+            "owned": _parse_int(tds[2].get_text(strip=True)),
+            "price": _parse_int(inp.get("value", "")),
+            "min": _parse_int(rng.group(1)) if rng else 0,
+            "max": _parse_int(rng.group(2)) if rng else 0,
+            "field": inp.get("name", ""),
+        })
+    return rows
+
+
+def _save_dealer_contacts(soup) -> list:
+    contacts = _parse_dealer_contacts(soup)
+    if contacts:
+        cfg.dealer_contacts_set(contacts)
+    return contacts
+
+
+def handle_load_dealer_contacts(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    label = "Dealer contacts"
+    blockers = drug_house_blockers(state, home_city=False)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    _nav(_u(_CONTACTS_PATH), state)
+    if not _check_session(state):
+        return _drug_reply(action, state, label, False, "Session expired")
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    contacts = _parse_dealer_contacts(soup)
+    if not contacts:
+        # An empty list is real only if the page is the contacts page — keep the saved
+        # list otherwise (redirect, page that didn't load right).
+        if soup.find("input", attrs={"name": "newcontact"}):
+            cfg.dealer_contacts_set([])
+            return _drug_reply(action, state, label, True, "no contacts yet", contacts=[])
+        return _drug_reply(action, state, label, False, "couldn't read the contacts page")
+    cfg.dealer_contacts_set(contacts)
+    _drug_reply(action, state, label, True, f"{len(contacts)} saved", contacts=contacts)
+
+
+def _open_contact_prices(state, link):
+    """Open a contact's price page.  (rows, None) or (None, error)."""
+    if not CONTACT_PRICES_LINK_RE.fullmatch(link or ""):
+        return None, "unknown contact link"
+    _nav(_u(link), state)
+    if not _check_session(state):
+        return None, "Session expired"
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    rows = _parse_contact_prices(soup)
+    if not rows:
+        div = _drug_result_div(soup)
+        return None, div.get_text(" ", strip=True) if div else "couldn't read the contact's price form"
+    return rows, None
+
+
+def handle_load_contact_prices(action: Action, state: GameState):
+    from tasks.middling import drug_house_blockers
+    label = "Contact prices"
+    blockers = drug_house_blockers(state, home_city=False)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    rows, err = _open_contact_prices(state, action.params.get("link", ""))
+    if err:
+        return _drug_reply(action, state, label, False, err)
+    _drug_reply(action, state, label, True, f"{len(rows)} drugs", prices=rows)
+
+
+def handle_set_contact_prices(action: Action, state: GameState):
+    """Fill a contact's price form and submit it — for every contact at once when
+    everyone=True (the form's "All contacts" checkbox)."""
+    from tasks.middling import drug_house_blockers
+    prices = action.params.get("prices", {})
+    everyone = bool(action.params.get("everyone", False))
+    link = action.params.get("link", "")
+    label = "Update all contact prices" if everyone else "Update contact prices"
+    blockers = drug_house_blockers(state, home_city=False)
+    if blockers:
+        return _drug_reply(action, state, label, False, "; ".join(blockers))
+    if not prices:
+        return _drug_reply(action, state, label, False, "needs at least one price")
+    if everyone and not link:
+        saved = cfg.dealer_contacts_get()
+        if not saved:
+            _nav(_u(_CONTACTS_PATH), state)
+            if not _check_session(state):
+                return _drug_reply(action, state, label, False, "Session expired")
+            saved = _save_dealer_contacts(BeautifulSoup(state.page_html, "html.parser"))
+        if not saved:
+            return _drug_reply(action, state, label, False, "no contacts to update")
+        link = saved[0]["link"]
+    rows, err = _open_contact_prices(state, link)
+    if err:
+        return _drug_reply(action, state, label, False, err)
+    by_key = {r["key"]: r for r in rows}
+    for key, price in prices.items():
+        r = by_key.get(key)
+        if not r:
+            return _drug_reply(action, state, label, False, f"{key} isn't on the price form")
+        if r["max"] and not r["min"] <= price <= r["max"]:
+            return _drug_reply(action, state, label, False,
+                               f"{r['name']} must be ${r['min']:,} – ${r['max']:,} (got ${price:,})")
+    page = browser.page()
+    for key, price in prices.items():
+        page.fill(f"input[name='{by_key[key]['field']}']", str(price))
+    box = "input[type='checkbox'][name='everyone']"
+    if page.query_selector(box):
+        page.set_checked(box, everyone)
+    elif everyone:
+        return _drug_reply(action, state, label, False, "the All contacts checkbox wasn't on the form")
+    ok, msg = _submit_and_read_result(state, "input[type='submit'][value='Update Prices']")
+    extra = {}
+    if ok is not False and CONTACT_PRICES_LINK_RE.fullmatch(link):
+        fresh, _ = _open_contact_prices(state, link)
+        if fresh:
+            extra["prices"] = fresh
+    _drug_reply(action, state, label, ok, msg, **extra)
 
 
 def handle_do_middling(action: Action, state: GameState):
@@ -8279,6 +8439,9 @@ HANDLERS = {
     "load_drug_house_stock": handle_load_drug_house_stock,
     "buy_drug_house": handle_buy_drug_house,
     "add_drug_contact": handle_add_drug_contact,
+    "load_dealer_contacts": handle_load_dealer_contacts,
+    "load_contact_prices": handle_load_contact_prices,
+    "set_contact_prices": handle_set_contact_prices,
     "do_blind_eye": handle_blind_eye,
     "check_warrants": handle_check_warrants,
     "turn_in_warrant": handle_turn_in_warrant,
