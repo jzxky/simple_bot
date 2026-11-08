@@ -401,12 +401,14 @@ def _parse_earn_queue_rows(soup) -> list:
     return rows
 
 
-def _save_earn_queue_cache(rows):
-    """Persist parsed queue rows so planner_view() can include queued counts."""
+def _save_earn_queue_cache(rows, character: str = ""):
+    """Persist parsed queue rows (and whose queue it is) so the planner can
+    count what's still queued."""
     import os, json, paths
     from datetime import datetime
     cache = {
         "cached_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "character": character or "",
         "rows": [{"name": n, "completed": c, "total": t} for n, c, t in rows],
     }
     path = os.path.join(paths.data_dir(), "earn_queue_cache.json")
@@ -484,6 +486,38 @@ def _ensure_auto_earn_mode(page, state: "GameState | None" = None) -> bool:
         return False
 
 
+def _snapshot_earn_queue(page, state: GameState) -> list:
+    """Parse the queue rows on the loaded earn page and save them as the
+    queue snapshot for the current character."""
+    try:
+        rows = _parse_earn_queue_rows(BeautifulSoup(page.content(), "html.parser"))
+    except Exception:
+        return []
+    try:
+        _save_earn_queue_cache(rows, state.own_name)
+    except Exception:
+        pass
+    return rows
+
+
+def _record_queue_cleared(rows, state: GameState):
+    """Log what a queue clear threw away (per earn), so action-log earn counts
+    don't treat cleared earns as completed."""
+    import earn_planner as _ep
+    values = _ep.known_values()
+    cleared = {}
+    for name, completed, total in rows or []:
+        value = _ep.value_for_name(name, values)
+        left = max(0, total - completed)
+        if value and left:
+            cleared[value] = cleared.get(value, 0) + left
+    for value, n in cleared.items():
+        label = _earn_display_name(value)
+        action_log.record(state, "earn_queue", label, "skip",
+                          message=f"Cleared {n} x {label} from the queue",
+                          cleared=n, earn_id=value)
+
+
 def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
     """Add `amount` of one auto-earn to the queue. Returns True on success."""
     try:
@@ -502,6 +536,8 @@ def _queue_earn(page, value: str, amount: int, state: GameState) -> bool:
         action_log.record(state, "earn_queue", _earn_display_name(value), "success",
                           amount=None, message=f"Queued {amount} x {_earn_display_name(value)}",
                           queued=amount, earn_id=value)
+        _settle_earn_page(page)
+        _snapshot_earn_queue(page, state)
         return True
     except Exception as e:
         state.add_log(f"Earn queue: failed to add {value} ({e}).")
@@ -575,6 +611,12 @@ def _planner_final_batch(page, state: GameState, active: str, decision: dict, do
     queue is now empty, so the retry won't clear again."""
     if not _clear_earn_queue(page, state, navigate=navigate):
         return False
+    if not cfg.load().get("character_history", {}).get("enabled"):
+        # Action-log counts: the clear just recorded exactly what was left in
+        # the queue, so recount instead of trusting the older queue snapshot.
+        import earn_planner as _ep
+        count = _ep.completed_count(active, _ep.load_counts(state.own_name))
+        decision = {**decision, "count": count, "remaining": max(0, decision["limit"] - count)}
     if decision["remaining"] > 0:
         if not _queue_earn(page, active, decision["remaining"], state):
             return False
@@ -592,14 +634,14 @@ def handle_earn_planner_check(action: Action, state: GameState):
     """Earn planner poll — runs after each character history update, and every
     10 minutes (silently) while waiting for an earn to become available."""
     import earn_planner as _ep
-    import character_history as _ch
+    _ep.sync_character(state.own_name)
     c = cfg.load()
     planner = c.get("earn_planner", {})
     limits = planner.get("limits", {})
     done = dict(planner.get("done", {}))
     if not limits:
         return
-    history = _ch.load()
+    history = _ep.load_counts(state.own_name, c)
 
     if planner.get("waiting_for_earns"):
         # Waiting (on the default earn, or with earns disabled). The timed
@@ -663,14 +705,16 @@ def handle_check_earns(action: Action, state: GameState):
 
     import earn_planner as _ep
     import character_history as _ch
+    _ep.sync_character(state.own_name)
     c = cfg.load()
     planner = c.get("earn_planner", {})
     planner_mode = bool(planner.get("enabled") and planner.get("limits")
-                        and c.get("character_history", {}).get("enabled")
                         and not planner.get("waiting_for_earns"))
+    history_on = bool(c.get("character_history", {}).get("enabled"))
 
-    # 1. Planner mode: refresh character history (the earn counts).
-    if planner_mode:
+    # 1. Planner mode: refresh character history (the earn counts). Without
+    #    it the counts come from the action log and the queue snapshot below.
+    if planner_mode and history_on:
         try:
             _ch.fetch_and_save(state.own_name or "")
         except Exception:
@@ -697,13 +741,13 @@ def handle_check_earns(action: Action, state: GameState):
 
     current_count = _queue_count(page)
     queue_rows = _parse_earn_queue_rows(BeautifulSoup(page.content(), "html.parser"))
-    _save_earn_queue_cache(queue_rows)
+    _save_earn_queue_cache(queue_rows, state.own_name)
 
     # 4a. Planner mode: decide on this page, before any top-up.
     if planner_mode:
         limits = planner.get("limits", {})
         done = dict(planner.get("done", {}))
-        history = _ch.load()
+        history = _ep.load_counts(state.own_name)
         decision = _ep.planner_decision("auto", earn_type, limits, done, history)
         if decision["action"] == "final_batch":
             if _planner_final_batch(page, state, earn_type, decision, done, navigate=False):
@@ -722,7 +766,7 @@ def handle_check_earns(action: Action, state: GameState):
     limit = planner.get("limits", {}).get(earn_type) if planner_mode else None
     if limit:
         # Never queue past the planner limit: completed (history) + already queued.
-        completed = _ep.completed_count(earn_type)
+        completed = _ep.completed_count(earn_type, _ep.load_counts(state.own_name))
         queued = _ep.queued_remaining(earn_type, queue_rows)
         amount = min(amount, int(limit) - completed - queued)
         if amount <= 0:
@@ -752,18 +796,65 @@ def _clear_earn_queue(page, state: GameState, navigate: bool = True) -> bool:
     if not btn:
         state.add_log("Clear queue button not found on earn page.")
         return False
+    before = _parse_earn_queue_rows(BeautifulSoup(page.content(), "html.parser"))
     with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
         btn.click()
     _refresh_state(state)
     state.add_log("Earn queue cleared.")
+    _record_queue_cleared(before, state)
+    _save_earn_queue_cache([], state.own_name)
     # Clearing the queue puts the game in MANUAL mode — switch back to AUTO.
     return _ensure_auto_earn_mode(page, state)
+
+
+def _planner_queue_wiped(state: GameState):
+    """The game queue was emptied outside the planner's own final batch, so
+    any final batch it handed off is gone: forget the hand-offs. Returns the
+    re-read planner config."""
+    c = cfg.load()
+    planner = c.get("earn_planner", {})
+    if planner.get("done"):
+        planner["done"] = {}
+        cfg.save(c)
+    return planner
+
+
+def _planner_reevaluate(state: GameState):
+    """Re-run the plan from the top after the queue was cleared: the first
+    available earn that hasn't reached its limit becomes the active earn
+    (earns are turned back on if the planner had turned them off); with none,
+    fall back to the default earn / disable earns."""
+    import earn_planner as _ep
+    _ep.sync_character(state.own_name)
+    planner = _planner_queue_wiped(state)
+    c = cfg.load()
+    if not (planner.get("enabled") and planner.get("limits")):
+        return
+    active = c.get("earns", {}).get("earn_type", "")
+    enabled = c.get("earns", {}).get("enabled", False)
+    turn_on = not enabled and planner.get("waiting_for_earns", False)
+    if not enabled and not turn_on:
+        return  # earns switched off by the user — leave them off
+    limits = planner["limits"]
+    counts = _ep.load_counts(state.own_name, c)
+    nxt = _ep.pick_next(limits, {}, counts)
+    if not nxt:
+        _planner_fall_back(state)
+        return
+    if nxt != active or planner.get("waiting_for_earns") or turn_on:
+        _planner_set_active(state, nxt, enable_earns=turn_on)
+        state.add_log(f"Earn planner: queue cleared — re-evaluated the plan, "
+                      f"active earn is {_earn_display_name(nxt)}.")
+    else:
+        state.add_log(f"Earn planner: queue cleared — re-evaluated the plan, "
+                      f"{_earn_display_name(nxt)} stays active.")
 
 
 def handle_clear_earn_queue(action: Action, state: GameState):
     page = browser.page()
     if not _clear_earn_queue(page, state):
         return
+    _planner_reevaluate(state)
 
     c = cfg.load()
     if c.get("earns", {}).get("enabled", False):
@@ -880,9 +971,13 @@ def _ensure_manual_earn_mode(page, state: GameState):
     if _queue_count(page) > 0:
         btn = page.query_selector("div.mm-earn-mode-auto button.mm-earn-queue-clear-btn")
         if btn:
+            before = _parse_earn_queue_rows(BeautifulSoup(page.content(), "html.parser"))
             with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
                 btn.click()
             state.add_log("Earn queue cleared — switched to MANUAL earn mode.")
+            _record_queue_cleared(before, state)
+            _save_earn_queue_cache([], state.own_name)
+            _planner_queue_wiped(state)
             _settle_earn_page(page)
             if _earn_panel_shown(page, "manual"):
                 return

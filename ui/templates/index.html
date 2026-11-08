@@ -346,16 +346,14 @@
           {% set _ch_on = config.get('character_history', {}).get('enabled', False) %}
           <label class="inline-toggle setting-row">
             Earn Planner
-            <label class="toggle-label"><input type="checkbox" id="earn-planner-toggle" {% if config.earn_planner.get('enabled') %}checked{% endif %} {% if not _ch_on %}disabled{% endif %} onchange="toggleEarnPlanner(); autoSave()"><span class="toggle"></span></label>
+            <label class="toggle-label"><input type="checkbox" id="earn-planner-toggle" {% if config.earn_planner.get('enabled') %}checked{% endif %} onchange="toggleEarnPlanner(); autoSave()"><span class="toggle"></span></label>
           </label>
-          <div id="earn-planner-needs-history" class="ep-unavailable" style="display:{% if _ch_on %}none{% else %}block{% endif %}">
-            Earn Planner needs <b>Character History</b> — it uses your earn counts from it.
-            Turn on Character History in Settings › Misc to use the planner.
-          </div>
-          <div id="earn-planner-body" style="display:{% if config.earn_planner.get('enabled') and _ch_on %}block{% else %}none{% endif %}">
+          <div id="earn-planner-body" style="display:{% if config.earn_planner.get('enabled') %}block{% else %}none{% endif %}">
+            <p class="ep-note" id="earn-planner-character" style="display:none"></p>
             <p class="ep-note">
               Works through the queue in order. When the active earn reaches its limit, the next available earn takes over.
-              Progress is checked after each character history update (every <b id="earn-planner-interval">{{ config.get('character_history', {}).get('refresh_interval_minutes', 30) }} min</b> — change in Settings › Misc).
+              <span id="earn-planner-source-history" style="display:{% if _ch_on %}inline{% else %}none{% endif %}">Progress is checked after each character history update (every <b id="earn-planner-interval">{{ config.get('character_history', {}).get('refresh_interval_minutes', 30) }} min</b> — change in Settings › Misc).</span>
+              <span id="earn-planner-source-log" style="display:{% if _ch_on %}none{% else %}inline{% endif %}">Character History is off, so earn counts come from <b>Bot History</b>: earns the bot queued, minus any cleared or still in the queue, plus manual earns. Earns done before the bot logged them aren't counted. Progress is checked every 10 minutes and on each earn check.</span>
             </p>
             <div id="earn-planner-waiting" class="ep-unavailable" style="display:none;margin-bottom:12px"></div>
             <div class="ep-add">

@@ -176,6 +176,11 @@ function loadEarnPlanner() {
     .then(d => {
       _earnPlannerData = d;
       _syncEarnPlannerHistory(d.history_enabled);
+      const charEl = document.getElementById("earn-planner-character");
+      if (charEl) {
+        charEl.style.display = d.character ? "" : "none";
+        charEl.innerHTML = d.character ? `Plan for <b>${escHtml(d.character)}</b> — each character keeps its own plan.` : "";
+      }
       _renderEarnPlannerDefault(d);
       const waitEl = document.getElementById("earn-planner-waiting");
       if (waitEl) {
@@ -233,17 +238,13 @@ function _renderEarnPlannerDefault(d) {
   sel.dataset.current = current;
 }
 
-// The planner needs Character History (earn counts come from it): without it
-// the planner switch is disabled and a notice is shown instead.
+// Earn counts come from Character History when it's on, otherwise from Bot
+// History (the action log) — show which one the planner is using.
 function _syncEarnPlannerHistory(historyOn) {
-  const toggle = document.getElementById("earn-planner-toggle");
-  const notice = document.getElementById("earn-planner-needs-history");
-  const body = document.getElementById("earn-planner-body");
-  if (!toggle) return;
-  toggle.disabled = !historyOn;
-  if (notice) notice.style.display = historyOn ? "none" : "";
-  if (!historyOn && body) body.style.display = "none";
-  else if (historyOn && body) body.style.display = toggle.checked ? "" : "none";
+  const fromHistory = document.getElementById("earn-planner-source-history");
+  const fromLog = document.getElementById("earn-planner-source-log");
+  if (fromHistory) fromHistory.style.display = historyOn ? "" : "none";
+  if (fromLog) fromLog.style.display = historyOn ? "none" : "";
   _syncEarnPlannerLock();
 }
 
@@ -454,6 +455,9 @@ function _buildPayload() {
     earn_type: document.getElementById("earn_type").value,
     earn_planner_enabled: document.getElementById("earn-planner-toggle").checked,
     earn_planner_default: _earnPlannerDefaultValue(),
+    // The character the planner data was loaded for: the server ignores this
+    // page's queue/default if the plan has since switched to another character.
+    earn_planner_character: _earnPlannerData === null ? undefined : (_earnPlannerData.character || ""),
     // Left out (undefined → dropped by JSON.stringify) until the planner data
     // has loaded, so an early save can't overwrite the saved queue with {}.
     earn_planner_limits: _earnPlannerData === null ? undefined : (() => {
