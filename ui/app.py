@@ -1417,7 +1417,9 @@ def drugs_players():
     own = ((s.own_name if s else "") or "").lower()
     alive = [p for p in _db.get_all_players()
              if p.get("active") and p.get("username") and p["username"].lower() != own]
+    from tasks.middling import MIDDLING_RANKS
     customs_ranks = {norm_rank(r) for r in _CAREER_GROUPS["Customs"]}
+    contacts = {(c.get("name") or "").lower() for c in cfg.drug_contacts_get()}
     local = {n.lower() for n in ((s.local_players if s else None) or set())}
     names = lambda pred: sorted((p["username"] for p in alive if pred(p)), key=str.lower)
     return jsonify({
@@ -1425,6 +1427,9 @@ def drugs_players():
                          or norm_rank(p.get("rank")) in customs_ranks),
         "local_online": names(lambda p: p["username"].lower() in local),
         "all_alive": names(lambda p: True),
+        # Dealing ranks a drug-house rank can take on as contacts, minus existing contacts.
+        "dealers": names(lambda p: norm_rank(p.get("rank")) in MIDDLING_RANKS
+                         and p["username"].lower() not in contacts),
     })
 
 
@@ -1482,6 +1487,27 @@ def drugs_offer():
     if total <= 0:
         return jsonify({"ok": False, "message": "Total price must be above $0."}), 400
     return _drug_task("create_drug_offer", target=target, price=total, drugs=drugs)
+
+
+@app.route("/drugs/house/stock", methods=["POST"])
+def drugs_house_stock():
+    return _drug_task("load_drug_house_stock")
+
+
+@app.route("/drugs/house/buy", methods=["POST"])
+def drugs_house_buy():
+    drugs, _, err = _drug_request_rows((request.get_json(silent=True) or {}).get("drugs"))
+    if err:
+        return jsonify({"ok": False, "message": err}), 400
+    return _drug_task("buy_drug_house", drugs=drugs)
+
+
+@app.route("/drugs/house/contact", methods=["POST"])
+def drugs_house_contact():
+    name = ((request.get_json(silent=True) or {}).get("name") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_ .'`-]{1,40}", name):
+        return jsonify({"ok": False, "message": "Enter a player name."}), 400
+    return _drug_task("add_drug_contact", name=_living_player(name) or name)
 
 
 @app.route("/character_history")

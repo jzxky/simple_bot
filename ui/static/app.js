@@ -873,6 +873,8 @@ function autobuyMarkDirty() {
 // ── Drugs tab: smuggling, contacts, deals ─────────────────────────────────────
 
 const _DRUG_TRADE_RANKS = new Set(["piciotto", "enforcer", "dealer", "giovane d'honore"]);
+const _DRUG_HOUSE_RANKS = new Set(["sgarrista", "capodecima", "caporegime", "boss", "don",
+  "godfather", "capo di tutti capi"]);
 const _GANGSTER_RANKS = new Set(["dealer", "giovane d'honore", "enforcer", "piciotto", "sgarrista",
   "capodecima", "caporegime", "boss", "don", "godfather", "capo di tutti capi"]);
 let _drugPlayersAt = 0;
@@ -910,15 +912,17 @@ function updateDrugsTab(d) {
   const rank = _drugNormRank(d.rank);
   const canTrade = _DRUG_TRADE_RANKS.has(rank);
   const gangster = /gangster/i.test(d.occupation || "") || _GANGSTER_RANKS.has(rank);
+  const canHouse = _DRUG_HOUSE_RANKS.has(rank);
   trade.hidden = !canTrade;
+  document.getElementById("drugs-house").hidden = !canHouse;
   _drugLocalPlayers = new Set((d.local_players || []).map(n => String(n).toLowerCase()));
   _drugMarkLocalContacts();
   document.getElementById("drugs-middling").hidden = !canTrade;
   document.getElementById("drugs-smuggling").hidden = !gangster;
   const note = document.getElementById("drugs-rank-note");
-  note.hidden = canTrade;
-  note.textContent = "Drug Middling and Drug Trade need rank Piciotto, Enforcer, Dealer or Giovane D'Honore"
-    + ` (current: ${d.rank || "unknown"}).`;
+  note.hidden = canTrade || canHouse;
+  note.textContent = "Drug Middling and Drug Trade need rank Piciotto, Enforcer, Dealer or Giovane D'Honore;"
+    + ` the Drug House needs Sgarrista or above (current: ${d.rank || "unknown"}).`;
   if ((canTrade || gangster) && Date.now() - _drugPlayersAt > 5 * 60 * 1000) drugsLoadPlayers();
 }
 
@@ -929,6 +933,8 @@ function drugsLoadPlayers() {
     _drugFillSelect("deal_customer_local", d.local_online || [], "No local players online");
     document.getElementById("deal-customers").replaceChildren(
       ...(d.all_alive || []).map(n => Object.assign(document.createElement("option"), {value: n})));
+    document.getElementById("house-dealers").replaceChildren(
+      ...(d.dealers || []).map(n => Object.assign(document.createElement("option"), {value: n})));
   }).catch(() => { _drugPlayersAt = 0; });
 }
 
@@ -1039,6 +1045,81 @@ function drugsBuy(btn) {
   if (!drugs.length) return _setSellHint("drug-stock-result", "Enter at least one quantity.", "bad");
   _setSellHint("drug-stock-result", "Buying…", "");
   _drugPost("/drugs/buy", {link: _drugStockLink, drugs}, btn).then(d => _drugResult("drug-stock-result", d));
+}
+
+// ── Drug house (Sgarrista and up) ──
+function _drugHouseRender(stock) {
+  document.getElementById("drug-house-rows").replaceChildren(...stock.map(s => {
+    const tr = document.createElement("tr");
+    tr.dataset.drug = s.key;
+    tr.dataset.price = s.price;
+    [s.name, _drugMoney(s.price), s.available, s.owned].forEach((v, i) => {
+      const td = document.createElement("td");
+      td.textContent = v;
+      if (i === 0) td.className = "apt-drug-name";
+      tr.append(td);
+    });
+    const max = Math.min(s.available, 999);
+    const qty = Object.assign(document.createElement("input"), {
+      type: "number", min: 0, max, step: 1, value: 0, placeholder: `Max ${max}`,
+      className: "input-narrow", disabled: max <= 0, oninput: drugsHouseCost,
+    });
+    qty.title = `Max ${max}`;
+    const td = document.createElement("td");
+    td.append(qty);
+    tr.append(td);
+    return tr;
+  }));
+  drugsHouseCost();
+}
+
+function drugsHouseCost() {
+  let units = 0, cost = 0, over = false;
+  document.querySelectorAll("#drug-house-rows tr[data-drug]").forEach(tr => {
+    const inp = tr.querySelector("input");
+    const q = _drugInt(inp);
+    const bad = q > (parseInt(inp.max, 10) || 0);
+    inp.style.color = bad ? "#f08c8c" : "";
+    over = over || bad;
+    units += q;
+    cost += q * (parseInt(tr.dataset.price, 10) || 0);
+  });
+  if (over) return _setSellHint("drug-house-cost", "More than the drug house has in stock.", "bad");
+  _setSellHint("drug-house-cost", units ? `${units} unit(s) — ${_drugMoney(cost)}` : "", "");
+}
+
+function drugsHouseLoad(btn) {
+  _setSellHint("drug-house-hint", "Checking the drug house…", "");
+  _drugPost("/drugs/house/stock", {}, btn).then(d => {
+    if (!d.ok) return _drugResult("drug-house-hint", d);
+    _drugHouseRender(d.stock || []);
+    const at = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+    _setSellHint("drug-house-hint", `${d.message} · updated ${at}`, "good");
+  });
+}
+
+function drugsHouseBuy(btn) {
+  const rows = [...document.querySelectorAll("#drug-house-rows tr[data-drug]")];
+  const over = rows.find(tr => { const i = tr.querySelector("input"); return _drugInt(i) > (parseInt(i.max, 10) || 0); });
+  if (over) return _setSellHint("drug-house-result", `Only ${over.querySelector("input").max} ${over.dataset.drug} in stock.`, "bad");
+  const drugs = rows.map(tr => ({drug: tr.dataset.drug, qty: _drugInt(tr.querySelector("input"))})).filter(r => r.qty > 0);
+  if (!drugs.length) return _setSellHint("drug-house-result", "Enter at least one amount.", "bad");
+  _setSellHint("drug-house-result", "Buying…", "");
+  _drugPost("/drugs/house/buy", {drugs}, btn).then(d => {
+    if (d.stock) _drugHouseRender(d.stock);
+    _drugResult("drug-house-result", d);
+  });
+}
+
+function drugsHouseAddContact(btn) {
+  const input = document.getElementById("house_new_contact");
+  const name = input.value.trim();
+  if (!name) return _setSellHint("drug-house-contact-result", "Enter a player name.", "bad");
+  _setSellHint("drug-house-contact-result", `Asking ${name} to partner…`, "");
+  _drugPost("/drugs/house/contact", {name}, btn).then(d => {
+    _drugResult("drug-house-contact-result", d);
+    if (d.ok) { input.value = ""; _drugPlayersAt = 0; }
+  });
 }
 
 function drugsDealCustomerMode() {
