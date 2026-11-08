@@ -43,7 +43,9 @@ class CSPunishmentTask(Task):
             from executor import travel_warrant_cooldown_active, no_vehicle_cooldown_active
             if not (state.timer_ready("travel") or "travel" not in state.timers):
                 return False
-            if travel_warrant_cooldown_active() or no_vehicle_cooldown_active():
+            from executor import drug_stock_travel_block_active
+            if (travel_warrant_cooldown_active() or no_vehicle_cooldown_active()
+                    or drug_stock_travel_block_active()):
                 return False
         return True
 
@@ -69,6 +71,9 @@ class CSPunishmentTask(Task):
                 reasons.append("Away CS unavailable — warrant travel cooldown")
             if no_vehicle_cooldown_active():
                 reasons.append("Away CS unavailable — no vehicle cooldown")
+            from executor import drug_stock_travel_block_active
+            if drug_stock_travel_block_active():
+                reasons.append("Away CS unavailable — carrying drug house stock")
         return reasons
 
     def run(self, state: GameState, executor):

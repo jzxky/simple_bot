@@ -991,6 +991,17 @@
               <h3>Drug House</h3>
               <p class="placeholder">Buy drugs from your drug house (home city only) and take dealers on as contacts.</p>
 
+              <label class="inline-toggle setting-row">
+                Allow travel while carrying stock
+                <label class="toggle-label">
+                  <input type="checkbox" id="drug_house_allow_travel"
+                    {% if config.get('drug_house', {}).get('allow_travel_with_stock') %}checked{% endif %}
+                    onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <p class="placeholder">Off: before any travel the bot checks the drug house, and if you're carrying any of its stock (Purchased above 0) travel is blocked for 1 hour.</p>
+
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
                 <button class="btn btn-sm" onclick="drugsHouseLoad(this)">Get Stock</button>
                 <span id="drug-house-hint" class="sell-hint" style="margin:0">Not loaded yet</span>
@@ -1017,6 +1028,34 @@
                 </div>
               </div>
               <div id="drug-house-contact-result" class="sell-hint"></div>
+
+              <hr class="stat-divider" style="margin:16px 0">
+
+              <h4>Contacts</h4>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+                <button class="btn btn-sm" onclick="drugsHouseLoadContacts(this)">Check Contacts</button>
+              </div>
+              <ul id="dealer-contact-list" class="drug-contact-list">
+                {% for ct in config.get('dealer_contacts', []) %}
+                <li data-name="{{ ct.name }}" data-link="{{ ct.link }}"><span class="drug-contact-name">{{ ct.name }} <span class="muted">· {{ ct.deals }} deal(s)</span></span><button class="btn btn-sm" onclick="drugsHouseOpenPrices(this)">Prices</button></li>
+                {% else %}
+                <li class="drug-contact-empty">No saved contacts — press Check Contacts</li>
+                {% endfor %}
+              </ul>
+              <div id="dealer-contacts-result" class="sell-hint"></div>
+
+              <h4 style="margin-top:12px">Default Prices</h4>
+              {% set dh_defaults = config.get('drug_house', {}).get('default_prices', {}) %}
+              <table class="priority-table" style="max-width:360px">
+                <thead><tr><th>Drug</th><th>Price</th></tr></thead>
+                <tbody>
+                  {% for key, label in [('marijuana', 'Marijuana'), ('ecstasy', 'Ecstasy'), ('acid', 'Acid'), ('speed', 'Speed'), ('ice', 'P / ICE'), ('heroin', 'Heroin'), ('cocaine', 'Cocaine')] %}
+                  <tr><td>{{ label }}</td><td><input type="number" class="dh-default-price" data-drug="{{ key }}" min="0" max="99999" step="1" style="width:100px" value="{{ dh_defaults.get(key, '') }}" oninput="markNumDirty(this)"></td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <button class="btn btn-sm" style="margin-top:6px" onclick="drugsHouseUpdateAll(this)">Update All Contacts</button>
+              <div id="dealer-update-all-result" class="sell-hint"></div>
             </div>
 
             <p class="placeholder" id="drugs-rank-note" style="grid-column:1/-1" hidden></p>
@@ -2701,6 +2740,24 @@
       <button type="button" class="action-btn" id="drug-stock-buy" onclick="drugsBuy(this)">Buy</button>
     </div>
     <div id="drug-stock-result" class="sell-hint"></div>
+  </div>
+</div>
+
+<div id="contact-prices-overlay" class="pl-modal-overlay" onclick="if(event.target===this)drugsHouseClosePrices()">
+  <div class="pl-modal-box" style="max-width:560px;flex-direction:column;align-items:stretch;gap:10px">
+    <h3 id="contact-prices-title" style="margin:0">Contact prices</h3>
+    <div class="apt-table-wrap">
+      <table class="apt-drugs">
+        <thead><tr><th>Drug</th><th>Owned</th><th>Price</th><th>Allowed</th></tr></thead>
+        <tbody id="contact-prices-rows"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button type="button" class="btn-secondary" onclick="drugsHouseUseDefaults()">Use Defaults</button>
+      <button type="button" class="btn-secondary" onclick="drugsHouseClosePrices()">Close</button>
+      <button type="button" class="action-btn" onclick="drugsHouseSavePrices(this)">Update Prices</button>
+    </div>
+    <div id="contact-prices-result" class="sell-hint"></div>
   </div>
 </div>
 

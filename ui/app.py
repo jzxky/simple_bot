@@ -43,6 +43,7 @@ NOTIFICATION_EVENTS = [
     ("targets_exhausted",   "Crime targets exhausted"),
     ("mhs_protected",       "MHS Protection Attempt"),
     ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
+    ("drug_stock_travel_block", "Carrying drug house stock (travel blocked)"),
     ("agg_not_available",   "Agg crime not available"),
     ("dog_trains_unavailable", "Dog trains unavailable"),
     ("no_available_earns",  "No available earns (earn planner)"),
@@ -497,6 +498,12 @@ def _apply_payload(c: dict, data: dict) -> dict:
 
     c.setdefault("middling", {})
     c["middling"]["enabled"] = data.get("middling_enabled", False)
+    if isinstance(data.get("drug_house_default_prices"), dict):
+        c.setdefault("drug_house", {})["default_prices"] = {
+            k: int(v) for k, v in data["drug_house_default_prices"].items()
+            if k in _DRUG_KEYS and str(v).isdigit() and int(v) > 0}
+    if "drug_house_allow_travel" in data:
+        c.setdefault("drug_house", {})["allow_travel_with_stock"] = bool(data["drug_house_allow_travel"])
     c["middling"]["max_on_hand"] = int(data.get("middling_max_on_hand", 500) or 500)
     c["middling"].setdefault("prices", {})
     _MID_DRUGS = ["marijuana", "ecstasy", "acid", "speed", "ice", "heroin", "cocaine"]
@@ -1419,7 +1426,8 @@ def drugs_players():
              if p.get("active") and p.get("username") and p["username"].lower() != own]
     from tasks.middling import MIDDLING_RANKS
     customs_ranks = {norm_rank(r) for r in _CAREER_GROUPS["Customs"]}
-    contacts = {(c.get("name") or "").lower() for c in cfg.drug_contacts_get()}
+    contacts = {(c.get("name") or "").lower()
+                for c in cfg.drug_contacts_get() + cfg.dealer_contacts_get()}
     local = {n.lower() for n in ((s.local_players if s else None) or set())}
     names = lambda pred: sorted((p["username"] for p in alive if pred(p)), key=str.lower)
     return jsonify({
@@ -1508,6 +1516,53 @@ def drugs_house_contact():
     if not re.fullmatch(r"[A-Za-z0-9_ .'`-]{1,40}", name):
         return jsonify({"ok": False, "message": "Enter a player name."}), 400
     return _drug_task("add_drug_contact", name=_living_player(name) or name)
+
+
+_CONTACT_PRICES_LINK_RE = re.compile(r"/income/contacts\.asp\?action=prices&id=\d+")
+
+
+def _price_rows(rows):
+    """({drug: price}, None) from [{drug, price}] request rows, or (None, error)."""
+    if not isinstance(rows, list) or not all(isinstance(r, dict) for r in rows):
+        return None, "Malformed price list."
+    prices = {}
+    for r in rows:
+        drug = str(r.get("drug") or "").strip().lower()
+        price = _whole_number(r.get("price"))
+        if drug not in _DRUG_KEYS or price is None or price > 99999:
+            return None, f"Bad price for {drug or 'a drug'}."
+        prices[drug] = price
+    if not prices:
+        return None, "Enter at least one price."
+    return prices, None
+
+
+@app.route("/drugs/house/contacts", methods=["POST"])
+def drugs_house_contacts():
+    return _drug_task("load_dealer_contacts")
+
+
+@app.route("/drugs/house/prices", methods=["POST"])
+def drugs_house_prices():
+    link = ((request.get_json(silent=True) or {}).get("link") or "").strip()
+    if not _CONTACT_PRICES_LINK_RE.fullmatch(link):
+        return jsonify({"ok": False, "message": "Unknown contact — reload contacts."}), 400
+    return _drug_task("load_contact_prices", link=link)
+
+
+@app.route("/drugs/house/set-prices", methods=["POST"])
+def drugs_house_set_prices():
+    data = request.get_json(silent=True) or {}
+    everyone = bool(data.get("everyone"))
+    link = (data.get("link") or "").strip()
+    if link and not _CONTACT_PRICES_LINK_RE.fullmatch(link):
+        return jsonify({"ok": False, "message": "Unknown contact — reload contacts."}), 400
+    if not link and not everyone:
+        return jsonify({"ok": False, "message": "Pick a contact."}), 400
+    prices, err = _price_rows(data.get("prices"))
+    if err:
+        return jsonify({"ok": False, "message": err}), 400
+    return _drug_task("set_contact_prices", link=link, prices=prices, everyone=everyone)
 
 
 @app.route("/character_history")
