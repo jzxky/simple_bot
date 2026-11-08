@@ -3,8 +3,9 @@ Earn planner — checks progress on the planner's active earn after each
 character-history update and moves through the planner queue (see
 earn_planner.py / executor.handle_earn_planner_check).
 
-Only runs while the planner is enabled, has earns queued, and Character
-History is enabled (the earn counts come from it). When no queued earn is
+Only runs while the planner is enabled and has earns queued. Earn counts come
+from Character History when it's enabled (checked after each history update);
+otherwise from the bot's action log, checked every 10 minutes. When no queued earn is
 available the bot uses the planner's default earn (if set) and re-assesses
 after each earn-list refresh; with no default, earns are disabled and it
 rechecks every 10 minutes, silently.
@@ -26,6 +27,8 @@ class EarnPlannerTask(Task):
         # -inf = never checked, so the first waiting recheck is always due
         # (time.monotonic() can be small right after boot).
         self._last_wait_check: float = float("-inf")
+        # Last action-log check (Character History off: nothing else triggers one).
+        self._last_log_check: float = float("-inf")
 
     @staticmethod
     def _cfg():
@@ -43,13 +46,23 @@ class EarnPlannerTask(Task):
                 and not self._earns_enabled()
                 and time.monotonic() - self._last_wait_check >= WAITING_RECHECK_SECS)
 
+    def _log_check_due(self, history: dict) -> bool:
+        # Without Character History nothing else prompts a check: poll the
+        # action-log counts on the waiting interval.
+        return (not history.get("enabled")
+                and time.monotonic() - self._last_log_check >= WAITING_RECHECK_SECS)
+
     def can_run(self, state: GameState) -> bool:
         if not state.logged_in or state.in_jail or state.in_hospital:
             return False
+        if state.own_name:
+            import earn_planner as _ep
+            _ep.sync_character(state.own_name)
         planner, history = self._cfg()
-        if not (planner.get("enabled") and planner.get("limits") and history.get("enabled")):
+        if not (planner.get("enabled") and planner.get("limits")):
             return False
-        return state.earn_planner_check_pending or self._waiting_due(planner)
+        return (state.earn_planner_check_pending or self._waiting_due(planner)
+                or self._log_check_due(history))
 
     def blocked_reasons(self, state):
         reasons = []
@@ -62,8 +75,6 @@ class EarnPlannerTask(Task):
             reasons.append("Not enabled")
         elif not planner.get("limits"):
             reasons.append("No earns in planner")
-        if not history.get("enabled"):
-            reasons.append("Character History disabled")
         if planner.get("waiting_for_earns") and self._earns_enabled():
             if not state.earn_planner_check_pending:
                 reasons.append("On default earn — waiting for next earn-list refresh")
@@ -72,13 +83,20 @@ class EarnPlannerTask(Task):
             if 0 < remaining < float("inf"):
                 reasons.append(f"Waiting for an available earn ({int(remaining // 60)}m)")
         elif not state.earn_planner_check_pending:
-            reasons.append("Waiting for next history update")
+            if history.get("enabled"):
+                reasons.append("Waiting for next history update")
+            else:
+                remaining = WAITING_RECHECK_SECS - (time.monotonic() - self._last_log_check)
+                if 0 < remaining < float("inf"):
+                    reasons.append(f"Next Bot History check ({int(remaining // 60)}m)")
         return reasons
 
     def run(self, state: GameState, executor):
-        planner, _ = self._cfg()
+        planner, history = self._cfg()
         timed = not state.earn_planner_check_pending and self._waiting_due(planner)
         state.earn_planner_check_pending = False
+        if not history.get("enabled"):
+            self._last_log_check = time.monotonic()
         if planner.get("waiting_for_earns"):
             self._last_wait_check = time.monotonic()
         # The timed recheck refreshes the earn list itself; checks triggered by a

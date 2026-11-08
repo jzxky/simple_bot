@@ -310,6 +310,32 @@ def _merge_changed(target: dict, before: dict, after: dict):
                 target.pop(k, None)
 
 
+def _clean_planner_limits(raw: dict) -> dict:
+    """Keep known earns with a positive whole-number limit, in order."""
+    import earn_planner as _ep
+    valid_values = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
+    clean = {}
+    for k, v in raw.items():
+        if k not in valid_values:
+            continue
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            continue
+        if n > 0:
+            clean[k] = n
+    return clean
+
+
+def _planner_payload_ok(c: dict, data: dict) -> bool:
+    """Plans are per character: only accept a page's planner queue/default if
+    it was loaded for the character the saved plan now belongs to (a page
+    left open across a character change must not overwrite the new plan)."""
+    if "earn_planner_character" not in data:
+        return True
+    return (data.get("earn_planner_character") or "") == c.get("earn_planner", {}).get("character", "")
+
+
 def _apply_payload(c: dict, data: dict) -> dict:
     """Populate config dict `c` from a settings payload `data`. Pure — no env
     writes, no bot signals, no persistence (those are handled by save())."""
@@ -318,22 +344,10 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["earns"]["earn_mode"] = data.get("earn_mode", "auto")
     c["earns"]["show_all"] = data.get("earn_show_all", False)
 
-    if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
-        import earn_planner as _ep
-        valid_values = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
-        clean = {}
-        for k, v in data["earn_planner_limits"].items():
-            if k not in valid_values:
-                continue
-            try:
-                n = int(v)
-            except (TypeError, ValueError):
-                continue
-            if n > 0:
-                clean[k] = n
-        c.setdefault("earn_planner", {})["limits"] = clean
+    if _planner_payload_ok(c, data) and "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
+        c.setdefault("earn_planner", {})["limits"] = _clean_planner_limits(data["earn_planner_limits"])
     c.setdefault("earn_planner", {})["enabled"] = bool(data.get("earn_planner_enabled", False))
-    if "earn_planner_default" in data:
+    if _planner_payload_ok(c, data) and "earn_planner_default" in data:
         import earn_planner as _ep
         default = str(data.get("earn_planner_default") or "")
         valid = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
@@ -633,20 +647,9 @@ def save():
         c = c_live
         # Earn planner limits are a self-contained dict — always write directly
         # to avoid diff-merge issues with mutable object references.
-        if "earn_planner_limits" in data and isinstance(data["earn_planner_limits"], dict):
-            import earn_planner as _ep
-            valid_values = set(_ep._catalog_labels().keys()) | set(_ep.HISTORY_NAME.keys())
-            clean = {}
-            for k, v in data["earn_planner_limits"].items():
-                if k not in valid_values:
-                    continue
-                try:
-                    n = int(v)
-                except (TypeError, ValueError):
-                    continue
-                if n > 0:
-                    clean[k] = n
-            c.setdefault("earn_planner", {})["limits"] = clean
+        if (_planner_payload_ok(c, data) and "earn_planner_limits" in data
+                and isinstance(data["earn_planner_limits"], dict)):
+            c.setdefault("earn_planner", {})["limits"] = _clean_planner_limits(data["earn_planner_limits"])
         creds_changed = (data.get("email") != base.get("email")
                          or data.get("password") != base.get("password"))
         pin_changed = (data.get("pin_required") != base.get("pin_required")
@@ -2112,12 +2115,15 @@ def api_available_earns():
 @app.route("/api/earn_planner")
 def api_earn_planner():
     import earn_planner as _ep
+    _ep.sync_character(_current_character())
     c = cfg.load()
     planner = c.get("earn_planner", {})
     limits = planner.get("limits", {})
     active = c.get("earns", {}).get("earn_type", "")
-    view = _ep.planner_view(limits, active, done=planner.get("done", {}),
+    view = _ep.planner_view(limits, active, history=_ep.load_counts(c=c),
+                            done=planner.get("done", {}),
                             waiting=bool(planner.get("waiting_for_earns")))
+    view["character"] = planner.get("character", "")
     view["default_earn"] = planner.get("default_earn", "")
     view["earns_enabled"] = bool(c.get("earns", {}).get("enabled", False))
     view["history_enabled"] = bool(c.get("character_history", {}).get("enabled", False))
