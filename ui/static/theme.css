@@ -165,3 +165,23 @@ html[data-theme="daylight"] .ep-unavailable { color: #7a5a12; border-color: #e2c
 html[data-theme="daylight"] .main-tab.active, html[data-theme="daylight"] .tab-btn.active { color: var(--text); }
 /* Close Bot sits in the header's top-right corner, level with the title */
 header > .close-bot-btn { position: absolute; top: 0; right: 0; }
+
+/* ── Notification settings: grouped cards ─────────────────────────────── */
+.nf-groups { max-width: 640px; }
+.nf-group { border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface2); margin: 0 0 10px; overflow: hidden; }
+.nf-group > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text); }
+.nf-group > summary::-webkit-details-marker { display: none; }
+.nf-group > summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; margin-right: 2px; }
+.nf-group[open] > summary::before { transform: rotate(45deg); }
+.nf-count { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--muted); }
+.nf-all { background: none !important; border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 0 0 10px; min-width: 0; height: auto; font-size: 12px; font-weight: 600; color: var(--accent) !important; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.nf-all:hover { text-decoration: underline; }
+.nf-body { padding: 0 14px 6px; }
+.nf-body label.setting-row.inline-toggle { grid-template-columns: 1fr auto; border-bottom: 1px solid var(--hairline); padding: 9px 0; }
+.nf-body label.setting-row.inline-toggle:last-child { border-bottom: none; }
+.nf-matrix { width: 100%; border-collapse: collapse; margin: 0 0 8px; }
+.nf-matrix th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 4px 0 8px; text-align: center; }
+.nf-matrix th:first-child { text-align: left; }
+.nf-matrix td { padding: 9px 0; border-top: 1px solid var(--hairline); text-align: center; font-size: 13.5px; color: var(--text); }
+.nf-matrix td:first-child { text-align: left; }
+.nf-matrix .toggle-label { display: inline-flex; justify-content: center; }

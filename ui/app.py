@@ -49,6 +49,29 @@ NOTIFICATION_EVENTS = [
     ("no_available_earns",  "No available earns (earn planner)"),
 ]
 
+# Settings layout for the notification toggles: a stores grid plus folding
+# groups. Any event not listed here lands in an "Other" group automatically.
+NOTIFICATION_STORES = [("Bionics", "bionics"), ("Weapons", "weapon_store"), ("Drugs", "drug_store")]
+NOTIFICATION_STORE_KINDS = [("In stock", "in_stock"), ("Bought", "purchased"), ("Restock", "restock")]
+NOTIFICATION_GROUPS = [
+    ("Career",         ["promotion_success", "auto_promo"]),
+    ("Account & jail", ["session_expired", "jailed", "warrants_outstanding", "mhs_protected"]),
+    ("Crimes & earns", ["targets_exhausted", "agg_not_available", "dog_trains_unavailable", "no_available_earns"]),
+]
+
+
+def _notification_layout():
+    labels = dict(NOTIFICATION_EVENTS)
+    store_slugs = {f"{k}_{s}" for _, k in NOTIFICATION_STORES for _, s in NOTIFICATION_STORE_KINDS}
+    grouped = {slug for _, slugs in NOTIFICATION_GROUPS for slug in slugs} | store_slugs
+    groups = [(title, [(s, labels[s]) for s in slugs if s in labels]) for title, slugs in NOTIFICATION_GROUPS]
+    other = [(s, l) for s, l in NOTIFICATION_EVENTS if s not in grouped]
+    if other:
+        groups.append(("Other", other))
+    return {"stores": NOTIFICATION_STORES, "kinds": NOTIFICATION_STORE_KINDS,
+            "groups": [g for g in groups if g[1]]}
+
+
 def _effective_consumable_limit():
     c = cfg.load()
     cons = c.get("consumables", {})
@@ -277,6 +300,7 @@ def index():
     if hide_credentials:
         c["credentials"] = {"email": "", "password": ""}
     return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS,
+                           notif_layout=_notification_layout(),
                            notif_defaults=cfg.DEFAULT_CONFIG["notifications"],
                            pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin(),
                            hide_credentials=hide_credentials,
