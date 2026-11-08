@@ -37,7 +37,8 @@ class AwayActionTask(Task):
                 return False
         if self.action_type == "drug_manufacturing":
             import executor
-            if executor.drug_manufacture_cooldown_active():
+            from tasks.drug_manufacturing import is_eligible
+            if executor.drug_manufacture_cooldown_active() or not is_eligible(state):
                 return False
         cooldown_key = "community_service_away" if self.action_type == "community_service" else self.action_type
         cooldown = ACTION_COOLDOWNS.get(cooldown_key, 10)
@@ -66,6 +67,8 @@ class AwayActionTask(Task):
             import executor
             if executor.drug_manufacture_cooldown_active():
                 reasons.append("Manufacture cooldown")
+            from tasks.drug_manufacturing import eligibility_reasons
+            reasons.extend(eligibility_reasons(state))
         if self.action_type:
             cooldown_key = "community_service_away" if self.action_type == "community_service" else self.action_type
             cooldown = ACTION_COOLDOWNS.get(cooldown_key, 10)

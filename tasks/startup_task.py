@@ -31,6 +31,14 @@ class StartupTask(Task):
             reasons.append("In jail")
         return reasons
 
+    @staticmethod
+    def _drug_manufacturing_configured() -> bool:
+        import config as cfg
+        c = cfg.load()
+        act, away = c.get("action", {}), c.get("away_action", {})
+        return ((act.get("enabled") and act.get("type") == "drug_manufacturing")
+                or (away.get("enabled") and away.get("type") == "drug_manufacturing"))
+
     def run(self, state: GameState, executor):
         self._done = True
 
@@ -46,6 +54,15 @@ class StartupTask(Task):
                 executor.execute(Action("check_earns", earn_type=earn_type), state)
             except Exception as e:
                 state.add_log(f"Startup earn queue check failed: {e}")
+
+        elif self._drug_manufacturing_configured():
+            # Drug manufacturing needs the Mortician Assistant earn unlocked,
+            # which is read from the earn catalog — refresh it even with earns off.
+            state.add_log("Startup: refreshing earns list (drug manufacturing check).")
+            try:
+                executor.execute(Action("refresh_earn_catalog"), state)
+            except Exception as e:
+                state.add_log(f"Startup earn list refresh failed: {e}")
 
         state.add_log("Startup: refreshing player list.")
         try:
