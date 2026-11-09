@@ -370,7 +370,7 @@ def _scrape_earn_catalog(page, state: GameState):
             state.earn_planner_check_pending = True
         auto_labels = ", ".join(f"{v} ({l})" for v, l in auto_opts) or "none"
         manual_labels = ", ".join(f"{d}:{l}" + (" [trap]" if t else "") for d, l, t in manual_opts) or "none"
-        if cfg.load().get("debug_logging", False):
+        if cfg.load().get("misc", {}).get("debug_logging", False):
             state.add_log(f"Earns detected — auto: [{auto_labels}] | manual: [{manual_labels}]")
     else:
         state.add_log("Earns: no options detected on earn page.")
@@ -1034,12 +1034,13 @@ def _find_manual_earn_option(page, earn_type: str, display_name: str):
     data-earn number, so match by label (or by data-earn for manual-only
     earns, whose ids like "Pizza" are stable) and skip any with <s>."""
     manual_id = earn_type[len(MANUAL_EARN_PREFIX):] if earn_type.startswith(MANUAL_EARN_PREFIX) else None
+    wanted = " ".join(display_name.split()).lower()
     for opt in page.query_selector_all("#earns_list div.earn-option"):
         span = opt.query_selector("span")
         if not span:
             continue
-        label = span.inner_text().strip().lower()
-        matches = (label == display_name.lower()
+        label = " ".join(span.inner_text().split()).lower()
+        matches = (label == wanted
                    or (manual_id is not None and opt.get_attribute("data-earn") == manual_id))
         if matches and not span.query_selector("s"):
             return opt
@@ -3406,13 +3407,54 @@ _EARN_SEED = [
     {"label": "Work at local bank",                  "schedule_value": "bank_teller",         "data_earn": "7",    "category": "Bank",        "available": True,  "enabled": False},
     {"label": "Mortician Assistant",                 "schedule_value": "mortician_assistant", "data_earn": "8",    "category": "Mortician",   "available": True,  "enabled": False},
     {"label": "Legal Secretary",                     "schedule_value": "legal_secretary",     "data_earn": "10",   "category": "Law",         "available": True,  "enabled": False},
-    {"label": "Drag racing",                         "schedule_value": "drag_racing",         "data_earn": None,   "category": "Crime",       "available": None,  "enabled": False},
+    {"label": "Compete at illegal drags",            "schedule_value": "drag_racing",         "data_earn": None,   "category": "Crime",       "available": None,  "enabled": False},
     {"label": "Hack bank account",                   "schedule_value": "hack_bank",           "data_earn": None,   "category": "Crime",       "available": None,  "enabled": False},
     {"label": "Scamming",                            "schedule_value": "scamming",            "data_earn": None,   "category": "Crime",       "available": None,  "enabled": False},
     {"label": "Pizza Restaurant",                    "schedule_value": None,                  "data_earn": "Pizza","category": "General",     "available": False,  "enabled": False},
     {"label": "Local 7/11",                          "schedule_value": None,                  "data_earn": "711",  "category": "General",     "available": False,  "enabled": False},
     {"label": "Bar/Nightclub",                       "schedule_value": None,                  "data_earn": "Bar",  "category": "General",     "available": False,  "enabled": False},
 ]
+
+
+def _merge_renamed_earns(entries: list, auto_opts) -> list:
+    """The auto-earn id (schedule_value) is the earn's identity; its label can
+    change when the game renames an earn (e.g. "Drag racing" became "Compete
+    at illegal drags"). For each scraped (value, label), rename the catalog
+    entry holding that value to the new label, folding in any duplicate entry
+    an earlier scrape made under the new label, so one entry per earn remains
+    and lookups by schedule_value find the current name."""
+    scraped = {val: label for val, label in auto_opts if val}
+    if not scraped:
+        return entries
+    by_value = {}
+    for e in entries:
+        v = e.get("schedule_value")
+        if v in scraped and e.get("label") != scraped[v]:
+            by_value.setdefault(v, e)
+    if not by_value:
+        return entries
+    drop = set()
+    for v, old in by_value.items():
+        new_label = scraped[v]
+        dup = next((e for e in entries if e is not old and e.get("label") == new_label), None)
+        if dup is not None:
+            # Keep the id the game's manual list gave the duplicate, if any.
+            if dup.get("data_earn"):
+                old["data_earn"] = dup["data_earn"]
+            if dup.get("category") and dup.get("category") != "Uncategorized":
+                old["category"] = dup["category"]
+            drop.add(id(dup))
+        old["label"] = new_label
+    merged = []
+    for e in entries:
+        if id(e) in drop:
+            continue
+        # Any other stale entry still holding a renamed value (older duplicates).
+        v = e.get("schedule_value")
+        if v in by_value and e is not by_value[v] and e.get("label") != scraped[v]:
+            continue
+        merged.append(e)
+    return merged
 
 
 def _upsert_earn_catalog(auto_opts, manual_opts):
@@ -3430,6 +3472,7 @@ def _upsert_earn_catalog(auto_opts, manual_opts):
     except Exception:
         entries = []
 
+    entries = _merge_renamed_earns(entries, auto_opts)
     by_label = {e["label"]: e for e in entries}
 
     scraped_labels = set()
