@@ -958,15 +958,13 @@ def _get_bionics_next_check_at(state) -> "float | None":
     next_at = task.last_checked_at + interval_secs
 
     if b.get("use_time_window", False) and state.server_time is not None:
-        start = b.get("window_start", "00:00")
-        end   = b.get("window_end",   "23:59")
-        start_mins = int(start[:2]) * 60 + int(start[3:])
-        end_mins   = int(end[:2])   * 60 + int(end[3:])
+        # An empty or malformed window time (e.g. a cleared field) means no
+        # usable window: keep the plain interval instead of crashing /status.
+        start_mins = store_windows.hhmm_to_mins(b.get("window_start", "00:00"))
+        end_mins   = store_windows.hhmm_to_mins(b.get("window_end",   "23:59"))
         ingame = state.ingame_mins
-        if start_mins < end_mins:
-            _outside = ingame is not None and not (start_mins < ingame < end_mins)
-        else:
-            _outside = ingame is not None and not (ingame > start_mins or ingame < end_mins)
+        _outside = (start_mins is not None and end_mins is not None
+                    and ingame is not None and not store_windows.in_window(b, ingame))
         if _outside:
             # Outside window — next check is at window start
             ingame_secs_now = (state.server_time.hour * 3600
@@ -991,15 +989,13 @@ def _get_weapon_store_next_check_at(state) -> "float | None":
     next_at = task.last_checked_at + interval_secs
 
     if w.get("use_time_window", False) and state.server_time is not None:
-        start = w.get("window_start", "00:00")
-        end   = w.get("window_end",   "23:59")
-        start_mins = int(start[:2]) * 60 + int(start[3:])
-        end_mins   = int(end[:2])   * 60 + int(end[3:])
+        # An empty or malformed window time (e.g. a cleared field) means no
+        # usable window: keep the plain interval instead of crashing /status.
+        start_mins = store_windows.hhmm_to_mins(w.get("window_start", "00:00"))
+        end_mins   = store_windows.hhmm_to_mins(w.get("window_end",   "23:59"))
         ingame = state.ingame_mins
-        if start_mins < end_mins:
-            _outside = ingame is not None and not (start_mins < ingame < end_mins)
-        else:
-            _outside = ingame is not None and not (ingame > start_mins or ingame < end_mins)
+        _outside = (start_mins is not None and end_mins is not None
+                    and ingame is not None and not store_windows.in_window(w, ingame))
         if _outside:
             ingame_secs_now = (state.server_time.hour * 3600
                                + state.server_time.minute * 60
