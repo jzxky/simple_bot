@@ -661,6 +661,7 @@ def save():
     c_live = cfg.load()
     prev_jail = dict(c_live.get("jail", {}))
     prev_duty = prev_jail.get("duty", "laundry")
+    prev_earn_mode = c_live.get("earns", {}).get("earn_mode", "auto")
 
     if isinstance(base, dict) and base:
         # Partial/diff apply: only overwrite the leaves this client changed vs
@@ -684,6 +685,13 @@ def save():
         c = _apply_payload(c_live, data)
         creds_changed = True
         pin_changed = True
+
+    # Switching to MANUAL earns empties the game's earn queue (the bot clears it
+    # before a manual earn), so the planner's queued final batches are gone:
+    # drop their hand-off records now so the planner stops showing them queued.
+    if prev_earn_mode != "manual" and c.get("earns", {}).get("earn_mode") == "manual":
+        if c.get("earn_planner", {}).get("done"):
+            c["earn_planner"]["done"] = {}
 
     # Once credentials are hidden the UI can't write them, and can't un-hide
     # them either — both are .env-only from then on.
