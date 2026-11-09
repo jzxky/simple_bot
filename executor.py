@@ -6,6 +6,7 @@ import json
 import queue
 import random
 import re
+import threading
 import time
 import config as cfg
 import urls
@@ -17,6 +18,17 @@ import action_log
 import item_images
 import travel_parser
 from urllib.parse import quote, urljoin
+
+
+# The game keeps one result message (#success / #fail) per login session and
+# shows it on the page that loads after an action. Separate-tab agg crimes run
+# on their own thread with the same session, so an earn submitted on the main
+# tab while an agg is in flight can put the earn's message on the agg result
+# page (or the other way round). Every submit whose result page we parse holds
+# this lock from the click until its result page has loaded, so the two tabs
+# never have actions in flight at the same time.
+_game_action_lock = threading.Lock()
+
 
 
 # Cooldown set when pre-travel warrant check finds unresolvable warrants.
@@ -932,11 +944,12 @@ def _try_quick_earn(page, display_name: str, schedule_value: str, state: GameSta
         pass
     lastearn = page.query_selector("input[name='lastearn']")
     if lastearn:
-        lastearn.click()
-        try:
-            page.wait_for_load_state("domcontentloaded", timeout=10000)
-        except Exception:
-            pass
+        with _game_action_lock:
+            lastearn.click()
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=10000)
+            except Exception:
+                pass
         _map_lastearn_to_catalog(lastearn_text, schedule_value)
         _refresh_state(state)
         _log_manual_earn_result(state, display_name, page.content(), "quick earn")
@@ -1085,8 +1098,9 @@ def handle_manual_earn(action: Action, state: GameState):
         state.add_log("Manual earn: Work button not found.")
         return
 
-    with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
-        work_btn.click()
+    with _game_action_lock:
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+            work_btn.click()
     _refresh_state(state)
     _log_manual_earn_result(state, display_name, page.content(), "earn page")
 
@@ -1873,8 +1887,9 @@ def _breaking_entering_steps(action: Action, state: GameState):
                 return
 
             page.select_option("select[name='breaking']", value=target)
-            page.click("input[type='submit'][name='B1'][value='Commit Crime']")
-            page.wait_for_load_state("domcontentloaded")
+            with _game_action_lock:
+                page.click("input[type='submit'][name='B1'][value='Commit Crime']")
+                page.wait_for_load_state("domcontentloaded")
             _refresh_state(state)
 
             result_soup = BeautifulSoup(page.content(), "html.parser")
@@ -1992,8 +2007,9 @@ def _do_crime_steps(action: Action, state: GameState):
                 return
 
         page.fill(_TARGET_INPUT, player)
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
+        with _game_action_lock:
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
 
         result_soup = BeautifulSoup(page.content(), "html.parser")
@@ -2046,8 +2062,9 @@ def _do_crime_steps(action: Action, state: GameState):
                     state.add_log("Could not return to crime page after transfer. Aborting.")
                     return
                 page.fill(_TARGET_INPUT, player)
-                page.click("input[type='submit'][name='B1']")
-                page.wait_for_load_state("domcontentloaded")
+                with _game_action_lock:
+                    page.click("input[type='submit'][name='B1']")
+                    page.wait_for_load_state("domcontentloaded")
                 _refresh_state(state)
                 retry_soup = BeautifulSoup(page.content(), "html.parser")
                 success_div = retry_soup.find("div", id="success")
@@ -2116,8 +2133,9 @@ def _interact_simple_crime(crime: str, target: str, state: GameState) -> dict:
         return {"ok": False, "message": "Session expired — will re-login."}
 
     page.fill(_TARGET_INPUT, target)
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
     soup = BeautifulSoup(page.content(), "html.parser")
@@ -2180,8 +2198,9 @@ def _interact_breaking(target: str, state: GameState) -> dict:
             return {"ok": False, "message": f"{target} has no burglable apartment here."}
 
         page.select_option("select[name='breaking']", value=match_val)
-        page.click("input[type='submit'][name='B1'][value='Commit Crime']")
-        page.wait_for_load_state("domcontentloaded")
+        with _game_action_lock:
+            page.click("input[type='submit'][name='B1'][value='Commit Crime']")
+            page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
 
         soup = BeautifulSoup(page.content(), "html.parser")
@@ -2431,8 +2450,9 @@ def handle_crossroad(action: Action, state: GameState):
     career = label_el.get_text(strip=True) if label_el else ("current" if idx == 0 else "new")
 
     radios[idx].click()
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
     state.add_log(f"Career crossroad: chose {'current' if idx == 0 else 'new'} career ({career}).")
 
@@ -2512,8 +2532,9 @@ def _submit_comservice_form(page, state: GameState, label: str, category: str = 
     """Submit the community service form and log the game's success/fail box.
     With `category`, the outcome is also recorded in the action history under
     `service` (the option that was done)."""
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
     soup = BeautifulSoup(page.content(), "html.parser")
     ok = soup.find("div", id="success")
@@ -2734,8 +2755,9 @@ def handle_career_training(action: Action, state: GameState):
         return
 
     page.select_option("select[name='action']", chosen)
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
     _record_page_result(state, "career_training", career, f"Career training submitted for {career}",
                         enrolled=chosen == enroll_opt and chosen != study_opt)
@@ -2754,8 +2776,9 @@ def handle_university(action: Action, state: GameState):
 
     def _submit(value: str):
         page.select_option("select[name='action']", value)
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
+        with _game_action_lock:
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
 
     # Walk the university flow in one run: select degree → accept enrollment → study.
@@ -2900,8 +2923,9 @@ def handle_training_centre(action: Action, state: GameState):
     # Already training page: "Yes, I would like to train"
     if "Yes" in options and discipline not in options:
         page.select_option("select[name='action']", "Yes")
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
+        with _game_action_lock:
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
         _record_page_result(state, "training_centre", discipline,
                             f"Training centre: continued training in {discipline}")
@@ -2920,8 +2944,9 @@ def handle_training_centre(action: Action, state: GameState):
                 return
             _nav(url, state)
         page.select_option("select[name='action']", accept_val)
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
+        with _game_action_lock:
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
         _record_page_result(state, "training_centre", discipline,
                             f"Training centre: enrolled in {discipline}", enrolled=True)
@@ -2930,8 +2955,9 @@ def handle_training_centre(action: Action, state: GameState):
     # Page 1: discipline selection — pick the configured discipline
     if discipline in options:
         page.select_option("select[name='action']", discipline)
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
+        with _game_action_lock:
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
 
         # Now on the confirmation page — ensure funds, enrol
@@ -2954,8 +2980,9 @@ def handle_training_centre(action: Action, state: GameState):
                         return
                     _nav(url, state)
                 page.select_option("select[name='action']", accept_val2)
-                page.click("input[type='submit'][name='B1']")
-                page.wait_for_load_state("domcontentloaded")
+                with _game_action_lock:
+                    page.click("input[type='submit'][name='B1']")
+                    page.wait_for_load_state("domcontentloaded")
                 _refresh_state(state)
                 _record_page_result(state, "training_centre", discipline,
                                     f"Training centre: enrolled in {discipline}", enrolled=True)
@@ -3074,8 +3101,9 @@ def _armed_robbery_steps(action: Action, state: GameState):
             _disable_agg_crimes(state, "Armed crime option not available — disabling aggravated crimes.")
         return
     page.check("input[name='agcrime'][value='armed']")
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
     if state.in_hospital:
@@ -3127,8 +3155,9 @@ def _armed_robbery_steps(action: Action, state: GameState):
             if target:
                 value, name, is_public, is_drug_house = target
                 page.select_option("select[name='armed']", value)
-                page.click("input[type='submit'][name='B1']")
-                page.wait_for_load_state("domcontentloaded")
+                with _game_action_lock:
+                    page.click("input[type='submit'][name='B1']")
+                    page.wait_for_load_state("domcontentloaded")
                 _refresh_state(state)
 
                 if state.in_hospital:
@@ -3212,8 +3241,9 @@ def _torch_business_steps(action: Action, state: GameState):
             _disable_agg_crimes(state, "Torch business option not available — disabling aggravated crimes.")
         return
     page.check("input[name='agcrime'][value='torchbusiness']")
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
     if state.in_hospital:
@@ -3260,8 +3290,9 @@ def _torch_business_steps(action: Action, state: GameState):
             if target:
                 value, name, is_public = target
                 page.select_option("select[name='torchb']", value)
-                page.click("input[type='submit'][name='B1']")
-                page.wait_for_load_state("domcontentloaded")
+                with _game_action_lock:
+                    page.click("input[type='submit'][name='B1']")
+                    page.wait_for_load_state("domcontentloaded")
                 _refresh_state(state)
 
                 if state.in_hospital:
@@ -3340,8 +3371,9 @@ def handle_drug_manufacturing(action: Action, state: GameState):
         return
 
     page.select_option("select[name='action']", value="Yes")
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
     global _drug_manufacture_cooldown_until
@@ -3833,8 +3865,9 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
     duty = chosen
     radio = page.query_selector(f"input[name='job'][value='{duty}']")
     radio.check()
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
     label = _JAIL_DUTY_LABELS.get(duty, duty)
@@ -3926,8 +3959,9 @@ def handle_jail_action(action: Action, state: GameState):
     jail_action = chosen
 
     page.check(f"input[type='radio'][value='{jail_action}']")
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
     soup = BeautifulSoup(browser.page().content(), "html.parser")
@@ -3968,8 +4002,9 @@ def handle_jail_consume(action: Action, state: GameState):
         return
 
     page.check(f"input[type='radio'][value='{radio_value}']")
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
     soup = BeautifulSoup(browser.page().content(), "html.parser")
@@ -5579,8 +5614,9 @@ def handle_blind_eye(action: Action, state: GameState):
         if name in options:
             page = browser.page()
             page.select_option("select[name='gangster']", options[name])
-            page.click("input[type='submit'][name='B1']")
-            page.wait_for_load_state("domcontentloaded")
+            with _game_action_lock:
+                page.click("input[type='submit'][name='B1']")
+                page.wait_for_load_state("domcontentloaded")
             _refresh_state(state)
             result_soup = BeautifulSoup(state.page_html, "html.parser")
             success = result_soup.find("div", id="success")
@@ -6569,8 +6605,9 @@ def handle_gym(action: Action, state: GameState):
         # Purchase membership
         page = browser.page()
         page.select_option("select[name='option']", "purchase")
-        page.click("input[type='submit'][name='B1']")
-        page.wait_for_load_state("domcontentloaded")
+        with _game_action_lock:
+            page.click("input[type='submit'][name='B1']")
+            page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
         state.add_log(f"Gym: purchased membership (${cost:,}).")
         action_log.record(state, "gym", "membership", "success", amount=-cost if cost else None,
@@ -6593,8 +6630,9 @@ def handle_gym(action: Action, state: GameState):
 
     page = browser.page()
     page.select_option("select[name='option']", activity)
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
     save_last_gym_use(time.time())
     state.add_log(f"Gym: completed activity '{activity}'.")
@@ -8168,8 +8206,9 @@ def handle_launder_money(action: Action, state: GameState):
         return
 
     amount_input.fill(str(amount))
-    page.click("input[type='submit'][name='B1']")
-    page.wait_for_load_state("domcontentloaded")
+    with _game_action_lock:
+        page.click("input[type='submit'][name='B1']")
+        page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
     # Sending dirty money to a banker contact to be laundered (kind = contact).
