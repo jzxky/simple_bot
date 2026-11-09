@@ -8,6 +8,9 @@ find who is online. For each known player seen online:
 
 Only runs when logged in and not in jail (bot must be on a page that
 renders the online cell, which is all standard game pages).
+
+When Player Hub updates are on, the hub counts ages from the online lists the
+bot sends and the bot mirrors them, so this task stays off.
 """
 
 import re
@@ -29,13 +32,22 @@ class OnlineAgeTask(Task):
     def __init__(self):
         self._last_run: float = time.monotonic()
 
+    @staticmethod
+    def _hub_owns_ages() -> bool:
+        from tasks.hub_update import HubUpdateTask
+        return HubUpdateTask()._enabled()
+
     def can_run(self, state: GameState) -> bool:
+        if self._hub_owns_ages():
+            return False
         if not state.logged_in or state.in_jail or state.in_hospital:
             return False
         return time.monotonic() - self._last_run >= _INTERVAL
 
     def blocked_reasons(self, state):
         reasons = []
+        if self._hub_owns_ages():
+            reasons.append("Player Hub counts ages")
         if not state.logged_in:
             reasons.append("Not logged in")
         if state.in_jail:
