@@ -74,6 +74,13 @@ function onEarnModeChange(sel) {
     return;
   }
   _populateEarnCategories();
+  if (sel.value === "manual") {
+    // The save drops the planner's queued final batches — reload it to match.
+    _doSave().then(() => loadEarnPlanner()).catch(() => {});
+    _updateIncomePills();
+    _updateIncomeTabColors();
+    return;
+  }
   autoSave();
 }
 
