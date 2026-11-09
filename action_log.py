@@ -47,6 +47,11 @@ CATEGORY_LABELS = {
     "community_service": "Community service",
     "dog_train": "Dog trains",
     "jail_duty": "Jail duties",
+    "fire_duty": "Fire duties",
+    "drug_manufacture": "Drug manufacturing",
+    "career_training": "Career training",
+    "training_centre": "Training centre",
+    "university": "University",
 }
 
 _SCHEMA = """
@@ -396,9 +401,13 @@ def summary(f: dict) -> dict:
             "SELECT message, COUNT(*) n"
             f" FROM actions{where}{and_}category='case_work' AND kind='hospital' AND result='fail'"
             " GROUP BY message ORDER BY n DESC LIMIT 20", args)]
+        # Degrees completed at university, by name.
+        degrees = [r["target"] for r in c.execute(
+            f"SELECT target, MIN(ts) t FROM actions{where}{and_}category='university' AND kind='degree'"
+            " AND result='success' AND target != '' GROUP BY target ORDER BY t", args)]
         return {"by_kind": by_kind,
                 "case_types": sorted(case_types.values(), key=lambda x: -x["n"]),
-                "hospital_fails": hospital_fails}
+                "hospital_fails": hospital_fails, "degrees": degrees}
     return _read(run)
 
 

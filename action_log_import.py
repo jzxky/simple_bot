@@ -75,6 +75,12 @@ def _bad(category, kind, msg, target="", result="fail", **detail):
             "amount": None, "message": msg, "detail": detail}
 
 
+def _nomoney(row: dict) -> dict:
+    """Training and duties carry no earnings; ignore any $ figure (fees) in the text."""
+    row["amount"] = None
+    return row
+
+
 def _expand_fail_summary(kind: str, text: str) -> list:
     """'3 fails — 2x You failed, 1x recently survived (fail count: 1/3)' → rows."""
     body = re.sub(r"\s*\(fail count:.*\)\s*$", "", text)
@@ -222,6 +228,34 @@ class _Parser:
         if m:
             self.cs = ("dog_train", m.group(1), "")
             return []
+
+        # ── Fire duties, training, university, drug manufacturing ─────────
+        m = re.match(r"Fire duties: (.+?)( failed)?(?: — (.*)|\.)?$", msg)
+        if m:
+            return [_nomoney((_bad if m.group(2) else _ok)("fire_duty", m.group(1), m.group(3) or ""))]
+        m = re.match(r"Career training submitted for (.+?)( failed)?(?: — (.*)|\.)$", msg)
+        if m:
+            return [_nomoney((_bad if m.group(2) else _ok)("career_training", m.group(1), m.group(3) or ""))]
+        m = re.match(r"Training centre: (continued training|enrolled) in (.+?)( failed)?(?: — (.*)|\.)$", msg)
+        if m:
+            extra = {"enrolled": True} if m.group(1) == "enrolled" else {}
+            return [_nomoney((_bad if m.group(3) else _ok)("training_centre", m.group(2), m.group(4) or "", **extra))]
+        m = re.match(r"University: study failed — (.*)$", msg)
+        if m:
+            return [_bad("university", "study", m.group(1))]
+        m = re.match(r"University: completed (.+?) degree(?: — (.*)|\.)?$", msg)
+        if m:
+            return [_nomoney(_ok("university", "study", m.group(2) or "", m.group(1))),
+                    _nomoney(_ok("university", "degree", f"Completed {m.group(1)} degree", m.group(1)))]
+        m = re.match(r"University: studied(?: — (.*))?", msg)
+        if m:
+            return [_nomoney(_ok("university", "study", m.group(1) or ""))]
+        m = re.match(r"Drug manufacturing failed: (.*?)(?: — cooling down.*)?$", msg)
+        if m:
+            return [_bad("drug_manufacture", "manufacture", m.group(1))]
+        m = re.match(r"Drug manufacturing: (?!action select|submitted \(no result)(.+)$", msg)
+        if m:
+            return [_ok("drug_manufacture", "manufacture", m.group(1))]
 
         # ── Gym ───────────────────────────────────────────────────────────
         m = re.match(r"Gym: completed activity '(.+)'\.$", msg)
