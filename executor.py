@@ -1071,10 +1071,32 @@ def _disable_earns(state: GameState, reason: str):
     state.add_log(reason)
 
 
+# Case work pages with a lockout: a quick earn started from one of these can
+# show the case page's #success / #fail instead of the earn's, so manual earns
+# leave them for /main.asp first. Matched on the path, any query string.
+_EARN_LOCKOUT_PAGES = (
+    "/localcity/hospital.asp",
+    "/localcity/firestation.asp",
+    "/income/construction.asp",
+)
+
+
+def _leave_lockout_page(state: GameState):
+    """Go to /main.asp if the main tab is on a case work page with a lockout."""
+    from urllib.parse import urlparse
+    path = urlparse(browser.current_url()).path.lower()
+    if any(path.endswith(p) for p in _EARN_LOCKOUT_PAGES):
+        _nav(_u("/main.asp"), state)
+
+
 def handle_manual_earn(action: Action, state: GameState):
     earn_type = action.params["earn_type"]
     page = browser.page()
     display_name = _earn_display_name(earn_type)
+
+    _leave_lockout_page(state)
+    if not _check_session(state):
+        return
 
     if _try_quick_earn(page, display_name, earn_type, state):
         return
