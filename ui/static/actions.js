@@ -298,6 +298,16 @@
       html += chSection(title, rows, "", kind === "banking" ? money(k.amount) : n(k.success));
     }
 
+    // ── Money sent to contacts to be laundered ──
+    const sent = cat("launder");
+    if (sent.length) {
+      let rows = chRow("Launders Sent", sumOf(sent, "success"),
+        {rate: [sumOf(sent, "success"), sumOf(sent, "fail")], sub: subRows(sent)});
+      rows += chRow("Total Sent", sumOf(sent, "amount"), {money: true, cls: "ah-total"});
+      html += chSection("Money Laundering", rows, "Dirty money sent to banker contacts to be laundered.",
+        money(sumOf(sent, "amount")));
+    }
+
     // ── Training & Education ──
     const ct = cat("career_training"), tc = cat("training_centre");
     const study = kindOf("university", "study"), degree = kindOf("university", "degree");
@@ -333,7 +343,7 @@
     // Anything else the bot records later still shows up.
     const shown = new Set(["gym", "community_service", "dog_train", "consume", "jail", "jail_duty",
                            "agg", "case_work", "earn", "earn_queue", "fire_duty", "career_training",
-                           "training_centre", "university", "drug_manufacture"]);
+                           "training_centre", "university", "drug_manufacture", "launder"]);
     Object.keys(byCat).filter(c => !shown.has(c)).forEach(c => {
       html += chSection(catLabel(c), byCat[c].map(k => chRow(k.kind || "–", k.success, {rate: [k.success, k.fail]})).join(""));
     });

@@ -257,6 +257,16 @@ class _Parser:
         if m:
             return [_ok("drug_manufacture", "manufacture", m.group(1))]
 
+        # ── Money sent to a contact to be laundered ───────────────────────
+        m = re.match(r"Laundering: sending \$([\d,]+) through (.+?) failed — (.*)$", msg)
+        if m:
+            return [_bad("launder", m.group(2), m.group(3), m.group(2))]
+        m = re.match(r"Laundering: submitted \$([\d,]+) through (.+?)\.(?: — (.*))?$", msg)
+        if m:
+            row = _ok("launder", m.group(2), m.group(3) or "", m.group(2))
+            row["amount"] = int(m.group(1).replace(",", ""))
+            return [row]
+
         # ── Gym ───────────────────────────────────────────────────────────
         m = re.match(r"Gym: completed activity '(.+)'\.$", msg)
         if m:

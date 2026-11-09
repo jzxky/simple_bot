@@ -52,6 +52,7 @@ CATEGORY_LABELS = {
     "career_training": "Career training",
     "training_centre": "Training centre",
     "university": "University",
+    "launder": "Laundering sent",
 }
 
 _SCHEMA = """

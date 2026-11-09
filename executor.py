@@ -8129,7 +8129,15 @@ def handle_launder_money(action: Action, state: GameState):
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
-    state.add_log(f"Laundering: submitted ${amount:,} through {chosen['name']}.")
+    # Sending dirty money to a banker contact to be laundered (kind = contact).
+    ok, msg = _game_result_message(state.page_html or page.content())
+    if ok is False:
+        state.add_log(f"Laundering: sending ${amount:,} through {chosen['name']} failed — {msg}")
+    else:
+        state.add_log(f"Laundering: submitted ${amount:,} through {chosen['name']}."
+                      + (f" — {msg}" if ok and msg else ""))
+    action_log.record(state, "launder", chosen["name"], "fail" if ok is False else "success",
+                      target=chosen["name"], amount=amount, message=msg if ok is not None else "")
 
 
 def handle_scrape_player(action: Action, state: GameState):
