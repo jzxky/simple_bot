@@ -365,6 +365,18 @@ def get_all_groups() -> list:
             con.close()
 
 
+def get_all_ages() -> dict:
+    """username -> {"character_age", "jail_age"} (minutes) for every known player."""
+    with _lock:
+        con = _conn()
+        try:
+            rows = con.execute("SELECT username, character_age, jail_age FROM players").fetchall()
+            return {r["username"]: {"character_age": r["character_age"] or 0,
+                                    "jail_age": r["jail_age"] or 0} for r in rows}
+        finally:
+            con.close()
+
+
 def get_character_ages() -> dict:
     """Map lowercased username -> character_age in minutes for every known player."""
     with _lock:
@@ -935,27 +947,33 @@ _HUB_PLAYER_FIELDS = (
     "homecity", "occupation", "rank", "active", "born_at", "died_at", "pic_url",
     "group_name", "agg_crimes", "case_work", "alias", "notes", "monitoring",
     "respect", "respect_last_checked", "sex", "wealth", "scripting",
+    "character_age", "jail_age",
 )
+# Mirrored only when the hub sends them (hubs before ages were hub-owned don't).
+_HUB_OPTIONAL_FIELDS = {"character_age", "jail_age"}
 
 
 def apply_hub_players(rows: list, full: bool = False) -> "tuple[int, int]":
-    """Mirror hub player rows into the local DB. Hub-owned fields are copied
-    as-is; local-only fields (ages, scraped godfather/crew) are kept. With
+    """Mirror hub player rows into the local DB. Hub-owned fields (including
+    character/jail age, which the hub counts) are copied as-is; local-only
+    fields (scraped godfather/crew) are kept. With
     full=True the rows are the hub's whole list and local players missing from
     it are removed. Returns (upserted, removed)."""
     with _lock:
         con = _conn()
         try:
-            cols = _HUB_PLAYER_FIELDS
             for r in rows:
                 name = r.get("username")
                 if not name:
                     continue
+                cols = [c for c in _HUB_PLAYER_FIELDS if c in r or c not in _HUB_OPTIONAL_FIELDS]
                 vals = []
                 for c in cols:
                     v = r.get(c)
                     if c in ("active", "monitoring"):
                         v = 1 if v else 0
+                    elif c in _HUB_OPTIONAL_FIELDS:
+                        v = int(v or 0)
                     elif c == "respect_last_checked":
                         v = float(v or 0)
                     else:

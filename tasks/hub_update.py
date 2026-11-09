@@ -17,6 +17,9 @@ from state import GameState
 
 _DEFAULT_INTERVAL_MINUTES = 10
 _DEFAULT_PROFILES_PER_UPDATE = 5
+# Set once this bot has sent the ages it counted locally while the hub was not
+# counting; the hub keeps the larger value and owns ages from then on.
+_AGES_SEEDED_KEY = "hub_ages_seeded"
 
 
 def _hub_cfg() -> dict:
@@ -56,6 +59,7 @@ class HubUpdateTask(Task):
         return reasons
 
     def run(self, state: GameState, executor):
+        import player_db
         import players
         import sync_client
         self._last = time.monotonic()
@@ -69,6 +73,10 @@ class HubUpdateTask(Task):
             players.download_player_images(raw)
         if state.online_players:
             payload["online_players"] = sorted(state.online_players)
+            payload["jailed_players"] = sorted(state.jail_players)
+        seed_ages = not player_db.get_sync_meta(_AGES_SEEDED_KEY)
+        if seed_ages:
+            payload["ages"] = player_db.get_all_ages()
         if state.current_city:
             payload["current_city"] = state.current_city
             payload["city_active"] = sorted(state.local_players)
@@ -81,6 +89,8 @@ class HubUpdateTask(Task):
             state.add_log(f"Hub update failed: {e}")
             return
         self._pending_profiles = []
+        if seed_ages and "ages" in result:  # an older hub ignores ages: retry later
+            player_db.set_sync_meta(_AGES_SEEDED_KEY, "1")
         self._profile_requests = list(result.get("profile_requests") or [])
         msg = (f"Hub update: {result.get('births', 0)} birth(s), {result.get('deaths', 0)} death(s), "
                f"{result.get('online', 0)} online")
