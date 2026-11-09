@@ -946,13 +946,26 @@ def _try_quick_earn(page, display_name: str, schedule_value: str, state: GameSta
     return True
 
 
+_crime_block_city = ""  # city we last sent a "crime too high" earn notification for
+
+
 def _log_manual_earn_result(state: GameState, display_name: str, html: str, how: str):
     """Log the game's #success / #fail message after an earn."""
     success, message = _game_result_message(html)
+    global _crime_block_city
     if success is True:
+        _crime_block_city = ""
         state.add_log(f"Manual earn ({how}): {display_name} — {message}")
         action_log.record(state, "earn", display_name, "success",
                           amount=action_log.parse_amount(message), message=message, how=how)
+    elif success is False and action_log.is_crime_blocked(message):
+        # Not a failed earn: the game won't run earns while city crime is high.
+        # Notify once per city until an earn goes through again.
+        city = state.current_city or "the city"
+        state.add_log(f"Manual earn ({how}): {display_name} — no result, crime is too high in {city}. {message}")
+        if _crime_block_city != city:
+            _crime_block_city = city
+            _notify(state, "earn_crime_blocked", f"Earns blocked: crime is too high in {city}")
     elif success is False:
         state.add_log(f"Manual earn ({how}) failed: {display_name} — {message}")
         action_log.record(state, "earn", display_name, "fail", message=message, how=how)
@@ -2621,11 +2634,27 @@ def handle_fire_duties(action: Action, state: GameState):
 
     last = options[-1]
     page.check(f"input[name='comservice'][value='{last['value']}']")
-    state.add_log(f"Fire duties: {last['value']}")
 
     page.click("input[type='submit'][name='B2']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
+    _record_page_result(state, "fire_duty", last["value"], f"Fire duties: {last['value']}")
+
+
+def _record_page_result(state: GameState, category: str, kind: str, label: str,
+                        target: str = "", **detail) -> bool:
+    """Read the game's #success / #fail box after a submit, write it to the text
+    log as "<label> — <message>" (or "<label> failed — ...") and record it in
+    the bot history. A page with neither box counts as done. Returns False only
+    on a #fail box."""
+    ok, msg = _game_result_message(state.page_html or browser.page().content())
+    if ok is False:
+        state.add_log(f"{label} failed — {msg}")
+    else:
+        state.add_log(f"{label}" + (f" — {msg}" if ok and msg else "."))
+    action_log.record(state, category, kind, "fail" if ok is False else "success",
+                      target=target, message=msg if ok is not None else "", **detail)
+    return ok is not False
 
 
 def _action_fallback(state: GameState, reason: str):
@@ -2707,7 +2736,8 @@ def handle_career_training(action: Action, state: GameState):
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
-    state.add_log(f"Career training submitted for {career}.")
+    _record_page_result(state, "career_training", career, f"Career training submitted for {career}",
+                        enrolled=chosen == enroll_opt and chosen != study_opt)
 
 
 def handle_university(action: Action, state: GameState):
@@ -2748,9 +2778,14 @@ def handle_university(action: Action, state: GameState):
             soup2 = BeautifulSoup(page.content(), "html.parser")
             ok_div = soup2.find("div", id="success")
             fail_div = soup2.find("div", id="fail")
+            studying = degree_cfg or ""
             if fail_div:
-                state.add_log(f"University: study failed — {fail_div.get_text(' ', strip=True)}")
+                fail_msg = fail_div.get_text(' ', strip=True)
+                state.add_log(f"University: study failed — {fail_msg}")
+                action_log.record(state, "university", "study", "fail", target=studying, message=fail_msg)
                 return
+            action_log.record(state, "university", "study", "success", target=studying,
+                              message=ok_div.get_text(' ', strip=True) if ok_div else "")
             result = f" — {ok_div.get_text(' ', strip=True)}" if ok_div else ""
             page_text = soup2.get_text(" ").lower()
             if any(w in page_text for w in ("congratulations", "completed", "graduated", "degree awarded")):
@@ -2764,6 +2799,8 @@ def handle_university(action: Action, state: GameState):
                         completed.append(canonical)
                         cfg.save(c)
                     state.add_log(f"University: completed {canonical} degree{result or '.'}")
+                    action_log.record(state, "university", "degree", "success", target=canonical,
+                                      message=f"Completed {canonical} degree")
                 else:
                     state.add_log(f"University: studied{result or '.'}")
             elif ok_div:
@@ -2865,7 +2902,8 @@ def handle_training_centre(action: Action, state: GameState):
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
-        state.add_log(f"Training centre: continued training in {discipline}.")
+        _record_page_result(state, "training_centre", discipline,
+                            f"Training centre: continued training in {discipline}")
         return
 
     # Enrollment confirmation page (accept option present) — ensure funds, enrol, then re-nav
@@ -2884,7 +2922,8 @@ def handle_training_centre(action: Action, state: GameState):
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
-        state.add_log(f"Training centre: enrolled in {discipline}.")
+        _record_page_result(state, "training_centre", discipline,
+                            f"Training centre: enrolled in {discipline}", enrolled=True)
         return
 
     # Page 1: discipline selection — pick the configured discipline
@@ -2917,7 +2956,8 @@ def handle_training_centre(action: Action, state: GameState):
                 page.click("input[type='submit'][name='B1']")
                 page.wait_for_load_state("domcontentloaded")
                 _refresh_state(state)
-                state.add_log(f"Training centre: enrolled in {discipline}.")
+                _record_page_result(state, "training_centre", discipline,
+                                    f"Training centre: enrolled in {discipline}", enrolled=True)
                 return
             else:
                 state.add_log("Training centre: no accept option found on confirmation page.")
@@ -3308,13 +3348,18 @@ def handle_drug_manufacturing(action: Action, state: GameState):
     success_div = result_soup.find("div", id="success")
     fail_div = result_soup.find("div", id="fail")
     if success_div:
-        state.add_log(f"Drug manufacturing: {success_div.get_text(strip=True)}")
+        ok_msg = success_div.get_text(" ", strip=True)
+        state.add_log(f"Drug manufacturing: {ok_msg}")
+        action_log.record(state, "drug_manufacture", "manufacture", "success", message=ok_msg,
+                          amount=action_log.parse_amount(ok_msg))
     elif fail_div:
         _drug_manufacture_cooldown_until = time.monotonic() + 1800
+        fail_msg = fail_div.get_text(" ", strip=True)
         state.add_log(
-            f"Drug manufacturing failed: {fail_div.get_text(strip=True)} "
+            f"Drug manufacturing failed: {fail_msg} "
             f"— cooling down for 30 minutes."
         )
+        action_log.record(state, "drug_manufacture", "manufacture", "fail", message=fail_msg)
     else:
         state.add_log("Drug manufacturing: submitted (no result div).")
 
@@ -8084,7 +8129,15 @@ def handle_launder_money(action: Action, state: GameState):
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
 
-    state.add_log(f"Laundering: submitted ${amount:,} through {chosen['name']}.")
+    # Sending dirty money to a banker contact to be laundered (kind = contact).
+    ok, msg = _game_result_message(state.page_html or page.content())
+    if ok is False:
+        state.add_log(f"Laundering: sending ${amount:,} through {chosen['name']} failed — {msg}")
+    else:
+        state.add_log(f"Laundering: submitted ${amount:,} through {chosen['name']}."
+                      + (f" — {msg}" if ok and msg else ""))
+    action_log.record(state, "launder", chosen["name"], "fail" if ok is False else "success",
+                      target=chosen["name"], amount=amount, message=msg if ok is not None else "")
 
 
 def handle_scrape_player(action: Action, state: GameState):

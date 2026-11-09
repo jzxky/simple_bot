@@ -27,6 +27,15 @@ _initialized = False
 
 RESULTS = ("success", "fail", "skip", "error")
 
+# The game refuses to run earns while crime in the city is high. That is a
+# non-result, not a failed earn, so it is never stored as an action.
+_CRIME_BLOCK_RE = re.compile(r"too afraid to go out to work", re.I)
+
+
+def is_crime_blocked(message: str) -> bool:
+    return bool(_CRIME_BLOCK_RE.search(message or ""))
+
+
 CATEGORY_LABELS = {
     "agg": "Agg crimes",
     "case_work": "Case work",
@@ -38,6 +47,12 @@ CATEGORY_LABELS = {
     "community_service": "Community service",
     "dog_train": "Dog trains",
     "jail_duty": "Jail duties",
+    "fire_duty": "Fire duties",
+    "drug_manufacture": "Drug manufacturing",
+    "career_training": "Career training",
+    "training_centre": "Training centre",
+    "university": "University",
+    "launder": "Laundering sent",
 }
 
 _SCHEMA = """
@@ -100,6 +115,8 @@ def _ensure():
         c.execute("CREATE INDEX IF NOT EXISTS idx_actions_source ON actions(character, source)")
         # Travel is no longer tracked; clear rows recorded before that change.
         c.execute("DELETE FROM actions WHERE category = 'travel'")
+        # High-crime earn refusals are non-results; clear any recorded as fails.
+        c.execute("DELETE FROM actions WHERE category = 'earn' AND message LIKE '%too afraid to go out to work%'")
         _fold_paybacks(c)
     _initialized = True
 
@@ -385,9 +402,13 @@ def summary(f: dict) -> dict:
             "SELECT message, COUNT(*) n"
             f" FROM actions{where}{and_}category='case_work' AND kind='hospital' AND result='fail'"
             " GROUP BY message ORDER BY n DESC LIMIT 20", args)]
+        # Degrees completed at university, by name.
+        degrees = [r["target"] for r in c.execute(
+            f"SELECT target, MIN(ts) t FROM actions{where}{and_}category='university' AND kind='degree'"
+            " AND result='success' AND target != '' GROUP BY target ORDER BY t", args)]
         return {"by_kind": by_kind,
                 "case_types": sorted(case_types.values(), key=lambda x: -x["n"]),
-                "hospital_fails": hospital_fails}
+                "hospital_fails": hospital_fails, "degrees": degrees}
     return _read(run)
 
 

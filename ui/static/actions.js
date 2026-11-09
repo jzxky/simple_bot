@@ -147,7 +147,9 @@
     ["banking", "Banking Work"], ["hospital", "Medical Work"], ["lawyer", "Law Work"],
     ["engineering", "Engineering"], ["fire", "Fire Fighter"],
   ];
-  const KIND_LABELS = Object.fromEntries(CRIME_ROWS.concat(CAREER_SECTIONS));
+  const KIND_LABELS = Object.assign(Object.fromEntries(CRIME_ROWS.concat(CAREER_SECTIONS)), {
+    manufacture: "Drug manufacturing", study: "Study", degree: "Degree completed",
+  });
 
   const CASE_TYPE_LABELS = {
     sex_change: "Sex Changes", bionics: "Bionic Surgery", flu: "Flu Treatment", recover: "Recovery",
@@ -241,6 +243,10 @@
       info += chRow("Consumables Used", sumOf(cat("consume"), "units"),
         {sub: cat("consume").slice().sort((a, b) => b.units - a.units).map(k => ({label: k.kind || "–", value: k.units, units: true}))});
     }
+    if (cat("fire_duty").length) {
+      const f = cat("fire_duty");
+      info += chRow("Fire Duties", sumOf(f, "success"), {rate: [sumOf(f, "success"), sumOf(f, "fail")], sub: subRows(f, true)});
+    }
     const jailed = kindOf("jail", "jailed");
     if (jailed) info += chRow("Times Jailed", jailed.n);
     const jb = kindOf("jail", "jailbreak");
@@ -292,15 +298,43 @@
       html += chSection(title, rows, "", kind === "banking" ? money(k.amount) : n(k.success));
     }
 
+    // ── Money sent to contacts to be laundered ──
+    const sent = cat("launder");
+    if (sent.length) {
+      let rows = chRow("Launders Sent", sumOf(sent, "success"),
+        {rate: [sumOf(sent, "success"), sumOf(sent, "fail")], sub: subRows(sent)});
+      rows += chRow("Total Sent", sumOf(sent, "amount"), {money: true, cls: "ah-total"});
+      html += chSection("Money Laundering", rows, "Dirty money sent to banker contacts to be laundered.",
+        money(sumOf(sent, "amount")));
+    }
+
+    // ── Training & Education ──
+    const ct = cat("career_training"), tc = cat("training_centre");
+    const study = kindOf("university", "study"), degree = kindOf("university", "degree");
+    if (ct.length || tc.length || study || degree) {
+      let rows = "";
+      if (ct.length) rows += chRow("Career Training", sumOf(ct, "success"), {sub: subRows(ct)});
+      if (tc.length) rows += chRow("Training Centre", sumOf(tc, "success"), {sub: subRows(tc)});
+      if (study) rows += chRow("University Study", study.success, {rate: [study.success, study.fail]});
+      if (degree) {
+        rows += chRow("Degrees Completed", degree.success,
+          {sub: (summary.degrees || []).map(d => ({label: d, value: 1}))});
+      }
+      html += chSection("Training & Education", rows, "",
+        n(sumOf(ct, "success") + sumOf(tc, "success") + (study ? study.success : 0)));
+    }
+
     // ── Earn History ──
     const earns = cat("earn"), queue = cat("earn_queue");
-    if (earns.length || queue.length) {
+    const drugs = kindOf("drug_manufacture", "manufacture");
+    if (earns.length || queue.length || drugs) {
       let rows = "";
       if (earns.length) {
         rows += chRow("Manual Earns", sumOf(earns, "success"), {rate: [sumOf(earns, "success"), sumOf(earns, "fail")], sub: subRows(earns, true)});
         if (sumOf(earns, "amount")) rows += chRow("Earned", sumOf(earns, "amount"), {money: true});
       }
       if (queue.length) rows += chRow("Earn Queue Top-ups", sumOf(queue, "success"), {sub: subRows(queue)});
+      if (drugs) rows += chRow("Drug Manufacturing", drugs.success, {rate: [drugs.success, drugs.fail]});
       html += chSection("Earn History", rows,
         "Auto earns can't be tracked: the game runs the auto earn queue on its own servers.",
         n(sumOf(earns, "success")));
@@ -308,7 +342,8 @@
 
     // Anything else the bot records later still shows up.
     const shown = new Set(["gym", "community_service", "dog_train", "consume", "jail", "jail_duty",
-                           "agg", "case_work", "earn", "earn_queue"]);
+                           "agg", "case_work", "earn", "earn_queue", "fire_duty", "career_training",
+                           "training_centre", "university", "drug_manufacture", "launder"]);
     Object.keys(byCat).filter(c => !shown.has(c)).forEach(c => {
       html += chSection(catLabel(c), byCat[c].map(k => chRow(k.kind || "–", k.success, {rate: [k.success, k.fail]})).join(""));
     });

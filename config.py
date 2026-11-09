@@ -328,6 +328,7 @@ DEFAULT_CONFIG = {
         "dog_trains_unavailable": False,
         "new_message":         False,
         "no_available_earns":  True,
+        "earn_crime_blocked":  True,
     }
 }
 
