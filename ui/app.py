@@ -2849,8 +2849,36 @@ def apply_update():
     return jsonify({"ok": True, "output": out})
 
 
+def load_plugins():
+    """Import every .py file in <data dir>/plugins (gitignored, so it never
+    ships with the bot). Lets one install add its own routes or features
+    without changing the code everyone runs. A broken plugin is logged and
+    skipped, never stops the bot."""
+    import importlib.util
+    folder = os.path.join(paths.data_dir(), "plugins")
+    if not os.path.isdir(folder):
+        return []
+    loaded = []
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith(".py") or name.startswith("_"):
+            continue
+        mod_name = f"plugin_{name[:-3]}"
+        try:
+            spec = importlib.util.spec_from_file_location(mod_name, os.path.join(folder, name))
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            loaded.append(name)
+            print(f"[plugins] loaded {name}")
+        except Exception as e:
+            sys.modules.pop(mod_name, None)
+            print(f"[plugins] {name} failed to load: {e}")
+    return loaded
+
+
 def run():
     import config as _cfg
     port = int(_cfg.get_env_var("UI_PORT", "8080"))
+    load_plugins()
     remote_control.start()
     app.run(host="0.0.0.0", port=port, debug=False)
