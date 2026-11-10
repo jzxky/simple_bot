@@ -93,3 +93,7 @@ Optionally set a **Remote password** (Settings, or `UI_REMOTE_PASSWORD` in `.env
 - Credentials are stored locally in a `.env` file and never committed.
 - Bot activity logs are saved to the `logs/` folder, named by start time.
 - The bot runs a headed Chrome window — your machine needs a display.
+
+### Local plugins
+
+Any `.py` file in a `plugins` folder next to `main.py` is loaded when the bot starts. The folder is gitignored, so a plugin only runs on the install where you put it and survives updates. A plugin that fails to load is logged and skipped.
