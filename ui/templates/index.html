@@ -1975,7 +1975,7 @@
                   <span class="toggle"></span>
                 </label>
               </h3>
-              <p class="setting-note">Lets the people a Player Hub admin assigns to this bot open this control panel from anywhere, through the hub. Uses the Sync server URL and API key above; no port forwarding needed. Your game email, password and PIN are never sent to the hub.</p>
+              <p class="setting-note">Open this control panel from anywhere through Player Hub, with no port forwarding. Uses the Sync server URL and API key above. Only you and the hub users you share it with can open it; hub admins can't. Your game email, password and PIN are never sent to the hub.</p>
               {% if remote_session %}
               <p class="setting-note">You're using this bot through Player Hub. Remote control, the remote password, the Sync connection, credentials and the PIN can only be changed on the bot's own computer.</p>
               {% endif %}
@@ -1988,6 +1988,17 @@
                 </div>
               </div>
               <p class="setting-note">If set, anyone opening this bot from the hub must enter it first, each time they open it. Stored in .env as <code>UI_REMOTE_PASSWORD</code>; it can't be seen or changed from the hub.</p>
+              {% endif %}
+              {% if not remote_session %}
+              <div class="setting-row remote-pair-row">
+                <button type="button" class="btn-secondary" id="remote-pair-btn" onclick="remotePair()">Pair with hub</button>
+                <button type="button" class="btn-secondary" id="remote-unpair-btn" onclick="remoteUnpair()" style="display:none">Unpair everyone</button>
+              </div>
+              <div id="remote-pair-box" class="remote-pair-box" style="display:none">
+                <div>On Player Hub, open <b>Remote</b> and enter this code under <b>Pair a bot</b>:</div>
+                <div class="remote-pair-code" id="remote-pair-code"></div>
+                <div class="setting-note"><span id="remote-pair-expiry"></span> · <a href="#" onclick="remotePairCancel(); return false">Cancel</a></div>
+              </div>
               {% endif %}
               <p class="setting-note">Status: <span id="remote-status-text">{% if config.get('remote', {}).get('enabled', False) %}Connecting…{% else %}Off{% endif %}</span></p>
             </div>

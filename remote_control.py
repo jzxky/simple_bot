@@ -6,8 +6,12 @@ When Settings → Remote control is on, a few worker threads long-poll the hub
 Each request is replayed against this bot's own Flask control panel in-process
 and the answer posted back. Nothing listens for inbound connections.
 
-The hub only relays once an admin has approved this bot and assigned it to
-users. Requests that arrive this way are marked in the WSGI environ
+Pairing is self-service: "Pair with hub" shows a one-time code here (and sends
+it with the polls); the owner types it on the hub's Remote page, which links
+this bot to their hub account. Only the owner and people they share it with
+can open it; hub admins get no access. "Unpair" here cuts every hub user off.
+
+Requests that arrive this way are marked in the WSGI environ
 (REMOTE_ENVIRON_KEY), and the control panel refuses the things that must stay
 local: game credentials, the PIN, sync/remote settings and shutdown.
 
@@ -38,10 +42,15 @@ LOCKOUT = 300              # seconds
 WORKERS = 3
 POLL_TIMEOUT = 40          # hub holds a poll ~20 s; allow for slow links
 IDLE_RECHECK = 5           # seconds between config checks while off
-NOT_APPROVED_WAIT = 15     # seconds between polls while pending/blocked
+UNPAIRED_WAIT = 15         # seconds between polls while no hub user is paired
+PAIRING_WAIT = 3           # ... while a pairing code is showing
+PAIR_CODE_TTL = 600
+_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # no 0/O, 1/I
 
 _lock = threading.Lock()
-_state = {"status": "off", "detail": ""}
+_state = {"status": "off", "detail": "", "owner": "", "shared": 0}
+_pairing = {"code": "", "expires": 0.0}
+_unpair_requested = False
 _started = False
 _wake = threading.Event()
 # New on every start, so the hub can tell a restarted bot from a slow one.
@@ -57,14 +66,54 @@ def _version() -> str:
         return ""
 
 
-def _set(status: str, detail: str = ""):
+def _set(status: str, detail: str = "", **extra):
     with _lock:
         _state["status"] = status
         _state["detail"] = detail
+        _state.update(extra)
+
+
+def _active_code() -> str:
+    with _lock:
+        if _pairing["code"] and _pairing["expires"] > time.time():
+            return _pairing["code"]
+        _pairing["code"] = ""
+        return ""
+
+
+def start_pairing() -> dict:
+    """Show a new one-time code; the hub accepts it while this bot keeps sending it."""
+    import secrets
+    code = "".join(secrets.choice(_CODE_ALPHABET) for _ in range(8))
+    with _lock:
+        _pairing["code"] = code
+        _pairing["expires"] = time.time() + PAIR_CODE_TTL
+    nudge()
+    return pairing()
+
+
+def cancel_pairing():
+    with _lock:
+        _pairing["code"] = ""
+
+
+def pairing() -> dict:
+    code = _active_code()
+    return {"code": f"{code[:4]}-{code[4:]}" if code else "",
+            "expires_in": max(0, int(_pairing["expires"] - time.time())) if code else 0}
+
+
+def request_unpair():
+    """Cut every hub user off on the next poll."""
+    global _unpair_requested
+    with _lock:
+        _unpair_requested = True
+    cancel_pairing()
+    nudge()
 
 
 def status() -> dict:
-    """{"status": off|connecting|pending|approved|blocked|error, "detail": str}"""
+    """{"status": off|connecting|paired|unpaired|error, "detail", "owner", "shared"}"""
     with _lock:
         st = dict(_state)
     if st["status"] == "off" and cfg.load().get("remote", {}).get("enabled", False):
@@ -198,8 +247,19 @@ def _worker(n: int):
             _wake.clear()
             continue
         url, key = target
+        global _unpair_requested
+        with _lock:
+            known = _state["status"]
+        payload = {"version": _version(), "session": _SESSION, "known_status": known}
+        code = _active_code()
+        if code:
+            payload["pair_code"] = code
+        with _lock:
+            unpair = _unpair_requested
+        if unpair:
+            payload["unpair"] = True
         try:
-            d = _post(url, key, "/api/remote/poll", {"version": _version(), "session": _SESSION}, POLL_TIMEOUT)
+            d = _post(url, key, "/api/remote/poll", payload, POLL_TIMEOUT)
         except urllib.error.HTTPError as e:
             msg = "The hub rejected this bot's API key." if e.code == 401 else \
                   "The hub doesn't support remote control yet." if e.code == 404 else f"Hub error {e.code}."
@@ -212,12 +272,17 @@ def _worker(n: int):
             backoff = min(backoff * 2, 60)
             continue
         backoff = 5
+        if unpair:
+            with _lock:
+                _unpair_requested = False
+        if d.get("pair_code_used"):
+            cancel_pairing()
         st = d.get("status", "")
-        if st != "approved":
-            _set(st or "error", "")
-            time.sleep(NOT_APPROVED_WAIT + n * 3)
+        _set(st or "error", "", owner=d.get("owner", ""), shared=int(d.get("shared") or 0))
+        if st != "paired":
+            _wake.wait(PAIRING_WAIT if _active_code() else UNPAIRED_WAIT + n * 3)
+            _wake.clear()
             continue
-        _set("approved", "")
         for frame in d.get("requests") or []:
             resp = handle(frame)
             try:

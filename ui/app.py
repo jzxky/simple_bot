@@ -1148,7 +1148,7 @@ def status():
         "event_boss_enabled": cfg.load().get("event_boss", {}).get("enabled", False),
         "event_consumables": s.event_consumables,
         "settings_rev": __import__("settings_rev").get(),
-        "remote": remote_control.status(),
+        "remote": _remote_status_payload(),
         "last_gym_use": _get_last_gym_use(),
         "casino_release_at": _get_casino_release_at(),
         "bionics_next_check_at": _get_bionics_next_check_at(s),
@@ -1176,6 +1176,39 @@ def status():
         "lawyer_cases_by_city": bot.state.lawyer_cases_by_city,
         "lawyer_case_details": bot.state.lawyer_case_details,
     })
+
+
+def _remote_status_payload():
+    st = remote_control.status()
+    if not _is_remote():
+        # The pairing code is shown only on this computer, never through the hub.
+        st["pairing"] = remote_control.pairing()
+    return st
+
+
+@app.route("/remote/pair", methods=["POST"])
+def remote_pair():
+    if _is_remote():
+        return _local_only()
+    if not cfg.load().get("remote", {}).get("enabled", False):
+        return jsonify({"error": "Turn on Remote control first."}), 400
+    return jsonify(remote_control.start_pairing())
+
+
+@app.route("/remote/pair/cancel", methods=["POST"])
+def remote_pair_cancel():
+    if _is_remote():
+        return _local_only()
+    remote_control.cancel_pairing()
+    return jsonify({"ok": True})
+
+
+@app.route("/remote/unpair", methods=["POST"])
+def remote_unpair():
+    if _is_remote():
+        return _local_only()
+    remote_control.request_unpair()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/shutdown", methods=["POST"])
