@@ -4,15 +4,15 @@ sniper settings (promo.top_job_thread_id) after a top job promotion.
 
 A promotion taken by any route (the sniper in the side browser, or the
 promotion page handler on the main tab) records a *pending post* in
-promo_post_pending.json. The record outlives errors and restarts, and is only
-cleared once the post has been seen in the thread, so:
+promo_post_pending.json. The record outlives errors and restarts:
 
-  - PromoForumPostTask (tasks/promo_forum_post.py) keeps trying until it's
-    done, urgently travelling home first when the character is away;
-  - every attempt first checks the thread for the post, so a retry after an
-    error never posts twice;
-  - after submitting, the post is checked for in the thread before the
-    record is cleared.
+  - PromoForumPostTask (tasks/promo_forum_post.py) keeps trying until a post
+    has been submitted, urgently travelling home first when the character is
+    away; an error part-way leaves the record for the next try;
+  - every attempt first checks the reply page's "last 5 posts" list, so a
+    retry never posts twice;
+  - after submitting, the list is checked again and a notification says
+    whether the post was found.
 
 The post is "<name> - <top job> - <server time of the promotion>".
 
@@ -110,84 +110,54 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip().lower()
 
 
-def _page_has(pg, msg: str) -> bool:
-    try:
-        return _norm(msg) in _norm(pg.inner_text("body"))
-    except Exception:
-        return False
-
-
 def _goto(pg, url: str):
     pg.goto(url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
 
 
-def _thread_link(pg, tid: str) -> "str | None":
-    """A link to the thread itself (not the reply form) on the current page."""
-    pat = re.compile(rf"[?&]t(?:opic)?(?:id)?={re.escape(tid)}(?:&|$)", re.I)
-    best = None
-    for a in pg.query_selector_all("a[href]"):
-        href = a.get_attribute("href") or ""
-        if not pat.search(href) or "postreply" in href.lower() or "javascript:" in href.lower():
-            continue
-        best = best or href
-    if not best:
+def _reply_url(tid: str) -> str:
+    return urls.BASE_URL + f"/forum/postreply.asp?t={tid}"
+
+
+# The reply page lists the thread's last 5 posts under #post_list: one
+# tr.alias per post, author link in the first cell, text in #bodytext.
+_RECENT_POSTS_JS = """() => {
+  const list = document.querySelector('#post_list');
+  if (!list) return null;
+  return Array.from(list.querySelectorAll('tr.alias')).map(tr => {
+    const a = tr.querySelector('td a');
+    const body = tr.querySelector('#bodytext, .bodytext');
+    return {author: a ? a.textContent : '', body: body ? body.textContent : ''};
+  });
+}"""
+
+
+def recent_posts(pg, tid: str) -> "list | None":
+    """The last 5 posts listed on the thread's reply page, or None if the list
+    isn't on the page."""
+    _goto(pg, _reply_url(tid))
+    try:
+        return pg.evaluate(_RECENT_POSTS_JS)
+    except Exception:
         return None
-    if best.startswith("http"):
-        return best
-    if best.startswith("/"):
-        return urls.BASE_URL + best
-    return urls.BASE_URL + "/forum/" + best
 
 
-def _last_page_links(pg, tid: str) -> list:
-    """Links to this thread's two highest-numbered pages on the current page,
-    highest first (the post is on the last page, or the one before it if the
-    thread has moved on since)."""
-    pat = re.compile(rf"[?&]t(?:opic)?(?:id)?={re.escape(tid)}(?:&|$)", re.I)
-    pages = {}
-    for a in pg.query_selector_all("a[href]"):
-        href = a.get_attribute("href") or ""
-        if not pat.search(href) or "postreply" in href.lower():
-            continue
-        m = re.search(r"[?&](?:page|p|pg|whichpage)=(\d+)", href, re.I)
-        if m and int(m.group(1)) > 1:
-            pages.setdefault(int(m.group(1)), href)
-    out = []
-    for n in sorted(pages, reverse=True)[:2]:
-        href = pages[n]
-        if href.startswith("http"):
-            out.append(href)
-        elif href.startswith("/"):
-            out.append(urls.BASE_URL + href)
-        else:
-            out.append(urls.BASE_URL + "/forum/" + href)
-    return out
-
-
-def check_posted(pg, p: dict, tid: str) -> "bool | None":
-    """True if the post is in the thread, False if the thread was read and it
-    isn't, None if the thread couldn't be found to check."""
-    msg = message(p)
-    _goto(pg, urls.BASE_URL + f"/forum/postreply.asp?t={tid}")
-    if _page_has(pg, msg):          # reply form's topic review, if it has one
-        return True
-    link = _thread_link(pg, tid)
-    if not link:
+def is_posted(pg, p: dict, tid: str) -> "bool | None":
+    """True if the post is in the reply page's last-5 list (by this character,
+    with this text), False if it isn't, None if the list couldn't be read."""
+    posts = recent_posts(pg, tid)
+    if posts is None:
         return None
-    _goto(pg, link)
-    if _page_has(pg, msg):
-        return True
-    for url in _last_page_links(pg, tid):
-        _goto(pg, url)
-        if _page_has(pg, msg):
-            return True
-    return False
+    msg = _norm(message(p))
+    who = _norm(p.get("character", ""))
+    return any(msg in _norm(x.get("body")) and (not who or _norm(x.get("author")) == who)
+               for x in posts)
 
 
 def post_and_verify(pg, state) -> bool:
-    """Make the pending post (if it isn't in the thread already) and confirm
-    it's there. Returns True once the post is confirmed and the record cleared.
-    Must be called with the character in its home city."""
+    """Make the pending post unless it's already in the thread, then check the
+    reply page's last-5 list for it and notify whether it was found. Returns
+    True once handled (record cleared). Raises on page errors, leaving the
+    record for a retry. Must be called with the character in its home city."""
     with _LOCK:
         p = pending_for(state)
         if not p:
@@ -201,42 +171,39 @@ def post_and_verify(pg, state) -> bool:
         _save(p)
         msg = message(p)
 
-        before = check_posted(pg, p, tid)
+        # A retry after an error: the earlier attempt may have posted already.
+        before = is_posted(pg, p, tid)
         if before:
-            state.add_log(f"Top job post: already in the thread — \"{msg}\".")
+            state.add_log(f"Top job post: found in the thread — \"{msg}\" (already posted).")
+            _note(state, f"Top job post found in the thread: {msg}")
             clear()
             return True
         if before is None and int(p.get("submits", 0)) > 0:
-            # Can't read the thread and a submit already went through once:
-            # posting again could double post, so stop and let the user check.
-            state.add_log("Top job post: a post was submitted but the thread can't be read to "
-                          "confirm it — not posting again. Check the thread.")
-            _note(state, f"Top job post for {p['top_job']} couldn't be confirmed — check the thread.")
+            state.add_log("Top job post: a post was submitted earlier but the thread's recent posts "
+                          "can't be read — not posting again.")
+            _note(state, f"Top job post for {p['top_job']} NOT confirmed (couldn't read the thread) — check it.")
             clear()
             return True
 
-        _goto(pg, urls.BASE_URL + f"/forum/postreply.asp?t={tid}")
+        # recent_posts() left the page on the reply form.
         pg.fill("textarea#body", msg)
         p["submits"] = int(p.get("submits", 0)) + 1
         _save(p)
         pg.click("input[name='Submit']")
         pg.wait_for_load_state("domcontentloaded", timeout=_NAV_TIMEOUT)
-        landed = _page_has(pg, msg)
 
-        after = True if landed else check_posted(pg, p, tid)
+        after = is_posted(pg, p, tid)
+        clear()
         if after:
-            state.add_log(f"Top job post: posted and confirmed in the thread — \"{msg}\".")
-            _note(state, f"Top job forum post made: {msg}")
-            clear()
-            return True
-        if after is None:
-            state.add_log(f"Top job post: submitted \"{msg}\" — the thread couldn't be read to confirm it. "
-                          "Check the thread.")
-            _note(state, f"Top job post submitted but not confirmed — check the thread.")
-            clear()
-            return True
-        state.add_log(f"Top job post: submitted but not found in the thread — will retry.")
-        return False
+            state.add_log(f"Top job post: posted and found in the thread — \"{msg}\".")
+            _note(state, f"Top job post found in the thread: {msg}")
+        elif after is None:
+            state.add_log(f"Top job post: submitted \"{msg}\" — couldn't read the thread's recent posts to check.")
+            _note(state, f"Top job post NOT confirmed (couldn't read the thread): {msg}")
+        else:
+            state.add_log(f"Top job post: submitted \"{msg}\" but it's not in the thread's last 5 posts.")
+            _note(state, f"Top job post NOT found in the thread: {msg}")
+        return True
 
 
 def _note(state, msg: str):
