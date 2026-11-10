@@ -6178,6 +6178,11 @@ def get_deferred_travel() -> "dict | None":
     return _deferred_travel
 
 
+def urgent_travel_pending() -> bool:
+    """True while an urgent trip is deferred until the travel timer is free."""
+    return bool(_deferred_travel and _deferred_travel.get("urgent"))
+
+
 def clear_deferred_travel():
     global _deferred_travel
     _deferred_travel = None
@@ -6341,7 +6346,7 @@ def _drug_stock_travel_check(state: GameState) -> bool:
 
 def handle_travel(action: Action, state: GameState) -> int:
     from datetime import datetime
-    global _travel_warrant_cooldown_until
+    global _travel_warrant_cooldown_until, _deferred_travel
     target = action.params.get("target_city", "")
     method = action.params.get("method", "airport")
     # A lockdown doesn't stop the character going to its own home city, and the
@@ -6365,6 +6370,13 @@ def handle_travel(action: Action, state: GameState) -> int:
     # Urgent travel (e.g. home to make a top job forum post) ignores the
     # warrant cooldown and turns in every warrant that carries no jail time.
     urgent = bool(action.params.get("urgent"))
+
+    # An urgent trip waiting on the travel timer goes first: no other travel
+    # (smart travel, etc.) may take the timer or replace it.
+    if not urgent and urgent_travel_pending():
+        state.add_log(f"Travel: urgent travel to {_deferred_travel['target_city']} is waiting for the "
+                      f"travel timer — skipping travel to {target}.")
+        return 0
 
     # Pre-travel warrant check
     if not urgent and time.monotonic() < _travel_warrant_cooldown_until:
@@ -6438,9 +6450,11 @@ def handle_travel(action: Action, state: GameState) -> int:
     # fresh from the warrant-check navigation above). A missing timer entry means
     # travel is available (the game only shows the timer while on cooldown).
     if "travel" in state.timers and not state.timer_ready("travel"):
-        global _deferred_travel
         _deferred_travel = {"target_city": target, "method": method}
-        state.add_log(f"Travel: travel timer not ready — travel to {target} deferred until it's free.")
+        if urgent:
+            _deferred_travel["urgent"] = True
+        state.add_log(f"Travel: travel timer not ready — {'urgent ' if urgent else ''}travel to {target} "
+                      f"deferred until it's free.")
         return 0
 
     # Travel fails silently without enough cash on hand — top up from the bank first.
@@ -8637,6 +8651,34 @@ def handle_hospital_sex_change(action: Action, state: GameState):
         result_q.put(result)
 
 
+def handle_promo_forum_post(action: Action, state: GameState):
+    """Pending top job forum post: get home (urgently — turning in warrants
+    with no jail time), then post in the sniper's thread and confirm it."""
+    import promo_post
+    if not promo_post.pending_for(state):
+        return
+    if not state.in_home_city():
+        home = state.home_city
+        if not home:
+            state.add_log("Top job post: home city unknown — can't travel to post.")
+            return
+        if urgent_travel_pending():
+            return  # already queued for the moment the travel timer frees up
+        state.add_log(f"Top job post: in {state.current_city or '?'} — travelling home to {home} urgently.")
+        if not handle_travel(Action("travel", target_city=home, method="own_vehicle", urgent=True), state):
+            if urgent_travel_pending():
+                return  # travel timer busy: the trip runs as soon as it's free
+            if not state.in_home_city():
+                handle_travel(Action("travel", target_city=home, method="airport", urgent=True), state)
+        _nav(_u("/main.asp"), state)
+        if not state.in_home_city():
+            return  # retried by PromoForumPostTask
+    try:
+        promo_post.post_and_verify(browser.page(), state)
+    finally:
+        _refresh_state(state)
+
+
 HANDLERS = {
     "login": handle_login,
     "check_earns": handle_check_earns,
@@ -8742,30 +8784,6 @@ HANDLERS = {
     "use_skill": handle_use_skill,
     "use_news_editor": handle_use_news_editor,
 }
-
-
-def handle_promo_forum_post(action: Action, state: GameState):
-    """Pending top job forum post: get home (urgently — turning in warrants
-    with no jail time), then post in the sniper's thread and confirm it."""
-    import promo_post
-    if not promo_post.pending_for(state):
-        return
-    if not state.in_home_city():
-        home = state.home_city
-        if not home:
-            state.add_log("Top job post: home city unknown — can't travel to post.")
-            return
-        state.add_log(f"Top job post: in {state.current_city or '?'} — travelling home to {home} urgently.")
-        if not handle_travel(Action("travel", target_city=home, method="own_vehicle", urgent=True), state):
-            if not state.in_home_city():
-                handle_travel(Action("travel", target_city=home, method="airport", urgent=True), state)
-        _nav(_u("/main.asp"), state)
-        if not state.in_home_city():
-            return  # retried by PromoForumPostTask
-    try:
-        promo_post.post_and_verify(browser.page(), state)
-    finally:
-        _refresh_state(state)
 
 
 class ActionExecutor:
