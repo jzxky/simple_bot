@@ -274,6 +274,9 @@ DEFAULT_CONFIG = {
         "all_seeing_eye": {"enabled": False, "target": ""},
         "news_editor": {"target": "", "title": "", "event": ""},
     },
+    "remote": {
+        "enabled": False,
+    },
     "sync": {
         "enabled": False,
         "server_url": "",
@@ -373,7 +376,7 @@ def credentials_present() -> bool:
 
 
 def save_env(email: str = None, password: str = None, pin_required: bool = None, pin: str = None,
-             hide_credentials: bool = None):
+             hide_credentials: bool = None, remote_password: str = None):
     """Update the managed keys in .env. A None argument leaves that key as-is."""
     lines = []
     if os.path.exists(ENV_PATH):
@@ -390,6 +393,8 @@ def save_env(email: str = None, password: str = None, pin_required: bool = None,
         managed["UI_PIN"] = pin
     if hide_credentials is not None:
         managed["UI_HIDE_CREDENTIALS"] = "true" if hide_credentials else "false"
+    if remote_password is not None:
+        managed["UI_REMOTE_PASSWORD"] = remote_password
     seen = set()
     new_lines = []
     for line in lines:
@@ -419,6 +424,12 @@ def get_pin_required() -> bool:
 
 def get_pin() -> str:
     return get_env_var("UI_PIN", "")
+
+
+def get_remote_password() -> str:
+    """Optional password hub users must enter before using this bot remotely.
+    Set in .env (UI_REMOTE_PASSWORD) or from the local control panel only."""
+    return get_env_var("UI_REMOTE_PASSWORD", "").strip()
 
 
 def get_hide_credentials() -> bool:

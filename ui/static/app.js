@@ -636,6 +636,9 @@ function _buildPayload() {
     sync_online_time:   (document.getElementById("sync_online_time")||{checked:true}).checked,
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
+    remote_enabled:     (document.getElementById("remote_enabled")||{checked:false}).checked,
+    // Absent when using the bot through the hub — then the server leaves it alone.
+    remote_password:    document.getElementById("remote_password")?.value,
     skill_travel_expert_enabled: (document.getElementById("skill_travel_expert_enabled")||{checked:false}).checked,
     skill_travel_expert_threshold: parseInt((document.getElementById("skill_travel_expert_threshold")||{value:"2"}).value)||2,
     skill_all_seeing_eye_enabled: (document.getElementById("skill_all_seeing_eye_enabled")||{checked:false}).checked,
@@ -2445,12 +2448,66 @@ const CONSUMABLE_LABELS = {
   acid: "Acid", speed: "Speed", heroin: "Heroin", pice: "P/Ice",
 };
 
+const REMOTE_STATUS_TEXT = {
+  off: "Off",
+  connecting: "Connecting…",
+  unpaired: "Connected — not paired yet. Click Pair with hub",
+  paired: "Paired",
+  error: "Problem",
+};
+
+function _renderRemoteStatus(r) {
+  const el = document.getElementById("remote-status-text");
+  if (!el || !r) return;
+  let text = REMOTE_STATUS_TEXT[r.status] || r.status;
+  if (r.status === "paired") {
+    text = "Paired with " + (r.owner || "a hub user");
+    if (r.shared) text += ` and shared with ${r.shared} other${r.shared === 1 ? "" : "s"}`;
+  }
+  if (r.detail) text = r.status === "error" ? r.detail : text + " — " + r.detail;
+  el.textContent = text;
+
+  const box = document.getElementById("remote-pair-box");
+  if (!box) return;   // using the bot through the hub: no pairing controls
+  const p = r.pairing || {};
+  box.style.display = p.code ? "" : "none";
+  if (p.code) {
+    document.getElementById("remote-pair-code").textContent = p.code;
+    const m = Math.ceil((p.expires_in || 0) / 60);
+    document.getElementById("remote-pair-expiry").textContent = `Expires in ${m} min`;
+  }
+  const on = r.status !== "off";
+  document.getElementById("remote-pair-btn").style.display = on && !p.code ? "" : "none";
+  document.getElementById("remote-pair-btn").textContent = r.status === "paired" ? "Pair with a different hub user" : "Pair with hub";
+  document.getElementById("remote-unpair-btn").style.display = r.status === "paired" ? "" : "none";
+}
+
+function remotePair() {
+  fetch("/remote/pair", {method: "POST"}).then(r => r.json()).then(d => {
+    if (d.error) { alert(d.error); return; }
+    _renderRemoteStatus(Object.assign({}, window._lastStatus?.remote || {status: "unpaired"}, {pairing: d}));
+  });
+}
+
+function remotePairCancel() {
+  fetch("/remote/pair/cancel", {method: "POST"}).then(() => {
+    const box = document.getElementById("remote-pair-box");
+    if (box) box.style.display = "none";
+  });
+}
+
+function remoteUnpair() {
+  if (!confirm("Unpair this bot from Player Hub? Nobody will be able to open it from the hub until you pair it again.")) return;
+  fetch("/remote/unpair", {method: "POST"});
+}
+
 function pollStatus() {
   fetch("/status")
     .then(r => r.json())
     .then(d => {
       window._lastStatus = d;
       updateBotState(d.running, d.paused);
+      _renderRemoteStatus(d.remote);
       syncGameClock(d.server_time_now);
       _hospSyncSexCooldown(d.sex_change_available_at, d.sex_change_cooldown_secs);
 

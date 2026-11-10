@@ -20,7 +20,7 @@
 <div class="container">
   <header>
     <h1>OpenBot</h1>
-    <button type="button" id="close-bot-btn" class="close-bot-btn" onclick="openCloseBotModal()" title="Shut down the bot and this control panel">Close Bot</button>
+    {% if not remote_session %}<button type="button" id="close-bot-btn" class="close-bot-btn" onclick="openCloseBotModal()" title="Shut down the bot and this control panel">Close Bot</button>{% endif %}
     <div class="status-row">
     <div class="status-bar">
       <span id="status-dot" class="dot stopped"></span>
@@ -1966,6 +1966,41 @@
               <label class="inline-toggle setting-row">Groups
                 <label class="toggle-label"><input type="checkbox" id="sync_groups" {% if config.get('sync', {}).get('sync_groups', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+            </div>
+            <div class="settings-group">
+              <h3>
+                Remote control
+                <label class="toggle-label">
+                  <input type="checkbox" id="remote_enabled" {% if config.get('remote', {}).get('enabled', False) %}checked{% endif %} {% if remote_session %}disabled{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <p class="setting-note">Open this control panel from anywhere through Player Hub, with no port forwarding. Uses the Sync server URL and API key above. Only you and the hub users you share it with can open it; hub admins can't. Your game email, password and PIN are never sent to the hub.</p>
+              {% if remote_session %}
+              <p class="setting-note">You're using this bot through Player Hub. Remote control, the remote password, the Sync connection, credentials and the PIN can only be changed on the bot's own computer.</p>
+              {% endif %}
+              {% if not remote_session %}
+              <div class="setting-row">
+                <label for="remote_password">Remote password</label>
+                <div class="input-with-btn">
+                  <input type="password" id="remote_password" value="{{ remote_password }}" placeholder="Optional" autocomplete="new-password" style="width:160px" onchange="autoSave()">
+                  <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('remote_password', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
+                </div>
+              </div>
+              <p class="setting-note">If set, anyone opening this bot from the hub must enter it first, each time they open it. Stored in .env as <code>UI_REMOTE_PASSWORD</code>; it can't be seen or changed from the hub.</p>
+              {% endif %}
+              {% if not remote_session %}
+              <div class="setting-row remote-pair-row">
+                <button type="button" class="btn-secondary" id="remote-pair-btn" onclick="remotePair()">Pair with hub</button>
+                <button type="button" class="btn-secondary" id="remote-unpair-btn" onclick="remoteUnpair()" style="display:none">Unpair everyone</button>
+              </div>
+              <div id="remote-pair-box" class="remote-pair-box" style="display:none">
+                <div>On Player Hub, open <b>Remote</b> and enter this code under <b>Pair a bot</b>:</div>
+                <div class="remote-pair-code" id="remote-pair-code"></div>
+                <div class="setting-note"><span id="remote-pair-expiry"></span> · <a href="#" onclick="remotePairCancel(); return false">Cancel</a></div>
+              </div>
+              {% endif %}
+              <p class="setting-note">Status: <span id="remote-status-text">{% if config.get('remote', {}).get('enabled', False) %}Connecting…{% else %}Off{% endif %}</span></p>
             </div>
           </div>
         </div>

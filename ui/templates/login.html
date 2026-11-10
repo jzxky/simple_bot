@@ -19,9 +19,9 @@
 </head>
 <body>
 <div class="login-wrapper">
-  <form class="login-card" method="POST" action="/login">
-    <h2>Enter PIN</h2>
-    <input type="password" name="pin" autofocus placeholder="PIN" required>
+  <form class="login-card" method="POST" action="{{ action or '/login' }}">
+    <h2>{{ heading or 'Enter PIN' }}</h2>
+    <input type="password" name="pin" autofocus placeholder="{{ placeholder or 'PIN' }}" required>
     <button type="submit">Unlock</button>
     {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
   </form>

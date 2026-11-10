@@ -76,6 +76,18 @@ macOS notes:
 - On first run, macOS may ask for permission for automation to control Chrome — allow it.
 - Port 8080 must be free; to use another port: `UI_PORT=8090 python main.py`.
 
+## Remote control (no port forwarding)
+
+You can control the bot from anywhere through Player Hub instead of forwarding port 8080:
+
+1. In **Settings**, fill in the Sync server URL (must be `https://`, or a local-network address) and API key, then turn on **Remote control**.
+2. Click **Pair with hub**. The bot shows a one-time code for 10 minutes.
+3. On the hub's **Remote** page, enter the code under **Pair a bot**. The bot is now linked to your hub account; open it from there, or share it with other hub users. Hub admins get no access to it.
+
+**Unpair everyone** (on the bot) or **Unpair** (on the hub) cuts every hub user off. Pairing again hands the bot to whoever enters the new code.
+
+Optionally set a **Remote password** (Settings, or `UI_REMOTE_PASSWORD` in `.env`): hub users then have to enter it every time they open the bot. Remote control can only be turned on or off on the bot's own computer. Your game email, password, PIN and API key are never sent to the hub, and remote users can't change them, the Sync connection or shut the bot down.
+
 ## Notes
 
 - Credentials are stored locally in a `.env` file and never committed.
