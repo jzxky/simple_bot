@@ -39,6 +39,7 @@ NOTIFICATION_EVENTS = [
     ("drug_store_restock",     "Drug store restock detected"),
     ("promotion_success",   "Rank promotion"),
     ("auto_promo",          "Auto-promotion triggered"),
+    ("promo_forum_post",    "Top job forum post"),
     ("session_expired",     "Session expired"),
     ("jailed",              "Went to jail"),
     ("targets_exhausted",   "Crime targets exhausted"),
@@ -56,7 +57,7 @@ NOTIFICATION_EVENTS = [
 NOTIFICATION_STORES = [("Bionics", "bionics"), ("Weapons", "weapon_store"), ("Drugs", "drug_store")]
 NOTIFICATION_STORE_KINDS = [("In stock", "in_stock"), ("Bought", "purchased"), ("Restock", "restock")]
 NOTIFICATION_GROUPS = [
-    ("Career",         ["promotion_success", "auto_promo"]),
+    ("Career",         ["promotion_success", "auto_promo", "promo_forum_post"]),
     ("Account & jail", ["session_expired", "jailed", "warrants_outstanding", "mhs_protected"]),
     ("Crimes & earns", ["targets_exhausted", "agg_not_available", "dog_trains_unavailable", "no_available_earns", "earn_crime_blocked"]),
 ]

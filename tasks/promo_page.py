@@ -98,5 +98,10 @@ class PromoPageTask(Task):
             state.earn_catalog_refresh_pending = True
             if cfg.load().get("notifications", {}).get("auto_promo", False):
                 state.push_notification("auto_promo", msg)
+            # A top job taken here (not by the sniper) still needs its forum
+            # post: PromoForumPostTask travels home and makes it.
+            if promo["rank"] in _MONITORED_TOP_JOBS and state.occupation == promo["rank"]:
+                import promo_post
+                promo_post.mark_pending(state, promo["rank"])
         except Exception as e:
             state.add_log(f"PromoPage: submit error: {e}")

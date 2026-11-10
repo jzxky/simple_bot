@@ -321,6 +321,7 @@ DEFAULT_CONFIG = {
         "weapon_store_restock":    False,
         "promotion_success":       True,
         "auto_promo":          True,
+        "promo_forum_post":    True,
         "session_expired":     True,
         "cloudflare_detected": True,
         "jailed":              False,

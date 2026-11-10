@@ -6362,8 +6362,12 @@ def handle_travel(action: Action, state: GameState) -> int:
         state.add_log(f"Travel: {target} was closed — travel there paused (1 hour cooldown).")
         return 0
 
+    # Urgent travel (e.g. home to make a top job forum post) ignores the
+    # warrant cooldown and turns in every warrant that carries no jail time.
+    urgent = bool(action.params.get("urgent"))
+
     # Pre-travel warrant check
-    if time.monotonic() < _travel_warrant_cooldown_until:
+    if not urgent and time.monotonic() < _travel_warrant_cooldown_until:
         state.add_log("Travel: warrant cooldown active — skipping travel.")
         return 0
 
@@ -6401,6 +6405,7 @@ def handle_travel(action: Action, state: GameState) -> int:
                 warrant_mode == "all"
                 or (warrant_mode == "failed_no_jail"   and is_failed and not jail_nz)
                 or (warrant_mode == "failed_incl_jail" and is_failed)
+                or (urgent and not jail_nz)
             )
 
             if should_turn_in:
@@ -6415,6 +6420,13 @@ def handle_travel(action: Action, state: GameState) -> int:
         remaining = [w for w in warrants if w["case_id"] not in turned_in_ids]
         if remaining:
             ids = ", ".join(w["case_id"] for w in remaining)
+            if urgent:
+                # The caller retries; don't block everyone else's travel for an hour.
+                msg = (f"Travel: {len(remaining)} outstanding warrant(s) with jail time ({ids}) — "
+                       f"can't travel to {target}.")
+                state.add_log(msg)
+                _notify(state, "warrants_outstanding", msg)
+                return 0
             msg = (f"Travel: {len(remaining)} outstanding warrant(s) ({ids}) — "
                    f"aborting travel for 1 hour.")
             state.add_log(msg)
@@ -8704,6 +8716,7 @@ HANDLERS = {
     "check_vehicle": handle_check_vehicle,
     "repair_vehicle": handle_repair_vehicle,
     "travel": handle_travel,
+    "promo_forum_post": handle_promo_forum_post,
     "fetch_respect": handle_fetch_respect,
     "fetch_profile": handle_fetch_profile,
     "sell_weapon": handle_sell_weapon,
@@ -8729,6 +8742,30 @@ HANDLERS = {
     "use_skill": handle_use_skill,
     "use_news_editor": handle_use_news_editor,
 }
+
+
+def handle_promo_forum_post(action: Action, state: GameState):
+    """Pending top job forum post: get home (urgently — turning in warrants
+    with no jail time), then post in the sniper's thread and confirm it."""
+    import promo_post
+    if not promo_post.pending_for(state):
+        return
+    if not state.in_home_city():
+        home = state.home_city
+        if not home:
+            state.add_log("Top job post: home city unknown — can't travel to post.")
+            return
+        state.add_log(f"Top job post: in {state.current_city or '?'} — travelling home to {home} urgently.")
+        if not handle_travel(Action("travel", target_city=home, method="own_vehicle", urgent=True), state):
+            if not state.in_home_city():
+                handle_travel(Action("travel", target_city=home, method="airport", urgent=True), state)
+        _nav(_u("/main.asp"), state)
+        if not state.in_home_city():
+            return  # retried by PromoForumPostTask
+    try:
+        promo_post.post_and_verify(browser.page(), state)
+    finally:
+        _refresh_state(state)
 
 
 class ActionExecutor:
