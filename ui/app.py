@@ -19,6 +19,7 @@ import action_log
 import consumable_limit_detector as cld
 import trait_requirements as tr
 import notifications_store
+import remote_control
 import event_consumables as _ec_mod
 from tasks import hospital as _hospital
 from state import is_gangster as _is_gangster
@@ -91,8 +92,20 @@ app = Flask(__name__,
 app.secret_key = cfg.get_or_create_secret_key()
 
 
+def _is_remote() -> bool:
+    """This request was relayed from Player Hub (see remote_control.py)."""
+    return bool(request.environ.get(remote_control.REMOTE_ENVIRON_KEY))
+
+
+def _local_only():
+    return jsonify({"error": "This can only be changed on the bot's own computer, not through Player Hub."}), 403
+
+
 @app.before_request
 def require_pin():
+    # Hub users were already signed in and approved on the hub.
+    if _is_remote():
+        return
     if not cfg.get_pin_required():
         return
     if request.endpoint in ("login", "static"):
@@ -180,7 +193,7 @@ def _earn_catalog_grouped() -> list:
     return list(groups.items()) or [("Hospital", [("surgeon", "Surgeon at local hospital")])]
 
 
-def _setup_prefill(c: dict) -> dict:
+def _setup_prefill(c: dict, remote: bool = False) -> dict:
     """Values the setup form starts with. A brand-new install gets earns and
     actions on and everything else off; if config.json already existed (only
     the credentials are missing) the current settings are shown."""
@@ -188,7 +201,7 @@ def _setup_prefill(c: dict) -> dict:
     # Hidden credentials that are already in .env stay out of the form; if
     # they're missing the form still has to collect them.
     creds_locked = cfg.get_hide_credentials() and cfg.credentials_present()
-    if creds_locked:
+    if creds_locked or remote:
         creds = {"email": "", "password": ""}
     fresh = not cfg.CONFIG_EXISTED_AT_START
     agg = c.get("aggravated_crimes", {})
@@ -271,7 +284,9 @@ def setup():
     global _setup_completed
     import settings_rev
     data = request.get_json(silent=True) or {}
-    if not (cfg.get_hide_credentials() and cfg.credentials_present()):
+    if _is_remote() and not cfg.credentials_present():
+        return jsonify({"error": "Enter the game email and password on the bot's own computer."}), 403
+    if not _is_remote() and not (cfg.get_hide_credentials() and cfg.credentials_present()):
         email = str(data.get("email", "")).strip()
         password = str(data.get("password", ""))
         if not email or not password:
@@ -297,17 +312,21 @@ def setup():
 def index():
     c = cfg.load()
     needs_setup = _needs_setup()
-    hide_credentials = cfg.get_hide_credentials()
+    remote = _is_remote()
+    hide_credentials = cfg.get_hide_credentials() or remote
     if hide_credentials:
         c["credentials"] = {"email": "", "password": ""}
+    if remote:
+        # Never relay secrets through the hub.
+        c.setdefault("sync", {})["api_key"] = ""
     return render_template("index.html", config=c, notification_events=NOTIFICATION_EVENTS,
                            notif_layout=_notification_layout(),
                            notif_defaults=cfg.DEFAULT_CONFIG["notifications"],
-                           pin_required=cfg.get_pin_required(), ui_pin=cfg.get_pin(),
-                           hide_credentials=hide_credentials,
+                           pin_required=cfg.get_pin_required(), ui_pin="" if remote else cfg.get_pin(),
+                           hide_credentials=hide_credentials, remote_session=remote,
                            app_version=_APP_VERSION, event_consumables=_ec_mod,
                            action_category_labels=action_log.CATEGORY_LABELS,
-                           setup=_setup_prefill(c) if needs_setup else None,
+                           setup=_setup_prefill(c, remote) if needs_setup else None,
                            setup_earns=_earn_catalog_grouped() if needs_setup else [],
                            setup_actions=SETUP_ACTIONS, setup_fallbacks=SETUP_FALLBACKS,
                            setup_crimes=SETUP_CRIMES, setup_gym=SETUP_GYM,
@@ -648,6 +667,9 @@ def _apply_payload(c: dict, data: dict) -> dict:
     for slug, _ in NOTIFICATION_EVENTS:
         c["notifications"][slug] = data.get(f"notif_{slug}", False)
 
+    c.setdefault("remote", {})
+    c["remote"]["enabled"] = bool(data.get("remote_enabled", c["remote"].get("enabled", False)))
+
     return c
 
 
@@ -659,6 +681,9 @@ def save():
     base = data.pop("_base", None)
 
     c_live = cfg.load()
+    remote = _is_remote()
+    # Settings a hub user can't change: the hub connection itself.
+    protected = {k: copy.deepcopy(c_live.get(k, {})) for k in ("remote", "sync")}
     prev_jail = dict(c_live.get("jail", {}))
     prev_duty = prev_jail.get("duty", "laundry")
     prev_earn_mode = c_live.get("earns", {}).get("earn_mode", "auto")
@@ -699,7 +724,11 @@ def save():
     enable_hide = not hide_credentials and bool(data.get("hide_credentials"))
     if not str(data.get("ui_pin") or "").strip():
         data["pin_required"] = False
-    if creds_changed or pin_changed or enable_hide:
+    if remote:
+        c["remote"] = protected["remote"]
+        for k in ("server_url", "api_key", "client_id"):
+            c.setdefault("sync", {})[k] = protected["sync"].get(k, "")
+    elif creds_changed or pin_changed or enable_hide:
         cfg.save_env(None if hide_credentials else data.get("email", ""),
                      None if hide_credentials else data.get("password", ""),
                      pin_required=data.get("pin_required"),
@@ -717,6 +746,7 @@ def save():
 
     cfg.save(c)
     settings_rev.bump()
+    remote_control.nudge()
     if bot.is_running():
         bot.request_reload()
     return jsonify({"ok": True, "settings_rev": settings_rev.get()})
@@ -1081,6 +1111,7 @@ def status():
         "event_boss_enabled": cfg.load().get("event_boss", {}).get("enabled", False),
         "event_consumables": s.event_consumables,
         "settings_rev": __import__("settings_rev").get(),
+        "remote": remote_control.status(),
         "last_gym_use": _get_last_gym_use(),
         "casino_release_at": _get_casino_release_at(),
         "bionics_next_check_at": _get_bionics_next_check_at(s),
@@ -1113,6 +1144,8 @@ def status():
 @app.route("/api/shutdown", methods=["POST"])
 def shutdown():
     import signal, threading
+    if _is_remote():
+        return _local_only()
     threading.Timer(0.3, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
     return jsonify({"ok": True})
 
@@ -2749,4 +2782,5 @@ def apply_update():
 def run():
     import config as _cfg
     port = int(_cfg.get_env_var("UI_PORT", "8080"))
+    remote_control.start()
     app.run(host="0.0.0.0", port=port, debug=False)

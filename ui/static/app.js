@@ -636,6 +636,7 @@ function _buildPayload() {
     sync_online_time:   (document.getElementById("sync_online_time")||{checked:true}).checked,
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
+    remote_enabled:     (document.getElementById("remote_enabled")||{checked:false}).checked,
     skill_travel_expert_enabled: (document.getElementById("skill_travel_expert_enabled")||{checked:false}).checked,
     skill_travel_expert_threshold: parseInt((document.getElementById("skill_travel_expert_threshold")||{value:"2"}).value)||2,
     skill_all_seeing_eye_enabled: (document.getElementById("skill_all_seeing_eye_enabled")||{checked:false}).checked,
@@ -2445,12 +2446,30 @@ const CONSUMABLE_LABELS = {
   acid: "Acid", speed: "Speed", heroin: "Heroin", pice: "P/Ice",
 };
 
+const REMOTE_STATUS_TEXT = {
+  off: "Off",
+  connecting: "Connecting…",
+  pending: "Waiting for a Player Hub admin to approve this bot",
+  approved: "Connected — assigned hub users can open this bot",
+  blocked: "Blocked by a Player Hub admin",
+  error: "Problem",
+};
+
+function _renderRemoteStatus(r) {
+  const el = document.getElementById("remote-status-text");
+  if (!el || !r) return;
+  let text = REMOTE_STATUS_TEXT[r.status] || r.status;
+  if (r.detail) text = r.status === "error" ? r.detail : text + " — " + r.detail;
+  el.textContent = text;
+}
+
 function pollStatus() {
   fetch("/status")
     .then(r => r.json())
     .then(d => {
       window._lastStatus = d;
       updateBotState(d.running, d.paused);
+      _renderRemoteStatus(d.remote);
       syncGameClock(d.server_time_now);
       _hospSyncSexCooldown(d.sex_change_available_at, d.sex_change_cooldown_secs);
 

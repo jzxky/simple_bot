@@ -274,6 +274,9 @@ DEFAULT_CONFIG = {
         "all_seeing_eye": {"enabled": False, "target": ""},
         "news_editor": {"target": "", "title": "", "event": ""},
     },
+    "remote": {
+        "enabled": False,
+    },
     "sync": {
         "enabled": False,
         "server_url": "",

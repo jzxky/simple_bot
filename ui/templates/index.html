@@ -20,7 +20,7 @@
 <div class="container">
   <header>
     <h1>OpenBot</h1>
-    <button type="button" id="close-bot-btn" class="close-bot-btn" onclick="openCloseBotModal()" title="Shut down the bot and this control panel">Close Bot</button>
+    {% if not remote_session %}<button type="button" id="close-bot-btn" class="close-bot-btn" onclick="openCloseBotModal()" title="Shut down the bot and this control panel">Close Bot</button>{% endif %}
     <div class="status-row">
     <div class="status-bar">
       <span id="status-dot" class="dot stopped"></span>
@@ -1966,6 +1966,20 @@
               <label class="inline-toggle setting-row">Groups
                 <label class="toggle-label"><input type="checkbox" id="sync_groups" {% if config.get('sync', {}).get('sync_groups', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
+            </div>
+            <div class="settings-group">
+              <h3>
+                Remote control
+                <label class="toggle-label">
+                  <input type="checkbox" id="remote_enabled" {% if config.get('remote', {}).get('enabled', False) %}checked{% endif %} {% if remote_session %}disabled{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <p class="setting-note">Lets the people a Player Hub admin assigns to this bot open this control panel from anywhere, through the hub. Uses the Sync server URL and API key above; no port forwarding needed. Your game email, password and PIN are never sent to the hub.</p>
+              {% if remote_session %}
+              <p class="setting-note">You're using this bot through Player Hub. Remote control, the Sync connection, credentials and the PIN can only be changed on the bot's own computer.</p>
+              {% endif %}
+              <p class="setting-note">Status: <span id="remote-status-text">{% if config.get('remote', {}).get('enabled', False) %}Connecting…{% else %}Off{% endif %}</span></p>
             </div>
           </div>
         </div>
