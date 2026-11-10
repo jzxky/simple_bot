@@ -637,6 +637,7 @@ function _buildPayload() {
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
     remote_enabled:     (document.getElementById("remote_enabled")||{checked:false}).checked,
+    remote_allow_plugins: (document.getElementById("remote_allow_plugins")||{checked:false}).checked,
     // Absent when using the bot through the hub — then the server leaves it alone.
     remote_password:    document.getElementById("remote_password")?.value,
     skill_travel_expert_enabled: (document.getElementById("skill_travel_expert_enabled")||{checked:false}).checked,
@@ -2456,6 +2457,19 @@ const REMOTE_STATUS_TEXT = {
   error: "Problem",
 };
 
+function _renderHubPlugins(hp) {
+  const el = document.getElementById("remote-plugins-text");
+  if (!el) return;
+  const items = (hp && hp.plugins) || [];
+  const removed = (hp && hp.removed) || [];
+  if (!items.length && !removed.length) { el.style.display = "none"; return; }
+  const label = { running: "running", restart: "restart to load", error: "problem" };
+  const parts = items.map(p => `${p.name} v${p.version} (${p.state === "error" ? p.error : label[p.state] || p.state})`);
+  if (removed.length) parts.push(`removed: ${removed.join(", ")} (restart to unload)`);
+  el.textContent = "Hub plugins: " + parts.join(" · ") + (hp.restart_needed ? ". Restart the bot to apply changes." : "");
+  el.style.display = "";
+}
+
 function _renderRemoteStatus(r) {
   const el = document.getElementById("remote-status-text");
   if (!el || !r) return;
@@ -2466,6 +2480,7 @@ function _renderRemoteStatus(r) {
   }
   if (r.detail) text = r.status === "error" ? r.detail : text + " — " + r.detail;
   el.textContent = text;
+  _renderHubPlugins(r.hub_plugins);
 
   const box = document.getElementById("remote-pair-box");
   if (!box) return;   // using the bot through the hub: no pairing controls

@@ -2000,6 +2000,11 @@
                 <div class="setting-note"><span id="remote-pair-expiry"></span> · <a href="#" onclick="remotePairCancel(); return false">Cancel</a></div>
               </div>
               {% endif %}
+              <label class="inline-toggle setting-row">Allow plugins from the hub
+                <label class="toggle-label"><input type="checkbox" id="remote_allow_plugins" {% if config.get('remote', {}).get('allow_plugins', False) %}checked{% endif %} {% if remote_session %}disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <p class="setting-note">Lets this bot's owner install plugins on it from the hub's Remote page. Only plugins hub admins shared with the owner are offered, and only the ones the owner picks are installed. Turning this off removes them. Plugins are Python code that runs on this computer, so only allow this if you trust the hub's admins.</p>
+              <p class="setting-note" id="remote-plugins-text" style="display:none"></p>
               <p class="setting-note">Status: <span id="remote-status-text">{% if config.get('remote', {}).get('enabled', False) %}Connecting…{% else %}Off{% endif %}</span></p>
             </div>
           </div>

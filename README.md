@@ -97,3 +97,5 @@ Optionally set a **Remote password** (Settings, or `UI_REMOTE_PASSWORD` in `.env
 ### Local plugins
 
 Any `.py` file in a `plugins` folder next to `main.py` is loaded when the bot starts. The folder is gitignored, so a plugin only runs on the install where you put it and survives updates. A plugin that fails to load is logged and skipped.
+
+Plugins can also come from Player Hub. Turn on **Settings → Remote control → Allow plugins from the hub** (only possible on the bot's own computer). Then, as the bot's owner, install the plugins hub admins shared with you from the hub's **Remote → Plugins…**. The bot downloads them within a few seconds, checks each file against the hub's checksum, and records them in `plugins/.hub.json`. Restart the bot to load new or updated plugins. Hub plugins are removed again when you remove them on the hub, lose access to them, or turn the setting off. Files you put in the folder yourself are left alone.
