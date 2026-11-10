@@ -15,7 +15,8 @@ Requests that arrive this way are marked in the WSGI environ
 (REMOTE_ENVIRON_KEY), and the control panel refuses the things that must stay
 local: game credentials, the PIN, sync/remote settings and shutdown.
 
-Only turned on or off from this machine's own control panel.
+Only turned on or off from this machine's own control panel. The same goes
+for "Allow plugins from the hub" (see plugin_sync.py).
 """
 
 import base64
@@ -31,6 +32,7 @@ import urllib.request
 from urllib.parse import urlsplit
 
 import config as cfg
+import plugin_sync
 
 log = logging.getLogger(__name__)
 
@@ -250,7 +252,9 @@ def _worker(n: int):
         global _unpair_requested
         with _lock:
             known = _state["status"]
-        payload = {"version": _version(), "session": _SESSION, "known_status": known}
+        allow_plugins = bool(cfg.load().get("remote", {}).get("allow_plugins", False))
+        payload = {"version": _version(), "session": _SESSION, "known_status": known,
+                   "plugins_allowed": allow_plugins, "plugins_state": plugin_sync.state()}
         code = _active_code()
         if code:
             payload["pair_code"] = code
@@ -279,6 +283,15 @@ def _worker(n: int):
             cancel_pairing()
         st = d.get("status", "")
         _set(st or "error", "", owner=d.get("owner", ""), shared=int(d.get("shared") or 0))
+        try:
+            # Re-read: the setting may have changed while the poll was held.
+            allowed_now = bool(cfg.load().get("remote", {}).get("allow_plugins", False))
+            if not allowed_now:
+                plugin_sync.apply([])     # switched off here: remove hub-installed plugins
+            elif allow_plugins and isinstance(d.get("plugins"), list):
+                plugin_sync.apply(d["plugins"], url, key)
+        except Exception as e:
+            log.warning("Plugin sync failed: %s", e)
         if st != "paired":
             _wake.wait(PAIRING_WAIT if _active_code() else UNPAIRED_WAIT + n * 3)
             _wake.clear()

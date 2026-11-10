@@ -700,6 +700,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
 
     c.setdefault("remote", {})
     c["remote"]["enabled"] = bool(data.get("remote_enabled", c["remote"].get("enabled", False)))
+    c["remote"]["allow_plugins"] = bool(data.get("remote_allow_plugins", c["remote"].get("allow_plugins", False)))
 
     return c
 
@@ -1179,7 +1180,9 @@ def status():
 
 
 def _remote_status_payload():
+    import plugin_sync
     st = remote_control.status()
+    st["hub_plugins"] = plugin_sync.summary()
     if not _is_remote():
         # The pairing code is shown only on this computer, never through the hub.
         st["pairing"] = remote_control.pairing()
@@ -2855,7 +2858,8 @@ def load_plugins():
     without changing the code everyone runs. A broken plugin is logged and
     skipped, never stops the bot."""
     import importlib.util
-    folder = os.path.join(paths.data_dir(), "plugins")
+    import plugin_sync
+    folder = plugin_sync.folder()
     if not os.path.isdir(folder):
         return []
     loaded = []
@@ -2869,9 +2873,11 @@ def load_plugins():
             sys.modules[mod_name] = mod
             spec.loader.exec_module(mod)
             loaded.append(name)
+            plugin_sync.note_loaded(name[:-3], os.path.join(folder, name))
             print(f"[plugins] loaded {name}")
         except Exception as e:
             sys.modules.pop(mod_name, None)
+            plugin_sync.note_error(name[:-3], f"Failed to load: {e}")
             print(f"[plugins] {name} failed to load: {e}")
     return loaded
 
