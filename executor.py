@@ -291,11 +291,27 @@ def _check_session(state: GameState) -> bool:
 # Handlers
 # ---------------------------------------------------------------------------
 
+def _dead_character_check(state: GameState, html: str) -> bool:
+    """On loggedin.asp a dead character has no PLAY NOW button. Flag it so
+    the bot pauses instead of trying to log in again."""
+    if "loggedin.asp" not in browser.current_url():
+        return False
+    if BeautifulSoup(html, "html.parser").find("a", class_="btn-play"):
+        return False
+    state.logged_in = False
+    if not state.character_dead:
+        state.character_dead = True
+        state.add_log("Character is dead. Please create a new character.")
+    return True
+
+
 def handle_login(action: Action, state: GameState):
     page = browser.page()
 
     # If already on the game, mark logged in and return
     if "default.asp" not in browser.current_url() and browser.current_url() != "about:blank":
+        if _dead_character_check(state, page.content()):
+            return
         state.logged_in = True
         return
 
@@ -329,6 +345,8 @@ def handle_login(action: Action, state: GameState):
     if play:
         page.goto(_u("/loggedin.asp?display=play"), wait_until="load")
         _refresh_state(state)
+    elif _dead_character_check(state, page.content()):
+        return
 
     state.logged_in = True
     state.add_log("Logged in successfully.")

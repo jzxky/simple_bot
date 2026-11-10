@@ -63,6 +63,9 @@ class GameState:
     server_time_monotonic: float = 0.0  # monotonic timestamp when server_time was last set
     logged_in: bool = False
     relog_suppressed: bool = False
+    # Login reached loggedin.asp but there was no PLAY NOW button: the
+    # character is dead. The bot pauses until the user makes a new one.
+    character_dead: bool = False
     current_url: str = ""
     bot_running: bool = False
     last_error: str = ""
