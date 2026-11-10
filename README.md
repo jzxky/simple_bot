@@ -84,7 +84,7 @@ You can control the bot from anywhere through Player Hub instead of forwarding p
 2. The bot connects out to the hub and waits as *Pending* until a hub admin approves it and assigns it to users.
 3. Assigned users open the bot from the hub's **Remote** page and get this same control panel.
 
-Remote control can only be turned on or off on the bot's own computer. Your game email, password, PIN and API key are never sent to the hub, and remote users can't change them, the Sync connection or shut the bot down.
+Optionally set a **Remote password** (Settings, or `UI_REMOTE_PASSWORD` in `.env`): hub users then have to enter it every time they open the bot. Remote control can only be turned on or off on the bot's own computer. Your game email, password, PIN and API key are never sent to the hub, and remote users can't change them, the Sync connection or shut the bot down.
 
 ## Notes
 

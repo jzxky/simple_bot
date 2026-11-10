@@ -101,11 +101,23 @@ def _local_only():
     return jsonify({"error": "This can only be changed on the bot's own computer, not through Player Hub."}), 403
 
 
+def _remote_unlock_key():
+    return remote_control.unlock_key(request.environ.get(remote_control.REMOTE_ENVIRON_KEY, ""),
+                                     request.environ.get(remote_control.REMOTE_SID_ENVIRON_KEY, ""))
+
+
 @app.before_request
 def require_pin():
-    # Hub users were already signed in and approved on the hub.
+    # Hub users were already signed in and approved on the hub; the local PIN
+    # doesn't apply to them, the optional remote password does.
     if _is_remote():
-        return
+        if not cfg.get_remote_password() or request.endpoint in ("remote_login", "static"):
+            return
+        if remote_control.is_unlocked(_remote_unlock_key()):
+            return
+        if request.method != "GET" or request.path.startswith("/api/") or request.is_json:
+            return jsonify({"error": "Enter the remote password first."}), 401
+        return redirect(url_for("remote_login"))
     if not cfg.get_pin_required():
         return
     if request.endpoint in ("login", "static"):
@@ -128,6 +140,24 @@ def login():
             return redirect(url_for("index"))
         error = "Incorrect PIN"
     return render_template("login.html", error=error)
+
+
+@app.route("/remote-login", methods=["GET", "POST"])
+def remote_login():
+    """Remote password prompt for hub users (see remote_control.py)."""
+    if not _is_remote() or not cfg.get_remote_password():
+        return redirect(url_for("index"))
+    user = request.environ.get(remote_control.REMOTE_ENVIRON_KEY, "")
+    error = None
+    if request.method == "POST":
+        wait = remote_control.locked_out(user)
+        if not wait and remote_control.try_unlock(user, _remote_unlock_key(),
+                                                  request.form.get("pin", ""), cfg.get_remote_password()):
+            return redirect(url_for("index"))
+        wait = remote_control.locked_out(user)
+        error = f"Too many attempts. Try again in {max(1, wait // 60)} min." if wait else "Incorrect password"
+    return render_template("login.html", error=error, heading="Enter remote password",
+                           placeholder="Remote password", action="/remote-login")
 
 
 @app.route("/logout")
@@ -324,6 +354,7 @@ def index():
                            notif_defaults=cfg.DEFAULT_CONFIG["notifications"],
                            pin_required=cfg.get_pin_required(), ui_pin="" if remote else cfg.get_pin(),
                            hide_credentials=hide_credentials, remote_session=remote,
+                           remote_password="" if remote else cfg.get_remote_password(),
                            app_version=_APP_VERSION, event_consumables=_ec_mod,
                            action_category_labels=action_log.CATEGORY_LABELS,
                            setup=_setup_prefill(c, remote) if needs_setup else None,
@@ -724,6 +755,12 @@ def save():
     enable_hide = not hide_credentials and bool(data.get("hide_credentials"))
     if not str(data.get("ui_pin") or "").strip():
         data["pin_required"] = False
+    remote_pw_changed = (data.get("remote_password") is not None
+                         and (not isinstance(base, dict) or data.get("remote_password") != base.get("remote_password")))
+    if remote_pw_changed and not remote:
+        cfg.save_env(remote_password=str(data.get("remote_password") or "").strip())
+        remote_control.lock_all()
+
     if remote:
         c["remote"] = protected["remote"]
         for k in ("server_url", "api_key", "client_id"):

@@ -637,6 +637,8 @@ function _buildPayload() {
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
     remote_enabled:     (document.getElementById("remote_enabled")||{checked:false}).checked,
+    // Absent when using the bot through the hub — then the server leaves it alone.
+    remote_password:    document.getElementById("remote_password")?.value,
     skill_travel_expert_enabled: (document.getElementById("skill_travel_expert_enabled")||{checked:false}).checked,
     skill_travel_expert_threshold: parseInt((document.getElementById("skill_travel_expert_threshold")||{value:"2"}).value)||2,
     skill_all_seeing_eye_enabled: (document.getElementById("skill_all_seeing_eye_enabled")||{checked:false}).checked,

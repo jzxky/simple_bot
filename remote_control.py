@@ -31,6 +31,10 @@ import config as cfg
 log = logging.getLogger(__name__)
 
 REMOTE_ENVIRON_KEY = "simple_bot.remote_user"
+REMOTE_SID_ENVIRON_KEY = "simple_bot.remote_sid"
+UNLOCK_IDLE = 12 * 3600    # remote password stays entered this long without use
+MAX_FAILS = 5              # wrong remote passwords before a lockout
+LOCKOUT = 300              # seconds
 WORKERS = 3
 POLL_TIMEOUT = 40          # hub holds a poll ~20 s; allow for slow links
 IDLE_RECHECK = 5           # seconds between config checks while off
@@ -117,7 +121,8 @@ def handle(frame: dict) -> dict:
         with app.test_client() as c:
             r = c.open(path=frame.get("path") or "/", method=frame.get("method") or "GET",
                        headers=frame.get("headers") or {}, data=body,
-                       environ_overrides={REMOTE_ENVIRON_KEY: frame.get("user") or "hub"})
+                       environ_overrides={REMOTE_ENVIRON_KEY: frame.get("user") or "hub",
+                                          REMOTE_SID_ENVIRON_KEY: frame.get("rsid") or ""})
             data = r.get_data()
             headers = {k: v for k, v in r.headers.items() if k.lower() != "set-cookie"}
             status = r.status_code
@@ -126,6 +131,60 @@ def handle(frame: dict) -> dict:
         log.exception("Remote request failed: %s %s", frame.get("method"), frame.get("path"))
         data, headers, status = f"Bot error: {e}".encode(), {"Content-Type": "text/plain"}, 500
     return {"id": rid, "status": status, "headers": headers, "body": base64.b64encode(data).decode()}
+
+
+# ---------------------------------------------------------------------------
+# Remote password: each time a hub user opens the bot (one hub "rsid"), they
+# enter it once. Unlocks live in memory, so a bot restart asks again.
+# ---------------------------------------------------------------------------
+
+_unlocked = {}   # unlock key -> last use (epoch)
+_fails = {}      # hub user -> [failures, locked_until]
+
+
+def unlock_key(user: str, sid: str) -> str:
+    return f"{user}|{sid}"
+
+
+def is_unlocked(key: str) -> bool:
+    now = time.time()
+    with _lock:
+        t = _unlocked.get(key)
+        if t is None or now - t > UNLOCK_IDLE:
+            _unlocked.pop(key, None)
+            return False
+        _unlocked[key] = now
+        return True
+
+
+def locked_out(user: str) -> int:
+    """Seconds this hub user must wait before trying again (0 = may try)."""
+    with _lock:
+        f = _fails.get(user)
+    return max(0, int(f[1] - time.time())) if f and f[1] else 0
+
+
+def try_unlock(user: str, key: str, given: str, expected: str) -> bool:
+    import hmac
+    if locked_out(user):
+        return False
+    ok = hmac.compare_digest(given.encode(), expected.encode())
+    with _lock:
+        if ok:
+            _fails.pop(user, None)
+            _unlocked[key] = time.time()
+        else:
+            f = _fails.setdefault(user, [0, 0])
+            f[0] += 1
+            if f[0] >= MAX_FAILS:
+                f[0], f[1] = 0, time.time() + LOCKOUT
+    return ok
+
+
+def lock_all():
+    """Remote password changed: everyone has to enter it again."""
+    with _lock:
+        _unlocked.clear()
 
 
 def _worker(n: int):
