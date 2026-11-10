@@ -21,6 +21,12 @@ def _travel_free(state: GameState) -> bool:
     return ("travel" not in state.timers) or state.timer_ready("travel")
 
 
+def _promo_trip_pending(state: GameState) -> bool:
+    import promo_post
+    from executor import urgent_travel_pending
+    return urgent_travel_pending() or promo_post.pending_for(state) is not None
+
+
 class SmartTravelTask(Task):
     priority = 45  # below gym (55)/casino (50) so activities run first when in-city
     label = "Smart Travel"
@@ -58,6 +64,9 @@ class SmartTravelTask(Task):
         from executor import drug_stock_travel_block_active
         if drug_stock_travel_block_active():
             return False
+        # A top job forum post is waiting: its urgent trip home has priority.
+        if _promo_trip_pending(state):
+            return False
         return time.monotonic() - self._last >= _POLL_INTERVAL
 
     def blocked_reasons(self, state):
@@ -89,6 +98,8 @@ class SmartTravelTask(Task):
         from executor import drug_stock_travel_block_active
         if drug_stock_travel_block_active():
             reasons.append("Carrying drug house stock")
+        if _promo_trip_pending(state):
+            reasons.append("Top job post trip home first")
         remaining = _POLL_INTERVAL - (time.monotonic() - self._last)
         if remaining > 0:
             reasons.append(f"Poll interval ({int(remaining)}s)")

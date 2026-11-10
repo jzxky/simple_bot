@@ -1,7 +1,7 @@
 """
 Hammers main.asp until the promotion page for the target top job appears,
-then submits it and posts a forum announcement if a thread ID is configured
-and the character is in their home city.
+then submits it and makes the forum announcement (promo_post.py) if a thread
+ID is configured; whatever isn't confirmed is retried by PromoForumPostTask.
 
 Runs in the side browser (side_browser.py) — a separate patchright instance on
 its own thread — so the refresh loop is never held up by the main bot loop: it
@@ -16,10 +16,11 @@ import config as cfg
 import browser
 import side_browser
 import urls
-from state import GameState, parse_state, SERVER_TIME_FMT
+from state import GameState, parse_state
 from tasks.base import Task, Action
 from tasks.check_top_job import TOP_JOB_MAP as _TOP_JOB_MAP
 from promotions import PROMO_BY_RANK, get_choice
+import promo_post
 
 SNIPE_TIMEOUT = 30 * 60  # seconds
 SNIPE_INTERVAL = 1.0     # seconds between the starts of consecutive main.asp loads
@@ -165,6 +166,13 @@ class SnipeTopJobTask(Task):
                         promoted = True
                         return
         finally:
+            if promoted:
+                # Recorded before anything else can fail: the main loop's
+                # PromoForumPostTask retries the post until it's confirmed.
+                try:
+                    promo_post.mark_pending(state, top_job)
+                except Exception as e:
+                    state.add_log(f"SnipeTopJob: couldn't record the pending forum post: {e}")
             try:
                 if promoted and pg is not None:
                     if not state.in_home_city():
@@ -240,26 +248,19 @@ class SnipeTopJobTask(Task):
             return False
 
     def _post_forum(self, state: GameState, top_job: str, pg):
-        thread_id = cfg.load().get("promo", {}).get("top_job_thread_id", "").strip()
-        if not thread_id:
+        """First attempt at the pending forum post, straight after the
+        promotion, from the side browser. Anything left over is retried by
+        PromoForumPostTask on the main tab."""
+        if not promo_post.pending_for(state):
             return
-
         if not state.in_home_city():
             temp = GameState()
             html = browser.navigate_page(pg, urls.BASE_URL + "/main.asp")
             parse_state(html, pg.url, temp)
             if not (temp.current_city and temp.current_city == temp.home_city):
-                state.add_log("SnipeTopJob: skipping forum post — not in home city.")
+                state.add_log("SnipeTopJob: not in home city yet — the forum post will be made once home.")
                 return
-
-        ts = state.server_time.strftime(SERVER_TIME_FMT) if state.server_time else "?"
-        message = f"{state.own_name} - {top_job} - {ts}"
-        post_url = urls.BASE_URL + f"/forum/postreply.asp?t={thread_id}"
         try:
-            pg.goto(post_url, wait_until="domcontentloaded", timeout=15000)
-            pg.fill("textarea#body", message)
-            pg.click("input[name='Submit']")
-            pg.wait_for_load_state("domcontentloaded", timeout=10000)
-            state.add_log(f"SnipeTopJob: forum post made — \"{message}\".")
+            promo_post.post_and_verify(pg, state)
         except Exception as e:
-            state.add_log(f"SnipeTopJob: forum post error: {e}")
+            state.add_log(f"SnipeTopJob: forum post error: {e} — will retry.")
