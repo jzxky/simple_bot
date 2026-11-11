@@ -2000,6 +2000,10 @@
                 <div class="setting-note"><span id="remote-pair-expiry"></span> · <a href="#" onclick="remotePairCancel(); return false">Cancel</a></div>
               </div>
               {% endif %}
+              <label class="inline-toggle setting-row">Share the action history with the hub
+                <label class="toggle-label"><input type="checkbox" id="remote_share_actions" {% if config.get('remote', {}).get('share_actions', True) %}checked{% endif %} {% if remote_session %}disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <p class="setting-note">While this bot is paired, new entries in its action history (crimes, earns, gym and so on) are sent to the hub so the people you shared it with can follow them in the Activity feed on the Remote page. The hub keeps the latest 2,000.</p>
               <label class="inline-toggle setting-row">Allow plugins from the hub
                 <label class="toggle-label"><input type="checkbox" id="remote_allow_plugins" {% if config.get('remote', {}).get('allow_plugins', False) %}checked{% endif %} {% if remote_session %}disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>

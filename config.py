@@ -277,6 +277,7 @@ DEFAULT_CONFIG = {
     "remote": {
         "enabled": False,
         "allow_plugins": False,
+        "share_actions": True,
     },
     "sync": {
         "enabled": False,

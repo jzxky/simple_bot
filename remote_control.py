@@ -31,6 +31,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
+import action_log
 import config as cfg
 import plugin_sync
 
@@ -47,6 +48,9 @@ IDLE_RECHECK = 5           # seconds between config checks while off
 UNPAIRED_WAIT = 15         # seconds between polls while no hub user is paired
 PAIRING_WAIT = 3           # ... while a pairing code is showing
 PAIR_CODE_TTL = 600
+FEED_EVERY = 5              # seconds between action history uploads
+FEED_BATCH = 200
+FEED_BACKFILL = 200         # recent actions sent when the hub has none from this bot
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # no 0/O, 1/I
 
 _lock = threading.Lock()
@@ -304,6 +308,54 @@ def _worker(n: int):
                 log.warning("Remote respond failed: %s", e)
 
 
+def _feed_worker():
+    """Send new action history rows to the hub while paired and sharing is on.
+
+    The hub keeps the latest 2,000 per bot for the Activity feed on its Remote
+    page. Only live rows are sent (not ones imported from old log files)."""
+    cursor = None          # last action id the hub has from this bot
+    last_target = None
+    shared = False         # sent anything this run (so a switch-off clears the hub's copy)
+    while True:
+        time.sleep(FEED_EVERY)
+        try:
+            target, _ = settings()
+            with _lock:
+                paired = _state["status"] == "paired"
+            share = bool(cfg.load().get("remote", {}).get("share_actions", True))
+            if target != last_target:
+                cursor, last_target = None, target
+            if not target or not paired:
+                cursor = None
+                continue
+            url, key = target
+            if not share:
+                if shared:
+                    _post(url, key, "/api/remote/actions", {"clear": True}, 15)
+                    shared = False
+                cursor = None
+                continue
+            if cursor is None:
+                local = action_log.max_id()
+                d = _post(url, key, "/api/remote/actions", {"hello": True, "max_id": local}, 15)
+                # The hub forgets its copy if this bot's history was reset
+                # (its last id is above ours) and answers 0.
+                cursor = max(int(d.get("last_id") or 0), local - FEED_BACKFILL, 0)
+                shared = True
+            rows = action_log.feed_rows(cursor, FEED_BATCH)
+            if not rows:
+                continue
+            _post(url, key, "/api/remote/actions", {"actions": rows}, 15)
+            cursor = rows[-1]["id"]
+        except urllib.error.HTTPError as e:
+            cursor = None
+            if e.code == 404:
+                time.sleep(300)      # the hub doesn't have the feed yet
+        except Exception as e:
+            log.debug("Action feed upload failed: %s", e)
+            cursor = None
+
+
 def _say_goodbye_when_disabled():
     """Tell the hub straight away when remote control is switched off here."""
     last = None
@@ -328,6 +380,7 @@ def start():
     for n in range(WORKERS):
         threading.Thread(target=_worker, args=(n,), name=f"remote-{n}", daemon=True).start()
     threading.Thread(target=_say_goodbye_when_disabled, name="remote-bye", daemon=True).start()
+    threading.Thread(target=_feed_worker, name="remote-feed", daemon=True).start()
 
 
 def nudge():

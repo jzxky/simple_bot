@@ -255,11 +255,61 @@ def navigate(url: str) -> str:
             pg.screenshot(path=SCREENSHOT_PATH, full_page=False)
         except Exception:
             pass
+        capture_if_watched(force=True)
     return pg.content()
 
 
 def current_url() -> str:
     return page().url
+
+
+# ---------------------------------------------------------------------------
+# Watching: view-only screenshots of the main browser (e.g. the live view
+# plugin's Watch mode). Patchright objects belong to the bot thread, so frames
+# are only taken there: after each navigate() and on every bot loop tick.
+# ---------------------------------------------------------------------------
+
+WATCH_EVERY = 1.0           # at most one frame a second
+_watch_cond = threading.Condition()
+_watch_until = 0.0
+_watch_last = 0.0
+_watch_frame = (0, b"", "")  # (seq, jpeg, url)
+
+
+def want_frames(seconds: float = 10.0):
+    """Someone is watching: take frames for the next `seconds`."""
+    global _watch_until
+    with _watch_cond:
+        _watch_until = max(_watch_until, time.monotonic() + seconds)
+
+
+def capture_if_watched(force: bool = False):
+    """Bot thread only. Take a frame of the main page if someone is watching."""
+    global _watch_last, _watch_frame
+    now = time.monotonic()
+    if not _on_main_thread() or is_secondary_page_active() or _page is None:
+        return
+    with _watch_cond:
+        if now >= _watch_until or (not force and now - _watch_last < WATCH_EVERY):
+            return
+    try:
+        img = _page.screenshot(type="jpeg", quality=60, scale="css", timeout=5000)
+        url = _page.url
+    except Exception:
+        return
+    with _watch_cond:
+        _watch_last = now
+        _watch_frame = (_watch_frame[0] + 1, img, url)
+        _watch_cond.notify_all()
+
+
+def watch_frame(after: int = -1, wait: float = 0.0):
+    """(seq, jpeg, url) of the latest frame, waiting up to `wait` seconds for
+    one newer than `after`."""
+    with _watch_cond:
+        if _watch_frame[0] <= after and wait > 0:
+            _watch_cond.wait(wait)
+        return _watch_frame
 
 
 def is_cloudflare_challenge() -> bool:

@@ -637,6 +637,7 @@ function _buildPayload() {
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
     remote_enabled:     (document.getElementById("remote_enabled")||{checked:false}).checked,
+    remote_share_actions: (document.getElementById("remote_share_actions")||{checked:true}).checked,
     remote_allow_plugins: (document.getElementById("remote_allow_plugins")||{checked:false}).checked,
     // Absent when using the bot through the hub — then the server leaves it alone.
     remote_password:    document.getElementById("remote_password")?.value,
