@@ -9,6 +9,7 @@ import time
 import browser
 import urls
 import config as cfg
+import hub_errors
 from tasks.base import Task
 import player_db as _db
 
@@ -253,15 +254,15 @@ class SyncTask(Task):
                     state.add_log(f"Hub sync: {r['players']} player(s) updated, {r['removed']} removed, "
                                   f"{r['career']} career row(s) added, {r['career_removed']} removed.")
             except Exception as e:
-                state.add_log(f"Hub sync failed: {e}")
+                state.add_log(f"Hub sync failed: {hub_errors.describe(e, self._sync_cfg().get('server_url', ''))}")
             return
         sc = self._sync_cfg()
         url = sc.get("server_url", "").strip()
         try:
             sync_client.push_changes(url)
         except Exception as e:
-            state.add_log(f"Sync push failed: {e}")
+            state.add_log(f"Sync push failed: {hub_errors.describe(e, url)}")
         try:
             sync_client.pull_changes(url)
         except Exception as e:
-            state.add_log(f"Sync pull failed: {e}")
+            state.add_log(f"Sync pull failed: {hub_errors.describe(e, url)}")

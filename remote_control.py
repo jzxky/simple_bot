@@ -33,6 +33,7 @@ from urllib.parse import urlsplit
 
 import action_log
 import config as cfg
+import hub_errors
 import plugin_sync
 
 log = logging.getLogger(__name__)
@@ -269,13 +270,11 @@ def _worker(n: int):
         try:
             d = _post(url, key, "/api/remote/poll", payload, POLL_TIMEOUT)
         except urllib.error.HTTPError as e:
-            msg = "The hub rejected this bot's API key." if e.code == 401 else \
-                  "The hub doesn't support remote control yet." if e.code == 404 else f"Hub error {e.code}."
-            _set("error", msg)
+            _set("error", hub_errors.describe(e, url))
             time.sleep(30)
             continue
         except Exception as e:
-            _set("error", f"Can't reach the hub ({e.__class__.__name__}).")
+            _set("error", hub_errors.describe(e, url))
             time.sleep(backoff)
             backoff = min(backoff * 2, 60)
             continue
