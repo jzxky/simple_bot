@@ -5896,6 +5896,10 @@ def handle_check_comms(action: Action, state: GameState):
     data = _load_comms(char)
     url = _u("/communications/comms.asp?display=inbox")
     changed = False
+    # Nothing stored yet (first check): the whole inbox looks new, so don't
+    # forward it to the hub.
+    import comms_forward
+    forward = bool(data) and comms_forward.enabled()
 
     while True:
         _nav(url, state)
@@ -5925,6 +5929,12 @@ def handle_check_comms(action: Action, state: GameState):
                 changed = True
 
                 if is_new_conv or new_count > old_count:
+                    if forward:
+                        try:
+                            comms_forward.queue(char, conv, comms_forward.new_incoming(
+                                cid, existing.get("messages", []), conv["messages"], char))
+                        except Exception as e:
+                            state.add_log(f"Comms: couldn't queue messages for the hub: {e}")
                     import config as cfg
                     c_snap = cfg.load()
                     if c_snap.get("notifications", {}).get("new_message", False):

@@ -278,6 +278,7 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "allow_plugins": False,
         "share_actions": True,
+        "forward_comms": False,
     },
     "sync": {
         "enabled": False,

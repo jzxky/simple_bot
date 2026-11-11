@@ -381,6 +381,8 @@ def start():
         threading.Thread(target=_worker, args=(n,), name=f"remote-{n}", daemon=True).start()
     threading.Thread(target=_say_goodbye_when_disabled, name="remote-bye", daemon=True).start()
     threading.Thread(target=_feed_worker, name="remote-feed", daemon=True).start()
+    import comms_forward
+    comms_forward.start()
 
 
 def nudge():

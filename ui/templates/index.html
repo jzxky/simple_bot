@@ -2004,6 +2004,10 @@
                 <label class="toggle-label"><input type="checkbox" id="remote_share_actions" {% if config.get('remote', {}).get('share_actions', True) %}checked{% endif %} {% if remote_session %}disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
               <p class="setting-note">While this bot is paired, new entries in its action history (crimes, earns, gym and so on) are sent to the hub so the people you shared it with can follow them in the Activity feed on the Remote page. The hub keeps the latest 2,000.</p>
+              <label class="inline-toggle setting-row">Forward in-game messages to the hub
+                <label class="toggle-label"><input type="checkbox" id="remote_forward_comms" {% if config.get('remote', {}).get('forward_comms', False) %}checked{% endif %} {% if remote_session %}disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <p class="setting-note">While this bot is paired, new in-game messages your character receives are sent to the hub, which DMs them to this bot's owner on Discord (the owner links Discord on the hub's Remote page). People the bot is shared with don't get them. Messages already in the inbox aren't sent.</p>
               <label class="inline-toggle setting-row">Allow plugins from the hub
                 <label class="toggle-label"><input type="checkbox" id="remote_allow_plugins" {% if config.get('remote', {}).get('allow_plugins', False) %}checked{% endif %} {% if remote_session %}disabled{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>

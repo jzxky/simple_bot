@@ -1,6 +1,8 @@
 .env
 config.json
 notifications.json
+comms_outbox.json
+comms_outbox.json.tmp
 earn_catalog.json
 .browser_profile/
 __pycache__/
