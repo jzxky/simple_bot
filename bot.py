@@ -514,6 +514,18 @@ def _run(c: dict):
             # Detect session expiry on every tick
             if state.logged_in and browser.current_url().rstrip("/") == urls.BASE_URL + "/default.asp" and not browser.is_cloudflare_challenge():
                 state.logged_in = False
+                # Logged in, then thrown out again within a minute, several times
+                # in a row: the game won't let this character play (e.g. it's dead).
+                if time.monotonic() - state.last_login_mono < 60:
+                    state.login_bounces += 1
+                else:
+                    state.login_bounces = 0
+                if state.login_bounces >= 3:
+                    state.login_bounces = 0
+                    state.character_dead = True
+                    state.add_log("Login keeps bouncing back to the login page. "
+                                  "Character is dead. Please create a new character.")
+                    continue
                 if c.get("misc", {}).get("relog_on_session_expire", True):
                     msg = "Session expired — will re-login."
                     state.add_log(msg)
@@ -867,6 +879,7 @@ def pause():
 def resume():
     state.relog_suppressed = False
     state.character_dead = False   # made a new character: log in again
+    state.login_bounces = 0
     _pause_event.clear()
     state.add_log("Bot resumed.")
 

@@ -3,6 +3,7 @@ ActionExecutor: maps Action.kind to handler functions that drive the browser.
 """
 
 import json
+import os
 import queue
 import random
 import re
@@ -298,11 +299,25 @@ def _dead_character_check(state: GameState, html: str) -> bool:
         return False
     if BeautifulSoup(html, "html.parser").find("a", class_="btn-play"):
         return False
+    _mark_character_dead(state)
+    return True
+
+
+def _mark_character_dead(state: GameState):
     state.logged_in = False
     if not state.character_dead:
         state.character_dead = True
         state.add_log("Character is dead. Please create a new character.")
-    return True
+
+
+def _save_dead_page(html: str):
+    """Keep the loggedin.asp we saw, to tune the dead-character check."""
+    try:
+        import paths
+        with open(os.path.join(paths.data_dir(), "last_dead_loggedin.html"), "w", encoding="utf-8") as f:
+            f.write(html)
+    except Exception:
+        pass
 
 
 def handle_login(action: Action, state: GameState):
@@ -343,12 +358,21 @@ def handle_login(action: Action, state: GameState):
     # Click PLAY NOW if present
     play = soup.find("a", class_="btn-play")
     if play:
+        loggedin_html = page.content()
         page.goto(_u("/loggedin.asp?display=play"), wait_until="load")
         _refresh_state(state)
+        # A dead character can't enter the game: PLAY bounces straight back
+        # to the login page. Don't keep logging in.
+        if "default.asp" in browser.current_url():
+            _save_dead_page(loggedin_html)
+            _mark_character_dead(state)
+            return
     elif _dead_character_check(state, page.content()):
+        _save_dead_page(page.content())
         return
 
     state.logged_in = True
+    state.last_login_mono = time.monotonic()
     state.add_log("Logged in successfully.")
 
 

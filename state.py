@@ -66,6 +66,8 @@ class GameState:
     # Login reached loggedin.asp but there was no PLAY NOW button: the
     # character is dead. The bot pauses until the user makes a new one.
     character_dead: bool = False
+    last_login_mono: float = 0.0     # time.monotonic() of the last successful login
+    login_bounces: int = 0           # logins that expired again within seconds
     current_url: str = ""
     bot_running: bool = False
     last_error: str = ""
