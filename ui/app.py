@@ -702,6 +702,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c.setdefault("remote", {})
     c["remote"]["enabled"] = bool(data.get("remote_enabled", c["remote"].get("enabled", False)))
     c["remote"]["allow_plugins"] = bool(data.get("remote_allow_plugins", c["remote"].get("allow_plugins", False)))
+    c["remote"]["share_actions"] = bool(data.get("remote_share_actions", c["remote"].get("share_actions", True)))
 
     return c
 

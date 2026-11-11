@@ -473,3 +473,36 @@ def characters() -> list:
             out.append(d)
         return out
     return _read(run)
+
+
+# ---------------------------------------------------------------------------
+# Hub feed (remote_control sends new live rows to the hub)
+# ---------------------------------------------------------------------------
+
+_FEED_COLS = "id, ts, server_time, character, category, kind, result, target, amount, city, message"
+
+
+def max_id() -> int:
+    """Highest action id so far (0 when there are none)."""
+    try:
+        return _read(lambda c: c.execute("SELECT COALESCE(MAX(id), 0) FROM actions").fetchone()[0])
+    except Exception:
+        return 0
+
+
+def feed_rows(after_id: int, limit: int = 200) -> list:
+    """Live actions (not imported from old logs) with id > after_id, oldest first."""
+    def run(c):
+        rows = c.execute(f"SELECT {_FEED_COLS} FROM actions WHERE id > ?"
+                         " AND COALESCE(source, '') = '' ORDER BY id LIMIT ?",
+                         (int(after_id), int(limit))).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["category_label"] = CATEGORY_LABELS.get(d["category"], d["category"])
+            out.append(d)
+        return out
+    try:
+        return _read(run)
+    except Exception:
+        return []

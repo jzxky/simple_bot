@@ -489,6 +489,9 @@ def _run(c: dict):
                 except Exception as e:
                     state.add_log(f"Side browser cookie refresh error: {e}")
 
+            # Someone is watching the bot's browser (view-only).
+            browser.capture_if_watched()
+
             # Dead character: stay paused until the user makes a new one and resumes.
             if state.character_dead and not _pause_event.is_set():
                 if c.get("notifications", {}).get("session_expired", False):
