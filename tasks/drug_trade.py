@@ -1,5 +1,6 @@
 """
 Drug trade autobuy task — triggered by "Drug Trade Offer" journal entries.
+Runs in the drug window (drug_window.py), not the main browser window.
 """
 
 import queue
@@ -15,7 +16,8 @@ class DrugTradeTask(Task):
         self._queue = trade_queue
 
     def can_run(self, state: GameState) -> bool:
-        return state.logged_in and not state.in_jail and not self._queue.empty()
+        return (state.logged_in and not state.in_jail and not state.drug_tab_active
+                and not self._queue.empty())
 
     def blocked_reasons(self, state):
         reasons = []
@@ -23,6 +25,8 @@ class DrugTradeTask(Task):
             reasons.append("Not logged in")
         if state.in_jail:
             reasons.append("In jail")
+        if state.drug_tab_active:
+            reasons.append("Drug window busy")
         if self._queue.empty():
             reasons.append("Queue empty")
         return reasons
@@ -32,4 +36,5 @@ class DrugTradeTask(Task):
             self._queue.get_nowait()
         except Exception:
             return
-        executor.execute(Action("check_drug_trade"), state)
+        import drug_window
+        drug_window.submit(state, Action("check_drug_trade"))

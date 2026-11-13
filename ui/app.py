@@ -1551,9 +1551,13 @@ def _drug_request_rows(rows, with_price=False):
 
 
 def _drug_task(kind: str, **params):
+    """Drugs-tab actions run in the drug window (their own Chrome window)."""
     if not bot.is_running():
         return jsonify({"ok": False, "message": "Bot must be running."}), 400
-    return _run_profile_task(kind, **params)
+    try:
+        return jsonify(bot.request_drug_task(kind, **params))
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e) or "The request failed — see the log."}), 500
 
 
 @app.route("/drugs/players")

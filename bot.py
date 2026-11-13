@@ -12,6 +12,7 @@ import paths
 import urls
 import browser
 import side_browser
+import drug_window
 from state import GameState
 from scheduler import Scheduler
 from executor import ActionExecutor
@@ -148,6 +149,9 @@ _interact_request: queue.Queue = queue.Queue(maxsize=1)
 _interact_result: queue.Queue = queue.Queue(maxsize=1)
 _profile_task_request: queue.Queue = queue.Queue(maxsize=1)
 _profile_task_result: queue.Queue = queue.Queue(maxsize=1)
+# Drugs-tab requests from the Flask thread: (kind, params, reply_q). Unbounded —
+# each carries its own reply queue and runs in the drug window, not here.
+_drug_task_request: queue.Queue = queue.Queue()
 state = GameState()
 
 
@@ -170,8 +174,8 @@ def _restart_browser(state: GameState, c: dict) -> bool:
     """Tear down and relaunch the browser after the driver or browser died.
     Returns True if the new browser came up."""
     state.logged_in = False
-    # The side browser (snipe / separate-tab crimes) is a separate Chrome and
-    # keeps running; it fetches fresh cookies if the session changes.
+    # The side browser (snipe / separate-tab crimes / drug window) is a separate
+    # Chrome and keeps running; it fetches fresh cookies if the session changes.
     if _drug_store_task is not None:
         _drug_store_task.stop_tab(state)
     state.drug_store_tab_active = False
@@ -193,7 +197,7 @@ def _scheduled_restart_due(state: GameState, c: dict) -> bool:
         return False
     if browser.uptime_seconds() < _SCHEDULED_RESTART_SECS:
         return False
-    return not (state.snipe_active or state.agg_tab_active)
+    return not (state.snipe_active or state.agg_tab_active or state.drug_tab_active)
 
 
 def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
@@ -448,6 +452,7 @@ def _run(c: dict):
 
     state = GameState()
     state.bot_running = True
+    drug_window.reset()
     executor = ActionExecutor()
     log_file = _open_log_file()
     _orig_add_log = state.add_log
@@ -573,6 +578,18 @@ def _run(c: dict):
                         _profile_task_result.put(RuntimeError("The request failed — see the log."))
                 except Exception as e:
                     _profile_task_result.put(e)
+
+            # Drugs-tab tasks from the Flask thread — handed to the drug window,
+            # which replies straight to the waiting request.
+            while not _drug_task_request.empty():
+                try:
+                    kind, params, reply_q = _drug_task_request.get_nowait()
+                except queue.Empty:
+                    break
+                try:
+                    drug_window.submit(state, Action(kind, **params), reply_q=reply_q)
+                except Exception as e:
+                    reply_q.put({"ok": False, "message": f"Couldn't start the drug window: {e}"})
 
             # Jail inmates requests from the Flask thread
             if not _jail_inmates_request.empty():
@@ -812,6 +829,7 @@ def _run(c: dict):
         state.add_log(f"Bot crashed: {e}")
     finally:
         side_browser.shutdown()
+        drug_window.reset(state)
         state.snipe_active = False
         state.agg_tab_active = False
         state.agg_tab_crime = ""
@@ -1147,6 +1165,19 @@ def request_profile_task(kind: str, timeout: float = 90.0, **params) -> dict:
     if isinstance(result, Exception):
         raise result
     return result
+
+
+def request_drug_task(kind: str, timeout: float = 120.0, **params) -> dict:
+    """Run a Drugs-tab action in the drug window (its own Chrome window, see
+    drug_window.py) and return its result dict ({"ok": bool, "message": str, ...})."""
+    if kind not in drug_window.UI_ACTIONS:
+        raise ValueError(f"Not a drug action: {kind}")
+    reply_q: queue.Queue = queue.Queue(maxsize=1)
+    _drug_task_request.put((kind, params, reply_q))
+    try:
+        return reply_q.get(timeout=timeout)
+    except queue.Empty:
+        raise RuntimeError("The drug window didn't answer in time — see the log.")
 
 
 def request_navigate(url: str):

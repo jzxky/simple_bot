@@ -9,6 +9,7 @@ from state import GameState
 
 class LaunderMoneyTask(Task):
     priority = 45
+    moves_cash = True
     label = 'Laundering'
 
     def __init__(self, launder_amount: int, preferred_contacts: list):

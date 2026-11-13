@@ -1,6 +1,7 @@
 """
 Drug middling task — triggered by !middle commands received via in-game comms,
-or manually via the UI.
+or manually via the UI. Runs in the drug window (drug_window.py), not the main
+browser window.
 """
 
 import queue
@@ -100,6 +101,8 @@ class MiddlingTask(Task):
         import config as cfg
         if not cfg.load().get("middling", {}).get("enabled", False):
             reasons.append("Middling disabled")
+        if state.drug_tab_active:
+            reasons.append("Drug window busy")
         if self._queue.empty():
             reasons.append("Queue empty")
         return reasons
@@ -109,4 +112,5 @@ class MiddlingTask(Task):
             item = self._queue.get_nowait()
         except queue.Empty:
             return
-        executor.execute(Action("do_middling", runner=item["runner"], buyer=item["buyer"]), state)
+        import drug_window
+        drug_window.submit(state, Action("do_middling", runner=item["runner"], buyer=item["buyer"]))
