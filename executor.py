@@ -8364,6 +8364,33 @@ def handle_scrape_businesses(action: Action, state: GameState):
     _nav(_u("/main.asp"), state)
 
 
+def handle_check_black_market(action: Action, state: GameState):
+    """Read the local black market and upload its prices to the Player Hub.
+    A redirect away from the page means this character can't use the market
+    yet (not enough crime XP): pause checks for an hour."""
+    import black_market
+    import war_hub_client
+    _nav(_u(black_market.PATH), state)
+    if not _check_session(state):
+        return
+    if not black_market.is_market_url(browser.current_url()):
+        black_market.mark_unavailable()
+        state.add_log("Black market: not available to this character — checking again in 1 hour.")
+        _nav(_u("/main.asp"), state)
+        return
+    market = black_market.parse_market(state.page_html)
+    city = state.current_city or ""
+    if not market or not city:
+        state.add_log("Black market: couldn't read the prices.")
+        _nav(_u("/main.asp"), state)
+        return
+    black_market.remember(city, market)
+    ok = war_hub_client.report_black_market(city, black_market.utc_now_str(), market["prices"])
+    state.add_log(f"Black market: {len(market['prices'])} prices in {city}"
+                  f"{' uploaded' if ok else ' (upload failed)'}.")
+    _nav(_u("/main.asp"), state)
+
+
 def handle_check_jail(action: Action, state: GameState):
     import war_hub_client
     _nav(_u("/localcity/jail.asp"), state)
@@ -8945,6 +8972,7 @@ HANDLERS = {
     "ws_monitor": handle_ws_monitor,
     "scrape_businesses": handle_scrape_businesses,
     "check_jail": handle_check_jail,
+    "check_black_market": handle_check_black_market,
     "crossroad": handle_crossroad,
     "interact": handle_interact,
     "check_weapon": handle_check_weapon,

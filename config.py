@@ -185,6 +185,10 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "selection": "current",   # "current" | "new"
     },
+    "black_market": {
+        "check_enabled": True,             # read the local black market and upload prices to the hub
+        "check_interval_min": 15,          # minutes between checks (also checks on arrival in a new city)
+    },
     "war_mode": {
         "enabled": False,
         "mode": "local",
