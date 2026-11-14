@@ -1256,6 +1256,22 @@ def _get_city_residents(city: str, own_name: str) -> list:
 _LAUNDER_EXCLUDE_CITIES = {"Heaven", "Hell", "Manila", "Locked"}
 
 
+def _launder_client_names(soup) -> set:
+    """Lower-cased gangster names in banklaunder.asp's client table
+    (Gangster | Location | Balance | Cut | # deals)."""
+    names = set()
+    table = soup.find("table", style=lambda st: st and "90%" in st)
+    if not table:
+        return names
+    for row in table.find_all("tr"):
+        cells = row.find_all("td", class_="display_border")
+        if cells:
+            name = cells[0].get_text(strip=True)
+            if name:
+                names.add(name.lower())
+    return names
+
+
 def handle_add_launder_contact(action: Action, state: GameState):
     """Establish a money-laundering deal with one player (from the UI, or
     queued by a comms message asking to be added)."""
@@ -1307,18 +1323,28 @@ def handle_bulk_add_launder_contacts(action: Action, state: GameState):
         state.add_log(f"Bulk launder: failed to load user list ({e}).")
         return
 
+    # Existing clients (banklaunder.asp) already have a deal — skip them.
+    try:
+        page.goto(_u("/income/banklaunder.asp"), wait_until="domcontentloaded", timeout=15000)
+        clients = _launder_client_names(BeautifulSoup(page.content(), "html.parser"))
+    except Exception as e:
+        state.add_log(f"Bulk launder: couldn't read current clients ({e}) — aborting.")
+        return
+
     names = [
         p["userName"] for p in data
         if p.get("userHomeCity") not in _LAUNDER_EXCLUDE_CITIES
         and p.get("userHomeCity") != state.home_city
         and p.get("userOccupation") != "Unemployed"
         and p.get("userName") != state.own_name
+        and (p.get("userName") or "").lower() not in clients
     ]
     if not names:
-        state.add_log("Bulk launder: no eligible candidates found.")
+        state.add_log(f"Bulk launder: no new candidates ({len(clients)} existing client(s) skipped).")
         return
 
-    state.add_log(f"Bulk launder: establishing deals with {len(names)} contact(s).")
+    state.add_log(f"Bulk launder: establishing deals with {len(names)} contact(s) "
+                  f"({len(clients)} existing client(s) skipped).")
 
     _ESTABLISH_URL = _u("/income/banklaunder.asp?display=establish")
 
