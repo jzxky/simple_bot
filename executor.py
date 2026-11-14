@@ -4112,9 +4112,10 @@ def handle_bank_invest(action: Action, state: GameState):
     term = bank_cfg.get("investment_term", "3,2.25")
     raw_amount = str(bank_cfg.get("invest_amount", 0))
     amount = int(re.sub(r"[^0-9]", "", raw_amount) or "0")
+    # 0 (or blank) means "as much as possible": the $1,500,000 cap, or the
+    # whole bank balance if that's less (clamped below).
     if amount < 1:
-        state.add_log("Banking: invest amount must be at least $1.")
-        return
+        amount = 1500000
     BANK_URL = _u("/income/bank.asp")
     INVEST_URL = _u("/income/bank.asp?option=invest")
     page = browser.page()
