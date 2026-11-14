@@ -1091,9 +1091,9 @@
               </div>
               <div class="setting-row">
                 <span>Drugs <span class="sell-hint" style="margin:0">(none ticked = any)</span></span>
-                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <div class="middle-drugs">
                   {% for key, label in [("marijuana","Marijuana"),("ecstasy","Ecstasy"),("acid","Acid"),("speed","Speed"),("ice","P / ICE"),("heroin","Heroin"),("cocaine","Cocaine")] %}
-                  <label style="display:inline-flex;gap:4px;align-items:center"><input type="checkbox" class="middle-drug" value="{{ key }}">{{ label }}</label>
+                  <label><input type="checkbox" class="middle-drug" value="{{ key }}">{{ label }}</label>
                   {% endfor %}
                 </div>
               </div>
