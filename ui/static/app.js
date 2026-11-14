@@ -953,6 +953,8 @@ function drugsLoadPlayers() {
     _drugFillSelect("deal_customer_local", d.local_online || [], "No local players online");
     document.getElementById("deal-customers").replaceChildren(
       ...(d.all_alive || []).map(n => Object.assign(document.createElement("option"), {value: n})));
+    document.getElementById("middle-runners").replaceChildren(
+      ...(d.contacts || []).map(n => Object.assign(document.createElement("option"), {value: n})));
     document.getElementById("house-dealers").replaceChildren(
       ...(d.dealers || []).map(n => Object.assign(document.createElement("option"), {value: n})));
   }).catch(() => { _drugPlayersAt = 0; });
@@ -1315,6 +1317,16 @@ function drugsDealTotal() {
   });
   document.getElementById("deal-total").textContent = _drugMoney(total);
   return total;
+}
+
+function drugsRunMiddle(btn) {
+  const runner = document.getElementById("middle_runner").value.trim();
+  const buyer = document.getElementById("middle_buyer").value.trim();
+  const drugs = [...document.querySelectorAll(".middle-drug:checked")].map(c => c.value);
+  const all = document.getElementById("middle_all").checked;
+  if (!runner || !buyer) return _setSellHint("middle-result", "Enter a runner and a buyer.", "bad");
+  _setSellHint("middle-result", "Queuing…", "");
+  _drugPost("/drugs/middle", {runner, buyer, drugs, all}, btn).then(d => _drugResult("middle-result", d));
 }
 
 function drugsCreateOffer(btn) {

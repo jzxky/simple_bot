@@ -1593,10 +1593,35 @@ def drugs_players():
                          or norm_rank(p.get("rank")) in customs_ranks),
         "local_online": names(lambda p: p["username"].lower() in local),
         "all_alive": names(lambda p: True),
+        # Saved drug contacts: the runners a !middle run can buy from.
+        "contacts": sorted({c.get("name") for c in cfg.drug_contacts_get() if c.get("name")}, key=str.lower),
         # Dealing ranks a drug-house rank can take on as contacts, minus existing contacts.
         "dealers": names(lambda p: norm_rank(p.get("rank")) in MIDDLING_RANKS
                          and p["username"].lower() not in contacts),
     })
+
+
+@app.route("/drugs/middle", methods=["POST"])
+def drugs_middle():
+    """Run the !middle command from the Drugs tab: same checks and queue as the in-game
+    command; results go to the log (Drug Log) instead of a comms reply."""
+    from tasks.middling import MIDDLE_DRUGS, describe_command
+    data = request.get_json(silent=True) or {}
+    if not cfg.load().get("middling", {}).get("enabled", False):
+        return jsonify({"ok": False, "message": "Turn on Enable Middling first."}), 400
+    runner = _living_player(data.get("runner"))
+    buyer = _living_player(data.get("buyer"))
+    if not runner or not buyer:
+        return jsonify({"ok": False, "message": "Runner and buyer must be living players in the player database."}), 400
+    if runner.lower() == buyer.lower():
+        return jsonify({"ok": False, "message": "Runner and buyer must be different players."}), 400
+    drugs = [k for k in MIDDLE_DRUGS if k in set(data.get("drugs") or [])]
+    item = {"runner": runner, "buyer": buyer, "drugs": drugs, "unknown": [],
+            "all": bool(data.get("all"))}
+    bot.request_middle(item)
+    cmd = describe_command(item)
+    bot.state.add_log(f"Middling command queued from the UI: {cmd}")
+    return jsonify({"ok": True, "message": f"Queued {cmd} — progress shows in the Drug Log below."})
 
 
 @app.route("/drugs/blind-eye", methods=["POST"])
