@@ -308,6 +308,7 @@
           <button class="tab-btn" id="income-tab-jail-btn" onclick="showTab('income-jail', this)">Jail</button>
           <button class="tab-btn" onclick="showTab('income-skills', this)">Skills</button>
           <button class="tab-btn" onclick="showTab('income-drugs', this)">Drugs</button>
+          <button class="tab-btn" onclick="showTab('income-blackmarket', this)">Black Market</button>
         </div>
         <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
         <div id="income-jail" class="tab-panel">
@@ -966,6 +967,47 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Black Market tab -->
+        <div id="income-blackmarket" class="tab-panel">
+          <div class="settings-groups">
+          {% set bm = config.get('black_market', {}) %}
+          <div class="settings-group" style="grid-column:1/-1">
+            <h3>Black Market</h3>
+            <label class="inline-toggle setting-row">Check prices and share them with Player Hub
+              <label class="toggle-label"><input type="checkbox" id="bm_check_enabled" {% if bm.get('check_enabled', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+            </label>
+            <div class="setting-row">
+              <label for="bm_check_interval_min">Check every (minutes)</label>
+              <input type="number" id="bm_check_interval_min" class="input-narrow" min="1" max="240" step="1" style="width:70px" value="{{ bm.get('check_interval_min', 15) }}" oninput="markNumDirty(this)">
+            </div>
+            <label class="inline-toggle setting-row">Trade before and after travel
+              <label class="toggle-label"><input type="checkbox" id="bm_trading_enabled" {% if bm.get('trading_enabled') %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+            </label>
+            <div class="setting-row">
+              <label for="bm_min_profit_pct">Minimum profit (%)</label>
+              <input type="number" id="bm_min_profit_pct" class="input-narrow" min="0" max="1000" step="1" style="width:70px" value="{{ bm.get('min_profit_pct', 10) }}" oninput="markNumDirty(this)">
+            </div>
+            <div class="setting-row">
+              <label for="bm_max_data_age_min">Trust prices up to (minutes old)</label>
+              <input type="number" id="bm_max_data_age_min" class="input-narrow" min="1" max="1440" step="1" style="width:70px" value="{{ bm.get('max_data_age_min', 60) }}" oninput="markNumDirty(this)">
+            </div>
+            <div class="setting-row">
+              <label for="bm_max_spend">Most to spend per trip ($, 0 = no cap)</label>
+              <input type="number" id="bm_max_spend" class="input-narrow" min="0" step="1000" style="width:110px" value="{{ bm.get('max_spend', 0) }}" oninput="markNumDirty(this)">
+            </div>
+            <div class="setting-row">
+              <label for="bm_keep_cash">Always keep cash ($)</label>
+              <input type="number" id="bm_keep_cash" class="input-narrow" min="0" step="1000" style="width:110px" value="{{ bm.get('keep_cash', 0) }}" oninput="markNumDirty(this)">
+            </div>
+            <p style="font-size:0.82rem;color:var(--muted);margin:6px 0 0">
+              Before each trip the bot compares this city's prices with the destination's latest prices from Player Hub,
+              and buys what will sell for at least the minimum profit. After arriving it sells once the trafficking timer is free.
+              Trading uses cash on hand and never holds up a trip.
+            </p>
+          </div>
           </div>
         </div>
 

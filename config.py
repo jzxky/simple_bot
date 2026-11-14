@@ -188,6 +188,11 @@ DEFAULT_CONFIG = {
     "black_market": {
         "check_enabled": True,             # read the local black market and upload prices to the hub
         "check_interval_min": 15,          # minutes between checks (also checks on arrival in a new city)
+        "trading_enabled": False,          # buy before travel, sell after arriving
+        "max_data_age_min": 60,            # target city prices older than this aren't trusted
+        "min_profit_pct": 10,              # a buy or sell must clear this margin over cost
+        "max_spend": 0,                    # most clean money spent on one trip's buys (0 = no cap)
+        "keep_cash": 0,                    # never spend below this cash balance
     },
     "war_mode": {
         "enabled": False,

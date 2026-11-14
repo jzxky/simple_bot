@@ -6725,6 +6725,10 @@ def handle_travel(action: Action, state: GameState) -> int:
                       f"deferred until it's free.")
         return 0
 
+    # Black market: buy low here to sell high at the target (never blocks the trip).
+    if not urgent:
+        black_market_pre_travel(state, target)
+
     # Travel fails silently without enough cash on hand — top up from the bank first.
     if state.clean_money < _TRAVEL_MIN_CLEAN:
         state.add_log(f"Travel: clean money ${state.clean_money:,} below ${_TRAVEL_MIN_CLEAN:,}, "
@@ -8386,30 +8390,183 @@ def handle_scrape_businesses(action: Action, state: GameState):
     _nav(_u("/main.asp"), state)
 
 
-def handle_check_black_market(action: Action, state: GameState):
-    """Read the local black market and upload its prices to the Player Hub.
-    A redirect away from the page means this character can't use the market
-    yet (not enough crime XP): pause checks for an hour."""
+def _bm_traffick_free(state: GameState) -> bool:
+    # A missing timer entry is treated as free; a busy timer shows as a fail div anyway.
+    return "traffick" not in state.timers or state.timer_ready("traffick")
+
+
+def _bm_load_market(state: GameState, upload: bool = True) -> "dict | None":
+    """Open the black market and parse it. Uploads the prices to the hub and
+    trims the holdings file to what the game says is held. None when the
+    page redirected (cooldown set) or couldn't be read."""
     import black_market
+    import black_market_trade as bmt
     import war_hub_client
     _nav(_u(black_market.PATH), state)
     if not _check_session(state):
-        return
+        return None
     if not black_market.is_market_url(browser.current_url()):
         black_market.mark_unavailable()
         state.add_log("Black market: not available to this character — checking again in 1 hour.")
-        _nav(_u("/main.asp"), state)
-        return
+        return None
     market = black_market.parse_market(state.page_html)
     city = state.current_city or ""
     if not market or not city:
         state.add_log("Black market: couldn't read the prices.")
-        _nav(_u("/main.asp"), state)
-        return
+        return None
     black_market.remember(city, market)
-    ok = war_hub_client.report_black_market(city, black_market.utc_now_str(), market["prices"])
-    state.add_log(f"Black market: {len(market['prices'])} prices in {city}"
-                  f"{' uploaded' if ok else ' (upload failed)'}.")
+    if upload:
+        ok = war_hub_client.report_black_market(city, black_market.utc_now_str(), market["prices"])
+        state.add_log(f"Black market: {len(market['prices'])} prices in {city}"
+                      f"{' uploaded' if ok else ' (upload failed)'}.")
+    data = bmt.load()
+    if data["lots"]:
+        bmt.save(bmt.reconcile(data, market["held"]))
+    return market
+
+
+def _bm_submit(state: GameState, option: str, qty: dict) -> "tuple[bool, str]":
+    """Fill the Amount boxes and press Buy or Sell. Returns (success, message)."""
+    page = browser.page()
+    for item, units in qty.items():
+        name = "qty" + item.replace('"', '\\"')
+        page.fill(f'input[name="{name}"]', str(int(units)))
+    with _game_action_lock:
+        page.click(f'input[type="submit"][name="option"][value="{option}"]')
+        page.wait_for_load_state("domcontentloaded")
+    _refresh_state(state)
+    soup = BeautifulSoup(state.page_html, "html.parser")
+    ok = soup.find("div", id="success")
+    if ok:
+        return True, ok.get_text(" ", strip=True)
+    fail = soup.find("div", id="fail")
+    return False, fail.get_text(" ", strip=True) if fail else "no result shown"
+
+
+def _bm_sell(state: GameState, market: dict, data: dict, target_prices: "dict | None") -> bool:
+    """Sell what clears the minimum profit here. True if a sale went through
+    (which uses the trafficking timer)."""
+    import black_market_trade as bmt
+    s = bmt.settings()
+    sells = bmt.plan_sells(market, data["lots"], s["min_profit_pct"], target_prices)
+    if not sells:
+        return False
+    ok, msg = _bm_submit(state, "Sell", sells)
+    city = state.current_city or ""
+    for item, units in sells.items():
+        price = market["prices"][item]
+        cost = data["lots"][item]["cost"]
+        pct = round(bmt.profit_pct(cost, price), 1)
+        if ok:
+            bmt.record_sell(data, item, units)
+        action_log.record(state, "bm_sell", item, "success" if ok else "fail", target=city,
+                          amount=units * price if ok else None, message=msg,
+                          units=units, price=price, cost=cost, profit_pct=pct)
+    bmt.save(data)
+    what = ", ".join(f"{u} {i}" for i, u in sells.items())
+    state.add_log(f"Black market: {'sold' if ok else 'could not sell'} {what} in {city}"
+                  f"{'' if ok else ' — ' + msg}.")
+    return ok
+
+
+def _bm_probe_carry_limit(state: GameState, market: dict, data: dict) -> "int | None":
+    """Try to buy PROBE_UNITS of the cheapest item; the fail message names the
+    most the character can hold."""
+    import black_market_trade as bmt
+    item = min(market["prices"], key=market["prices"].get)
+    ok, msg = _bm_submit(state, "Buy", {item: bmt.PROBE_UNITS})
+    if ok:  # shouldn't happen, but keep the books straight if it does
+        bmt.record_buy(data, item, bmt.PROBE_UNITS, market["prices"][item], state.current_city or "")
+        bmt.save(data)
+        state.add_log(f"Black market: carry-limit probe bought {bmt.PROBE_UNITS} {item}.")
+        return None
+    limit = bmt.parse_carry_limit(msg)
+    if limit:
+        data["carry_limit"] = limit
+        data["carry_limit_checked"] = time.time()
+        bmt.save(data)
+        state.add_log(f"Black market: this character can carry {limit} units.")
+    else:
+        state.add_log(f"Black market: couldn't read the carry limit ({msg}).")
+    return limit
+
+
+def black_market_pre_travel(state: GameState, target: str):
+    """Before travelling: sell here what's worth more here than at the target,
+    otherwise buy what sells for at least the minimum profit at the target.
+    Never blocks the trip: every failure just logs."""
+    import black_market
+    import black_market_trade as bmt
+    import war_hub_client
+    s = bmt.settings()
+    if not s["trading_enabled"] or not war_hub_client.is_configured():
+        return
+    if black_market.unavailable_remaining():
+        return
+    if not _bm_traffick_free(state):
+        state.add_log("Black market: trafficking timer busy — no trades before this trip.")
+        return
+    try:
+        market = _bm_load_market(state)
+        if not market:
+            return
+        data = bmt.load()
+        snaps = war_hub_client.fetch_black_market(city=target, max_age_seconds=int(s["max_data_age_min"] * 60))
+        target_prices = snaps[0]["prices"] if snaps else None
+        # One trade per trafficking timer: a sale here goes first.
+        if _bm_sell(state, market, data, target_prices):
+            return
+        if not target_prices:
+            state.add_log(f"Black market: no prices for {target} from the last "
+                          f"{s['max_data_age_min']} minutes — not buying.")
+            return
+        budget = bmt.spend_budget(state.clean_money, s, floor=_TRAVEL_MIN_CLEAN)
+        if not bmt.plan_buys(market, target_prices, s["min_profit_pct"], budget, None):
+            return
+        if bmt.carry_limit_stale(data, ""):
+            _bm_probe_carry_limit(state, market, data)
+            market = black_market.parse_market(state.page_html) or market
+        limit = data.get("carry_limit")
+        room = max(0, limit - sum(market["held"].values())) if limit else 0
+        buys = bmt.plan_buys(market, target_prices, s["min_profit_pct"], budget, room)
+        if not buys:
+            if limit and not room:
+                state.add_log(f"Black market: carrying the most this character can ({limit} units).")
+            return
+        ok, msg = _bm_submit(state, "Buy", {item: units for item, units, _, _ in buys})
+        city = state.current_city or ""
+        for item, units, price, pct in buys:
+            if ok:
+                bmt.record_buy(data, item, units, price, city)
+            action_log.record(state, "bm_buy", item, "success" if ok else "fail", target=target,
+                              amount=units * price if ok else None, message=msg,
+                              units=units, price=price, target_price=target_prices.get(item),
+                              profit_pct=pct)
+        if not ok and "space" in msg.lower():
+            data["carry_limit"] = None  # probe again next time
+        bmt.save(data)
+        what = ", ".join(f"{u} {i} (+{p}%)" for i, u, _, p in buys)
+        state.add_log(f"Black market: {'bought' if ok else 'could not buy'} {what} in {city} to sell in {target}"
+                      f"{'' if ok else ' — ' + msg}.")
+    except Exception as e:
+        state.add_log(f"Black market: trade step failed ({e}) — travelling anyway.")
+
+
+def handle_check_black_market(action: Action, state: GameState):
+    """Read the local black market and upload its prices to the Player Hub."""
+    _bm_load_market(state)
+    _nav(_u("/main.asp"), state)
+
+
+def handle_black_market_sell(action: Action, state: GameState):
+    """After arriving: sell held goods that clear the minimum profit here."""
+    import black_market_trade as bmt
+    try:
+        market = _bm_load_market(state)
+        if market:
+            _bm_sell(state, market, bmt.load(), None)
+    except Exception as e:
+        state.add_log(f"Black market: selling failed ({e}).")
     _nav(_u("/main.asp"), state)
 
 
@@ -8995,6 +9152,7 @@ HANDLERS = {
     "scrape_businesses": handle_scrape_businesses,
     "check_jail": handle_check_jail,
     "check_black_market": handle_check_black_market,
+    "black_market_sell": handle_black_market_sell,
     "crossroad": handle_crossroad,
     "interact": handle_interact,
     "check_weapon": handle_check_weapon,
