@@ -41,7 +41,7 @@ UI_ACTIONS = {
     "add_drug_contact", "load_dealer_contacts", "load_contact_prices", "set_contact_prices",
 }
 # Scheduler-driven drug actions.
-TASK_ACTIONS = {"check_drug_trade", "do_middling", "do_drug_manufacturing"}
+TASK_ACTIONS = {"check_drug_trade", "do_middling", "middle_notify", "do_drug_manufacturing"}
 ACTIONS = UI_ACTIONS | TASK_ACTIONS
 
 # Actions that use the action timer: it is reserved for them while they run.

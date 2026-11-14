@@ -4954,6 +4954,12 @@ def handle_check_drug_trade(action: Action, state: GameState):
         accept_url = _u("/income/drugtrade.asp") + f"?action=accept&offerid={offer_id}"
         _nav(accept_url, state)
         state.add_log(f"Drug trade offer {offer_id}: accepted [{item_summary}] for ${offer_price:,}.")
+        bought = {}
+        for raw_name, drug_key, qty in items:
+            name = drug_key or raw_name
+            bought[name] = bought.get(name, 0) + qty
+        _record_drug_trade(state, "drug_buy", "trade_offer", True, f"offer {offer_id} accepted",
+                           "", offer_price, bought)
 
 
 # ---------------------------------------------------------------------------
@@ -5148,13 +5154,32 @@ def _check_buy(stock, drugs):
     return cost, None
 
 
-def _buy_drugs(state, link, stock, drugs, submit_selector="input[type='submit'][value='Buy']"):
+def _buy_drugs(state, link, stock, drugs, submit_selector="input[type='submit'][value='Buy']",
+               seller="", kind=""):
     """Buy from the page already loaded (a contact's list or the drug house; stock = its
     parsed list), first withdrawing from the bank if cash on hand + dirty money won't cover
-    it.  drugs: {key: qty}.  Returns (ok, message)."""
+    it.  drugs: {key: qty}.  Returns (ok, message).  The buy goes in the action log as
+    drug_buy (kind: drug_house, contact or middle; target: the seller)."""
+    if not kind:
+        kind = "drug_house" if link == _DRUG_HOUSE_PATH else "contact"
+    ok, msg, cost = _buy_drugs_inner(state, link, stock, drugs, submit_selector)
+    _record_drug_trade(state, "drug_buy", kind, ok, msg, seller, cost, drugs)
+    return ok, msg
+
+
+def _record_drug_trade(state, category, kind, ok, msg, target, amount, drugs):
+    if msg == "Session expired":
+        return
+    action_log.record(state, category, kind, "fail" if ok is False else "success",
+                      target=target, amount=amount if ok is not False else None, message=msg,
+                      drugs=dict(drugs), units=sum(drugs.values()))
+
+
+def _buy_drugs_inner(state, link, stock, drugs, submit_selector):
+    """_buy_drugs without the logging.  Returns (ok, message, cost)."""
     cost, err = _check_buy(stock, drugs)
     if err:
-        return False, err
+        return False, err, 0
     have = state.clean_money + state.dirty_money
     if have < cost:
         state.add_log(f"Drug buy: costs ${cost:,} but only ${have:,} on hand "
@@ -5165,19 +5190,20 @@ def _buy_drugs(state, link, stock, drugs, submit_selector="input[type='submit'][
         # handler doesn't wait for its result page) and what's on sale may have changed.
         _nav(_u(link), state)
         if not _check_session(state):
-            return False, "Session expired"
+            return False, "Session expired", cost
         stock = _parse_contact_stock(BeautifulSoup(state.page_html, "html.parser"))
         cost, err = _check_buy(stock, drugs)
         if err:
-            return False, err
+            return False, err, cost
         have = state.clean_money + state.dirty_money
         if have < cost:
-            return False, f"not enough money — costs ${cost:,}, have ${have:,} after trying the bank"
+            return False, f"not enough money — costs ${cost:,}, have ${have:,} after trying the bank", cost
     by_key = {s["key"]: s for s in stock}
     page = browser.page()
     for key, qty in drugs.items():
         page.fill(f"input[name='{by_key[key]['buy_field']}']", str(qty))
-    return _submit_and_read_result(state, submit_selector)
+    ok, msg = _submit_and_read_result(state, submit_selector)
+    return ok, msg, cost
 
 
 def _on_sell_page() -> bool:
@@ -5202,8 +5228,20 @@ def _open_sell_form(state):
     return soup, _parse_sell_form(soup)
 
 
-def _create_offer(state, buyer, price, drugs):
-    """Offer drugs to a player from the sell page.  drugs: {key: qty}.  Returns (ok, message)."""
+def _create_offer(state, buyer, price, drugs, kind="offer"):
+    """Offer drugs to a player from the sell page.  drugs: {key: qty}.  Returns (ok, message).
+    A failed offer goes in the action log as drug_sell; a successful one is recorded when the
+    buyer's "Drug Trade Offer Accepted" journal arrives (tasks.middling.handle_offer_journal)."""
+    from tasks import middling
+    ok, msg = _create_offer_inner(state, buyer, price, drugs)
+    if ok is False:
+        _record_drug_trade(state, "drug_sell", kind, ok, msg, buyer, price, drugs)
+    else:
+        middling.note_offer(buyer, price, drugs, kind)
+    return ok, msg
+
+
+def _create_offer_inner(state, buyer, price, drugs):
     soup, form = _open_sell_form(state)
     if soup is None:
         return False, "Session expired"
@@ -5616,15 +5654,56 @@ def handle_set_contact_prices(action: Action, state: GameState):
 
 
 def handle_do_middling(action: Action, state: GameState):
-    """!middle flow: buy up to 100 drugs from the runner (cocaine upwards — all of them if
-    fewer are on sale) and offer them to the buyer at cost. An optional drugs list (canonical
-    keys) limits the buy to those drugs."""
-    runner = action.params.get("runner", "")
-    buyer = action.params.get("buyer", "")
-    wanted = set(action.params.get("drugs") or [])
-    if not runner or not buyer:
+    """One !middle round: buy up to 100 drugs from the runner (cocaine upwards — all of them
+    if fewer are on sale; only the listed drugs when the command named some) and offer them
+    to the buyer at cost. The run dict (tasks.middling) carries the command, its sender and
+    the rounds so far. A plain command replies to the sender after its one round; an --all
+    run waits for the buyer to accept, then goes again until the runner is out of drugs."""
+    from tasks import middling
+    run = action.params.get("run") or {
+        "runner": action.params.get("runner", ""), "buyer": action.params.get("buyer", ""),
+        "drugs": action.params.get("drugs") or [], "all": False}
+    run.setdefault("rounds", [])
+    if not run["runner"] or not run["buyer"]:
         state.add_log("Middling: missing runner or buyer name.")
         return
+    try:
+        status, msg, rnd = _middle_round(state, run)
+    except Exception as e:
+        run["stop_reason"] = f"error: {e}"
+        _middle_reply(state, run, middling.finish_run(run))
+        raise
+    if status == "offered":
+        run["rounds"].append(rnd)
+        if run.get("all"):
+            state.add_log(f"Middling: round {len(run['rounds'])} offered to {run['buyer']} — "
+                          f"waiting for the accept journal.")
+            middling.wait_for_buyer(run)
+            return
+    elif status == "empty" and run["rounds"]:
+        pass  # an --all run that has bought the runner out: done
+    else:
+        run["stop_reason"] = msg
+    _middle_reply(state, run, middling.finish_run(run))
+
+
+def _middle_reply(state, run, body):
+    """Drug window: send the run's result to the !middle sender from this tab."""
+    state.add_log(f"Middling: {body.splitlines()[0]}")
+    if run.get("sender"):
+        try:
+            handle_middle_notify(Action("middle_notify", to=run["sender"],
+                                        conv_id=run.get("conv_id", ""), body=body), state)
+        except Exception as e:
+            state.add_log(f"Middling: couldn't reply to {run['sender']}: {e}")
+
+
+def _middle_round(state, run):
+    """Buy from the runner and offer to the buyer. Returns (status, message, round):
+    status "offered" (round = {drugs: [{key, name, qty, price}], cost}), "empty" (the runner
+    has none of the wanted drugs left) or "failed"."""
+    runner, buyer = run["runner"], run["buyer"]
+    wanted = set(run.get("drugs") or [])
 
     mid_cfg = cfg.load().get("middling", {})
     max_on_hand = mid_cfg.get("max_on_hand", 500)
@@ -5633,36 +5712,31 @@ def handle_do_middling(action: Action, state: GameState):
     # Our own open offer to this buyer blocks a new one
     _nav(_u("/income/drugtrade.asp"), state)
     if not _check_session(state):
-        return
+        return "failed", "session expired", None
     if buyer.lower() in _outgoing_offer_customers(BeautifulSoup(state.page_html, "html.parser")):
-        state.add_log(f"Middling: deal failed — outstanding trade already exists to {buyer}.")
-        return
+        return "failed", f"an offer to {buyer} is already open", None
 
     _nav(_u("/income/deals.asp"), state)
     if not _check_session(state):
-        return
+        return "failed", "session expired", None
     contacts = _parse_drug_contacts(BeautifulSoup(state.page_html, "html.parser"))
     runner_contact = next((c for c in contacts if c["name"].lower() == runner.lower()), None)
     if not runner_contact:
-        state.add_log(f"Middling: deal failed — {runner} is not a contact.")
-        return
-    runner = runner_contact["name"]
+        return "failed", f"{runner} is not one of my contacts", None
+    runner = run["runner"] = runner_contact["name"]
 
     _nav(_u(runner_contact["link"]), state)
     if not _check_session(state):
-        return
+        return "failed", "session expired", None
     drug_stock = _parse_contact_stock(BeautifulSoup(state.page_html, "html.parser"))
     if not drug_stock:
-        state.add_log(f"Middling: deal failed — could not read {runner}'s stock table.")
-        return
-    if not any(d["available"] > 0 for d in drug_stock):
-        state.add_log(f"Middling: deal failed — {runner} has no drugs in stock.")
-        return
+        return "failed", f"couldn't read {runner}'s drug list", None
     candidates = [d for d in drug_stock if not wanted or d["key"] in wanted]
-    if wanted and not any(d["available"] > 0 for d in candidates):
-        state.add_log(f"Middling: deal failed — {runner} has none of the requested drugs "
-                      f"({', '.join(sorted(wanted))}) in stock.")
-        return
+    if not any(d["available"] > 0 for d in candidates):
+        if wanted:
+            return "empty", (f"{runner} has none of the requested drugs "
+                             f"({', '.join(sorted(wanted))}) for sale"), None
+        return "empty", f"{runner} has no drugs for sale", None
 
     # Plan up to 100 units from the bottom of the list (cocaine first); if fewer are on sale,
     # take everything there is.
@@ -5680,38 +5754,65 @@ def handle_do_middling(action: Action, state: GameState):
 
     total_held = sum(d["owned"] for d in drug_stock)
     if total_held + units > max_on_hand:
-        state.add_log(
-            f"Middling: deal failed — too many drugs on hand "
-            f"({total_held} held + {units} = {total_held + units} > {max_on_hand} max)."
-        )
-        return
+        return "failed", (f"too many drugs on hand ({total_held} held + {units} = "
+                          f"{total_held + units}, max {max_on_hand})"), None
 
     # Only the drugs actually being bought are held to the price limits
     for key, info in buy_plan.items():
         max_price = price_limits.get(key, 0)
         if max_price > 0 and info["price"] > max_price:
-            state.add_log(
-                f"Middling: deal failed — {info['name']} price ${info['price']:,} "
-                f"exceeds max ${max_price:,}."
-            )
-            return
+            return "failed", (f"{info['name']} costs ${info['price']:,}, "
+                              f"over my max of ${max_price:,}"), None
 
     total_price = sum(v["qty"] * v["price"] for v in buy_plan.values())
     quantities = {k: v["qty"] for k, v in buy_plan.items()}
     summary = ", ".join(f"{v['qty']}x {k}" for k, v in buy_plan.items())
     state.add_log(f"Middling: buying from {runner}: {summary} (total ${total_price:,})")
 
-    ok, msg = _buy_drugs(state, runner_contact["link"], drug_stock, quantities)
+    ok, msg = _buy_drugs(state, runner_contact["link"], drug_stock, quantities,
+                         seller=runner, kind="middle")
     if ok is False:
-        state.add_log(f"Middling: buy from {runner} failed — {msg}")
-        return
+        return "failed", f"buying from {runner} failed: {msg}", None
     state.add_log(f"Middling: buy from {runner} — {msg}")
 
-    ok, msg = _create_offer(state, buyer, total_price, quantities)
+    ok, msg = _create_offer(state, buyer, total_price, quantities, kind="middle")
     if ok is False:
-        state.add_log(f"Middling: sell to {buyer} failed — {msg}")
-    else:
-        state.add_log(f"Middling: sell to {buyer} — {msg}")
+        return "failed", (f"bought {units} drugs from {runner} for ${total_price:,} but the "
+                          f"offer to {buyer} failed: {msg}"), None
+    state.add_log(f"Middling: sell to {buyer} — {msg}")
+    rnd = {"drugs": [{"key": k, "name": v["name"], "qty": v["qty"], "price": v["price"]}
+                     for k, v in buy_plan.items()],
+           "cost": total_price}
+    return "offered", msg, rnd
+
+
+def handle_middle_notify(action: Action, state: GameState):
+    """Reply to a !middle sender: in the conversation the command came from, or a new
+    message when that isn't known (drug window)."""
+    to_name = action.params.get("to", "")
+    conv_id = str(action.params.get("conv_id", "") or "")
+    body = action.params.get("body", "")
+    if not to_name or not body:
+        return
+    page = browser.page()
+    if conv_id.isdigit():
+        _nav(_u(f"/communications/comms.asp?display=viewconv&id={conv_id}"), state)
+        if not _check_session(state):
+            return
+        if page.query_selector("textarea[name='newmessagebody']"):
+            page.fill("textarea[name='newmessagebody']", body)
+            ok, msg = _submit_and_read_result(state, "input[name='B1']")
+            state.add_log(f"Middling: replied to {to_name}" + (f" — {msg}" if ok is not None else ""))
+            return
+    _nav(_u("/communications/compose.asp"), state)
+    if not _check_session(state):
+        return
+    page.fill("input[name='toname']", to_name)
+    page.fill("input[name='msgsubject']", "!middle")
+    page.fill("textarea[name='messagebody']", body)
+    page.select_option("select[name='msgtype']", "character")
+    ok, msg = _submit_and_read_result(state, "input[name='B1']")
+    state.add_log(f"Middling: messaged {to_name}" + (f" — {msg}" if ok is not None else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -6024,20 +6125,20 @@ def handle_check_comms(action: Action, state: GameState):
                             state.add_log(f"Middling parser: new msg from {m_sender} — first line: {first_line!r}")
                             parsed = parse_middle_command(body_text)
                             if parsed:
-                                m_runner, m_buyer, m_drugs, m_unknown = parsed
-                                drugs_txt = ",".join(m_drugs) if m_drugs else "any"
-                                state.add_log(f"Middling parser: matched !middle runner={m_runner} buyer={m_buyer} drugs={drugs_txt}")
+                                from tasks.middling import describe_command, notify_sender
+                                parsed.update(sender=m_sender, conv_id=cid)
+                                cmd_txt = describe_command(parsed)
+                                state.add_log(f"Middling parser: matched {cmd_txt}")
                                 if _middling_queue is not None:
-                                    err = validate_middle_players(m_runner, m_buyer)
-                                    if m_unknown:
-                                        err = f"unknown drug(s): {', '.join(m_unknown)}"
+                                    err = validate_middle_players(parsed["runner"], parsed["buyer"])
+                                    if parsed["unknown"]:
+                                        err = f"unknown drug(s): {', '.join(parsed['unknown'])}"
                                     if err:
                                         state.add_log(f"Middling command from {m_sender} rejected: {err}")
+                                        notify_sender(state, parsed, f"{first_line} failed: {err}.")
                                     else:
-                                        _middling_queue.put({"action": "do_middling", "runner": m_runner,
-                                                             "buyer": m_buyer, "drugs": m_drugs})
-                                        drugs_arg = f" {','.join(m_drugs)}" if m_drugs else ""
-                                        state.add_log(f"Middling command queued from {m_sender}: !middle {m_runner} {m_buyer}{drugs_arg}")
+                                        _middling_queue.put(parsed)
+                                        state.add_log(f"Middling command queued from {m_sender}: {cmd_txt}")
                             else:
                                 state.add_log(f"Middling parser: no !middle command found in message")
                             conv["_middling_parsed_count"] = len(msgs)
@@ -8884,6 +8985,7 @@ HANDLERS = {
     "archive_comms": handle_archive_comms,
     "check_drug_trade": handle_check_drug_trade,
     "do_middling": handle_do_middling,
+    "middle_notify": handle_middle_notify,
     "send_blind_eye": handle_send_blind_eye,
     "load_drug_contacts": handle_load_drug_contacts,
     "load_contact_stock": handle_load_contact_stock,

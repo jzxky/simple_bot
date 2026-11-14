@@ -213,6 +213,9 @@ def dispatch_journal_action(entry: dict, state: GameState):
         if cfg.load().get("autobuy", {}).get("enabled", False):
             if _drug_trade_queue is not None:
                 _drug_trade_queue.put(True)
+    if entry.get("title", "").startswith("Drug Trade Offer "):  # "... Accepted" / "... Declined"
+        from tasks.middling import handle_offer_journal
+        handle_offer_journal(entry, state)
     if entry.get("title") == "Drug Smuggle":
         if "turn a blind eye on your customs duty" in entry.get("text", "").lower():
             _handle_drug_smuggle(entry, state)

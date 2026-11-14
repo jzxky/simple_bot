@@ -1077,12 +1077,17 @@
                   <span class="toggle"></span>
                 </label>
               </label>
-              <p class="placeholder">Rank required: Piciotto, Enforcer, Dealer, or Giovane D'Honore. Responds to <code>!middle [runner] [buyer] [drugs]</code> commands via in-game comms. <code>drugs</code> is an optional comma-separated list (e.g. <code>weed,ecstasy,coke</code>) limiting which drugs are bought; leave it out to buy any.</p>
+              <p class="placeholder">Rank required: Piciotto, Enforcer, Dealer, or Giovane D'Honore. Responds to <code>!middle [runner] [buyer] [drugs] [--all]</code> commands via in-game comms and replies to the sender with the result. <code>drugs</code> is an optional comma-separated list (e.g. <code>weed,ecstasy,coke</code>) limiting which drugs are bought; leave it out to buy any. <code>--all</code> keeps going (buy, offer, wait for the buyer to accept) until the runner is out of drugs.</p>
 
               <div class="setting-row">
                 <label for="middling_max_on_hand">Max drugs on hand</label>
                 <input type="number" id="middling_max_on_hand" class="input-narrow" min="0"
                   value="{{ mid_cfg.get('max_on_hand', 500) }}" oninput="markNumDirty(this)">
+              </div>
+              <div class="setting-row">
+                <label for="middling_accept_timeout_mins">--all: wait for accept (minutes)</label>
+                <input type="number" id="middling_accept_timeout_mins" class="input-narrow" min="1"
+                  value="{{ mid_cfg.get('accept_timeout_mins', 30) }}" oninput="markNumDirty(this)">
               </div>
 
               <h4 style="margin-top:12px">Accepted Buy Prices (max price per unit)</h4>

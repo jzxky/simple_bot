@@ -595,6 +595,7 @@ def _apply_payload(c: dict, data: dict) -> dict:
     if "drug_house_allow_travel" in data:
         c.setdefault("drug_house", {})["allow_travel_with_stock"] = bool(data["drug_house_allow_travel"])
     c["middling"]["max_on_hand"] = int(data.get("middling_max_on_hand", 500) or 500)
+    c["middling"]["accept_timeout_mins"] = max(1, int(data.get("middling_accept_timeout_mins", 30) or 30))
     c["middling"].setdefault("prices", {})
     _MID_DRUGS = ["marijuana", "ecstasy", "acid", "speed", "ice", "heroin", "cocaine"]
     for key in _MID_DRUGS:
