@@ -770,8 +770,11 @@ def _run(c: dict):
             # Bulk-add laundering contacts if requested from UI
             if not _bulk_launder_queue.empty():
                 try:
-                    _bulk_launder_queue.get_nowait()
-                    executor.execute(Action("bulk_add_launder_contacts"), state)
+                    item = _bulk_launder_queue.get_nowait()
+                    if isinstance(item, str):
+                        executor.execute(Action("add_launder_contact", username=item), state)
+                    else:
+                        executor.execute(Action("bulk_add_launder_contacts"), state)
                 except Exception as e:
                     state.add_log(f"Bulk launder error: {e}")
 
@@ -954,6 +957,12 @@ def request_reload():
 
 def request_bulk_launder():
     _bulk_launder_queue.put(True)
+
+
+def request_add_launder(username: str):
+    """Establish a laundering deal with one player on the next loop pass."""
+    if username and username.strip():
+        _bulk_launder_queue.put(username.strip())
 
 
 def request_auto_jail_check():

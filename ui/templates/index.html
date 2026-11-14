@@ -735,6 +735,14 @@
             </p>
             <button type="button" class="action-btn" id="bulk-launder-btn" onclick="bulkAddLaunderContacts()">Bulk-Add Contacts</button>
             <span id="bulk-launder-status" style="font-size:0.8rem;color:var(--muted);margin-left:8px"></span>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+              <input type="text" id="add-launder-name" placeholder="Username" style="width:150px">
+              <button type="button" class="action-btn" id="add-launder-btn" onclick="addLaunderContact()">Add Contact</button>
+              <span id="add-launder-status" style="font-size:0.8rem;color:var(--muted)"></span>
+            </div>
+            <p style="font-size:0.8rem;color:var(--muted);margin:6px 0 0">
+              Bank careers: anyone who sends you a message containing "add" is added automatically.
+            </p>
           </div>
         </div>
 
@@ -848,7 +856,7 @@
                   <input type="text" inputmode="numeric" id="banking_invest_amount" style="width:150px"
                     value="{{ config.get('banking', {}).get('invest_amount', 0) }}"
                     oninput="markNumDirty(this)">
-                  <span style="font-size:0.8rem;color:var(--muted);white-space:nowrap">Max: 1,500,000</span>
+                  <span style="font-size:0.8rem;color:var(--muted);white-space:nowrap">Max: 1,500,000 (0 = max available)</span>
                 </div>
               </div>
               <div class="setting-row">

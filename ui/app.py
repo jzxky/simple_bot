@@ -906,6 +906,17 @@ def banklaunder_bulk_add():
     return jsonify({"ok": True})
 
 
+@app.route("/banklaunder/add_one", methods=["POST"])
+def banklaunder_add_one():
+    if not bot.is_running():
+        return jsonify({"ok": False, "error": "Bot is not running."})
+    name = ((request.get_json(silent=True) or {}).get("username") or "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "Enter a username."})
+    bot.request_add_launder(name)
+    return jsonify({"ok": True})
+
+
 @app.route("/jail/partner_candidates")
 def jail_partner_candidates():
     """Valid jail-break partners from the player-list DB (including offline players,

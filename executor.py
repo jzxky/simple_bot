@@ -1256,6 +1256,55 @@ def _get_city_residents(city: str, own_name: str) -> list:
 _LAUNDER_EXCLUDE_CITIES = {"Heaven", "Hell", "Manila", "Locked"}
 
 
+def _launder_client_names(soup) -> set:
+    """Lower-cased gangster names in banklaunder.asp's client table
+    (Gangster | Location | Balance | Cut | # deals)."""
+    names = set()
+    table = soup.find("table", style=lambda st: st and "90%" in st)
+    if not table:
+        return names
+    for row in table.find_all("tr"):
+        cells = row.find_all("td", class_="display_border")
+        if cells:
+            name = cells[0].get_text(strip=True)
+            if name:
+                names.add(name.lower())
+    return names
+
+
+def handle_add_launder_contact(action: Action, state: GameState):
+    """Establish a money-laundering deal with one player (from the UI, or
+    queued by a comms message asking to be added)."""
+    name = (action.params.get("username") or "").strip()
+    if not name:
+        return
+    if name.lower() == (state.own_name or "").lower():
+        return
+    if not state.in_home_city():
+        state.add_log(f"Add launder contact {name}: not in home city — skipped.")
+        return
+    page = browser.page()
+    page.goto(_u("/income/banklaunder.asp?display=establish"), wait_until="domcontentloaded", timeout=15000)
+    if not _check_session(state):
+        return
+    if not page.query_selector("input[name='gangster']"):
+        state.add_log(f"Add launder contact {name}: establish form not available.")
+        return
+    page.fill("input[name='gangster']", name)
+    page.click("input[name='B1']")
+    page.wait_for_load_state("domcontentloaded")
+    soup = BeautifulSoup(page.content(), "html.parser")
+    fail_div = soup.find("div", id="fail")
+    success_div = soup.find("div", id="success")
+    if fail_div:
+        state.add_log(f"Add launder contact {name}: {fail_div.get_text(strip=True)}")
+    elif success_div:
+        state.add_log(f"Add launder contact {name}: {success_div.get_text(strip=True)}")
+    else:
+        state.add_log(f"Add launder contact {name}: submitted (no result div).")
+    _refresh_state(state)
+
+
 def handle_bulk_add_launder_contacts(action: Action, state: GameState):
     """Establish a money-laundering deal with every eligible player.
 
@@ -1274,18 +1323,28 @@ def handle_bulk_add_launder_contacts(action: Action, state: GameState):
         state.add_log(f"Bulk launder: failed to load user list ({e}).")
         return
 
+    # Existing clients (banklaunder.asp) already have a deal — skip them.
+    try:
+        page.goto(_u("/income/banklaunder.asp"), wait_until="domcontentloaded", timeout=15000)
+        clients = _launder_client_names(BeautifulSoup(page.content(), "html.parser"))
+    except Exception as e:
+        state.add_log(f"Bulk launder: couldn't read current clients ({e}) — aborting.")
+        return
+
     names = [
         p["userName"] for p in data
         if p.get("userHomeCity") not in _LAUNDER_EXCLUDE_CITIES
         and p.get("userHomeCity") != state.home_city
         and p.get("userOccupation") != "Unemployed"
         and p.get("userName") != state.own_name
+        and (p.get("userName") or "").lower() not in clients
     ]
     if not names:
-        state.add_log("Bulk launder: no eligible candidates found.")
+        state.add_log(f"Bulk launder: no new candidates ({len(clients)} existing client(s) skipped).")
         return
 
-    state.add_log(f"Bulk launder: establishing deals with {len(names)} contact(s).")
+    state.add_log(f"Bulk launder: establishing deals with {len(names)} contact(s) "
+                  f"({len(clients)} existing client(s) skipped).")
 
     _ESTABLISH_URL = _u("/income/banklaunder.asp?display=establish")
 
@@ -4112,9 +4171,10 @@ def handle_bank_invest(action: Action, state: GameState):
     term = bank_cfg.get("investment_term", "3,2.25")
     raw_amount = str(bank_cfg.get("invest_amount", 0))
     amount = int(re.sub(r"[^0-9]", "", raw_amount) or "0")
+    # 0 (or blank) means "as much as possible": the $1,500,000 cap, or the
+    # whole bank balance if that's less (clamped below).
     if amount < 1:
-        state.add_log("Banking: invest amount must be at least $1.")
-        return
+        amount = 1500000
     BANK_URL = _u("/income/bank.asp")
     INVEST_URL = _u("/income/bank.asp?option=invest")
     page = browser.page()
@@ -5882,6 +5942,10 @@ def handle_journal_action(action: Action, state: GameState):
 # Communications handlers
 # ---------------------------------------------------------------------------
 
+_LAUNDER_OCCUPATIONS = {"Bank Teller", "Loan Officer", "Bank Manager"}
+_LAUNDER_ADD_RE = re.compile(r"\badd\b", re.I)
+
+
 def handle_check_comms(action: Action, state: GameState):
     from tasks.communications import (
         _load_comms, _save_comms, parse_inbox_rows, parse_thread,
@@ -5897,7 +5961,8 @@ def handle_check_comms(action: Action, state: GameState):
     # Nothing stored yet (first check): the whole inbox looks new, so don't
     # forward it to the hub.
     import comms_forward
-    forward = bool(data) and comms_forward.enabled()
+    data_existed = bool(data)
+    forward = data_existed and comms_forward.enabled()
 
     while True:
         _nav(url, state)
@@ -5964,6 +6029,24 @@ def handle_check_comms(action: Action, state: GameState):
                             else:
                                 state.add_log(f"Middling parser: no !middle command found in message")
                             conv["_middling_parsed_count"] = len(msgs)
+
+                    # Banking careers: a new message saying "add" asks to be
+                    # added as a laundering contact — establish a deal with
+                    # the sender. Skipped on the very first inbox read.
+                    if data_existed and state.occupation in _LAUNDER_OCCUPATIONS:
+                        msgs = conv.get("messages", [])
+                        old_n = existing.get("_launder_parsed_count", len(existing.get("messages", [])))
+                        new_msgs = msgs[:max(len(msgs) - old_n, 0)]  # newest-first
+                        own = (state.own_name or "").lower()
+                        for m in new_msgs:
+                            sender = m.get("from", "")
+                            if (sender and sender.lower() != own
+                                    and _LAUNDER_ADD_RE.search(m.get("body", ""))):
+                                import bot as _bot
+                                _bot.request_add_launder(sender)
+                                state.add_log(f"Comms: {sender} asked to be added — queued launder contact.")
+                                break
+                        conv["_launder_parsed_count"] = len(msgs)
             else:
                 for k, v in conv.items():
                     if k != "messages":
@@ -8740,6 +8823,7 @@ HANDLERS = {
     "manual_earn": handle_manual_earn,
     "bulk_add_launder_contacts": handle_bulk_add_launder_contacts,
     "check_banking_cases": handle_check_banking_cases,
+    "add_launder_contact": handle_add_launder_contact,
     "check_lawyer_cases": handle_check_lawyer_cases,
     "do_crime": handle_do_crime,
     "event_boss": handle_event_boss,
