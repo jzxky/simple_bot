@@ -292,12 +292,28 @@ def _check_session(state: GameState) -> bool:
 # Handlers
 # ---------------------------------------------------------------------------
 
+def _login_panel_says_dead(soup) -> bool | None:
+    """loggedin.asp names the character in the login panel header, e.g.
+    <div class="panel-heading loginpanelheader">Busy_woman (Dead)</div>.
+    True when it ends in "(Dead)", False when the header is there without it,
+    None when there's no header to go by."""
+    hdr = soup.find("div", class_="loginpanelheader")
+    if not hdr:
+        return None
+    return hdr.get_text(" ", strip=True).lower().endswith("(dead)")
+
+
 def _dead_character_check(state: GameState, html: str) -> bool:
-    """On loggedin.asp a dead character has no PLAY NOW button. Flag it so
-    the bot pauses instead of trying to log in again."""
+    """On loggedin.asp a dead character's name is shown as "Name (Dead)" in the
+    login panel header. Flag it so the bot pauses instead of trying to log in
+    again. Without that header, fall back to "no PLAY NOW button"."""
     if "loggedin.asp" not in browser.current_url():
         return False
-    if BeautifulSoup(html, "html.parser").find("a", class_="btn-play"):
+    soup = BeautifulSoup(html, "html.parser")
+    dead = _login_panel_says_dead(soup)
+    if dead is None:
+        dead = not soup.find("a", class_="btn-play")
+    if not dead:
         return False
     _mark_character_dead(state)
     return True
@@ -353,6 +369,12 @@ def handle_login(action: Action, state: GameState):
         state.last_error = "Login failed: incorrect credentials."
         state.add_log(state.last_error)
         state.bot_running = False
+        return
+
+    # The login panel header reads "Name (Dead)" for a dead character.
+    if _login_panel_says_dead(soup):
+        _save_dead_page(page.content())
+        _mark_character_dead(state)
         return
 
     # Click PLAY NOW if present
