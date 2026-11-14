@@ -152,3 +152,37 @@ def report_home_cities(cities: list) -> bool:
     except Exception as e:
         log.warning("war_hub: report_home_cities failed: %s", e)
         return False
+
+
+def report_black_market(city: str, checked_at: str, prices: dict) -> bool:
+    """Upload one city's black market prices ({item: price}) and when they were read (UTC)."""
+    if not is_configured() or not city or not prices:
+        return False
+    try:
+        result = _post("/api/sync/blackmarket", {
+            "city": city, "checked_at": checked_at,
+            "prices": [{"item": i, "price": p} for i, p in prices.items()],
+        })
+        return result.get("ok", False)
+    except Exception as e:
+        log.warning("war_hub: report_black_market failed: %s", e)
+        return False
+
+
+def fetch_black_market(city: str = "", max_age_seconds: "int | None" = None) -> "list | None":
+    """Latest black market prices per city from the hub:
+    [{"city", "checked_at", "age_seconds", "prices": {item: price}}, ...], or None on failure."""
+    if not is_configured():
+        return None
+    from urllib.parse import urlencode
+    params = {}
+    if city:
+        params["city"] = city
+    if max_age_seconds is not None:
+        params["max_age"] = int(max_age_seconds)
+    try:
+        path = "/api/sync/blackmarket" + ("?" + urlencode(params) if params else "")
+        return _get(path).get("cities", [])
+    except Exception as e:
+        log.warning("war_hub: fetch_black_market failed: %s", e)
+        return None

@@ -73,6 +73,7 @@ from tasks.business_scrape import BusinessScrapeTask
 from tasks.online_check import OnlineCheckTask
 from tasks.home_city_check import HomeCityCheckTask
 from tasks.jail_check import JailCheckTask
+from tasks.black_market_check import BlackMarketCheckTask
 from tasks.skills_task import DiscoverSkillsTask, CombatMedicTask, BiometricVirusTask, AllSeeingEyeTask, NewsEditorTask
 from tasks.drug_store import DrugStoreTask
 from tasks.startup_task import StartupTask
@@ -354,6 +355,7 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(OnlineCheckTask())
     sched.add(HomeCityCheckTask())
     sched.add(JailCheckTask())
+    sched.add(BlackMarketCheckTask())
     _player_refresh_task_ref = PlayerRefreshTask()
     sched.add(_player_refresh_task_ref)
     if old_sched:
