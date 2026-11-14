@@ -6,6 +6,7 @@ from state import GameState
 
 class DepositTask(Task):
     priority = 50
+    moves_cash = True
     label = 'Deposit'
 
     def __init__(self, deposit_queue: queue.Queue):

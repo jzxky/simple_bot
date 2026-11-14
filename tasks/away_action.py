@@ -38,7 +38,8 @@ class AwayActionTask(Task):
         if self.action_type == "drug_manufacturing":
             import executor
             from tasks.drug_manufacturing import is_eligible
-            if executor.drug_manufacture_cooldown_active() or not is_eligible(state):
+            if (state.drug_tab_active or executor.drug_manufacture_cooldown_active()
+                    or not is_eligible(state)):
                 return False
         cooldown_key = "community_service_away" if self.action_type == "community_service" else self.action_type
         cooldown = ACTION_COOLDOWNS.get(cooldown_key, 10)
@@ -65,6 +66,8 @@ class AwayActionTask(Task):
                 reasons.append("Rank/occupation not allowed")
         if self.action_type == "drug_manufacturing":
             import executor
+            if state.drug_tab_active:
+                reasons.append("Drug window busy")
             if executor.drug_manufacture_cooldown_active():
                 reasons.append("Manufacture cooldown")
             from tasks.drug_manufacturing import eligibility_reasons
@@ -80,7 +83,8 @@ class AwayActionTask(Task):
         if self.action_type == "community_service":
             executor.execute(Action("do_community_service", in_home_city=False), state)
         elif self.action_type == "drug_manufacturing":
-            executor.execute(Action("do_drug_manufacturing", context="away"), state)
+            import drug_window  # its own Chrome window
+            drug_window.submit(state, Action("do_drug_manufacturing", context="away"))
         elif self.action_type == "dog_trains":
             executor.execute(Action("do_dog_trains", context="away"), state)
         else:
