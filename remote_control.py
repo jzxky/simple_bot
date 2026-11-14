@@ -34,6 +34,7 @@ from urllib.parse import urlsplit
 import action_log
 import config as cfg
 import hub_errors
+import hub_state
 import plugin_sync
 
 log = logging.getLogger(__name__)
@@ -49,6 +50,8 @@ IDLE_RECHECK = 5           # seconds between config checks while off
 UNPAIRED_WAIT = 15         # seconds between polls while no hub user is paired
 PAIRING_WAIT = 3           # ... while a pairing code is showing
 PAIR_CODE_TTL = 600
+STATE_EVERY = 5             # seconds between game status checks
+STATE_HEARTBEAT = 60        # resend unchanged status this often
 FEED_EVERY = 5              # seconds between action history uploads
 FEED_BATCH = 200
 FEED_BACKFILL = 200         # recent actions sent when the hub has none from this bot
@@ -355,6 +358,54 @@ def _feed_worker():
             cursor = None
 
 
+def _state_key(snap: dict) -> str:
+    """Comparison key for a status snapshot. Countdowns shrink every second,
+    so they are compared as the (rounded) time they end: a bot whose timers
+    just tick down isn't resent every few seconds, but a reset timer is."""
+    now = time.time()
+
+    def ends(v):
+        return None if v is None else int((now + v) // 10)
+
+    card = dict(snap.get("card") or {})
+    details = dict(snap.get("details") or {})
+    for d in (card, details):
+        for k in [k for k in d if k.endswith("_left")]:
+            d[k] = ends(d[k])
+    details["timers"] = {n: ends(v) for n, v in (details.get("timers") or {}).items()}
+    details.pop("server_time", None)
+    return json.dumps({"card": card, "details": details}, sort_keys=True, default=str)
+
+
+def _state_worker():
+    """Send the game status shown on the hub's Remote page while paired:
+    every STATE_EVERY seconds when it changed, else every STATE_HEARTBEAT."""
+    last, last_sent = None, 0.0
+    while True:
+        time.sleep(STATE_EVERY)
+        try:
+            target, _ = settings()
+            with _lock:
+                paired = _state["status"] == "paired"
+            if not target or not paired:
+                last = None
+                continue
+            snap = hub_state.snapshot()
+            key = _state_key(snap)
+            if key == last and time.time() - last_sent < STATE_HEARTBEAT:
+                continue
+            url, key_ = target
+            _post(url, key_, "/api/remote/state", {"state": snap}, 15)
+            last, last_sent = key, time.time()
+        except urllib.error.HTTPError as e:
+            last = None
+            if e.code == 404:
+                time.sleep(300)      # the hub doesn't take status yet
+        except Exception as e:
+            log.debug("Status upload failed: %s", e)
+            last = None
+
+
 def _say_goodbye_when_disabled():
     """Tell the hub straight away when remote control is switched off here."""
     last = None
@@ -380,6 +431,7 @@ def start():
         threading.Thread(target=_worker, args=(n,), name=f"remote-{n}", daemon=True).start()
     threading.Thread(target=_say_goodbye_when_disabled, name="remote-bye", daemon=True).start()
     threading.Thread(target=_feed_worker, name="remote-feed", daemon=True).start()
+    threading.Thread(target=_state_worker, name="remote-state", daemon=True).start()
     import comms_forward
     comms_forward.start()
 
