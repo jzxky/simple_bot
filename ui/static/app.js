@@ -3482,6 +3482,25 @@ function bulkAddLaunderContacts() {
     .finally(() => { setTimeout(() => { if (btn) btn.disabled = false; }, 2000); });
 }
 
+function addLaunderContact() {
+  const input = document.getElementById("add-launder-name");
+  const btn = document.getElementById("add-launder-btn");
+  const status = document.getElementById("add-launder-status");
+  const name = (input && input.value || "").trim();
+  if (!name) { if (input) input.focus(); return; }
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = "Starting…";
+  fetch("/banklaunder/add_one", {method: "POST", headers: {"Content-Type": "application/json"},
+                                 body: JSON.stringify({username: name})})
+    .then(r => r.json())
+    .then(d => {
+      if (status) status.textContent = d.ok ? "Queued — see activity log." : (d.error || "Failed.");
+      if (d.ok && input) input.value = "";
+    })
+    .catch(() => { if (status) status.textContent = "Request failed."; })
+    .finally(() => { setTimeout(() => { if (btn) btn.disabled = false; }, 2000); });
+}
+
 // ── Laundering preferred contacts ─────────────────────────────────────────────
 
 const _LAUNDER_OCCUPATIONS = ["Bank Teller", "Loan Officer", "Bank Manager"];
