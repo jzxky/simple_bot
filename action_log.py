@@ -55,6 +55,8 @@ CATEGORY_LABELS = {
     "launder": "Laundering sent",
     "drug_buy": "Drugs bought",
     "drug_sell": "Drugs sold",
+    "bm_buy": "Black market bought",
+    "bm_sell": "Black market sold",
 }
 
 _SCHEMA = """

@@ -616,6 +616,22 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c.setdefault("travel", {})
     c["travel"]["ignore_closed"] = bool(data.get("travel_ignore_closed", False))
 
+    if "bm_check_enabled" in data:
+        bm = c.setdefault("black_market", {})
+
+        def _num(key, default, lo, hi, cast=int):
+            try:
+                return max(lo, min(hi, cast(data.get(key, default))))
+            except (TypeError, ValueError):
+                return default
+        bm["check_enabled"] = bool(data.get("bm_check_enabled", True))
+        bm["check_interval_min"] = _num("bm_check_interval_min", 15, 1, 240)
+        bm["trading_enabled"] = bool(data.get("bm_trading_enabled", False))
+        bm["min_profit_pct"] = _num("bm_min_profit_pct", 10, 0, 1000, float)
+        bm["max_data_age_min"] = _num("bm_max_data_age_min", 60, 1, 1440)
+        bm["max_spend"] = _num("bm_max_spend", 0, 0, 10**12)
+        bm["keep_cash"] = _num("bm_keep_cash", 0, 0, 10**12)
+
     c.setdefault("smart_travel", {})
     c["smart_travel"]["enabled"] = data.get("smart_travel_enabled", False)
     c["smart_travel"]["priority_order"] = data.get("smart_travel_priority_order",
