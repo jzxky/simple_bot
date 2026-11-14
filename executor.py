@@ -1825,7 +1825,7 @@ def _nav_to_target_input(crime: str, state: GameState) -> bool:
         if not _check_cs_punishment(state):
             _disable_agg_crimes(state, f"Agg crime '{crime}' not on the available list — disabling aggravated crimes.")
         return False
-    page.check(f"input[name='agcrime'][value='{crime}']")
+    browser.check_radio(page, f"input[name='agcrime'][value='{crime}']")
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     return bool(page.query_selector(_TARGET_INPUT))
@@ -1882,7 +1882,7 @@ def _breaking_entering_steps(action: Action, state: GameState):
         if not _check_session(state):
             return
 
-        page.check("input[name='agcrime'][value='breaking']")
+        browser.check_radio(page, "input[name='agcrime'][value='breaking']")
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
 
@@ -1934,7 +1934,7 @@ def _breaking_entering_steps(action: Action, state: GameState):
             _nav(_u("/income/agcrime.asp"), state)
             if not _check_session(state):
                 return False
-            page.check("input[name='agcrime'][value='breaking']")
+            browser.check_radio(page, "input[name='agcrime'][value='breaking']")
             page.click("input[type='submit'][name='B1']")
             page.wait_for_load_state("domcontentloaded")
             return bool(page.query_selector("select[name='breaking']"))
@@ -2180,7 +2180,7 @@ def _interact_nav(crime: str, state: GameState) -> bool:
     _nav(_u("/income/agcrime.asp"), state)
     if not page.query_selector(f"input[name='agcrime'][value='{crime}']"):
         return False
-    page.check(f"input[name='agcrime'][value='{crime}']")
+    browser.check_radio(page, f"input[name='agcrime'][value='{crime}']")
     page.click("input[type='submit'][name='B1']")
     page.wait_for_load_state("domcontentloaded")
     return bool(page.query_selector(_TARGET_INPUT))
@@ -2237,7 +2237,7 @@ def _interact_breaking(target: str, state: GameState) -> dict:
             if _check_cs_punishment(state):
                 return {"ok": False, "message": "Community service required before B&E."}
             return {"ok": False, "message": "Breaking & Entering is not available right now."}
-        page.check("input[name='agcrime'][value='breaking']")
+        browser.check_radio(page, "input[name='agcrime'][value='breaking']")
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
 
@@ -2540,14 +2540,10 @@ def _select_radio(page, name: str, value: str) -> bool:
     a click would. Returns True if the radio ends up selected."""
     sel = f"input[name='{name}'][value='{value}']"
     try:
-        page.check(sel, timeout=5000)
+        browser.check_radio(page, sel, timeout=5000)
+        return True
     except Exception:
-        page.eval_on_selector(sel, """el => {
-            el.checked = true;
-            el.dispatchEvent(new Event('input', {bubbles: true}));
-            el.dispatchEvent(new Event('change', {bubbles: true}));
-        }""")
-    return page.eval_on_selector(sel, "el => el.checked")
+        return False
 
 
 def _radio_label(radio) -> str:
@@ -2719,7 +2715,7 @@ def handle_fire_duties(action: Action, state: GameState):
         return
 
     last = options[-1]
-    page.check(f"input[name='comservice'][value='{last['value']}']")
+    browser.check_radio(page, f"input[name='comservice'][value='{last['value']}']")
 
     page.click("input[type='submit'][name='B2']")
     page.wait_for_load_state("domcontentloaded")
@@ -3164,7 +3160,7 @@ def _armed_robbery_steps(action: Action, state: GameState):
         if not _check_cs_punishment(state):
             _disable_agg_crimes(state, "Armed crime option not available — disabling aggravated crimes.")
         return
-    page.check("input[name='agcrime'][value='armed']")
+    browser.check_radio(page, "input[name='agcrime'][value='armed']")
     with _game_action_lock:
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
@@ -3304,7 +3300,7 @@ def _torch_business_steps(action: Action, state: GameState):
         if not _check_cs_punishment(state):
             _disable_agg_crimes(state, "Torch business option not available — disabling aggravated crimes.")
         return
-    page.check("input[name='agcrime'][value='torchbusiness']")
+    browser.check_radio(page, "input[name='agcrime'][value='torchbusiness']")
     with _game_action_lock:
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
@@ -3927,8 +3923,7 @@ def _handle_jail_duty_manual(duty: str, state: GameState):
     if chosen != duty:
         state.add_log(f"Jail duties: '{duty}' unavailable — stepping down to '{chosen}'.")
     duty = chosen
-    radio = page.query_selector(f"input[name='job'][value='{duty}']")
-    radio.check()
+    browser.check_radio(page, f"input[name='job'][value='{duty}']")
     with _game_action_lock:
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
@@ -4022,7 +4017,7 @@ def handle_jail_action(action: Action, state: GameState):
         state.add_log(f"Jail action: '{jail_action}' unavailable — falling back to '{chosen}'.")
     jail_action = chosen
 
-    page.check(f"input[type='radio'][value='{jail_action}']")
+    browser.check_radio(page, f"input[type='radio'][value='{jail_action}']")
     with _game_action_lock:
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
@@ -4065,7 +4060,7 @@ def handle_jail_consume(action: Action, state: GameState):
         state.add_log(f"Jail consume: radio for '{consumable}' ({radio_value}) not found on page.")
         return
 
-    page.check(f"input[type='radio'][value='{radio_value}']")
+    browser.check_radio(page, f"input[type='radio'][value='{radio_value}']")
     with _game_action_lock:
         page.click("input[type='submit'][name='B1']")
         page.wait_for_load_state("domcontentloaded")
@@ -4364,7 +4359,7 @@ def handle_check_bionics(action: Action, state: GameState):
         target = can_buy[0]
         price = BIONIC_PRICES[target]
         state.add_log(f"Bionics: purchasing {target} for ${price:,}.")
-        page.check(f"input[name='bionic'][value='{target}']")
+        browser.check_radio(page, f"input[name='bionic'][value='{target}']")
         page.click("input[type='submit'][name='B1'][value='Purchase']")
         page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
@@ -4533,7 +4528,7 @@ def handle_check_weapon_store(action: Action, state: GameState):
         price = store[target]["price"]
         _withdraw_for(price)
         state.add_log(f"Weapon Store: purchasing {target} for ${price:,}.")
-        page.check(f"input[name='weapon'][value='{target}']")
+        browser.check_radio(page, f"input[name='weapon'][value='{target}']")
         page.click("input[type='submit'][name='B1'][value='Purchase']")
         page.wait_for_load_state("domcontentloaded")
         _refresh_state(state)
@@ -5199,7 +5194,7 @@ def handle_send_blind_eye(action: Action, state: GameState):
     if not page.query_selector("input[name='action'][value='bribe']"):
         ok, msg = _read_result()
         return _drug_reply(action, state, label, False, msg if ok is not None else "smuggling form not found")
-    page.check("input[name='action'][value='bribe']")
+    browser.check_radio(page, "input[name='action'][value='bribe']")
     if not _submit_form(state, submit):
         return _drug_reply(action, state, label, False, "Session expired")
 
@@ -6905,7 +6900,9 @@ def handle_casino(action: Action, state: GameState):
     if not soup.find("input", attrs={"name": "casinooption", "value": radio_value}):
         state.add_log(f"Casino: could not find the '{activity}' option on the casino page.")
         return
-    page.check(f"input[name='casinooption'][value='{radio_value}']")
+    if not _select_radio(page, "casinooption", radio_value):
+        state.add_log(f"Casino: couldn't select the '{activity}' option — not submitting.")
+        return
     page.click("input[name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
@@ -7107,7 +7104,7 @@ def handle_check_engineering_cases(action: Action, state: GameState):
                 continue
             val = radio.get("value", "")
             state.add_log(f"Engineering: repair business job #{val}.")
-            page.check(f"input[type='radio'][name='Req_id'][value='{val}']")
+            browser.check_radio(page, f"input[type='radio'][name='Req_id'][value='{val}']")
             _click_eng_submit(page, "Req_id", val)
             _finish_eng(state, job=f"repair business #{val}")
             return
@@ -7122,7 +7119,7 @@ def handle_check_engineering_cases(action: Action, state: GameState):
                 if not _target_ok(username, typ):
                     continue
                 state.add_log(f"Engineering: construct apartment for '{username}'.")
-                page.check(f"input[type='radio'][name='Req_username'][value='{username}']")
+                browser.check_radio(page, f"input[type='radio'][name='Req_username'][value='{username}']")
                 _click_eng_submit(page, "Req_username", username)
                 _finish_eng(state, job="construct apartment", target=username)
                 return
@@ -7138,7 +7135,7 @@ def handle_check_engineering_cases(action: Action, state: GameState):
                     continue
                 label = "repair vehicle" if typ == "repair_vehicle" else "construct vault"
                 state.add_log(f"Engineering: {label} job #{val}" + (f" for '{username}'" if username else "") + ".")
-                page.check(f"input[type='radio'][name='Req_id'][value='{val}']")
+                browser.check_radio(page, f"input[type='radio'][name='Req_id'][value='{val}']")
                 _click_eng_submit(page, "Req_id", val)
                 _finish_eng(state, job=f"{label} #{val}", target=username or "")
                 return
@@ -7893,7 +7890,7 @@ def handle_apartment_money(action: Action, state: GameState):
     result = _open_apartment(state)
     if result is None:
         page = browser.page()
-        page.check("#stashmoney" if mode == "stash" else "#grabmoney")
+        browser.check_radio(page, "#stashmoney" if mode == "stash" else "#grabmoney")
         page.fill("input[name='amount']", str(amount))
         result = _apartment_submit(state, label, "input[name='amount'] ~ input[type='submit']")
     else:

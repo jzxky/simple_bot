@@ -321,7 +321,7 @@ class DrugStoreTask(Task):
             target = can_buy[0]
             price = DRUG_STORE_PRICES.get(target, 0)
             state.add_log(f"Drug Store: purchasing {target} for ${price:,}.")
-            self._page.check(f"input[name='product'][value='{target}']")
+            browser.check_radio(self._page, f"input[name='product'][value='{target}']")
             self._page.click("input[type='submit'][name='B1'][value='Purchase']")
             self._page.wait_for_load_state("domcontentloaded")
             _refresh_state(state)
