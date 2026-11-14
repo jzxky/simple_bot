@@ -59,15 +59,57 @@ def set_middling_queue(q: "queue.Queue"):
     _middling_queue = q
 
 
+# Canonical drug keys (the order the game lists them) and the names a !middle command
+# accepts for each. Matching ignores case and spaces, so "P / ICE" and "crystal meth" work.
+MIDDLE_DRUGS = {
+    "marijuana": ("marijuana", "weed", "mj", "pot", "grass", "ganja", "cannabis", "mary jane"),
+    "ecstasy":   ("ecstasy", "ecstacy", "e", "x", "xtc", "mdma", "molly"),
+    "acid":      ("acid", "lsd"),
+    "speed":     ("speed", "amphetamine", "amphetamines", "amph"),
+    "ice":       ("ice", "p/ice", "pice", "p", "meth", "crystal", "crystal meth"),
+    "heroin":    ("heroin", "h", "smack", "horse"),
+    "cocaine":   ("cocaine", "coke", "c", "blow", "snow", "charlie"),
+}
+
+
+def _alias_key(name: str) -> str:
+    return re.sub(r"\s+", "", name).lower()
+
+
+DRUG_ALIASES = {_alias_key(alias): key
+                for key, aliases in MIDDLE_DRUGS.items() for alias in aliases}
+
+
+def parse_drug_list(text: str):
+    """Turn a comma-delimited drug list ("weed,ecstasy,coke") into canonical keys.
+    Returns (keys, unknown): keys in the order given with duplicates dropped, and the
+    names that matched no drug."""
+    keys, unknown = [], []
+    for part in text.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        key = DRUG_ALIASES.get(_alias_key(part))
+        if key is None:
+            unknown.append(part)
+        elif key not in keys:
+            keys.append(key)
+    return keys, unknown
+
+
 def parse_middle_command(text: str):
-    """Parse a !middle command from message text.
-    Returns (runner, buyer) or None.
+    """Parse a !middle command from message text: !middle <runner> <buyer> [drugs].
+    drugs is an optional comma-delimited list ("weed,ecstasy,coke"); everything after the
+    buyer is read as that list, so spaces around the commas are fine.
+    Returns (runner, buyer, drugs, unknown) or None. drugs is a list of canonical keys
+    (empty = no list given, buy any drug); unknown holds names that matched no drug.
     Only the first line is checked."""
     first_line = text.split("\n", 1)[0].strip()
-    m = re.match(r"^!middle\s+(\S+)\s+(\S+)", first_line, re.IGNORECASE)
-    if m:
-        return m.group(1), m.group(2)
-    return None
+    m = re.match(r"^!middle\s+(\S+)\s+(\S+)(?:\s+(.+))?$", first_line, re.IGNORECASE)
+    if not m:
+        return None
+    drugs, unknown = parse_drug_list(m.group(3) or "")
+    return m.group(1), m.group(2), drugs, unknown
 
 
 def validate_middle_players(runner: str, buyer: str) -> "str | None":
@@ -113,4 +155,5 @@ class MiddlingTask(Task):
         except queue.Empty:
             return
         import drug_window
-        drug_window.submit(state, Action("do_middling", runner=item["runner"], buyer=item["buyer"]))
+        drug_window.submit(state, Action("do_middling", runner=item["runner"], buyer=item["buyer"],
+                                            drugs=item.get("drugs") or []))

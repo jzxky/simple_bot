@@ -5617,9 +5617,11 @@ def handle_set_contact_prices(action: Action, state: GameState):
 
 def handle_do_middling(action: Action, state: GameState):
     """!middle flow: buy up to 100 drugs from the runner (cocaine upwards — all of them if
-    fewer are on sale) and offer them to the buyer at cost."""
+    fewer are on sale) and offer them to the buyer at cost. An optional drugs list (canonical
+    keys) limits the buy to those drugs."""
     runner = action.params.get("runner", "")
     buyer = action.params.get("buyer", "")
+    wanted = set(action.params.get("drugs") or [])
     if not runner or not buyer:
         state.add_log("Middling: missing runner or buyer name.")
         return
@@ -5656,12 +5658,17 @@ def handle_do_middling(action: Action, state: GameState):
     if not any(d["available"] > 0 for d in drug_stock):
         state.add_log(f"Middling: deal failed — {runner} has no drugs in stock.")
         return
+    candidates = [d for d in drug_stock if not wanted or d["key"] in wanted]
+    if wanted and not any(d["available"] > 0 for d in candidates):
+        state.add_log(f"Middling: deal failed — {runner} has none of the requested drugs "
+                      f"({', '.join(sorted(wanted))}) in stock.")
+        return
 
     # Plan up to 100 units from the bottom of the list (cocaine first); if fewer are on sale,
     # take everything there is.
     buy_plan = {}
     remaining = 100
-    for d in reversed(drug_stock):
+    for d in reversed(candidates):
         if remaining <= 0:
             break
         if d["available"] <= 0:
@@ -6017,15 +6024,20 @@ def handle_check_comms(action: Action, state: GameState):
                             state.add_log(f"Middling parser: new msg from {m_sender} — first line: {first_line!r}")
                             parsed = parse_middle_command(body_text)
                             if parsed:
-                                m_runner, m_buyer = parsed
-                                state.add_log(f"Middling parser: matched !middle runner={m_runner} buyer={m_buyer}")
+                                m_runner, m_buyer, m_drugs, m_unknown = parsed
+                                drugs_txt = ",".join(m_drugs) if m_drugs else "any"
+                                state.add_log(f"Middling parser: matched !middle runner={m_runner} buyer={m_buyer} drugs={drugs_txt}")
                                 if _middling_queue is not None:
                                     err = validate_middle_players(m_runner, m_buyer)
+                                    if m_unknown:
+                                        err = f"unknown drug(s): {', '.join(m_unknown)}"
                                     if err:
                                         state.add_log(f"Middling command from {m_sender} rejected: {err}")
                                     else:
-                                        _middling_queue.put({"action": "do_middling", "runner": m_runner, "buyer": m_buyer})
-                                        state.add_log(f"Middling command queued from {m_sender}: !middle {m_runner} {m_buyer}")
+                                        _middling_queue.put({"action": "do_middling", "runner": m_runner,
+                                                             "buyer": m_buyer, "drugs": m_drugs})
+                                        drugs_arg = f" {','.join(m_drugs)}" if m_drugs else ""
+                                        state.add_log(f"Middling command queued from {m_sender}: !middle {m_runner} {m_buyer}{drugs_arg}")
                             else:
                                 state.add_log(f"Middling parser: no !middle command found in message")
                             conv["_middling_parsed_count"] = len(msgs)
