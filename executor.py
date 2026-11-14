@@ -5049,8 +5049,11 @@ def _outgoing_offer_customers(soup) -> set:
 def _submit_form(state, submit_selector) -> bool:
     """Click a submit button and wait for the response page.  False if logged out."""
     page = browser.page()
-    with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
-        page.click(submit_selector)
+    # Drug forms submit from the drug window while the main window keeps going —
+    # hold the action lock so the two windows' result messages can't cross.
+    with _game_action_lock:
+        with page.expect_navigation(wait_until="domcontentloaded", timeout=15000):
+            page.click(submit_selector)
     if not _check_session(state):
         return False
     _refresh_state(state)

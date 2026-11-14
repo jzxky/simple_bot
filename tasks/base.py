@@ -22,6 +22,10 @@ class Task(ABC):
     # the aggravated-crimes tab is active (state.agg_tab_active) — a mid-run city
     # change would invalidate the crime tab's target list and city context.
     changes_city: bool = False
+    # If True, this task deposits, launders or invests cash. Skipped while a drug
+    # trade task runs in its own window (state.drug_tab_active), so money
+    # withdrawn for a drug buy isn't moved away before the buy goes through.
+    moves_cash: bool = False
 
     def can_run(self, state) -> bool:
         return True

@@ -9,9 +9,10 @@ its own Chrome window on a dedicated profile (.browser_profile_side). It shares
 the main browser's login by importing the main context's cookies (session +
 Cloudflare clearance) — no second login.
 
-Work is split into lanes ("snipe", "crime"), each its own worker thread with
-its own Chrome window and profile (.browser_profile_side_<lane>), so a top-job
-snipe and a crime run can go at the same time without waiting on each other.
+Work is split into lanes ("snipe", "crime", "drugs"), each its own worker thread
+with its own Chrome window and profile (.browser_profile_side_<lane>), so a
+top-job snipe, a crime run and a drug trade task (drug_window.py) can go at the
+same time without waiting on each other.
 Within a lane, jobs run one at a time, each in a fresh tab that it closes when
 done. A lane's browser launches on its first job and stays open until
 shutdown().
