@@ -231,6 +231,36 @@ _TRANSIENT_NAV_ERRORS = (
 )
 
 
+_FORCE_CHECK_JS = """el => {
+    el.checked = true;
+    el.dispatchEvent(new Event('input', {bubbles: true}));
+    el.dispatchEvent(new Event('change', {bubbles: true}));
+}"""
+
+
+def check_radio(pg: Page, selector: str, timeout: "float | None" = None):
+    """Select a radio button, with a failsafe. page.check() can fail with
+    "Clicking the checkbox did not change its state" when the page's own
+    script swallows the click; in that case set it in the page and fire the
+    events a click would. Raises the original error only if the radio still
+    isn't selected afterwards (so callers behave as with page.check())."""
+    try:
+        if timeout is None:
+            pg.check(selector)  # default wait, same as a plain page.check()
+        else:
+            pg.check(selector, timeout=timeout)
+        return
+    except Exception as e:
+        err = e
+    try:
+        pg.eval_on_selector(selector, _FORCE_CHECK_JS)
+        if pg.eval_on_selector(selector, "el => el.checked"):
+            return
+    except Exception:
+        pass
+    raise err
+
+
 def _goto_with_retry(pg: Page, url: str):
     attempts = 3
     for attempt in range(attempts):
