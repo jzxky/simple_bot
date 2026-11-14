@@ -1438,6 +1438,7 @@ const _TAB_ENABLE_TOGGLES = {
   "income-banking":  ["banking_auto_invest_enabled", "laundering_enabled"],
   "income-skills":   ["skill_travel_expert_enabled", "skill_all_seeing_eye_enabled"],
   "income-drugs":    ["middling_enabled"],
+  "income-blackmarket": ["bm_check_enabled", "bm_trading_enabled"],
   "city-bionics":    ["bionics_enabled"],
   "city-weapons":    ["weapon_store_enabled"],
   "city-drugs":      ["drug_store_enabled"],
