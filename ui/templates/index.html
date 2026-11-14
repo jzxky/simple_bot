@@ -1077,12 +1077,46 @@
                   <span class="toggle"></span>
                 </label>
               </label>
-              <p class="placeholder">Rank required: Piciotto, Enforcer, Dealer, or Giovane D'Honore. Responds to <code>!middle [runner] [buyer]</code> commands via in-game comms.</p>
+              <p class="placeholder">Rank required: Piciotto, Enforcer, Dealer, or Giovane D'Honore. Responds to <code>!middle [runner] [buyer] [drugs] [--all]</code> commands via in-game comms and replies to the sender with the result. <code>drugs</code> is an optional comma-separated list (e.g. <code>weed,ecstasy,coke</code>) limiting which drugs are bought; leave it out to buy any. <code>--all</code> keeps going (buy, offer, wait for the buyer to accept) until the runner is out of drugs.</p>
 
+              <h4 style="margin-top:12px">Run Middle Command</h4>
+              <div class="setting-row">
+                <label for="middle_runner">Runner</label>
+                <input type="text" id="middle_runner" class="name-picker" list="middle-runners" placeholder="Contact to buy from" autocomplete="off">
+                <datalist id="middle-runners"></datalist>
+              </div>
+              <div class="setting-row">
+                <label for="middle_buyer">Buyer</label>
+                <input type="text" id="middle_buyer" class="name-picker" list="deal-customers" placeholder="Player to offer to" autocomplete="off">
+              </div>
+              <div class="setting-row">
+                <span>Drugs <span class="sell-hint" style="margin:0">(none ticked = any)</span></span>
+                <div class="middle-drugs">
+                  {% for key, label in [("marijuana","Marijuana"),("ecstasy","Ecstasy"),("acid","Acid"),("speed","Speed"),("ice","P / ICE"),("heroin","Heroin"),("cocaine","Cocaine")] %}
+                  <label><input type="checkbox" class="middle-drug" value="{{ key }}">{{ label }}</label>
+                  {% endfor %}
+                </div>
+              </div>
+              <label class="inline-toggle setting-row">
+                --all (keep going until the runner is out)
+                <label class="toggle-label">
+                  <input type="checkbox" id="middle_all">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+              <button class="btn btn-sm" onclick="drugsRunMiddle(this)">Run</button>
+              <div id="middle-result" class="sell-hint"></div>
+
+              <h4 style="margin-top:12px">Settings</h4>
               <div class="setting-row">
                 <label for="middling_max_on_hand">Max drugs on hand</label>
                 <input type="number" id="middling_max_on_hand" class="input-narrow" min="0"
                   value="{{ mid_cfg.get('max_on_hand', 500) }}" oninput="markNumDirty(this)">
+              </div>
+              <div class="setting-row">
+                <label for="middling_accept_timeout_mins">--all: wait for accept (minutes)</label>
+                <input type="number" id="middling_accept_timeout_mins" class="input-narrow" min="1"
+                  value="{{ mid_cfg.get('accept_timeout_mins', 30) }}" oninput="markNumDirty(this)">
               </div>
 
               <h4 style="margin-top:12px">Accepted Buy Prices (max price per unit)</h4>
@@ -1161,6 +1195,12 @@
               </div>
               <button class="btn btn-sm" style="margin-top:6px" onclick="drugsCreateOffer(this)">Submit</button>
               <div id="deal-result" class="sell-hint"></div>
+            </div>
+
+            <div class="settings-group" id="drugs-log" style="grid-column:1/-1">
+              <h3>Drug Log</h3>
+              <p class="placeholder">Just the drug lines from the activity log: buys, offers, !middle runs, trade offers, smuggling and manufacturing. Newest first.</p>
+              <div id="drug-log-box"></div>
             </div>
 
           </div>

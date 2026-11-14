@@ -53,6 +53,8 @@ CATEGORY_LABELS = {
     "training_centre": "Training centre",
     "university": "University",
     "launder": "Laundering sent",
+    "drug_buy": "Drugs bought",
+    "drug_sell": "Drugs sold",
 }
 
 _SCHEMA = """
@@ -365,7 +367,9 @@ def _row(r) -> dict:
 _AMOUNT = "CASE WHEN result='success' AND amount > 0 THEN amount END"
 # Consumables used: the item count recorded with each consume (1 when not recorded).
 _UNITS = ("CASE WHEN category='consume' AND result='success' THEN"
-          " COALESCE(CASE WHEN detail != '' THEN json_extract(detail, '$.consumed') END, 1) END")
+          " COALESCE(CASE WHEN detail != '' THEN json_extract(detail, '$.consumed') END, 1)"
+          " WHEN category IN ('drug_buy','drug_sell') AND result='success' AND detail != '' THEN"
+          " json_extract(detail, '$.units') END")
 
 
 def summary(f: dict) -> dict:

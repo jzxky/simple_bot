@@ -1027,6 +1027,11 @@ def request_archive_journals(pages: int | None = None):
     _archive_journals_queue.put({"pages": pages})
 
 
+def request_middle(item: dict):
+    """Queue a !middle run from the UI (same as the in-game command, with no one to reply to)."""
+    _middling_queue.put(item)
+
+
 def request_send_comms(to: str, subject: str, body: str):
     _comms_send_queue.put({"_action": "send_comms", "to": to, "subject": subject, "body": body})
 

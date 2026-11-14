@@ -308,6 +308,27 @@
         money(sumOf(sent, "amount")));
     }
 
+    // ── Drug dealing: buys from contacts / the drug house / trade offers, sales to buyers ──
+    const dBuy = cat("drug_buy"), dSell = cat("drug_sell");
+    if (dBuy.length || dSell.length) {
+      const kindLabel = {contact: "From contacts", drug_house: "Drug house", trade_offer: "Trade offers accepted",
+                         middle: "!middle runs", offer: "Offers"};
+      const unitRows = ks => ks.map(k => ({label: kindLabel[k.kind] || k.kind || "–", value: k.units}));
+      let rows = "";
+      if (dBuy.length) {
+        rows += chRow("Drugs Bought", sumOf(dBuy, "units"),
+          {rate: [sumOf(dBuy, "success"), sumOf(dBuy, "fail")], sub: unitRows(dBuy)});
+        rows += chRow("Spent", sumOf(dBuy, "amount"), {money: true});
+      }
+      if (dSell.length) {
+        rows += chRow("Drugs Sold", sumOf(dSell, "units"),
+          {rate: [sumOf(dSell, "success"), sumOf(dSell, "fail")], sub: unitRows(dSell)});
+        rows += chRow("Sales", sumOf(dSell, "amount"), {money: true, cls: "ah-total"});
+      }
+      html += chSection("Drug Dealing", rows, "A sale counts when the buyer accepts the offer.",
+        money(sumOf(dSell, "amount")));
+    }
+
     // ── Training & Education ──
     const ct = cat("career_training"), tc = cat("training_centre");
     const study = kindOf("university", "study"), degree = kindOf("university", "degree");
@@ -343,7 +364,8 @@
     // Anything else the bot records later still shows up.
     const shown = new Set(["gym", "community_service", "dog_train", "consume", "jail", "jail_duty",
                            "agg", "case_work", "earn", "earn_queue", "fire_duty", "career_training",
-                           "training_centre", "university", "drug_manufacture", "launder"]);
+                           "training_centre", "university", "drug_manufacture", "launder",
+                           "drug_buy", "drug_sell"]);
     Object.keys(byCat).filter(c => !shown.has(c)).forEach(c => {
       html += chSection(catLabel(c), byCat[c].map(k => chRow(k.kind || "–", k.success, {rate: [k.success, k.fail]})).join(""));
     });

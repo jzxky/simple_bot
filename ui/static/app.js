@@ -582,6 +582,7 @@ function _buildPayload() {
     drug_house_allow_travel: (document.getElementById("drug_house_allow_travel")||{checked:false}).checked,
     drug_house_default_prices: _drugHouseDefaults(),
     middling_max_on_hand: parseInt((document.getElementById("middling_max_on_hand")||{value:500}).value)||500,
+    middling_accept_timeout_mins: parseInt((document.getElementById("middling_accept_timeout_mins")||{value:30}).value)||30,
     middling_price_marijuana: parseInt((document.getElementById("middling_price_marijuana")||{value:0}).value)||0,
     middling_price_ecstasy:   parseInt((document.getElementById("middling_price_ecstasy")||{value:0}).value)||0,
     middling_price_acid:      parseInt((document.getElementById("middling_price_acid")||{value:0}).value)||0,
@@ -952,6 +953,8 @@ function drugsLoadPlayers() {
     _drugFillSelect("deal_customer_local", d.local_online || [], "No local players online");
     document.getElementById("deal-customers").replaceChildren(
       ...(d.all_alive || []).map(n => Object.assign(document.createElement("option"), {value: n})));
+    document.getElementById("middle-runners").replaceChildren(
+      ...(d.contacts || []).map(n => Object.assign(document.createElement("option"), {value: n})));
     document.getElementById("house-dealers").replaceChildren(
       ...(d.dealers || []).map(n => Object.assign(document.createElement("option"), {value: n})));
   }).catch(() => { _drugPlayersAt = 0; });
@@ -1314,6 +1317,16 @@ function drugsDealTotal() {
   });
   document.getElementById("deal-total").textContent = _drugMoney(total);
   return total;
+}
+
+function drugsRunMiddle(btn) {
+  const runner = document.getElementById("middle_runner").value.trim();
+  const buyer = document.getElementById("middle_buyer").value.trim();
+  const drugs = [...document.querySelectorAll(".middle-drug:checked")].map(c => c.value);
+  const all = document.getElementById("middle_all").checked;
+  if (!runner || !buyer) return _setSellHint("middle-result", "Enter a runner and a buyer.", "bad");
+  _setSellHint("middle-result", "Queuing…", "");
+  _drugPost("/drugs/middle", {runner, buyer, drugs, all}, btn).then(d => _drugResult("middle-result", d));
 }
 
 function drugsCreateOffer(btn) {
@@ -2920,6 +2933,12 @@ function pollStatus() {
       const logSel = document.getElementById("log-file-select");
       if (logSel && logSel.options.length && logSel.options[0].value === _logCurrentFile) {
         _logLiveMode = true;
+      }
+      const drugLogBox = document.getElementById("drug-log-box");
+      if (drugLogBox && d.drug_log) {
+        drugLogBox.innerHTML = [...d.drug_log].reverse()
+          .map(l => `<div class="log-line">${escHtml(l)}</div>`)
+          .join("");
       }
       if (_logLiveMode) {
         const box = document.getElementById("log-box");

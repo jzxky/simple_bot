@@ -304,6 +304,8 @@ DEFAULT_CONFIG = {
     "middling": {
         "enabled": False,
         "max_on_hand": 500,
+        # --all runs give up when the buyer hasn't accepted an offer within this long
+        "accept_timeout_mins": 30,
         "prices": {
             "marijuana": 500,
             "ecstasy": 6000,
