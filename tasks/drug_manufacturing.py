@@ -2,6 +2,7 @@
 Performs drug manufacturing when the action timer is ready.
 Requires the Gangster occupation and the Mortician Assistant earn unlocked
 (and a science degree — the game redirects to the income page otherwise).
+Runs in the drug window (drug_window.py), not the main browser window.
 """
 
 from tasks.base import Task, Action
@@ -44,6 +45,7 @@ class DrugManufacturingTask(Task):
         # Eligibility last: it reads the earn catalog from disk.
         return (state.logged_in
                 and not state.in_jail
+                and not state.drug_tab_active
                 and state.action_available()
                 and state.in_home_city()
                 and not state.hold_action_timer
@@ -58,6 +60,8 @@ class DrugManufacturingTask(Task):
             reasons.append("Not logged in")
         if state.in_jail:
             reasons.append("In jail")
+        if state.drug_tab_active:
+            reasons.append("Drug window busy")
         if not state.action_available():
             reasons.append("Action timer busy")
         if not state.in_home_city():
@@ -68,4 +72,5 @@ class DrugManufacturingTask(Task):
         return reasons
 
     def run(self, state: GameState, executor):
-        executor.execute(Action("do_drug_manufacturing"), state)
+        import drug_window
+        drug_window.submit(state, Action("do_drug_manufacturing"))

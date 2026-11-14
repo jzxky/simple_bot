@@ -19,6 +19,7 @@ def _min_cash(state: GameState) -> int:
 
 class MaintainCashTask(Task):
     priority = 25
+    moves_cash = True
     label = 'Maintain Cash'
 
     def __init__(self):

@@ -33,6 +33,7 @@ def save_mature_date(ts: float):
 
 class BankingInvestTask(Task):
     priority = 60
+    moves_cash = True
     label = "Banking"
 
     def can_run(self, state: GameState) -> bool:

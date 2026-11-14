@@ -22,6 +22,8 @@ class Scheduler:
                 continue
             if state.agg_tab_active and task.changes_city:
                 continue
+            if state.drug_tab_active and (task.changes_city or task.moves_cash):
+                continue
             if task.can_run(state):
                 state.current_task = task.label or type(task).__name__
                 try:
@@ -39,6 +41,8 @@ class Scheduler:
                 reasons.append("In hospital")
             if state.agg_tab_active and task.changes_city:
                 reasons.append("Crime tab active")
+            if state.drug_tab_active and (task.changes_city or task.moves_cash):
+                reasons.append("Drug window busy")
             try:
                 reasons.extend(task.blocked_reasons(state))
             except Exception:
