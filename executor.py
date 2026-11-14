@@ -6905,7 +6905,9 @@ def handle_casino(action: Action, state: GameState):
     if not soup.find("input", attrs={"name": "casinooption", "value": radio_value}):
         state.add_log(f"Casino: could not find the '{activity}' option on the casino page.")
         return
-    page.check(f"input[name='casinooption'][value='{radio_value}']")
+    if not _select_radio(page, "casinooption", radio_value):
+        state.add_log(f"Casino: couldn't select the '{activity}' option — not submitting.")
+        return
     page.click("input[name='B1']")
     page.wait_for_load_state("domcontentloaded")
     _refresh_state(state)
