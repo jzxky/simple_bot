@@ -2922,6 +2922,12 @@ function pollStatus() {
       if (logSel && logSel.options.length && logSel.options[0].value === _logCurrentFile) {
         _logLiveMode = true;
       }
+      const drugLogBox = document.getElementById("drug-log-box");
+      if (drugLogBox && d.drug_log) {
+        drugLogBox.innerHTML = [...d.drug_log].reverse()
+          .map(l => `<div class="log-line">${escHtml(l)}</div>`)
+          .join("");
+      }
       if (_logLiveMode) {
         const box = document.getElementById("log-box");
         box.innerHTML = [...d.log].reverse()

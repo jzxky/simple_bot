@@ -882,6 +882,24 @@ button {
 @media (max-width: 600px) {
   #log-box { height: 50vh; max-height: 420px; }
 }
+#drug-log-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  height: 260px;
+  overflow-y: auto;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+#drug-log-box:empty::before {
+  content: "No drug actions yet.";
+  color: var(--muted);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+}
+#drug-log-box .log-line,
 #log-box .log-line {
   padding: 2px 0;
   border-bottom: 1px solid rgba(46, 64, 96, 0.3);

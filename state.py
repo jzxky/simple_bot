@@ -34,6 +34,13 @@ def is_gangster(occupation: str, rank: str = "") -> bool:
     return "gangster" in (occupation or "").lower() or norm_rank(rank) in GANGSTER_RANKS
 
 
+
+# Log lines that belong to drug dealing: everything run in the drug window, the !middle
+# flow, drug trade offers/buys/sales, the drug house, smuggling bribes and manufacturing.
+_DRUG_LOG_RE = re.compile(r"^(\[Drug window\] |Middling|Drug |Blind eye|Smuggl)")
+# ...minus the !middle parser's note on every incoming message.
+_DRUG_LOG_NOISE_RE = re.compile(r"^Middling parser: (new msg|no !middle)")
+
 @dataclass
 class GameState:
     page_html: str = ""
@@ -72,6 +79,8 @@ class GameState:
     bot_running: bool = False
     last_error: str = ""
     log: list = field(default_factory=list)
+    # The drug lines of the log (Income → Drugs), kept apart so the busy main log can't push them out.
+    drug_log: list = field(default_factory=list)
     timers: dict = field(default_factory=dict)
     agg_fail_times: list = field(default_factory=list)
     current_task: str = ""
@@ -172,6 +181,10 @@ class GameState:
         self.log.append(entry)
         if len(self.log) > 200:
             self.log = self.log[-200:]
+        if _DRUG_LOG_RE.match(message) and not _DRUG_LOG_NOISE_RE.match(message):
+            self.drug_log.append(entry)
+            if len(self.drug_log) > 200:
+                self.drug_log = self.drug_log[-200:]
         print(entry)
 
     def push_notification(self, event_type: str, message: str):

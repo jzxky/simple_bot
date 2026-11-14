@@ -1107,6 +1107,7 @@ def status():
         "running": bot.is_running(),
         "paused": bot.is_paused(),
         "log": s.log[-500:],
+        "drug_log": s.drug_log[-200:],
         "energy": s.energy,
         "action_ready": s.action_available(),
         "city": s.current_city,
