@@ -1631,8 +1631,6 @@ def drugs_middle():
     if missing:
         return jsonify({"ok": False, "message": "Not a living player in the player database: "
                         + ", ".join(missing) + " — pick from the suggestions."}), 400
-    if runner.lower() == buyer.lower():
-        return jsonify({"ok": False, "message": "Runner and buyer must be different players."}), 400
     drugs = [k for k in MIDDLE_DRUGS if k in set(data.get("drugs") or [])]
     item = {"runner": runner, "buyer": buyer, "drugs": drugs, "unknown": [],
             "all": bool(data.get("all"))}
