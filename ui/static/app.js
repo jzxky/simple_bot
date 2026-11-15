@@ -960,8 +960,7 @@ function drugsLoadPlayers() {
     _drugFillSelect("deal_customer_local", d.local_online || [], "No local players online");
     document.getElementById("deal-customers").replaceChildren(
       ...(d.all_alive || []).map(n => Object.assign(document.createElement("option"), {value: n})));
-    document.getElementById("middle-runners").replaceChildren(
-      ...(d.contacts || []).map(n => Object.assign(document.createElement("option"), {value: n})));
+    _midContacts = new Set((d.contacts || []).map(n => n.toLowerCase()));
     document.getElementById("house-dealers").replaceChildren(
       ...(d.dealers || []).map(n => Object.assign(document.createElement("option"), {value: n})));
   }).catch(() => { _drugPlayersAt = 0; });
@@ -1326,12 +1325,90 @@ function drugsDealTotal() {
   return total;
 }
 
+// Run Middle Command: runner/buyer autocomplete over living players, like Transfer Money
+// (the runner list puts saved drug contacts first).
+let _midContacts = new Set();
+const _midAcIdx = {runner: -1, buyer: -1};
+
+function _midHits(field) {
+  const v = document.getElementById(`middle_${field}`).value.trim().toLowerCase();
+  if (!v) return [];
+  let hits = _sellPlayers.filter(p => p.username.toLowerCase().startsWith(v));
+  if (field === "runner") {
+    hits = hits.slice().sort((a, b) =>
+      _midContacts.has(b.username.toLowerCase()) - _midContacts.has(a.username.toLowerCase()));
+  }
+  return hits.slice(0, 8);
+}
+
+function _midMatch(field) {
+  const v = document.getElementById(`middle_${field}`).value.trim().toLowerCase();
+  return v ? _sellPlayers.find(p => p.username.toLowerCase() === v) || null : null;
+}
+
+function _midValidate(field) {
+  const el = document.getElementById(`middle_${field}`);
+  const ok = !!_midMatch(field);
+  el.classList.toggle("input-good", ok);
+  el.classList.toggle("input-bad", !!el.value.trim() && !ok && _sellPlayers.length > 0);
+  return ok;
+}
+
+function _renderMidAc(field) {
+  const ac = document.getElementById(`middle_${field}_ac`);
+  const v = document.getElementById(`middle_${field}`).value.trim().toLowerCase();
+  const hits = _midHits(field);
+  if (!hits.length || (hits.length === 1 && hits[0].username.toLowerCase() === v)) { ac.hidden = true; _midAcIdx[field] = -1; return; }
+  if (_midAcIdx[field] >= hits.length) _midAcIdx[field] = hits.length - 1;
+  ac.innerHTML = hits.map((p, i) => {
+    const info = [field === "runner" && _midContacts.has(p.username.toLowerCase()) ? "contact" : "",
+                  p.rank, p.homecity].filter(Boolean).join(" · ");
+    return `<div class="sell-ac-item${i === _midAcIdx[field] ? " sel" : ""}" data-name="${escHtml(p.username)}" ` +
+      `onmousedown="event.preventDefault();midPickName('${field}', this.dataset.name)">` +
+      `<span>${escHtml(p.username)}</span><small>${escHtml(info)}</small></div>`;
+  }).join("");
+  ac.hidden = false;
+}
+
+function midNameInput(field) {
+  _midAcIdx[field] = -1; _renderMidAc(field); _midValidate(field);
+  _loadSellPlayers().then(() => {
+    if (document.activeElement && document.activeElement.id === `middle_${field}`) _renderMidAc(field);
+    _midValidate(field);
+  });
+}
+
+function midPickName(field, name) {
+  document.getElementById(`middle_${field}`).value = name;
+  midHideAc(field);
+  _midValidate(field);
+  if (field === "runner") document.getElementById("middle_buyer").focus();
+}
+
+function midNameKey(e, field) {
+  const ac = document.getElementById(`middle_${field}_ac`);
+  const items = ac.hidden ? [] : ac.querySelectorAll(".sell-ac-item");
+  if (items.length && e.key === "ArrowDown") { _midAcIdx[field] = (_midAcIdx[field] + 1) % items.length; _renderMidAc(field); e.preventDefault(); }
+  else if (items.length && e.key === "ArrowUp") { _midAcIdx[field] = (_midAcIdx[field] - 1 + items.length) % items.length; _renderMidAc(field); e.preventDefault(); }
+  else if (items.length && (e.key === "Enter" || e.key === "Tab") && _midAcIdx[field] >= 0) { midPickName(field, items[_midAcIdx[field]].dataset.name); e.preventDefault(); }
+  else if (e.key === "Escape") { midHideAc(field); }
+}
+
+function midHideAc(field) {
+  const ac = document.getElementById(`middle_${field}_ac`);
+  if (ac) ac.hidden = true;
+  _midAcIdx[field] = -1;
+}
+
 function drugsRunMiddle(btn) {
   const runner = document.getElementById("middle_runner").value.trim();
   const buyer = document.getElementById("middle_buyer").value.trim();
   const drugs = [...document.querySelectorAll(".middle-drug:checked")].map(c => c.value);
   const all = document.getElementById("middle_all").checked;
   if (!runner || !buyer) return _setSellHint("middle-result", "Enter a runner and a buyer.", "bad");
+  const unknown = ["runner", "buyer"].filter(f => _sellPlayers.length && !_midMatch(f))
+    .map(f => document.getElementById(`middle_${f}`).value.trim());
+  if (unknown.length) return _setSellHint("middle-result", `Not a living player in the player database: ${unknown.join(", ")} — pick from the suggestions.`, "bad");
   _setSellHint("middle-result", "Queuing…", "");
   _drugPost("/drugs/middle", {runner, buyer, drugs, all}, btn).then(d => _drugResult("middle-result", d));
 }

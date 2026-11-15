@@ -1627,8 +1627,10 @@ def drugs_middle():
         return jsonify({"ok": False, "message": "Turn on Enable Middling first."}), 400
     runner = _living_player(data.get("runner"))
     buyer = _living_player(data.get("buyer"))
-    if not runner or not buyer:
-        return jsonify({"ok": False, "message": "Runner and buyer must be living players in the player database."}), 400
+    missing = [str(n or "").strip() for n, p in ((data.get("runner"), runner), (data.get("buyer"), buyer)) if not p]
+    if missing:
+        return jsonify({"ok": False, "message": "Not a living player in the player database: "
+                        + ", ".join(missing) + " — pick from the suggestions."}), 400
     if runner.lower() == buyer.lower():
         return jsonify({"ok": False, "message": "Runner and buyer must be different players."}), 400
     drugs = [k for k in MIDDLE_DRUGS if k in set(data.get("drugs") or [])]
