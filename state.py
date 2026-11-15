@@ -92,9 +92,6 @@ class GameState:
     drug_store_tab_active: bool = False
     # True while a drug trade task runs in its own Chrome window (drug_window.py).
     drug_tab_active: bool = False
-    # True while that window is about to use the action timer (drug manufacturing):
-    # action_available() reports it busy so no other task submits an action.
-    action_timer_reserved: bool = False
     # Set after a promotion is submitted — the available earns often change, so
     # the bot loop refreshes the earns list (earn.asp) on its next pass.
     earn_catalog_refresh_pending: bool = False
@@ -156,8 +153,6 @@ class GameState:
         return self.server_time + timedelta(seconds=elapsed)
 
     def action_available(self) -> bool:
-        if self.action_timer_reserved:
-            return False
         if self.action_timer_ready:
             return True
         if self.action_timer_end:
