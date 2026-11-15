@@ -2,11 +2,13 @@
 Drug trade tasks in their own Chrome window.
 
 Drug house buying and stock checks, dealer contacts and prices, contact buys and
-sell offers, smuggling bribes, journal drug trade offers, !middle runs and drug
-manufacturing all run on the side browser's "drugs" lane (side_browser.py): a
+sell offers, smuggling bribes, journal drug trade offers and !middle runs all run
+on the side browser's "drugs" lane (side_browser.py): a
 separate Chrome window on its own profile (.browser_profile_side_drugs) and its
 own worker thread, logged in with the main browser's cookies. The main window
-stays on whatever it was doing.
+stays on whatever it was doing. Drug manufacturing (an action-timer action) and
+the Auckland drug store (its own tab, drug_store.py) are not drug trade tasks
+and stay where they were.
 
 Each job opens a fresh tab in that window, runs the executor's handler there on
 a copy of the GameState (so the drug pages don't overwrite the main tab's
@@ -14,13 +16,10 @@ page_html/current_url), copies the results that matter back (cash, bank,
 consumables, jail/hospital, timers) and closes the tab. Jobs on the lane run one
 at a time, in the order they were submitted.
 
-While a job is in flight (state.drug_tab_active):
-  - the scheduler holds back tasks that travel (changes_city) or move cash
-    (moves_cash), so the character doesn't leave the city mid-deal and the money
-    withdrawn for a buy isn't deposited straight back
-  - drug manufacturing also reserves the action timer
-    (state.action_timer_reserved), so no other task submits an action while the
-    drug window is about to
+While a job is in flight (state.drug_tab_active) the scheduler holds back tasks
+that travel (changes_city) or move cash (moves_cash), so the character doesn't
+leave the city mid-deal and the money withdrawn for a buy isn't deposited
+straight back.
 
 Threading: submit() is called on the bot thread (it reads the main browser's
 cookies). The job runs on the lane's worker thread and only touches its own tab.
@@ -41,11 +40,9 @@ UI_ACTIONS = {
     "add_drug_contact", "load_dealer_contacts", "load_contact_prices", "set_contact_prices",
 }
 # Scheduler-driven drug actions.
-TASK_ACTIONS = {"check_drug_trade", "do_middling", "middle_notify", "do_drug_manufacturing"}
+TASK_ACTIONS = {"check_drug_trade", "do_middling", "middle_notify"}
 ACTIONS = UI_ACTIONS | TASK_ACTIONS
 
-# Actions that use the action timer: it is reserved for them while they run.
-_ACTION_TIMER_ACTIONS = {"do_drug_manufacturing"}
 
 # Fields copied back from the job's state copy when the job changed them.
 _MERGE_FIELDS = ("clean_money", "dirty_money", "bank_balance", "consumables",
@@ -54,7 +51,6 @@ _TIMER_FIELDS = ("timers", "action_timer_ready", "action_timer_end", "agg_pro_ac
 
 _lock = threading.Lock()
 _in_flight = 0
-_timer_holds = 0
 
 
 class _Reply:
@@ -73,24 +69,20 @@ def _label(kind: str) -> str:
     return kind.replace("_", " ").capitalize()
 
 
-def _set_flags(state, delta: int, holds_timer: bool):
-    global _in_flight, _timer_holds
+def _set_flags(state, delta: int):
+    global _in_flight
     with _lock:
         _in_flight = max(0, _in_flight + delta)
-        if holds_timer:
-            _timer_holds = max(0, _timer_holds + delta)
         state.drug_tab_active = _in_flight > 0
-        state.action_timer_reserved = _timer_holds > 0
 
 
 def reset(state=None):
     """Forget in-flight jobs (bot start/stop: the lane's queue is gone with it)."""
-    global _in_flight, _timer_holds
+    global _in_flight
     with _lock:
-        _in_flight = _timer_holds = 0
+        _in_flight = 0
     if state is not None:
         state.drug_tab_active = False
-        state.action_timer_reserved = False
 
 
 def busy() -> bool:
@@ -102,21 +94,20 @@ def submit(state, action, reply_q=None) -> "side_browser.Job":
     """Bot thread: queue `action` (an executor Action whose kind is in ACTIONS)
     to run in the drug window. reply_q, if given, gets the handler's result dict
     (UI requests); a job that fails before replying sends {"ok": False, ...}."""
-    holds_timer = action.kind in _ACTION_TIMER_ACTIONS
     reply = None
     if reply_q is not None:
         reply = _Reply(reply_q)
         action.params["result_queue"] = reply
-    _set_flags(state, +1, holds_timer)
+    _set_flags(state, +1)
     headless = cfg.load().get("misc", {}).get("headless", False)
     try:
         return side_browser.submit(
             LANE, action.kind,
-            lambda side, job: _run_job(side, job, state, action, reply, holds_timer),
+            lambda side, job: _run_job(side, job, state, action, reply),
             cookies=browser.export_cookies(), headless=headless,
         )
     except Exception:
-        _set_flags(state, -1, holds_timer)
+        _set_flags(state, -1)
         raise
 
 
@@ -124,8 +115,6 @@ def _shadow_state(state):
     shadow = copy.copy(state)
     shadow.add_log = lambda msg: state.add_log(f"[Drug window] {msg}")
     shadow.push_notification = state.push_notification
-    # The reservation is for everyone except the drug window itself.
-    shadow.action_timer_reserved = False
     return shadow
 
 
@@ -140,7 +129,7 @@ def _merge_back(state, shadow, before: dict):
             setattr(state, f, getattr(shadow, f))
 
 
-def _run_job(side, job, state, action, reply, holds_timer: bool):
+def _run_job(side, job, state, action, reply):
     """Worker thread."""
     import executor
     label = _label(action.kind)
@@ -168,4 +157,4 @@ def _run_job(side, job, state, action, reply, holds_timer: bool):
         finally:
             if reply is not None and not reply.sent:
                 reply.put({"ok": False, "message": "The request finished without a result — see the log."})
-            _set_flags(state, -1, holds_timer)
+            _set_flags(state, -1)
