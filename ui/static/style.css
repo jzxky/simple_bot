@@ -2338,3 +2338,7 @@ body.setup-open { overflow: hidden; }
   color: var(--text); font-size: 13px;
 }
 .setting-row .middle-drugs input[type="checkbox"] { margin: 0; }
+
+/* Run Middle Command: runner/buyer autocomplete (same look as Transfer Money) */
+.mid-name { position: relative; flex: 1 1 200px; max-width: 320px; }
+.mid-name .sell-ac { top: calc(100% + 2px); }

@@ -1124,12 +1124,19 @@
               <h4 style="margin-top:12px">Run Middle Command</h4>
               <div class="setting-row">
                 <label for="middle_runner">Runner</label>
-                <input type="text" id="middle_runner" class="name-picker" list="middle-runners" placeholder="Contact to buy from" autocomplete="off">
-                <datalist id="middle-runners"></datalist>
+                <div class="sell-field mid-name">
+                  <input type="text" id="middle_runner" placeholder="Contact to buy from" autocomplete="off"
+                    oninput="midNameInput('runner')" onkeydown="midNameKey(event, 'runner')" onblur="setTimeout(() => midHideAc('runner'), 120)">
+                  <div id="middle_runner_ac" class="sell-ac" hidden></div>
+                </div>
               </div>
               <div class="setting-row">
                 <label for="middle_buyer">Buyer</label>
-                <input type="text" id="middle_buyer" class="name-picker" list="deal-customers" placeholder="Player to offer to" autocomplete="off">
+                <div class="sell-field mid-name">
+                  <input type="text" id="middle_buyer" placeholder="Player to offer to" autocomplete="off"
+                    oninput="midNameInput('buyer')" onkeydown="midNameKey(event, 'buyer')" onblur="setTimeout(() => midHideAc('buyer'), 120)">
+                  <div id="middle_buyer_ac" class="sell-ac" hidden></div>
+                </div>
               </div>
               <div class="setting-row">
                 <span>Drugs <span class="sell-hint" style="margin:0">(none ticked = any)</span></span>
