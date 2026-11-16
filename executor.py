@@ -380,15 +380,8 @@ def handle_login(action: Action, state: GameState):
     # Click PLAY NOW if present
     play = soup.find("a", class_="btn-play")
     if play:
-        loggedin_html = page.content()
         page.goto(_u("/loggedin.asp?display=play"), wait_until="load")
         _refresh_state(state)
-        # A dead character can't enter the game: PLAY bounces straight back
-        # to the login page. Don't keep logging in.
-        if "default.asp" in browser.current_url():
-            _save_dead_page(loggedin_html)
-            _mark_character_dead(state)
-            return
     elif _dead_character_check(state, page.content()):
         _save_dead_page(page.content())
         return
