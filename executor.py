@@ -394,7 +394,6 @@ def handle_login(action: Action, state: GameState):
         return
 
     state.logged_in = True
-    state.last_login_mono = time.monotonic()
     state.add_log("Logged in successfully.")
 
 
