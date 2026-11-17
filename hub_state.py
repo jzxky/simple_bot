@@ -37,7 +37,7 @@ def snapshot() -> dict:
     card = {
         "name": s.own_name, "rank": s.rank, "next_rank": s.next_rank, "rank_progress": s.rank_progress,
         "occupation": s.occupation, "home_city": s.home_city, "city": s.current_city,
-        "dead": bool(s.character_dead), "energy": s.energy,
+        "dead": False, "energy": s.energy,
         "in_hospital": bool(s.in_hospital), "hospital_left": _epoch_left(s.hospital_release_at),
         "clean_money": s.clean_money, "dirty_money": s.dirty_money,
         "action_left": action_left,

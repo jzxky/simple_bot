@@ -490,9 +490,8 @@ def _run(c: dict):
 
         while not _stop_event.is_set():
             # Side browser (snipe / separate-tab crimes / live view) asking for
-            # fresh cookies. Served even while paused, so a paused bot's login
-            # can still be used, e.g. to make a new character after a death.
-            if side_browser.cookies_requested() and (state.logged_in or state.character_dead):
+            # fresh cookies. Served even while paused.
+            if side_browser.cookies_requested() and state.logged_in:
                 try:
                     side_browser.provide_cookies(browser.export_cookies())
                 except Exception as e:
@@ -500,12 +499,6 @@ def _run(c: dict):
 
             # Someone is watching the bot's browser (view-only).
             browser.capture_if_watched()
-
-            # Dead character: stay paused until the user makes a new one and resumes.
-            if state.character_dead and not _pause_event.is_set():
-                if c.get("notifications", {}).get("session_expired", False):
-                    state.push_notification("session_expired", "Character is dead. Please create a new character.")
-                _pause_event.set()
 
             if _pause_event.is_set():
                 time.sleep(1)
@@ -894,7 +887,6 @@ def pause():
 
 def resume():
     state.relog_suppressed = False
-    state.character_dead = False   # made a new character: log in again
     _pause_event.clear()
     state.add_log("Bot resumed.")
 
