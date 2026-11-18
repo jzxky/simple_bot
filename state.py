@@ -70,6 +70,11 @@ class GameState:
     server_time_monotonic: float = 0.0  # monotonic timestamp when server_time was last set
     logged_in: bool = False
     relog_suppressed: bool = False
+    # Game site not responding (navigation timeouts / connection errors):
+    # tasks pause until site_down_until (time.time()), then one probe load.
+    site_down_until: float = 0.0
+    site_down_since: float = 0.0
+    site_down_backoff: int = 0
     current_url: str = ""
     bot_running: bool = False
     last_error: str = ""
