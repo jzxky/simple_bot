@@ -37,6 +37,54 @@ POST_TIMEOUT = 15000     # ms
 _NAV_ERROR_LOG_EVERY = 30  # log 1st, 31st, 61st... consecutive nav error
 
 
+class _SnipeStats:
+    """Counters for one snipe run, reported when the promotion is accepted."""
+
+    def __init__(self):
+        self.started = time.monotonic()
+        self.loop_started = self.started
+        self.posts = 0
+        self.checks = 0
+        self.errors = 0
+        self.post_ms = []          # round-trip time of each completed POST
+        self.last_ms = 0.0         # round-trip time of the latest request
+
+    def timed(self, fn, kind):
+        t0 = time.monotonic()
+        out = fn()
+        self.last_ms = (time.monotonic() - t0) * 1000
+        if kind == "post":
+            self.posts += 1
+            self.post_ms.append(self.last_ms)
+        else:
+            self.checks += 1
+        return out
+
+    def report(self, via: str) -> str:
+        now = time.monotonic()
+        parts = [f"took {_dur(now - self.started)}"]
+        if self.loop_started - self.started >= 1:
+            parts[0] += f" ({_dur(now - self.loop_started)} sniping after the trip home)"
+        parts.append(f"{self.posts} form posts, {self.checks} main.asp checks, {self.errors} errors")
+        if self.post_ms:
+            ms = self.post_ms
+            parts.append(f"form post round trip avg {sum(ms) / len(ms):.0f} ms "
+                         f"(min {min(ms):.0f}, max {max(ms):.0f})")
+        parts.append(f"won by {via} in {self.last_ms:.0f} ms")
+        return "; ".join(parts)
+
+
+def _dur(sec: float) -> str:
+    sec = int(round(sec))
+    if sec < 60:
+        return f"{sec}s"
+    m, s = divmod(sec, 60)
+    if m < 60:
+        return f"{m}m {s:02d}s"
+    h, m = divmod(m, 60)
+    return f"{h}h {m:02d}m"
+
+
 class SnipeTopJobTask(Task):
     priority = 99
     label = 'Snipe Top Job'
@@ -97,6 +145,7 @@ class SnipeTopJobTask(Task):
         import bot as _bot
         pg = None
         promoted = False
+        stats = _SnipeStats()
         try:
             try:
                 pg = side.new_page(job)
@@ -112,12 +161,12 @@ class SnipeTopJobTask(Task):
             form = {"option": "one" if choice == "A" else "two", "B1": "Continue", "action": "choice"}
             main_url = urls.BASE_URL + "/main.asp"
 
+            stats.loop_started = time.monotonic()
             deadline = time.monotonic() + SNIPE_TIMEOUT
             next_at = time.monotonic()
             verify_at = time.monotonic() + VERIFY_EVERY
             nav_errors = 0
             cf_warned = False
-            posts = 0
             while True:
                 if _bot._cancel_snipe_event.is_set():
                     _bot._cancel_snipe_event.clear()
@@ -128,7 +177,7 @@ class SnipeTopJobTask(Task):
                     return
                 if time.monotonic() >= deadline:
                     state.add_log(f"SnipeTopJob: timed out after 30 minutes without promotion "
-                                  f"({posts} promotion posts sent).")
+                                  f"({stats.posts} form posts, {stats.checks} main.asp checks, {stats.errors} errors).")
                     return
                 wait = next_at - time.monotonic()
                 if wait > 0:
@@ -144,14 +193,15 @@ class SnipeTopJobTask(Task):
                 try:
                     if verify:
                         verify_at = time.monotonic() + VERIFY_EVERY
-                        html = browser.navigate_page(pg, main_url)
+                        html = stats.timed(lambda: browser.navigate_page(pg, main_url), "check")
                         final_url = pg.url
                     else:
-                        resp = pg.request.post(promo_url, form=form, timeout=POST_TIMEOUT)
+                        resp = stats.timed(
+                            lambda: pg.request.post(promo_url, form=form, timeout=POST_TIMEOUT), "post")
                         html = resp.text()
                         final_url = resp.url
-                        posts += 1
                 except Exception as e:
+                    stats.errors += 1
                     if browser.is_lost_error(e):
                         state.add_log(f"SnipeTopJob: side browser lost — {e}")
                         return
@@ -187,7 +237,8 @@ class SnipeTopJobTask(Task):
                     state.server_time_monotonic = temp.server_time_monotonic
 
                 if temp.occupation == top_job:
-                    self._promoted(state, top_job, choice, temp.occupation)
+                    self._promoted(state, top_job, choice, temp.occupation,
+                                   stats, "form post" if not verify else "a main.asp check (confirmed)")
                     promoted = True
                     return
 
@@ -196,7 +247,7 @@ class SnipeTopJobTask(Task):
                         # The game sent the plain page load to the promotion
                         # form: the POSTs aren't taking, so click through it.
                         state.add_log("SnipeTopJob: promotion page detected — submitting.")
-                        if self._submit_promo(state, top_job, pg):
+                        if self._submit_promo(state, top_job, pg, stats):
                             promoted = True
                             return
                     continue
@@ -266,14 +317,18 @@ class SnipeTopJobTask(Task):
         return get_choice(slug) if slug else "A"
 
     @staticmethod
-    def _promoted(state: GameState, top_job: str, choice: str, occupation: str):
+    def _promoted(state: GameState, top_job: str, choice: str, occupation: str,
+                  stats: "_SnipeStats" = None, via: str = ""):
         state.occupation = occupation
-        msg = f"SnipeTopJob: promoted to {top_job} (option {choice})!"
+        gains = PROMO_BY_RANK.get(top_job, {}).get("a" if choice == "A" else "b", "")
+        msg = f"SnipeTopJob: promoted to {top_job} (option {choice}" + (f": {gains}" if gains else "") + ")!"
+        if stats is not None:
+            msg += " Report: " + stats.report(via) + "."
         state.add_log(msg)
         if cfg.load().get("notifications", {}).get("promotion_success", False):
             state.push_notification("promotion_success", msg)
 
-    def _submit_promo(self, state: GameState, top_job: str, pg) -> bool:
+    def _submit_promo(self, state: GameState, top_job: str, pg, stats=None) -> bool:
         """Fallback: click through the promotion page the side browser is on."""
         try:
             choice = self._choice(top_job)
@@ -282,12 +337,15 @@ class SnipeTopJobTask(Task):
             target = radios[idx] if len(radios) > idx else (radios[0] if radios else None)
             if target:
                 target.click()
+            t0 = time.monotonic()
             pg.click("input[type='submit']")
             pg.wait_for_load_state("domcontentloaded", timeout=10000)
+            if stats is not None:
+                stats.last_ms = (time.monotonic() - t0) * 1000
             temp = GameState()
             parse_state(pg.content(), pg.url, temp)
             if temp.occupation == top_job:
-                self._promoted(state, top_job, choice, temp.occupation)
+                self._promoted(state, top_job, choice, temp.occupation, stats, "click-through")
                 return True
             state.add_log("SnipeTopJob: form submitted but occupation not updated yet.")
             return False
