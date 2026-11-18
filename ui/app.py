@@ -896,8 +896,14 @@ def start():
 
 
 @app.route("/stop", methods=["POST"])
+def _who() -> str:
+    if _is_remote():
+        return f"via Player Hub ({request.environ.get(remote_control.REMOTE_ENVIRON_KEY) or 'hub'})"
+    return "from the control panel"
+
+
 def stop():
-    bot.stop()
+    bot.stop(f"Stop {_who()}")
     return jsonify({"running": False, "paused": False})
 
 
@@ -2834,9 +2840,11 @@ def tasks_travel():
 def restart():
     import sys
     import threading as _threading
+    reason = f"Restart {_who()}"
+
     def _do_restart():
         import time as _time
-        bot.stop()
+        bot.stop(reason)
         # Wait for the bot thread to close Chrome — a lingering browser keeps
         # .browser_profile locked and the restarted bot can't launch.
         if not bot.wait_stopped(60):

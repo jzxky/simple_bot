@@ -710,6 +710,16 @@ def _run(c: dict):
                     _stop_event.wait(30)
                 continue
 
+            # Game site not answering: tasks stay paused until the back-off
+            # ends, then a single probe load decides whether to resume.
+            if state.site_down_until:
+                if time.time() < state.site_down_until:
+                    time.sleep(1)
+                    continue
+                import executor as _ex
+                if not _ex.probe_site(state):
+                    continue
+
             try:
                 sched.tick(state, executor)
 
@@ -848,8 +858,13 @@ def _run(c: dict):
 
             time.sleep(2)
 
+        state.add_log(f"Bot stopping: {_stop_reason or 'stop requested'}.")
     except Exception as e:
         state.add_log(f"Bot crashed: {e}")
+    except BaseException as e:
+        # Not an Exception (e.g. SystemExit, GreenletExit): would otherwise end
+        # the run silently, straight into the logout below.
+        state.add_log(f"Bot stopped by {type(e).__name__}: {e!r}")
     finally:
         side_browser.shutdown()
         drug_window.reset(state)
@@ -876,6 +891,8 @@ def start():
     global _thread, _stop_event
     if _thread and _thread.is_alive():
         return
+    global _stop_reason
+    _stop_reason = ""
     _stop_event.clear()
     _pause_event.clear()
     _cancel_snipe_event.clear()
@@ -885,7 +902,14 @@ def start():
     _thread.start()
 
 
-def stop():
+_stop_reason = ""
+
+
+def stop(reason: str = ""):
+    """Stop the bot. `reason` is logged when the run ends (e.g. "Stop button
+    in the control panel", "Restart via Player Hub (user)")."""
+    global _stop_reason
+    _stop_reason = reason
     _stop_event.set()
     _pause_event.clear()
     _cancel_snipe_event.set()

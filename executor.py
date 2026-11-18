@@ -9196,6 +9196,53 @@ def _restart_main_browser(state: GameState):
     _bot._restart_browser(state)
 
 
+_SITE_DOWN_BACKOFFS = (30, 60, 120, 300)  # seconds; stays at the last one
+
+
+def mark_site_down(state: GameState):
+    """Game site not responding: pause tasks and schedule a probe load."""
+    now = time.time()
+    if not state.site_down_since:
+        state.site_down_since = now
+    wait = _SITE_DOWN_BACKOFFS[min(state.site_down_backoff, len(_SITE_DOWN_BACKOFFS) - 1)]
+    state.site_down_backoff += 1
+    state.site_down_until = now + wait
+    state.add_log(f"Game site not responding — pausing tasks, checking again in {wait}s.")
+
+
+def probe_site(state: GameState) -> bool:
+    """One load of the game page after a site-down pause. Returns True (and
+    clears the pause) once the site answers; otherwise backs off further.
+    Only a real redirect to the login page counts as logged out."""
+    page = browser.page()
+    try:
+        page.goto(_u("/loggedin.asp?display=play"), wait_until="domcontentloaded", timeout=30000)
+    except Exception as e:
+        browser.record_nav_failure()
+        if (browser.is_lost_error(str(e)) or "chrome-error://" in str(e)
+                or browser.should_restart_for_nav_failures()):
+            # A hung Chrome looks the same as a down site; a fresh one rules it out.
+            state.add_log("Still can't load the game — restarting browser.")
+            _restart_main_browser(state)
+        mark_site_down(state)
+        return False
+    browser.record_nav_success()
+    down_for = int(time.time() - state.site_down_since) if state.site_down_since else 0
+    state.site_down_until = state.site_down_since = 0.0
+    state.site_down_backoff = 0
+    try:
+        _refresh_state(state)
+    except Exception:
+        pass
+    if "default.asp" in (browser.current_url() or ""):
+        state.logged_in = False
+        state.add_log(f"Game site is back (down ~{down_for // 60}m {down_for % 60}s) — session ended, logging in again.")
+    else:
+        state.logged_in = True
+        state.add_log(f"Game site is back (down ~{down_for // 60}m {down_for % 60}s) — resuming.")
+    return True
+
+
 class ActionExecutor:
     def execute(self, action: Action, state: GameState):
         handler = HANDLERS.get(action.kind)
@@ -9231,6 +9278,18 @@ class ActionExecutor:
                     state.add_log("Browser/page lost — restarting browser.")
                     _crash_report("crash", e, state, action.kind)
                     _restart_main_browser(state)
+                elif ("interrupted by another navigation" not in err
+                      and (("Timeout" in err and ("navigating to" in err or "Page.goto" in err
+                                                  or "Page.reload" in err))
+                           or "net::ERR_" in err)
+                      and not browser.is_secondary_page_active()):
+                    # The game site isn't answering. Hammering it (and marking
+                    # the session logged out) only makes things worse: pause
+                    # tasks and probe again with a growing back-off instead.
+                    if "Timeout" in err:
+                        _crash_report("timeout", e, state, action.kind)
+                    browser.record_nav_failure()
+                    mark_site_down(state)
                 elif any(kw in err for kw in ("Timeout", "interrupted by another navigation", "net::", "ERR_")):
                     if "Timeout" in err:
                         _crash_report("timeout", e, state, action.kind)
