@@ -9181,6 +9181,14 @@ HANDLERS = {
 }
 
 
+def _crash_report(kind: str, err, state: GameState, action: str):
+    try:
+        import crash_report
+        crash_report.capture(kind, err, state, action)
+    except Exception:
+        pass
+
+
 def _restart_main_browser(state: GameState):
     """Restart the main browser through the bot's restart path, so crash-loop
     backoff and drug-store tab cleanup apply here too."""
@@ -9221,8 +9229,11 @@ class ActionExecutor:
                 # Recovery — get the browser back to a known safe page
                 if browser.is_lost_error(err):
                     state.add_log("Browser/page lost — restarting browser.")
+                    _crash_report("crash", e, state, action.kind)
                     _restart_main_browser(state)
                 elif any(kw in err for kw in ("Timeout", "interrupted by another navigation", "net::", "ERR_")):
+                    if "Timeout" in err:
+                        _crash_report("timeout", e, state, action.kind)
                     browser.record_nav_failure()
                     if browser.should_restart_for_nav_failures():
                         state.add_log(

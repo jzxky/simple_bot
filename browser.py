@@ -110,10 +110,32 @@ def start(headless: bool = False):
     _playwright = sync_playwright().start()
     _context = launch_context(_playwright, PROFILE_DIR, headless)
     _page = _context.pages[0] if _context.pages else _context.new_page()
+    _watch_crashes(_page)
+    _context.on("page", _watch_crashes)
     global _nav_fail_count
     _nav_fail_count = 0
     _started_at = time.monotonic()
     print("[browser] Browser launched.")
+
+
+def _watch_crashes(pg: Page):
+    """Record renderer crashes the moment they happen (with the page's URL),
+    so crash reports show which page took the tab down."""
+    def on_crash(p):
+        try:
+            url = p.url
+        except Exception:
+            url = "?"
+        print(f"[browser] Tab crashed on {url}")
+        try:
+            import crash_report
+            crash_report.note_tab_crash(url)
+        except Exception:
+            pass
+    try:
+        pg.on("crash", on_crash)
+    except Exception:
+        pass
 
 
 def stop():
@@ -206,9 +228,10 @@ def restart(headless: bool, log, wait=None) -> bool:
         except Exception as e:
             print(f"[browser] Error shutting down side browsers: {e}")
         cleared = _clear_profile_caches(PROFILE_DIR)
+        import crash_report
         log(f"Browser crashed again shortly after a restart ({_restart_streak} in a row) — "
             f"closed side windows{', cleared browser cache' if cleared else ''}, "
-            f"waiting {int(delay)}s before relaunching.")
+            f"waiting {int(delay)}s before relaunching. ({crash_report.resource_summary()})")
         if wait is not None:
             if wait(delay):
                 return False
@@ -222,6 +245,11 @@ def restart(headless: bool, log, wait=None) -> bool:
         start(headless=headless)
     except Exception as e:
         log(f"Browser restart failed: {e}")
+        try:
+            import crash_report
+            crash_report.capture("restart_failed", e, with_page=False)
+        except Exception:
+            pass
         return False
     finally:
         # Measured from when the browser came back, so a long backoff wait
@@ -255,6 +283,12 @@ def uptime_seconds() -> float:
     if _context is None:
         return 0.0
     return time.monotonic() - _started_at
+
+
+def is_running() -> bool:
+    """True when the main browser was launched and not torn down (it may still
+    have crashed — see is_alive())."""
+    return _context is not None and _page is not None
 
 
 def is_alive() -> bool:
@@ -323,9 +357,6 @@ def export_cookies() -> list:
     return _context.cookies() if _context is not None else []
 
 
-SCREENSHOT_PATH = os.path.join(paths.data_dir(), "last_screenshot.png")
-
-
 # Network errors that are usually a one-off blip (dropped connection, protocol
 # hiccup) rather than a real problem with the page — worth one more try.
 _TRANSIENT_NAV_ERRORS = (
@@ -388,11 +419,7 @@ def navigate(url: str) -> str:
     _goto_with_retry(pg, url)
     record_nav_success()
     _wait_for_cloudflare_on(pg)
-    if _on_main_thread():  # don't let the side browser race the main one for the file
-        try:
-            pg.screenshot(path=SCREENSHOT_PATH, full_page=False)
-        except Exception:
-            pass
+    if _on_main_thread():
         capture_if_watched(force=True)
     return pg.content()
 

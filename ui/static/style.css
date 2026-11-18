@@ -285,9 +285,6 @@ button {
 #pause-btn.paused:hover { background: #235023; }
 #pause-btn:disabled { background: var(--surface2); border-color: var(--border); color: var(--muted); cursor: default; }
 
-#screenshot-btn { background: var(--surface); border-color: var(--border); color: var(--muted); }
-#screenshot-btn:hover { border-color: var(--accent); color: var(--accent); }
-#screenshot-btn:disabled { opacity: 0.5; cursor: default; }
 /* Keep START BOT / PAUSE / SCREENSHOT on one line each on phones. */
 @media (max-width: 600px) {
   .controls { gap: 6px; }
