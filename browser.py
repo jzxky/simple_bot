@@ -123,6 +123,102 @@ def stop():
     print("[browser] Browser stopped.")
 
 
+# ---------------------------------------------------------------------------
+# Restart with crash-loop protection
+# ---------------------------------------------------------------------------
+
+# Two restarts closer together than this count as one crash streak.
+_RESTART_STREAK_WINDOW = 180.0
+_RESTART_BACKOFF_BASE = 30.0
+_RESTART_BACKOFF_MAX = 600.0
+_last_restart_at: float = 0.0
+_restart_streak = 0
+
+# Disposable Chrome caches inside the profile. A corrupt cache or a bloated
+# GPU/code cache can make every fresh renderer crash on its first page load,
+# so they are cleared once the browser keeps dying right after a restart.
+# Cookies, Local Storage and the rest of the profile are left alone.
+_CACHE_DIRS = (
+    "Cache", "Code Cache", "GPUCache", "DawnCache", "DawnGraphiteCache",
+    "DawnWebGPUCache", "GrShaderCache", "GraphiteDawnCache", "ShaderCache",
+    os.path.join("Service Worker", "CacheStorage"),
+    os.path.join("Service Worker", "ScriptCache"),
+)
+
+
+def _clear_profile_caches(profile_dir: str) -> int:
+    import shutil
+    removed = 0
+    for base in (profile_dir, os.path.join(profile_dir, "Default")):
+        for name in _CACHE_DIRS:
+            path = os.path.join(base, name)
+            if os.path.isdir(path):
+                shutil.rmtree(path, ignore_errors=True)
+                removed += 1
+    return removed
+
+
+def restart_streak() -> int:
+    """How many restarts in a row came close together (1 = an isolated one)."""
+    return _restart_streak
+
+
+def restart(headless: bool, log, wait=None) -> bool:
+    """Tear the main browser down and relaunch it, without spinning when the
+    browser keeps dying straight after a restart (e.g. the machine is out of
+    memory: ERR_INSUFFICIENT_RESOURCES / "Page crashed" on every new page).
+
+    A first restart happens right away. If the browser dies again within a
+    few minutes of the last restart, this:
+      - closes the side browsers (snipe / crime / drug windows) to free memory,
+      - clears Chrome's disposable caches in the profile,
+      - waits before relaunching, doubling the wait each time (30s, 60s, ...
+        up to 10 min).
+
+    `log` is called with progress messages. `wait(seconds)` is used for the
+    backoff and should return True when the bot is stopping (e.g. an Event's
+    wait); the restart is then abandoned. Returns True if the browser came up."""
+    global _last_restart_at, _restart_streak
+    now = time.monotonic()
+    if _last_restart_at and now - _last_restart_at < _RESTART_STREAK_WINDOW:
+        _restart_streak += 1
+    else:
+        _restart_streak = 1
+
+    stop()
+    if _restart_streak >= 2:
+        delay = min(_RESTART_BACKOFF_BASE * (2 ** (_restart_streak - 2)), _RESTART_BACKOFF_MAX)
+        try:
+            import side_browser
+            side_browser.shutdown()
+        except Exception as e:
+            print(f"[browser] Error shutting down side browsers: {e}")
+        cleared = _clear_profile_caches(PROFILE_DIR)
+        log(f"Browser crashed again shortly after a restart ({_restart_streak} in a row) — "
+            f"closed side windows{', cleared browser cache' if cleared else ''}, "
+            f"waiting {int(delay)}s before relaunching.")
+        if wait is not None:
+            if wait(delay):
+                return False
+        else:
+            time.sleep(delay)
+    else:
+        # Give the old Chrome processes a moment to exit and release the profile.
+        time.sleep(2)
+
+    try:
+        start(headless=headless)
+    except Exception as e:
+        log(f"Browser restart failed: {e}")
+        return False
+    finally:
+        # Measured from when the browser came back, so a long backoff wait
+        # doesn't make the next quick crash look like a fresh, isolated one.
+        _last_restart_at = time.monotonic()
+    log("Browser restarted — will re-login on next tick.")
+    return True
+
+
 # Substrings that mean the browser, its page, or the patchright driver process
 # is gone and nothing short of a full restart will recover it.
 BROWSER_LOST_MARKERS = (

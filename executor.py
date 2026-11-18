@@ -9181,6 +9181,13 @@ HANDLERS = {
 }
 
 
+def _restart_main_browser(state: GameState):
+    """Restart the main browser through the bot's restart path, so crash-loop
+    backoff and drug-store tab cleanup apply here too."""
+    import bot as _bot
+    _bot._restart_browser(state)
+
+
 class ActionExecutor:
     def execute(self, action: Action, state: GameState):
         handler = HANDLERS.get(action.kind)
@@ -9214,29 +9221,14 @@ class ActionExecutor:
                 # Recovery — get the browser back to a known safe page
                 if browser.is_lost_error(err):
                     state.add_log("Browser/page lost — restarting browser.")
-                    # Whatever the browser was mid-way through is gone with it.
-                    state.logged_in = False
-                    try:
-                        headless = cfg.load().get("misc", {}).get("headless", False)
-                        browser.stop()
-                        browser.start(headless=headless)
-                        state.add_log("Browser restarted — will re-login on next tick.")
-                    except Exception as restart_err:
-                        state.add_log(f"Browser restart failed: {restart_err}")
+                    _restart_main_browser(state)
                 elif any(kw in err for kw in ("Timeout", "interrupted by another navigation", "net::", "ERR_")):
                     browser.record_nav_failure()
                     if browser.should_restart_for_nav_failures():
                         state.add_log(
                             f"Too many consecutive navigation failures — restarting browser."
                         )
-                        state.logged_in = False
-                        try:
-                            headless = cfg.load().get("misc", {}).get("headless", False)
-                            browser.stop()
-                            browser.start(headless=headless)
-                            state.add_log("Browser restarted — will re-login on next tick.")
-                        except Exception as restart_err:
-                            state.add_log(f"Browser restart failed: {restart_err}")
+                        _restart_main_browser(state)
                     else:
                         state.add_log(f"Recovering from {action.kind} error — navigating to safe page.")
                         try:
@@ -9260,12 +9252,6 @@ class ActionExecutor:
                             )
                             if needs_restart:
                                 state.add_log("Browser in broken state during recovery — restarting browser.")
-                                try:
-                                    headless = cfg.load().get("misc", {}).get("headless", False)
-                                    browser.stop()
-                                    browser.start(headless=headless)
-                                    state.add_log("Browser restarted — will re-login on next tick.")
-                                except Exception as restart_err:
-                                    state.add_log(f"Browser restart failed: {restart_err}")
+                                _restart_main_browser(state)
         else:
             state.add_log(f"No handler for action: {action.kind}")

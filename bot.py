@@ -172,24 +172,39 @@ def _transfer_state(old_sched: Scheduler, new_sched: Scheduler):
                 setattr(new_task, attr, getattr(old, attr))
 
 
-def _restart_browser(state: GameState, c: dict) -> bool:
+def _restart_browser(state: GameState, c: dict = None) -> bool:
     """Tear down and relaunch the browser after the driver or browser died.
-    Returns True if the new browser came up."""
+    Returns True if the new browser came up. Repeated crashes back off (see
+    browser.restart) instead of relaunching every tick."""
+    if c is None:
+        c = cfg.load()
     state.logged_in = False
     # The side browser (snipe / separate-tab crimes / drug window) is a separate
     # Chrome and keeps running; it fetches fresh cookies if the session changes.
     if _drug_store_task is not None:
-        _drug_store_task.stop_tab(state)
+        try:
+            _drug_store_task.stop_tab(state)
+        except Exception:
+            pass
     state.drug_store_tab_active = False
     try:
-        browser.stop()
-        browser.start(headless=c.get("misc", {}).get("headless", False))
-        state.add_log("Browser restarted — will re-login on next tick.")
-        return True
+        ok = browser.restart(
+            headless=c.get("misc", {}).get("headless", False),
+            log=state.add_log,
+            wait=_stop_event.wait,
+        )
     except Exception as e:
         state.add_log(f"Browser restart failed: {e}")
-        state.last_error = str(e)
-        return False
+        ok = False
+    if not ok:
+        state.last_error = "Browser restart failed"
+    if browser.restart_streak() >= 2:
+        # browser.restart closed the side windows to free memory.
+        drug_window.reset(state)
+        state.snipe_active = False
+        state.agg_tab_active = False
+        state.agg_tab_crime = ""
+    return ok
 
 
 def _scheduled_restart_due(state: GameState, c: dict) -> bool:
