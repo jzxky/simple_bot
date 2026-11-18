@@ -46,50 +46,62 @@ def _clear_window_placement(profile_dir: str):
         pass
 
 
-def launch_context(pw, profile_dir: str, headless: bool = False) -> BrowserContext:
-    """Launch a persistent Chrome context on `profile_dir` with the bot's
-    standard settings. Shared by the main browser and the side browser."""
-    os.makedirs(profile_dir, exist_ok=True)
-    _clear_window_placement(profile_dir)
+_DESKTOP_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/136.0.0.0 Safari/537.36"
+)
+
+
+def _launch_options(headless: bool) -> "tuple[dict, dict]":
+    """(launch options, context options) shared by every browser the bot opens."""
     # --disable-quic: Chrome's HTTP/3 (QUIC over UDP) connections to the
     # Cloudflare-fronted site intermittently die with ERR_QUIC_PROTOCOL_ERROR;
     # plain HTTP/2 over TCP is reliable.
     args = ["--disable-notifications", "--disable-save-password-bubble", "--disable-wake-lock",
             "--disable-quic"]
-    DESKTOP_UA = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/136.0.0.0 Safari/537.36"
-    )
-    # Patchright adds this by default; Chrome then shows an "unsupported
-    # command-line flag" infobar. Strip it from the default args.
-    ignore_default_args = ["--disable-blink-features=AutomationControlled"]
+    launch = {
+        "channel": "chrome",
+        "headless": headless,
+        "chromium_sandbox": True,
+        "args": args,
+        # Patchright adds this by default; Chrome then shows an "unsupported
+        # command-line flag" infobar. Strip it from the default args.
+        "ignore_default_args": ["--disable-blink-features=AutomationControlled"],
+    }
+    ctx = {"locale": "en-US", "timezone_id": "America/New_York"}
     if headless:
         args.append("--window-size=1920,1080")
-        return pw.chromium.launch_persistent_context(
-            profile_dir,
-            channel="chrome",
-            headless=True,
-            chromium_sandbox=True,
-            viewport={"width": 1920, "height": 1080},
-            user_agent=DESKTOP_UA,
-            locale="en-US",
-            timezone_id="America/New_York",
-            args=args,
-            ignore_default_args=ignore_default_args,
-        )
-    args.append("--start-maximized")
-    return pw.chromium.launch_persistent_context(
-        profile_dir,
-        channel="chrome",
-        headless=False,
-        chromium_sandbox=True,
-        no_viewport=True,
-        locale="en-US",
-        timezone_id="America/New_York",
-        args=args,
-        ignore_default_args=ignore_default_args,
-    )
+        ctx.update(viewport={"width": 1920, "height": 1080}, user_agent=_DESKTOP_UA)
+    else:
+        args.append("--start-maximized")
+        ctx.update(no_viewport=True)
+    return launch, ctx
+
+
+def launch_context(pw, profile_dir: str, headless: bool = False) -> BrowserContext:
+    """Launch the main browser: a persistent Chrome context on `profile_dir`
+    with the bot's standard settings."""
+    os.makedirs(profile_dir, exist_ok=True)
+    _clear_window_placement(profile_dir)
+    launch, ctx = _launch_options(headless)
+    return pw.chromium.launch_persistent_context(profile_dir, **launch, **ctx)
+
+
+def launch_ephemeral_context(pw, headless: bool = False):
+    """Launch a Chrome with a throwaway profile that leaves nothing on disk,
+    for the side browsers (they borrow the main browser's cookies, so they
+    have nothing worth keeping). Returns (browser, context); close both."""
+    launch, ctx = _launch_options(headless)
+    br = pw.chromium.launch(**launch)
+    try:
+        return br, br.new_context(**ctx)
+    except Exception:
+        try:
+            br.close()
+        except Exception:
+            pass
+        raise
 
 
 def start(headless: bool = False):
@@ -98,10 +110,32 @@ def start(headless: bool = False):
     _playwright = sync_playwright().start()
     _context = launch_context(_playwright, PROFILE_DIR, headless)
     _page = _context.pages[0] if _context.pages else _context.new_page()
+    _watch_crashes(_page)
+    _context.on("page", _watch_crashes)
     global _nav_fail_count
     _nav_fail_count = 0
     _started_at = time.monotonic()
     print("[browser] Browser launched.")
+
+
+def _watch_crashes(pg: Page):
+    """Record renderer crashes the moment they happen (with the page's URL),
+    so crash reports show which page took the tab down."""
+    def on_crash(p):
+        try:
+            url = p.url
+        except Exception:
+            url = "?"
+        print(f"[browser] Tab crashed on {url}")
+        try:
+            import crash_report
+            crash_report.note_tab_crash(url)
+        except Exception:
+            pass
+    try:
+        pg.on("crash", on_crash)
+    except Exception:
+        pass
 
 
 def stop():
@@ -121,6 +155,108 @@ def stop():
             print(f"[browser] Error during stop ({label}): {e}")
     _page = _context = _playwright = None
     print("[browser] Browser stopped.")
+
+
+# ---------------------------------------------------------------------------
+# Restart with crash-loop protection
+# ---------------------------------------------------------------------------
+
+# Two restarts closer together than this count as one crash streak.
+_RESTART_STREAK_WINDOW = 180.0
+_RESTART_BACKOFF_BASE = 30.0
+_RESTART_BACKOFF_MAX = 600.0
+_last_restart_at: float = 0.0
+_restart_streak = 0
+
+# Disposable Chrome caches inside the profile. A corrupt cache or a bloated
+# GPU/code cache can make every fresh renderer crash on its first page load,
+# so they are cleared once the browser keeps dying right after a restart.
+# Cookies, Local Storage and the rest of the profile are left alone.
+_CACHE_DIRS = (
+    "Cache", "Code Cache", "GPUCache", "DawnCache", "DawnGraphiteCache",
+    "DawnWebGPUCache", "GrShaderCache", "GraphiteDawnCache", "ShaderCache",
+    os.path.join("Service Worker", "CacheStorage"),
+    os.path.join("Service Worker", "ScriptCache"),
+)
+
+
+def _clear_profile_caches(profile_dir: str) -> int:
+    import shutil
+    removed = 0
+    for base in (profile_dir, os.path.join(profile_dir, "Default")):
+        for name in _CACHE_DIRS:
+            path = os.path.join(base, name)
+            if os.path.isdir(path):
+                shutil.rmtree(path, ignore_errors=True)
+                removed += 1
+    return removed
+
+
+def restart_streak() -> int:
+    """How many restarts in a row came close together (1 = an isolated one)."""
+    return _restart_streak
+
+
+def restart(headless: bool, log, wait=None) -> bool:
+    """Tear the main browser down and relaunch it, without spinning when the
+    browser keeps dying straight after a restart (e.g. the machine is out of
+    memory: ERR_INSUFFICIENT_RESOURCES / "Page crashed" on every new page).
+
+    A first restart happens right away. If the browser dies again within a
+    few minutes of the last restart, this:
+      - closes the side browsers (snipe / crime / drug windows) to free memory,
+      - clears Chrome's disposable caches in the profile,
+      - waits before relaunching, doubling the wait each time (30s, 60s, ...
+        up to 10 min).
+
+    `log` is called with progress messages. `wait(seconds)` is used for the
+    backoff and should return True when the bot is stopping (e.g. an Event's
+    wait); the restart is then abandoned. Returns True if the browser came up."""
+    global _last_restart_at, _restart_streak
+    now = time.monotonic()
+    if _last_restart_at and now - _last_restart_at < _RESTART_STREAK_WINDOW:
+        _restart_streak += 1
+    else:
+        _restart_streak = 1
+
+    stop()
+    if _restart_streak >= 2:
+        delay = min(_RESTART_BACKOFF_BASE * (2 ** (_restart_streak - 2)), _RESTART_BACKOFF_MAX)
+        try:
+            import side_browser
+            side_browser.shutdown()
+        except Exception as e:
+            print(f"[browser] Error shutting down side browsers: {e}")
+        cleared = _clear_profile_caches(PROFILE_DIR)
+        import crash_report
+        log(f"Browser crashed again shortly after a restart ({_restart_streak} in a row) — "
+            f"closed side windows{', cleared browser cache' if cleared else ''}, "
+            f"waiting {int(delay)}s before relaunching. ({crash_report.resource_summary()})")
+        if wait is not None:
+            if wait(delay):
+                return False
+        else:
+            time.sleep(delay)
+    else:
+        # Give the old Chrome processes a moment to exit and release the profile.
+        time.sleep(2)
+
+    try:
+        start(headless=headless)
+    except Exception as e:
+        log(f"Browser restart failed: {e}")
+        try:
+            import crash_report
+            crash_report.capture("restart_failed", e, with_page=False)
+        except Exception:
+            pass
+        return False
+    finally:
+        # Measured from when the browser came back, so a long backoff wait
+        # doesn't make the next quick crash look like a fresh, isolated one.
+        _last_restart_at = time.monotonic()
+    log("Browser restarted — will re-login on next tick.")
+    return True
 
 
 # Substrings that mean the browser, its page, or the patchright driver process
@@ -147,6 +283,12 @@ def uptime_seconds() -> float:
     if _context is None:
         return 0.0
     return time.monotonic() - _started_at
+
+
+def is_running() -> bool:
+    """True when the main browser was launched and not torn down (it may still
+    have crashed — see is_alive())."""
+    return _context is not None and _page is not None
 
 
 def is_alive() -> bool:
@@ -215,9 +357,6 @@ def export_cookies() -> list:
     return _context.cookies() if _context is not None else []
 
 
-SCREENSHOT_PATH = os.path.join(paths.data_dir(), "last_screenshot.png")
-
-
 # Network errors that are usually a one-off blip (dropped connection, protocol
 # hiccup) rather than a real problem with the page — worth one more try.
 _TRANSIENT_NAV_ERRORS = (
@@ -280,11 +419,7 @@ def navigate(url: str) -> str:
     _goto_with_retry(pg, url)
     record_nav_success()
     _wait_for_cloudflare_on(pg)
-    if _on_main_thread():  # don't let the side browser race the main one for the file
-        try:
-            pg.screenshot(path=SCREENSHOT_PATH, full_page=False)
-        except Exception:
-            pass
+    if _on_main_thread():
         capture_if_watched(force=True)
     return pg.content()
 

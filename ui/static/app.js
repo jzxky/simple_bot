@@ -534,6 +534,7 @@ function _buildPayload() {
     logout_on_stop: document.getElementById("logout_on_stop").checked,
     relog_on_session_expire: document.getElementById("relog_on_session_expire").checked,
     scheduled_browser_restart: (document.getElementById("scheduled_browser_restart")||{checked:true}).checked,
+    browser_restart_hours: parseInt((document.getElementById("browser_restart_hours")||{value:"24"}).value) || 24,
     min_cash_on_hand: parseInt(document.getElementById("min_cash_on_hand").value) || 0,
     char_history_enabled: document.getElementById("char_history_enabled").checked,
     char_history_interval: parseInt(document.getElementById("char_history_interval").value) || 30,
@@ -3327,10 +3328,6 @@ function _updateStatPanel() {
     row("CS Sentence",        b.cs_sentence,                       b.cs_sentence > 0),
     row("Agg Fail Count",     `${b.agg_fail_count} / 3`,          b.agg_fail_count >= 3),
   ].join("");
-}
-
-function takeScreenshot() {
-  window.open("/screenshot", "_blank");
 }
 
 function clearEarnQueue() {

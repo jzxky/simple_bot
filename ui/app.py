@@ -545,6 +545,10 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c["misc"]["logout_on_stop"] = data.get("logout_on_stop", True)
     c["misc"]["relog_on_session_expire"] = data.get("relog_on_session_expire", True)
     c["misc"]["scheduled_browser_restart"] = data.get("scheduled_browser_restart", True)
+    try:
+        c["misc"]["browser_restart_hours"] = max(1, int(data.get("browser_restart_hours", 24)))
+    except (TypeError, ValueError):
+        c["misc"]["browser_restart_hours"] = 24
     c["misc"]["min_cash_on_hand"] = int(data.get("min_cash_on_hand", 0))
     c["misc"]["headless"] = data.get("headless", False)
     c.setdefault("communications", {})
@@ -2136,16 +2140,6 @@ def repair_vehicle_route():
     if not bot.is_running():
         return jsonify({"error": "Bot must be running."}), 400
     return _run_profile_task("repair_vehicle_ui")
-
-
-@app.route("/screenshot")
-def screenshot():
-    import paths as _paths
-    import browser as _browser
-    path = _browser.SCREENSHOT_PATH
-    if not os.path.exists(path):
-        return "No screenshot yet.", 204
-    return send_file(path, mimetype="image/png")
 
 
 @app.route("/tasks/check_warrants", methods=["POST"])

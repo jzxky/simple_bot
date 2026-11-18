@@ -3,14 +3,13 @@ Side browser — a second, fully independent patchright instance driven from its
 own worker thread, so long-running tab work (top-job sniping, separate-tab
 aggravated crimes) never waits on the main bot loop and never blocks it.
 
-Patchright's sync API is bound to the thread that started it, and Chrome locks
-a profile directory to one process, so this runs its own sync_playwright() and
-its own Chrome window on a dedicated profile (.browser_profile_side). It shares
-the main browser's login by importing the main context's cookies (session +
-Cloudflare clearance) — no second login.
+Patchright's sync API is bound to the thread that started it, so this runs its
+own sync_playwright() and its own Chrome window. That Chrome uses a throwaway
+profile (nothing on disk); it shares the main browser's login by importing the
+main context's cookies — no second login.
 
 Work is split into lanes ("snipe", "crime", "drugs"), each its own worker thread
-with its own Chrome window and profile (.browser_profile_side_<lane>), so a
+with its own Chrome window, so a
 top-job snipe, a crime run and a drug trade task (drug_window.py) can go at the
 same time without waiting on each other.
 Within a lane, jobs run one at a time, each in a fresh tab that it closes when
@@ -30,7 +29,26 @@ import queue
 import threading
 import paths
 
-SIDE_PROFILE_DIR = os.path.join(paths.data_dir(), ".browser_profile_side")  # + "_<lane>"
+# Side browsers used to keep a persistent profile per lane here; they now run
+# on throwaway profiles, so old folders are just deleted on first launch.
+_OLD_SIDE_PROFILE_PREFIX = ".browser_profile_side"
+_old_profiles_cleared = False
+
+
+def _remove_old_side_profiles():
+    global _old_profiles_cleared
+    if _old_profiles_cleared:
+        return
+    _old_profiles_cleared = True
+    import shutil
+    try:
+        names = os.listdir(paths.data_dir())
+    except OSError:
+        return
+    for name in names:
+        path = os.path.join(paths.data_dir(), name)
+        if name.startswith(_OLD_SIDE_PROFILE_PREFIX) and os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
 
 
 class Job:
@@ -55,6 +73,7 @@ class _Side:
     def __init__(self, lane: "_Lane"):
         self._lane = lane
         self._pw = None
+        self._browser = None
         self._context = None
 
     def _ensure(self, headless: bool):
@@ -62,9 +81,10 @@ class _Side:
             return
         from patchright.sync_api import sync_playwright
         import browser
+        _remove_old_side_profiles()
         self._pw = sync_playwright().start()
         try:
-            self._context = browser.launch_context(self._pw, f"{SIDE_PROFILE_DIR}_{self._lane.name}", headless)
+            self._browser, self._context = browser.launch_ephemeral_context(self._pw, headless)
         except Exception:
             self._stop_pw()
             raise
@@ -109,6 +129,12 @@ class _Side:
             except Exception:
                 pass
             self._context = None
+        if self._browser is not None:
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
         self._stop_pw()
 
     def _stop_pw(self):

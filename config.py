@@ -74,6 +74,7 @@ DEFAULT_CONFIG = {
         "logout_on_stop": True,
         "relog_on_session_expire": True,
         "scheduled_browser_restart": True,
+        "browser_restart_hours": 24,
         "min_cash_on_hand": 0,
         "headless": False,
         "show_scheduler": False,

@@ -47,7 +47,6 @@ button, .btn-secondary, .action-btn { border-radius: 8px; }
 #pause-btn:hover { background: rgba(212,178,90,.10); border-color: #a8862a; }
 #pause-btn.paused { background: transparent; border-color: var(--success); color: var(--success); }
 #pause-btn:disabled { background: transparent; border-color: var(--border); color: var(--muted); }
-#screenshot-btn { background: transparent; }
 
 @media (max-width: 559px) {
   .stat-group-table { table-layout: fixed; width: 100%; max-width: 100%; }
@@ -73,7 +72,6 @@ html[data-theme="graphite"] .stat-progress-cell::after { content:""; position:ab
 html[data-theme="graphite"] .stat-progress-bg { left:14px; bottom:8px; height:4px; border-radius:4px; z-index:1; max-width:calc(100% - 28px); }
 html[data-theme="graphite"] #pause-btn { background: #1f2430; border-color: #2c3240; color: var(--text); }
 html[data-theme="graphite"] #pause-btn:disabled { background: #171a21; color: #5c6473; border-color: #222731; }
-html[data-theme="graphite"] #screenshot-btn { background: #1f2430; color: var(--text); border-color: #2c3240; }
 html[data-theme="graphite"] #toggle-btn:not(.running) { background: var(--accent); border-color: var(--accent); }
 html[data-theme="graphite"] #toggle-btn:not(.running):hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 html[data-theme="graphite"] .dot.running { background: var(--success); box-shadow: 0 0 0 3px rgba(47,191,113,.2); }
@@ -100,7 +98,6 @@ html[data-theme="daylight"] .status-bar { background: #fff; }
 html[data-theme="daylight"] #game-time-value { color: var(--text); }
 html[data-theme="daylight"] #pause-btn { background: #fff; border-color: #e2c98e; color: #8f6614; }
 html[data-theme="daylight"] #pause-btn:disabled { background: #f3f4f6; border-color: var(--border); color: #a0a7b2; }
-html[data-theme="daylight"] #screenshot-btn,
 html[data-theme="daylight"] .btn-secondary,
 html[data-theme="daylight"] .action-btn,
 html[data-theme="daylight"] .close-bot-btn { background: #fff; color: var(--text); border-color: var(--border); }

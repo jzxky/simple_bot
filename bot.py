@@ -13,6 +13,7 @@ import urls
 import browser
 import side_browser
 import drug_window
+import crash_report
 from state import GameState
 from scheduler import Scheduler
 from executor import ActionExecutor
@@ -99,8 +100,9 @@ _cancel_snipe_event = threading.Event()
 _cancel_agg_event = threading.Event()
 _reload_requested_at: float = 0.0
 _RELOAD_DEBOUNCE = 2.0  # seconds
-# Chrome slowly leaks memory over long runs — relaunch it after this much uptime.
-_SCHEDULED_RESTART_SECS = 24 * 60 * 60
+# Chrome slowly leaks memory over long runs — relaunch it after this much
+# uptime (misc.browser_restart_hours, default 24).
+_DEFAULT_RESTART_HOURS = 24
 _consume_queue: queue.Queue = queue.Queue()
 _deposit_queue: queue.Queue = queue.Queue()
 _withdraw_queue: queue.Queue = queue.Queue()
@@ -172,32 +174,55 @@ def _transfer_state(old_sched: Scheduler, new_sched: Scheduler):
                 setattr(new_task, attr, getattr(old, attr))
 
 
-def _restart_browser(state: GameState, c: dict) -> bool:
+def _restart_browser(state: GameState, c: dict = None) -> bool:
     """Tear down and relaunch the browser after the driver or browser died.
-    Returns True if the new browser came up."""
+    Returns True if the new browser came up. Repeated crashes back off (see
+    browser.restart) instead of relaunching every tick."""
+    if c is None:
+        c = cfg.load()
     state.logged_in = False
     # The side browser (snipe / separate-tab crimes / drug window) is a separate
     # Chrome and keeps running; it fetches fresh cookies if the session changes.
     if _drug_store_task is not None:
-        _drug_store_task.stop_tab(state)
+        try:
+            _drug_store_task.stop_tab(state)
+        except Exception:
+            pass
     state.drug_store_tab_active = False
     try:
-        browser.stop()
-        browser.start(headless=c.get("misc", {}).get("headless", False))
-        state.add_log("Browser restarted — will re-login on next tick.")
-        return True
+        ok = browser.restart(
+            headless=c.get("misc", {}).get("headless", False),
+            log=state.add_log,
+            wait=_stop_event.wait,
+        )
     except Exception as e:
         state.add_log(f"Browser restart failed: {e}")
-        state.last_error = str(e)
-        return False
+        ok = False
+    if not ok:
+        state.last_error = "Browser restart failed"
+    if browser.restart_streak() >= 2:
+        # browser.restart closed the side windows to free memory.
+        drug_window.reset(state)
+        state.snipe_active = False
+        state.agg_tab_active = False
+        state.agg_tab_crime = ""
+    return ok
+
+
+def _restart_hours(c: dict) -> float:
+    try:
+        return max(1.0, float(c.get("misc", {}).get("browser_restart_hours", _DEFAULT_RESTART_HOURS)))
+    except (TypeError, ValueError):
+        return float(_DEFAULT_RESTART_HOURS)
 
 
 def _scheduled_restart_due(state: GameState, c: dict) -> bool:
-    """True once the browser has been up for 24h and nothing is mid-run in the
-    side browsers (a snipe or crime run would be cut off by the re-login)."""
+    """True once the browser has been up for the configured number of hours
+    and nothing is mid-run in the side browsers (a snipe or crime run would be
+    cut off by the re-login)."""
     if not c.get("misc", {}).get("scheduled_browser_restart", True):
         return False
-    if browser.uptime_seconds() < _SCHEDULED_RESTART_SECS:
+    if browser.uptime_seconds() < _restart_hours(c) * 3600:
         return False
     return not (state.snipe_active or state.agg_tab_active or state.drug_tab_active)
 
@@ -677,6 +702,14 @@ def _run(c: dict):
                 _sched = sched
                 state.add_log("Config reloaded.")
 
+            # A failed relaunch leaves no browser; every task would then fail
+            # on it and end the run. Try again (with backoff) instead.
+            if not browser.is_running():
+                state.add_log("Browser is not running — relaunching.")
+                if not _restart_browser(state, c):
+                    _stop_event.wait(30)
+                continue
+
             # Game site not answering: tasks stay paused until the back-off
             # ends, then a single probe load decides whether to resume.
             if state.site_down_until:
@@ -699,6 +732,7 @@ def _run(c: dict):
                 if not browser.is_lost_error(tick_err):
                     raise
                 state.add_log(f"Browser lost during tick: {tick_err} — restarting browser.")
+                crash_report.capture("crash", tick_err, state, state.current_task or "tick")
                 if not _restart_browser(state, c):
                     # Don't spin on a machine that can't launch Chrome right now.
                     time.sleep(30)
@@ -716,7 +750,8 @@ def _run(c: dict):
                 state.add_log("Too many consecutive navigation failures — restarting browser.")
                 _restart_browser(state, c)
             elif _scheduled_restart_due(state, c):
-                state.add_log("Browser has been running for 24 hours — restarting to free memory.")
+                state.add_log(f"Browser has been running for {_restart_hours(c):g} hours — restarting "
+                              f"to free memory. ({crash_report.resource_summary()})")
                 # The side browsers are idle (checked above); close them too so
                 # their Chrome processes are recycled — they relaunch on next use.
                 side_browser.shutdown()
