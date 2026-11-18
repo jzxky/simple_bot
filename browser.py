@@ -46,50 +46,62 @@ def _clear_window_placement(profile_dir: str):
         pass
 
 
-def launch_context(pw, profile_dir: str, headless: bool = False) -> BrowserContext:
-    """Launch a persistent Chrome context on `profile_dir` with the bot's
-    standard settings. Shared by the main browser and the side browser."""
-    os.makedirs(profile_dir, exist_ok=True)
-    _clear_window_placement(profile_dir)
+_DESKTOP_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/136.0.0.0 Safari/537.36"
+)
+
+
+def _launch_options(headless: bool) -> "tuple[dict, dict]":
+    """(launch options, context options) shared by every browser the bot opens."""
     # --disable-quic: Chrome's HTTP/3 (QUIC over UDP) connections to the
     # Cloudflare-fronted site intermittently die with ERR_QUIC_PROTOCOL_ERROR;
     # plain HTTP/2 over TCP is reliable.
     args = ["--disable-notifications", "--disable-save-password-bubble", "--disable-wake-lock",
             "--disable-quic"]
-    DESKTOP_UA = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/136.0.0.0 Safari/537.36"
-    )
-    # Patchright adds this by default; Chrome then shows an "unsupported
-    # command-line flag" infobar. Strip it from the default args.
-    ignore_default_args = ["--disable-blink-features=AutomationControlled"]
+    launch = {
+        "channel": "chrome",
+        "headless": headless,
+        "chromium_sandbox": True,
+        "args": args,
+        # Patchright adds this by default; Chrome then shows an "unsupported
+        # command-line flag" infobar. Strip it from the default args.
+        "ignore_default_args": ["--disable-blink-features=AutomationControlled"],
+    }
+    ctx = {"locale": "en-US", "timezone_id": "America/New_York"}
     if headless:
         args.append("--window-size=1920,1080")
-        return pw.chromium.launch_persistent_context(
-            profile_dir,
-            channel="chrome",
-            headless=True,
-            chromium_sandbox=True,
-            viewport={"width": 1920, "height": 1080},
-            user_agent=DESKTOP_UA,
-            locale="en-US",
-            timezone_id="America/New_York",
-            args=args,
-            ignore_default_args=ignore_default_args,
-        )
-    args.append("--start-maximized")
-    return pw.chromium.launch_persistent_context(
-        profile_dir,
-        channel="chrome",
-        headless=False,
-        chromium_sandbox=True,
-        no_viewport=True,
-        locale="en-US",
-        timezone_id="America/New_York",
-        args=args,
-        ignore_default_args=ignore_default_args,
-    )
+        ctx.update(viewport={"width": 1920, "height": 1080}, user_agent=_DESKTOP_UA)
+    else:
+        args.append("--start-maximized")
+        ctx.update(no_viewport=True)
+    return launch, ctx
+
+
+def launch_context(pw, profile_dir: str, headless: bool = False) -> BrowserContext:
+    """Launch the main browser: a persistent Chrome context on `profile_dir`
+    with the bot's standard settings."""
+    os.makedirs(profile_dir, exist_ok=True)
+    _clear_window_placement(profile_dir)
+    launch, ctx = _launch_options(headless)
+    return pw.chromium.launch_persistent_context(profile_dir, **launch, **ctx)
+
+
+def launch_ephemeral_context(pw, headless: bool = False):
+    """Launch a Chrome with a throwaway profile that leaves nothing on disk,
+    for the side browsers (they borrow the main browser's cookies, so they
+    have nothing worth keeping). Returns (browser, context); close both."""
+    launch, ctx = _launch_options(headless)
+    br = pw.chromium.launch(**launch)
+    try:
+        return br, br.new_context(**ctx)
+    except Exception:
+        try:
+            br.close()
+        except Exception:
+            pass
+        raise
 
 
 def start(headless: bool = False):

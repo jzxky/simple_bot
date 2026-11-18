@@ -4,7 +4,7 @@ Drug trade tasks in their own Chrome window.
 Drug house buying and stock checks, dealer contacts and prices, contact buys and
 sell offers, smuggling bribes, journal drug trade offers and !middle runs all run
 on the side browser's "drugs" lane (side_browser.py): a
-separate Chrome window on its own profile (.browser_profile_side_drugs) and its
+separate Chrome window (throwaway profile) and its
 own worker thread, logged in with the main browser's cookies. The main window
 stays on whatever it was doing. Drug manufacturing (an action-timer action) and
 the Auckland drug store (its own tab, drug_store.py) are not drug trade tasks
