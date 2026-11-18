@@ -70,10 +70,22 @@ class _Side:
             raise
 
     def new_page(self, job: Job):
-        self._ensure(job.headless)
-        if job.cookies:
-            self._context.add_cookies(job.cookies)
-        return self._context.new_page()
+        """Open a tab for `job`. If the lane's Chrome window was closed (or
+        crashed) since the last job, the stale context raises "Target page,
+        context or browser has been closed" — tear it down and relaunch once
+        instead of failing every job from then on."""
+        import browser
+        for attempt in (1, 2):
+            self._ensure(job.headless)
+            try:
+                if job.cookies:
+                    self._context.add_cookies(job.cookies)
+                return self._context.new_page()
+            except Exception as e:
+                if attempt == 2 or not browser.is_lost_error(e):
+                    raise
+                print(f"[side_browser:{self._lane.name}] browser was closed — relaunching.")
+                self.teardown()
 
     def refresh_cookies(self, job: Job) -> bool:
         """Ask the main thread for fresh cookies (e.g. after the session

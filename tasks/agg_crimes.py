@@ -37,6 +37,7 @@ COOLDOWN_SECONDS = 180
 class AggCrimeTask(Task):
     priority = 50
     label = 'Agg Crimes'
+    _ERROR_BACKOFF_SECONDS = 60  # pause after a side-tab run errors out
 
     def __init__(self, primary_crime: str, primary_threshold: int,
                  away_crime: str, away_threshold: int,
@@ -353,6 +354,9 @@ class AggCrimeTask(Task):
         except Exception as e:
             state.add_log(f"Agg Crimes (side): error — {e}")
             reason = "error"
+            # Don't relaunch straight away into the same error.
+            self._cooldown_until = max(self._cooldown_until,
+                                       time.monotonic() + self._ERROR_BACKOFF_SECONDS)
         finally:
             if pg is not None:
                 side.close_page(pg)
