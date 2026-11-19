@@ -100,7 +100,9 @@ class _Side:
             try:
                 if job.cookies:
                     self._context.add_cookies(job.cookies)
-                return self._context.new_page()
+                pg = self._context.new_page()
+                browser._patch_content(pg)
+                return pg
             except Exception as e:
                 if attempt == 2 or not browser.is_lost_error(e):
                     raise

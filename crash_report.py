@@ -25,7 +25,8 @@ import paths
 REPORTS_DIR = os.path.join(paths.data_dir(), "logs", "crash_reports")
 KEEP_REPORTS = 40
 # Per kind: a crash loop or a run of timeouts shouldn't write a report every tick.
-_MIN_GAP = {"crash": 30.0, "restart_failed": 30.0, "timeout": 300.0}
+_MIN_GAP = {"crash": 30.0, "restart_failed": 30.0, "timeout": 300.0,
+            "task_error": 60.0, "loop_error": 60.0}
 _last_by_kind: "dict[str, float]" = {}
 _lock = threading.Lock()
 # Recent tab crashes seen through the page "crash" event (time, url).
@@ -140,7 +141,8 @@ def _prune():
 
 
 def capture(kind: str, error, state=None, action: str = "", with_page: bool = True) -> "str | None":
-    """Write a crash report. `kind` is "crash", "timeout" or "restart_failed".
+    """Write a crash report. `kind` is "crash", "timeout", "restart_failed",
+    "task_error" or "loop_error".
     Returns the report folder, or None if skipped (rate limit) or it failed.
     Logs a one-line summary through state.add_log when `state` is given."""
     try:

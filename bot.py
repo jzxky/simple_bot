@@ -100,6 +100,9 @@ _cancel_snipe_event = threading.Event()
 _cancel_agg_event = threading.Event()
 _reload_requested_at: float = 0.0
 _RELOAD_DEBOUNCE = 2.0  # seconds
+# Consecutive failed loop iterations before the run is stopped (with backoff
+# between them, ~15 min in all).
+_MAX_LOOP_ERRORS = 20
 # Chrome slowly leaks memory over long runs — relaunch it after this much
 # uptime (misc.browser_restart_hours, default 24).
 _DEFAULT_RESTART_HOURS = 24
@@ -512,351 +515,372 @@ def _run(c: dict):
         _state = state
 
         _was_in_jail = False
+        _loop_errors = 0
 
         while not _stop_event.is_set():
-            # Side browser (snipe / separate-tab crimes / live view) asking for
-            # fresh cookies. Served even while paused.
-            if side_browser.cookies_requested() and state.logged_in:
-                try:
-                    side_browser.provide_cookies(browser.export_cookies())
-                except Exception as e:
-                    state.add_log(f"Side browser cookie refresh error: {e}")
-
-            # Someone is watching the bot's browser (view-only).
-            browser.capture_if_watched()
-
-            if _pause_event.is_set():
-                time.sleep(1)
-                continue
-
-            # Detect Cloudflare challenge — pause and wait for manual resolution
-            if browser.is_cloudflare_challenge():
-                msg = (
-                    "Cloudflare gateway detected — manual takeover required. "
-                    "Complete the challenge in the browser then press Resume."
-                )
-                state.add_log(msg)
-                if c.get("notifications", {}).get("cloudflare_detected", False):
-                    state.push_notification("cloudflare_detected", msg)
-                _pause_event.set()
-                continue
-
-            # Detect session expiry on every tick
-            if state.logged_in and browser.current_url().rstrip("/") == urls.BASE_URL + "/default.asp" and not browser.is_cloudflare_challenge():
-                state.logged_in = False
-                if c.get("misc", {}).get("relog_on_session_expire", True):
-                    msg = "Session expired — will re-login."
-                    state.add_log(msg)
-                    if c.get("notifications", {}).get("session_expired", False):
-                        state.push_notification("session_expired", msg)
-                else:
-                    msg = "Session expired — re-login disabled, pausing."
-                    state.add_log(msg)
-                    if c.get("notifications", {}).get("session_expired", False):
-                        state.push_notification("session_expired", msg)
-                    state.relog_suppressed = True
-                    _pause_event.set()
-
-
-            # Bar threads requests from the Flask thread
-            if not _bar_threads_request.empty():
-                try:
-                    _bar_threads_request.get_nowait()
-                    _bar_threads_result.put(_fetch_bar_threads())
-                except Exception as e:
-                    _bar_threads_result.put(e)
-
-            # Manual player-interaction requests from the Flask thread
-            if not _interact_request.empty():
-                try:
-                    params = _interact_request.get_nowait()
-                    result_q = queue.Queue()
-                    executor.execute(Action("interact", result_queue=result_q, **params), state)
-                    _interact_result.put(result_q.get(timeout=90))
-                except Exception as e:
-                    _interact_result.put(e)
-
-            # Profile-tab tasks (sales, apartment stash) from the Flask thread
-            if not _profile_task_request.empty():
-                try:
-                    kind, params = _profile_task_request.get_nowait()
-                    result_q = queue.Queue()
-                    executor.execute(Action(kind, result_queue=result_q, **params), state)
-                    try:
-                        _profile_task_result.put(result_q.get(timeout=60))
-                    except queue.Empty:
-                        _profile_task_result.put(RuntimeError("The request failed — see the log."))
-                except Exception as e:
-                    _profile_task_result.put(e)
-
-            # Drugs-tab tasks from the Flask thread — handed to the drug window,
-            # which replies straight to the waiting request.
-            while not _drug_task_request.empty():
-                try:
-                    kind, params, reply_q = _drug_task_request.get_nowait()
-                except queue.Empty:
-                    break
-                try:
-                    drug_window.submit(state, Action(kind, **params), reply_q=reply_q)
-                except Exception as e:
-                    reply_q.put({"ok": False, "message": f"Couldn't start the drug window: {e}"})
-
-            # Jail inmates requests from the Flask thread
-            if not _jail_inmates_request.empty():
-                try:
-                    _jail_inmates_request.get_nowait()
-                    _jail_inmates_result.put(_fetch_jail_inmates())
-                except Exception as e:
-                    _jail_inmates_result.put(e)
-
-            # Warrants check requests from the Flask thread
-            if not _warrants_request.empty():
-                try:
-                    _warrants_request.get_nowait()
-                    result_q = queue.Queue()
-                    executor.execute(Action("check_warrants", result_queue=result_q), state)
-                    _warrants_result.put(result_q.get(timeout=30))
-                except Exception as e:
-                    _warrants_result.put(e)
-
-            # Turn-in warrant requests
-            if not _turn_in_warrant_queue.empty():
-                try:
-                    params = _turn_in_warrant_queue.get_nowait()
-                    executor.execute(Action("turn_in_warrant", **params), state)
-                except Exception as e:
-                    state.add_log(f"Turn in warrant error: {e}")
-
-            # Travel requests — a manual travel request always wins; finish the
-            # crime tab first so it isn't left running against a stale city.
-            if not _travel_queue.empty():
-                try:
-                    params = _travel_queue.get_nowait()
-                    if state.agg_tab_active and _agg_task is not None:
-                        _agg_task.stop_tab(state)
-                    executor.execute(Action("travel", **params), state)
-                except Exception as e:
-                    state.add_log(f"Travel error: {e}")
-
-            # Resume deferred travel once the travel timer is free
             try:
-                from executor import get_deferred_travel, clear_deferred_travel
-                _dt = get_deferred_travel()
-                if _dt and state.timer_ready("travel"):
-                    clear_deferred_travel()
-                    state.add_log(f"Travel timer free — resuming deferred travel to {_dt['target_city']}.")
-                    _travel_queue.put(_dt)
-            except Exception as e:
-                state.add_log(f"Deferred travel handler error: {e}")
+                # Side browser (snipe / separate-tab crimes / live view) asking for
+                # fresh cookies. Served even while paused.
+                if side_browser.cookies_requested() and state.logged_in:
+                    try:
+                        side_browser.provide_cookies(browser.export_cookies())
+                    except Exception as e:
+                        state.add_log(f"Side browser cookie refresh error: {e}")
 
-            # Repair complete → resume deferred vehicle travel
-            if not _repair_complete_queue.empty():
-                try:
-                    _repair_complete_queue.get_nowait()
-                    from executor import get_pending_vehicle_travel_target, clear_pending_vehicle_travel_target
-                    pending = get_pending_vehicle_travel_target()
-                    clear_pending_vehicle_travel_target()
-                    if pending:
-                        state.add_log(f"Repair complete — resuming deferred travel to {pending}.")
-                        _travel_queue.put({"target_city": pending, "method": "own_vehicle"})
-                except Exception as e:
-                    state.add_log(f"Repair complete handler error: {e}")
+                # Someone is watching the bot's browser (view-only).
+                browser.capture_if_watched()
 
-            # Navigate requests from the Flask thread
-            if not _navigate_queue.empty():
-                try:
-                    params = _navigate_queue.get_nowait()
-                    executor.execute(Action("navigate", **params), state)
-                except Exception as e:
-                    state.add_log(f"Navigate error: {e}")
-
-            # Manual skill use requests from the Flask thread
-            if not _skill_queue.empty():
-                try:
-                    params = _skill_queue.get_nowait()
-                    action_kind = params.pop("_action_kind", "use_skill")
-                    executor.execute(Action(action_kind, **params), state)
-                except Exception as e:
-                    state.add_log(f"Skill use error: {e}")
-
-            # Travel destination fetch (for UI dropdowns)
-            if not _travel_dests_request.empty():
-                try:
-                    method = _travel_dests_request.get_nowait()
-                    _travel_dests_result.put(_fetch_travel_dests(method, state.home_city))
-                except Exception as e:
-                    _travel_dests_result.put(e)
-
-            if _stop_event.is_set():
-                break
-
-            # Reload config and rebuild scheduler if Save was pressed (debounced).
-            # Rebuilding replaces the AggCrimeTask instance, so finish any tab run
-            # first — otherwise its page/generator would be orphaned.
-            if _reload_event.is_set() and time.monotonic() - _reload_requested_at >= _RELOAD_DEBOUNCE:
-                _reload_event.clear()
-                if state.agg_tab_active and _agg_task is not None:
-                    _agg_task.stop_tab(state)
-                c = cfg.load()
-                sched = _build_scheduler(c, old_sched=sched)
-                _sched = sched
-                state.add_log("Config reloaded.")
-
-            # A failed relaunch leaves no browser; every task would then fail
-            # on it and end the run. Try again (with backoff) instead.
-            if not browser.is_running():
-                state.add_log("Browser is not running — relaunching.")
-                if not _restart_browser(state, c):
-                    _stop_event.wait(30)
-                continue
-
-            # Game site not answering: tasks stay paused until the back-off
-            # ends, then a single probe load decides whether to resume.
-            if state.site_down_until:
-                if time.time() < state.site_down_until:
+                if _pause_event.is_set():
                     time.sleep(1)
                     continue
-                import executor as _ex
-                if not _ex.probe_site(state):
+
+                # Detect Cloudflare challenge — pause and wait for manual resolution
+                if browser.is_cloudflare_challenge():
+                    msg = (
+                        "Cloudflare gateway detected — manual takeover required. "
+                        "Complete the challenge in the browser then press Resume."
+                    )
+                    state.add_log(msg)
+                    if c.get("notifications", {}).get("cloudflare_detected", False):
+                        state.push_notification("cloudflare_detected", msg)
+                    _pause_event.set()
                     continue
 
-            try:
-                sched.tick(state, executor)
-
-                if state.drug_store_tab_active and _drug_store_task is not None:
-                    _drug_store_task.tick_drug_store(state)
-            except Exception as tick_err:
-                # Task code that talks to the browser outside executor.execute()
-                # has no recovery of its own — a dead driver here would otherwise
-                # end the whole run.
-                if not browser.is_lost_error(tick_err):
-                    raise
-                state.add_log(f"Browser lost during tick: {tick_err} — restarting browser.")
-                crash_report.capture("crash", tick_err, state, state.current_task or "tick")
-                if not _restart_browser(state, c):
-                    # Don't spin on a machine that can't launch Chrome right now.
-                    time.sleep(30)
-
-            # Refresh the earns list after a promotion (set by Promo Page / the
-            # top-job sniper). earn.asp isn't usable from jail or hospital, so
-            # it waits until the character is out.
-            if (state.earn_catalog_refresh_pending and state.logged_in
-                    and not state.in_jail and not state.in_hospital):
-                state.earn_catalog_refresh_pending = False
-                state.add_log("Promotion detected — refreshing earns list.")
-                executor.execute(Action("refresh_earn_catalog"), state)
-
-            if browser.should_restart_for_nav_failures():
-                state.add_log("Too many consecutive navigation failures — restarting browser.")
-                _restart_browser(state, c)
-            elif _scheduled_restart_due(state, c):
-                state.add_log(f"Browser has been running for {_restart_hours(c):g} hours — restarting "
-                              f"to free memory. ({crash_report.resource_summary()})")
-                # The side browsers are idle (checked above); close them too so
-                # their Chrome processes are recycled — they relaunch on next use.
-                side_browser.shutdown()
-                if not _restart_browser(state, c):
-                    time.sleep(30)
-
-            _scheduler_snapshot = sched.snapshot(state)
-
-            # Respect refresh requests from the Flask thread
-            if not _respect_refresh_queue.empty():
-                try:
-                    _respect_refresh_queue.get_nowait()
-                    executor.execute(Action("fetch_respect"), state)
-                except Exception as e:
-                    state.add_log(f"Respect refresh error: {e}")
-
-            # Manual WS-monitor check requests from the Flask thread
-            if not _ws_monitor_queue.empty():
-                try:
-                    item = _ws_monitor_queue.get_nowait()
-                    target = item if isinstance(item, str) else None
-                    executor.execute(Action("ws_monitor", target=target), state)
-                except Exception as e:
-                    state.add_log(f"WS monitor error: {e}")
-
-            # Profile fetch requests from the Flask thread
-            if not _profile_request.empty():
-                try:
-                    _profile_request.get_nowait()
-                    result_q = queue.Queue()
-                    executor.execute(Action("fetch_profile", result_queue=result_q), state)
-                    _profile_result.put(result_q.get(timeout=30))
-                except Exception as e:
-                    _profile_result.put(e)
-
-            # Game Settings sub-tab requests (fetch / save options, quit) from the Flask thread
-            if not _game_settings_request.empty():
-                try:
-                    kind, params = _game_settings_request.get_nowait()
-                    result_q = queue.Queue()
-                    executor.execute(Action(kind, result_queue=result_q, **params), state)
-                    _game_settings_result.put(result_q.get(timeout=30))
-                except Exception as e:
-                    _game_settings_result.put(e)
-
-            # Bulk-add laundering contacts if requested from UI
-            if not _bulk_launder_queue.empty():
-                try:
-                    item = _bulk_launder_queue.get_nowait()
-                    if isinstance(item, str):
-                        executor.execute(Action("add_launder_contact", username=item), state)
+                # Detect session expiry on every tick
+                if state.logged_in and browser.current_url().rstrip("/") == urls.BASE_URL + "/default.asp" and not browser.is_cloudflare_challenge():
+                    state.logged_in = False
+                    if c.get("misc", {}).get("relog_on_session_expire", True):
+                        msg = "Session expired — will re-login."
+                        state.add_log(msg)
+                        if c.get("notifications", {}).get("session_expired", False):
+                            state.push_notification("session_expired", msg)
                     else:
-                        executor.execute(Action("bulk_add_launder_contacts"), state)
-                except Exception as e:
-                    state.add_log(f"Bulk launder error: {e}")
+                        msg = "Session expired — re-login disabled, pausing."
+                        state.add_log(msg)
+                        if c.get("notifications", {}).get("session_expired", False):
+                            state.push_notification("session_expired", msg)
+                        state.relog_suppressed = True
+                        _pause_event.set()
 
-            # Manual auto-jail check if requested from UI
-            if not _auto_jail_check_queue.empty():
+
+                # Bar threads requests from the Flask thread
+                if not _bar_threads_request.empty():
+                    try:
+                        _bar_threads_request.get_nowait()
+                        _bar_threads_result.put(_fetch_bar_threads())
+                    except Exception as e:
+                        _bar_threads_result.put(e)
+
+                # Manual player-interaction requests from the Flask thread
+                if not _interact_request.empty():
+                    try:
+                        params = _interact_request.get_nowait()
+                        result_q = queue.Queue()
+                        executor.execute(Action("interact", result_queue=result_q, **params), state)
+                        _interact_result.put(result_q.get(timeout=90))
+                    except Exception as e:
+                        _interact_result.put(e)
+
+                # Profile-tab tasks (sales, apartment stash) from the Flask thread
+                if not _profile_task_request.empty():
+                    try:
+                        kind, params = _profile_task_request.get_nowait()
+                        result_q = queue.Queue()
+                        executor.execute(Action(kind, result_queue=result_q, **params), state)
+                        try:
+                            _profile_task_result.put(result_q.get(timeout=60))
+                        except queue.Empty:
+                            _profile_task_result.put(RuntimeError("The request failed — see the log."))
+                    except Exception as e:
+                        _profile_task_result.put(e)
+
+                # Drugs-tab tasks from the Flask thread — handed to the drug window,
+                # which replies straight to the waiting request.
+                while not _drug_task_request.empty():
+                    try:
+                        kind, params, reply_q = _drug_task_request.get_nowait()
+                    except queue.Empty:
+                        break
+                    try:
+                        drug_window.submit(state, Action(kind, **params), reply_q=reply_q)
+                    except Exception as e:
+                        reply_q.put({"ok": False, "message": f"Couldn't start the drug window: {e}"})
+
+                # Jail inmates requests from the Flask thread
+                if not _jail_inmates_request.empty():
+                    try:
+                        _jail_inmates_request.get_nowait()
+                        _jail_inmates_result.put(_fetch_jail_inmates())
+                    except Exception as e:
+                        _jail_inmates_result.put(e)
+
+                # Warrants check requests from the Flask thread
+                if not _warrants_request.empty():
+                    try:
+                        _warrants_request.get_nowait()
+                        result_q = queue.Queue()
+                        executor.execute(Action("check_warrants", result_queue=result_q), state)
+                        _warrants_result.put(result_q.get(timeout=30))
+                    except Exception as e:
+                        _warrants_result.put(e)
+
+                # Turn-in warrant requests
+                if not _turn_in_warrant_queue.empty():
+                    try:
+                        params = _turn_in_warrant_queue.get_nowait()
+                        executor.execute(Action("turn_in_warrant", **params), state)
+                    except Exception as e:
+                        state.add_log(f"Turn in warrant error: {e}")
+
+                # Travel requests — a manual travel request always wins; finish the
+                # crime tab first so it isn't left running against a stale city.
+                if not _travel_queue.empty():
+                    try:
+                        params = _travel_queue.get_nowait()
+                        if state.agg_tab_active and _agg_task is not None:
+                            _agg_task.stop_tab(state)
+                        executor.execute(Action("travel", **params), state)
+                    except Exception as e:
+                        state.add_log(f"Travel error: {e}")
+
+                # Resume deferred travel once the travel timer is free
                 try:
-                    _auto_jail_check_queue.get_nowait()
-                    if _auto_jail_task is not None:
-                        if _auto_jail_task.can_run(state):
-                            state.add_log("Auto Jail Time: manual check triggered.")
-                            _auto_jail_task.run(state, executor)
-                        else:
-                            state.add_log("Auto Jail Time: manual check skipped — conditions not met "
-                                          "(mode off, no partner, action timer busy, or no target).")
+                    from executor import get_deferred_travel, clear_deferred_travel
+                    _dt = get_deferred_travel()
+                    if _dt and state.timer_ready("travel"):
+                        clear_deferred_travel()
+                        state.add_log(f"Travel timer free — resuming deferred travel to {_dt['target_city']}.")
+                        _travel_queue.put(_dt)
                 except Exception as e:
-                    state.add_log(f"Auto Jail Time: manual check error: {e}")
+                    state.add_log(f"Deferred travel handler error: {e}")
 
-            # Clear earn queue if requested from UI
-            if _clear_earn_event.is_set():
-                _clear_earn_event.clear()
-                executor.execute(Action("clear_earn_queue"), state)
+                # Repair complete → resume deferred vehicle travel
+                if not _repair_complete_queue.empty():
+                    try:
+                        _repair_complete_queue.get_nowait()
+                        from executor import get_pending_vehicle_travel_target, clear_pending_vehicle_travel_target
+                        pending = get_pending_vehicle_travel_target()
+                        clear_pending_vehicle_travel_target()
+                        if pending:
+                            state.add_log(f"Repair complete — resuming deferred travel to {pending}.")
+                            _travel_queue.put({"target_city": pending, "method": "own_vehicle"})
+                    except Exception as e:
+                        state.add_log(f"Repair complete handler error: {e}")
 
-            # Clear jail duty queue if requested from UI
-            if _clear_jail_duty_queue_event.is_set():
-                _clear_jail_duty_queue_event.clear()
-                executor.execute(Action("clear_jail_duty_queue"), state)
+                # Navigate requests from the Flask thread
+                if not _navigate_queue.empty():
+                    try:
+                        params = _navigate_queue.get_nowait()
+                        executor.execute(Action("navigate", **params), state)
+                    except Exception as e:
+                        state.add_log(f"Navigate error: {e}")
 
-            # Run jail duties immediately (e.g. after switching from manual to auto)
-            if _run_jail_duties_event.is_set():
-                _run_jail_duties_event.clear()
-                duty = c.get("jail", {}).get("duty", "laundry")
-                executor.execute(Action("jail_duties", duty=duty), state)
+                # Manual skill use requests from the Flask thread
+                if not _skill_queue.empty():
+                    try:
+                        params = _skill_queue.get_nowait()
+                        action_kind = params.pop("_action_kind", "use_skill")
+                        executor.execute(Action(action_kind, **params), state)
+                    except Exception as e:
+                        state.add_log(f"Skill use error: {e}")
 
-            # Jailed notification — fires once when in_jail flips True
-            if state.in_jail and not _was_in_jail:
-                if c.get("notifications", {}).get("jailed", False):
-                    state.push_notification("jailed", "Bot went to jail.")
-            _was_in_jail = state.in_jail
+                # Travel destination fetch (for UI dropdowns)
+                if not _travel_dests_request.empty():
+                    try:
+                        method = _travel_dests_request.get_nowait()
+                        _travel_dests_result.put(_fetch_travel_dests(method, state.home_city))
+                    except Exception as e:
+                        _travel_dests_result.put(e)
 
-            # Payback after a successful crime
-            if getattr(state, "_last_crime_victim", None):
-                victim = state._last_crime_victim
-                amount = state._last_crime_amount
-                payback_mode_override = getattr(state, "_last_crime_payback_mode", None)
-                del state._last_crime_victim
-                del state._last_crime_amount
-                if hasattr(state, "_last_crime_payback_mode"):
-                    del state._last_crime_payback_mode
-                if _should_payback(victim, c, mode=payback_mode_override):
-                    executor.execute(Action("payback", amount=amount, target=victim), state)
+                if _stop_event.is_set():
+                    break
 
-            time.sleep(2)
+                # Reload config and rebuild scheduler if Save was pressed (debounced).
+                # Rebuilding replaces the AggCrimeTask instance, so finish any tab run
+                # first — otherwise its page/generator would be orphaned.
+                if _reload_event.is_set() and time.monotonic() - _reload_requested_at >= _RELOAD_DEBOUNCE:
+                    _reload_event.clear()
+                    if state.agg_tab_active and _agg_task is not None:
+                        _agg_task.stop_tab(state)
+                    c = cfg.load()
+                    sched = _build_scheduler(c, old_sched=sched)
+                    _sched = sched
+                    state.add_log("Config reloaded.")
+
+                # A failed relaunch leaves no browser; every task would then fail
+                # on it and end the run. Try again (with backoff) instead.
+                if not browser.is_running():
+                    state.add_log("Browser is not running — relaunching.")
+                    if not _restart_browser(state, c):
+                        _stop_event.wait(30)
+                    continue
+
+                # Game site not answering: tasks stay paused until the back-off
+                # ends, then a single probe load decides whether to resume.
+                if state.site_down_until:
+                    if time.time() < state.site_down_until:
+                        time.sleep(1)
+                        continue
+                    import executor as _ex
+                    if not _ex.probe_site(state):
+                        continue
+
+                try:
+                    sched.tick(state, executor)
+
+                    if state.drug_store_tab_active and _drug_store_task is not None:
+                        _drug_store_task.tick_drug_store(state)
+                except Exception as tick_err:
+                    # Task code that talks to the browser outside executor.execute()
+                    # has no recovery of its own — a dead driver here would otherwise
+                    # end the whole run.
+                    if not browser.is_lost_error(tick_err):
+                        raise
+                    state.add_log(f"Browser lost during tick: {tick_err} — restarting browser.")
+                    crash_report.capture("crash", tick_err, state, state.current_task or "tick")
+                    if not _restart_browser(state, c):
+                        # Don't spin on a machine that can't launch Chrome right now.
+                        time.sleep(30)
+
+                # Refresh the earns list after a promotion (set by Promo Page / the
+                # top-job sniper). earn.asp isn't usable from jail or hospital, so
+                # it waits until the character is out.
+                if (state.earn_catalog_refresh_pending and state.logged_in
+                        and not state.in_jail and not state.in_hospital):
+                    state.earn_catalog_refresh_pending = False
+                    state.add_log("Promotion detected — refreshing earns list.")
+                    executor.execute(Action("refresh_earn_catalog"), state)
+
+                if browser.should_restart_for_nav_failures():
+                    state.add_log("Too many consecutive navigation failures — restarting browser.")
+                    _restart_browser(state, c)
+                elif _scheduled_restart_due(state, c):
+                    state.add_log(f"Browser has been running for {_restart_hours(c):g} hours — restarting "
+                                  f"to free memory. ({crash_report.resource_summary()})")
+                    # The side browsers are idle (checked above); close them too so
+                    # their Chrome processes are recycled — they relaunch on next use.
+                    side_browser.shutdown()
+                    if not _restart_browser(state, c):
+                        time.sleep(30)
+
+                _scheduler_snapshot = sched.snapshot(state)
+
+                # Respect refresh requests from the Flask thread
+                if not _respect_refresh_queue.empty():
+                    try:
+                        _respect_refresh_queue.get_nowait()
+                        executor.execute(Action("fetch_respect"), state)
+                    except Exception as e:
+                        state.add_log(f"Respect refresh error: {e}")
+
+                # Manual WS-monitor check requests from the Flask thread
+                if not _ws_monitor_queue.empty():
+                    try:
+                        item = _ws_monitor_queue.get_nowait()
+                        target = item if isinstance(item, str) else None
+                        executor.execute(Action("ws_monitor", target=target), state)
+                    except Exception as e:
+                        state.add_log(f"WS monitor error: {e}")
+
+                # Profile fetch requests from the Flask thread
+                if not _profile_request.empty():
+                    try:
+                        _profile_request.get_nowait()
+                        result_q = queue.Queue()
+                        executor.execute(Action("fetch_profile", result_queue=result_q), state)
+                        _profile_result.put(result_q.get(timeout=30))
+                    except Exception as e:
+                        _profile_result.put(e)
+
+                # Game Settings sub-tab requests (fetch / save options, quit) from the Flask thread
+                if not _game_settings_request.empty():
+                    try:
+                        kind, params = _game_settings_request.get_nowait()
+                        result_q = queue.Queue()
+                        executor.execute(Action(kind, result_queue=result_q, **params), state)
+                        _game_settings_result.put(result_q.get(timeout=30))
+                    except Exception as e:
+                        _game_settings_result.put(e)
+
+                # Bulk-add laundering contacts if requested from UI
+                if not _bulk_launder_queue.empty():
+                    try:
+                        item = _bulk_launder_queue.get_nowait()
+                        if isinstance(item, str):
+                            executor.execute(Action("add_launder_contact", username=item), state)
+                        else:
+                            executor.execute(Action("bulk_add_launder_contacts"), state)
+                    except Exception as e:
+                        state.add_log(f"Bulk launder error: {e}")
+
+                # Manual auto-jail check if requested from UI
+                if not _auto_jail_check_queue.empty():
+                    try:
+                        _auto_jail_check_queue.get_nowait()
+                        if _auto_jail_task is not None:
+                            if _auto_jail_task.can_run(state):
+                                state.add_log("Auto Jail Time: manual check triggered.")
+                                _auto_jail_task.run(state, executor)
+                            else:
+                                state.add_log("Auto Jail Time: manual check skipped — conditions not met "
+                                              "(mode off, no partner, action timer busy, or no target).")
+                    except Exception as e:
+                        state.add_log(f"Auto Jail Time: manual check error: {e}")
+
+                # Clear earn queue if requested from UI
+                if _clear_earn_event.is_set():
+                    _clear_earn_event.clear()
+                    executor.execute(Action("clear_earn_queue"), state)
+
+                # Clear jail duty queue if requested from UI
+                if _clear_jail_duty_queue_event.is_set():
+                    _clear_jail_duty_queue_event.clear()
+                    executor.execute(Action("clear_jail_duty_queue"), state)
+
+                # Run jail duties immediately (e.g. after switching from manual to auto)
+                if _run_jail_duties_event.is_set():
+                    _run_jail_duties_event.clear()
+                    duty = c.get("jail", {}).get("duty", "laundry")
+                    executor.execute(Action("jail_duties", duty=duty), state)
+
+                # Jailed notification — fires once when in_jail flips True
+                if state.in_jail and not _was_in_jail:
+                    if c.get("notifications", {}).get("jailed", False):
+                        state.push_notification("jailed", "Bot went to jail.")
+                _was_in_jail = state.in_jail
+
+                # Payback after a successful crime
+                if getattr(state, "_last_crime_victim", None):
+                    victim = state._last_crime_victim
+                    amount = state._last_crime_amount
+                    payback_mode_override = getattr(state, "_last_crime_payback_mode", None)
+                    del state._last_crime_victim
+                    del state._last_crime_amount
+                    if hasattr(state, "_last_crime_payback_mode"):
+                        del state._last_crime_payback_mode
+                    if _should_payback(victim, c, mode=payback_mode_override):
+                        executor.execute(Action("payback", amount=amount, target=victim), state)
+
+                time.sleep(2)
+                _loop_errors = 0
+            except Exception as loop_err:
+                # Anything not handled above (a task helper, a UI request, a
+                # parse error) used to end the whole run. Log it, keep going,
+                # and only stop if every iteration keeps failing.
+                if browser.is_lost_error(loop_err):
+                    state.add_log(f"Browser lost: {loop_err} — restarting browser.")
+                    crash_report.capture("crash", loop_err, state, state.current_task or "loop")
+                    if not _restart_browser(state, c):
+                        _stop_event.wait(30)
+                    continue
+                _loop_errors += 1
+                first_line = (str(loop_err).strip().splitlines() or [type(loop_err).__name__])[0][:300]
+                state.add_log(f"Unexpected error ({_loop_errors} in a row): {first_line} — continuing.")
+                crash_report.capture("loop_error", loop_err, state, state.current_task or "loop")
+                if _loop_errors >= _MAX_LOOP_ERRORS:
+                    stop(f"{_loop_errors} errors in a row — last: {first_line}")
+                    break
+                _stop_event.wait(min(5 * _loop_errors, 60))
 
         state.add_log(f"Bot stopping: {_stop_reason or 'stop requested'}.")
     except Exception as e:
