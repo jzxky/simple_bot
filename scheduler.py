@@ -3,12 +3,52 @@ Priority-ordered task scheduler. Each tick, runs the first task whose
 can_run() returns True.
 """
 
+import time
+
 from tasks.base import Task
+
+# A task whose own code raises (a parse error, an unexpected page) is cooled
+# down instead of ending the run: 30s, then doubling, up to 30 min. A clean run
+# resets it.
+_ERROR_COOLDOWN_BASE = 30.0
+_ERROR_COOLDOWN_MAX = 30 * 60.0
+
+
+def _is_lost(err) -> bool:
+    try:
+        import browser
+        return browser.is_lost_error(err)
+    except Exception:
+        return False
 
 
 class Scheduler:
     def __init__(self):
         self._tasks: list[Task] = []
+        # id(task) -> (consecutive failures, cooled down until monotonic time)
+        self._errors: "dict[int, tuple[int, float]]" = {}
+
+    def _cooling(self, task) -> float:
+        """Seconds left on `task`'s error cooldown (0 when none)."""
+        _, until = self._errors.get(id(task), (0, 0.0))
+        return max(0.0, until - time.monotonic())
+
+    def _record_error(self, task, state, err, where: str):
+        """Log a task's own error and cool it down. A lost browser is re-raised
+        so the bot's restart path handles it."""
+        if _is_lost(err):
+            raise err
+        count = self._errors.get(id(task), (0, 0.0))[0] + 1
+        wait = min(_ERROR_COOLDOWN_BASE * (2 ** (count - 1)), _ERROR_COOLDOWN_MAX)
+        self._errors[id(task)] = (count, time.monotonic() + wait)
+        name = task.label or type(task).__name__
+        first_line = (str(err).strip().splitlines() or [type(err).__name__])[0][:300]
+        state.add_log(f"{name} failed ({where}): {first_line} — skipping it for {int(wait)}s.")
+        try:
+            import crash_report
+            crash_report.capture("task_error", err, state, f"{name} ({where})", with_page=False)
+        except Exception:
+            pass
 
     def add(self, task: Task):
         self._tasks.append(task)
@@ -24,10 +64,21 @@ class Scheduler:
                 continue
             if state.drug_tab_active and (task.changes_city or task.moves_cash):
                 continue
-            if task.can_run(state):
+            if self._cooling(task):
+                continue
+            try:
+                ready = task.can_run(state)
+            except Exception as e:
+                self._record_error(task, state, e, "check")
+                continue
+            if ready:
                 state.current_task = task.label or type(task).__name__
                 try:
                     task.run(state, executor)
+                except Exception as e:
+                    self._record_error(task, state, e, "run")
+                else:
+                    self._errors.pop(id(task), None)
                 finally:
                     state.current_task = ""
                 return
@@ -43,6 +94,9 @@ class Scheduler:
                 reasons.append("Crime tab active")
             if state.drug_tab_active and (task.changes_city or task.moves_cash):
                 reasons.append("Drug window busy")
+            cooling = self._cooling(task)
+            if cooling:
+                reasons.append(f"Error cooldown ({int(cooling)}s)")
             try:
                 reasons.extend(task.blocked_reasons(state))
             except Exception:

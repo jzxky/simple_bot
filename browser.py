@@ -110,12 +110,50 @@ def start(headless: bool = False):
     _playwright = sync_playwright().start()
     _context = launch_context(_playwright, PROFILE_DIR, headless)
     _page = _context.pages[0] if _context.pages else _context.new_page()
-    _watch_crashes(_page)
-    _context.on("page", _watch_crashes)
+    _prepare_page(_page)
+    _context.on("page", _prepare_page)
     global _nav_fail_count
     _nav_fail_count = 0
     _started_at = time.monotonic()
     print("[browser] Browser launched.")
+
+
+# page.content() raises "Unable to retrieve content because the page is
+# navigating and changing the content" when a redirect or a late script
+# navigation is still running. That is transient: wait for the new page and
+# read it again.
+_CONTENT_RETRIES = 3
+
+
+def _content_with_retry(pg: Page, orig):
+    for attempt in range(_CONTENT_RETRIES):
+        try:
+            return orig()
+        except Exception as e:
+            if attempt == _CONTENT_RETRIES - 1 or "is navigating" not in str(e):
+                raise
+            try:
+                pg.wait_for_load_state("domcontentloaded", timeout=10000)
+            except Exception:
+                time.sleep(0.5)
+
+
+def _patch_content(pg: Page):
+    """Make pg.content() retry while the page is mid-navigation, for every
+    caller (there are 100+ direct pg.content() calls)."""
+    if getattr(pg, "_bot_content_patched", False):
+        return
+    orig = pg.content
+    try:
+        pg.content = lambda: _content_with_retry(pg, orig)
+        pg._bot_content_patched = True
+    except Exception:
+        pass
+
+
+def _prepare_page(pg: Page):
+    _patch_content(pg)
+    _watch_crashes(pg)
 
 
 def _watch_crashes(pg: Page):
