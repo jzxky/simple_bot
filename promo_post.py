@@ -34,6 +34,13 @@ import urls
 _LOCK = threading.Lock()
 _PATH = os.path.join(paths.data_dir(), "promo_post_pending.json")
 _NAV_TIMEOUT = 20000
+_FORM_TIMEOUT = 5000     # the reply form is already loaded when it's filled in
+MAX_ATTEMPTS = 5         # attempts without ever finding the reply form before giving up
+
+
+class ReplyFormMissing(Exception):
+    """The thread's reply page has no reply box (wrong or locked thread, no
+    permission to post, or a page the game sent instead)."""
 
 
 # ---------------------------------------------------------------------------
@@ -167,9 +174,19 @@ def post_and_verify(pg, state) -> bool:
             state.add_log("Top job post: no forum thread set — dropping the pending post.")
             clear()
             return True
+        msg = message(p)
+        # Only a missing reply box (recorded in last_error) counts towards
+        # giving up; page errors such as the site being down keep retrying.
+        if (int(p.get("attempts", 0)) >= MAX_ATTEMPTS and int(p.get("submits", 0)) == 0
+                and p.get("last_error")):
+            why = p["last_error"]
+            state.add_log(f"Top job post: giving up after {p['attempts']} attempts — {why}. "
+                          f"Post \"{msg}\" in thread {tid} yourself.")
+            _note(state, f"Top job post NOT made after {p['attempts']} attempts ({why}): {msg}")
+            clear()
+            return True
         p["attempts"] = int(p.get("attempts", 0)) + 1
         _save(p)
-        msg = message(p)
 
         # A retry after an error: the earlier attempt may have posted already.
         before = is_posted(pg, p, tid)
@@ -185,11 +202,25 @@ def post_and_verify(pg, state) -> bool:
             clear()
             return True
 
-        # recent_posts() left the page on the reply form.
-        pg.fill("textarea#body", msg)
+        # recent_posts() left the page on the reply form. Check it's really
+        # there before filling it in: without this, a page with no reply box
+        # makes fill() wait 30s on every retry.
+        if pg.query_selector("textarea#body") is None:
+            title = ""
+            try:
+                title = (pg.title() or "").strip()
+            except Exception:
+                pass
+            why = (f"no reply box on the thread's reply page ({pg.url}"
+                   + (f", \"{title}\"" if title else "") + ") — check the Top Job Thread ID")
+            p["last_error"] = why
+            _save(p)
+            raise ReplyFormMissing(f"Top job post: {why} "
+                                   f"(attempt {p['attempts']} of {MAX_ATTEMPTS}).")
+        pg.fill("textarea#body", msg, timeout=_FORM_TIMEOUT)
         p["submits"] = int(p.get("submits", 0)) + 1
         _save(p)
-        pg.click("input[name='Submit']")
+        pg.click("input[name='Submit']", timeout=_FORM_TIMEOUT)
         pg.wait_for_load_state("domcontentloaded", timeout=_NAV_TIMEOUT)
 
         after = is_posted(pg, p, tid)
