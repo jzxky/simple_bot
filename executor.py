@@ -8235,7 +8235,14 @@ def handle_ws_monitor(action: Action, state: GameState):
     if state.server_time is not None:
         war_mode.set_server_now(state.server_time)
     target = (action.params.get("target") or "").strip()
-    if server_mode:
+    # Names handed out by the hub (war_hub_tasks): check those, and hand the
+    # readings back through result_queue instead of reporting them here.
+    hub_names = action.params.get("names")
+    result_queue = action.params.get("result_queue")
+    if hub_names:
+        server_mode = True
+        pairs = [("", n) for n in hub_names]
+    elif server_mode:
         pairs = war_mode.all_names_from_hub()
     else:
         pairs = war_mode.all_names()
@@ -8276,9 +8283,11 @@ def handle_ws_monitor(action: Action, state: GameState):
             hub_records.append(record)
         except Exception as e:
             state.add_log(f"WS monitor: error checking {name}: {e}")
-    if hub_records:
+    if result_queue is not None:
+        result_queue.put({"type": "ws", "names": [n for _, n in pairs], "records": hub_records})
+    elif hub_records:
         war_hub_client.report_ws(hub_records)
-    if checked and state.current_city:
+    if checked and state.current_city and result_queue is None:
         try:
             online = list(state.local_players)
             war_hub_client.report_online(state.current_city, online)
@@ -8321,7 +8330,11 @@ def handle_scrape_businesses(action: Action, state: GameState):
             "available": available,
             "status": status,
         })
-    if businesses and state.current_city:
+    result_queue = action.params.get("result_queue")
+    if result_queue is not None and state.current_city:
+        result_queue.put({"type": "businesses", "city": state.current_city, "businesses": businesses})
+        state.add_log(f"Business scrape: {len(businesses)} businesses in {state.current_city}.")
+    elif businesses and state.current_city:
         war_hub_client.report_businesses(businesses)
         state.add_log(f"Business scrape: {len(businesses)} businesses in {state.current_city}.")
     _nav(_u("/main.asp"), state)
@@ -8519,7 +8532,11 @@ def handle_check_jail(action: Action, state: GameState):
         if name:
             inmates.append(name)
     city = state.current_city or ""
-    if city:
+    result_queue = action.params.get("result_queue")
+    if city and result_queue is not None:
+        result_queue.put({"type": "jail", "city": city, "inmates": inmates})
+        state.add_log(f"Jail check: {len(inmates)} inmate(s) in {city}.")
+    elif city:
         war_hub_client.report_jail(city, inmates)
         state.add_log(f"Jail check: {len(inmates)} inmate(s) in {city}.")
     _nav(_u("/main.asp"), state)

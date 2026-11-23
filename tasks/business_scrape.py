@@ -8,6 +8,7 @@ data to the Player Hub.
 import time
 
 import config as cfg
+import war_hub_tasks
 from tasks.base import Task, Action
 from state import GameState
 
@@ -25,6 +26,8 @@ class BusinessScrapeTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         wm = cfg.load().get("war_mode", {})
+        if war_hub_tasks.server_mode() and war_hub_tasks.hub_drives():
+            return False  # the hub hands out these checks (tasks/war_hub_checks.py)
         if not wm.get("enabled", False):
             return False
         if not state.logged_in:

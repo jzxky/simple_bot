@@ -8,6 +8,7 @@ Uses the same jail page parsing as the offline jailbreak target checker.
 import time
 
 import config as cfg
+import war_hub_tasks
 from tasks.base import Task, Action
 from state import GameState
 
@@ -32,6 +33,8 @@ class JailCheckTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         wm = cfg.load().get("war_mode", {})
+        if war_hub_tasks.hub_drives():
+            return False  # the hub hands out these checks (tasks/war_hub_checks.py)
         if not wm.get("enabled", False):
             return False
         if not wm.get("checking_enabled", False):
