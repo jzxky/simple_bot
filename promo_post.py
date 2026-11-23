@@ -125,22 +125,21 @@ def _reply_url(tid: str) -> str:
     return urls.BASE_URL + f"/forum/postreply.asp?t={tid}"
 
 
-# The reply page lists the thread's last 5 posts under #post_list: one
-# tr.alias per post, author link in the first cell, text in #bodytext.
+# The reply page lists the thread's last 5 posts under #post_list. The check
+# reads the list's whole text rather than picking rows apart: the per-row
+# match (author link + #bodytext in each tr.alias) reported a post that was in
+# the thread as missing. The message itself names the character and the
+# promotion time, so finding it anywhere in the list is enough. When it still
+# isn't found, the page is saved to logs/top_job_post_check.html.
 _RECENT_POSTS_JS = """() => {
   const list = document.querySelector('#post_list');
-  if (!list) return null;
-  return Array.from(list.querySelectorAll('tr.alias')).map(tr => {
-    const a = tr.querySelector('td a');
-    const body = tr.querySelector('#bodytext, .bodytext');
-    return {author: a ? a.textContent : '', body: body ? body.textContent : ''};
-  });
+  return list ? list.innerText : null;
 }"""
 
 
-def recent_posts(pg, tid: str) -> "list | None":
-    """The last 5 posts listed on the thread's reply page, or None if the list
-    isn't on the page."""
+def recent_posts_text(pg, tid: str) -> "str | None":
+    """The text of the last 5 posts listed on the thread's reply page, or None
+    if the list isn't on the page."""
     _goto(pg, _reply_url(tid))
     try:
         return pg.evaluate(_RECENT_POSTS_JS)
@@ -149,15 +148,26 @@ def recent_posts(pg, tid: str) -> "list | None":
 
 
 def is_posted(pg, p: dict, tid: str) -> "bool | None":
-    """True if the post is in the reply page's last-5 list (by this character,
-    with this text), False if it isn't, None if the list couldn't be read."""
-    posts = recent_posts(pg, tid)
-    if posts is None:
+    """True if the post is in the reply page's last-5 list, False if it isn't,
+    None if the list couldn't be read."""
+    text = recent_posts_text(pg, tid)
+    if text is None:
         return None
-    msg = _norm(message(p))
-    who = _norm(p.get("character", ""))
-    return any(msg in _norm(x.get("body")) and (not who or _norm(x.get("author")) == who)
-               for x in posts)
+    return _norm(message(p)) in _norm(text)
+
+
+def _save_check_page(pg, state):
+    """Keep the reply page a failed check read, for troubleshooting."""
+    try:
+        folder = os.path.join(paths.data_dir(), "logs")
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, "top_job_post_check.html")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(pg.content())
+        state.add_log(f"Top job post: saved the page it checked to "
+                      f"{os.path.relpath(path, paths.data_dir())}.")
+    except Exception:
+        pass
 
 
 def post_and_verify(pg, state) -> bool:
@@ -233,6 +243,7 @@ def post_and_verify(pg, state) -> bool:
             _note(state, f"Top job post NOT confirmed (couldn't read the thread): {msg}")
         else:
             state.add_log(f"Top job post: submitted \"{msg}\" but it's not in the thread's last 5 posts.")
+            _save_check_page(pg, state)
             _note(state, f"Top job post NOT found in the thread: {msg}")
         return True
 

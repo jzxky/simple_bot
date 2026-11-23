@@ -133,8 +133,7 @@ DEFAULT_CONFIG = {
     },
     "players": {
         "enabled": True,
-        "refresh_interval_minutes": 30,
-        "whitelist_bolds": True
+        "refresh_interval_minutes": 30
     },
     "gym": {
         "enabled": False,
@@ -344,6 +343,7 @@ DEFAULT_CONFIG = {
         "mhs_protected":       True,
         "warrants_outstanding": True,
         "agg_not_available":   True,
+        "agg_missing_item":    True,
         "dog_trains_unavailable": False,
         "new_message":         False,
         "no_available_earns":  True,

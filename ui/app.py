@@ -47,6 +47,7 @@ NOTIFICATION_EVENTS = [
     ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
     ("drug_stock_travel_block", "Carrying drug house stock (travel blocked)"),
     ("agg_not_available",   "Agg crime not available"),
+    ("agg_missing_item",    "Agg crime needs an item (switched to pickpocket)"),
     ("dog_trains_unavailable", "Dog trains unavailable"),
     ("no_available_earns",  "No available earns (earn planner)"),
     ("earn_crime_blocked",  "Earns blocked by high city crime"),
@@ -59,7 +60,7 @@ NOTIFICATION_STORE_KINDS = [("In stock", "in_stock"), ("Bought", "purchased"), (
 NOTIFICATION_GROUPS = [
     ("Career",         ["promotion_success", "auto_promo", "promo_forum_post"]),
     ("Account & jail", ["session_expired", "jailed", "warrants_outstanding", "mhs_protected"]),
-    ("Crimes & earns", ["targets_exhausted", "agg_not_available", "dog_trains_unavailable", "no_available_earns", "earn_crime_blocked"]),
+    ("Crimes & earns", ["targets_exhausted", "agg_not_available", "agg_missing_item", "dog_trains_unavailable", "no_available_earns", "earn_crime_blocked"]),
 ]
 
 
@@ -471,7 +472,6 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c.setdefault("players", {})
     c["players"]["enabled"] = data.get("player_list_enabled", True)
     c["players"]["refresh_interval_minutes"] = int(data.get("player_refresh_interval", 30))
-    c["players"]["whitelist_bolds"] = data.get("player_whitelist_bolds", True)
 
     c.setdefault("consumables", {})
     c["consumables"]["timer_limit"] = data.get("consume_timer_limit", "00:00")
@@ -866,13 +866,13 @@ def start():
     return jsonify({"running": True, "paused": False})
 
 
-@app.route("/stop", methods=["POST"])
 def _who() -> str:
     if _is_remote():
         return f"via Player Hub ({request.environ.get(remote_control.REMOTE_ENVIRON_KEY) or 'hub'})"
     return "from the control panel"
 
 
+@app.route("/stop", methods=["POST"])
 def stop():
     bot.stop(f"Stop {_who()}")
     return jsonify({"running": False, "paused": False})
@@ -1570,6 +1570,27 @@ def _drug_task(kind: str, **params):
         return jsonify({"ok": False, "message": str(e) or "The request failed — see the log."}), 500
 
 
+@app.route("/agg/hack-blacklist/remove", methods=["POST"])
+def hack_blacklist_remove():
+    name = ((request.get_json(silent=True) or {}).get("name") or "").strip().lower()
+    c = cfg.load()
+    agg = c.setdefault("aggravated_crimes", {})
+    bl = [n for n in agg.get("hack_blacklist", []) if n.lower() != name]
+    agg["hack_blacklist"] = bl
+    cfg.save(c)
+    return jsonify({"ok": True, "count": len(bl)})
+
+
+@app.route("/earns/refresh-catalog", methods=["POST"])
+def earns_refresh_catalog():
+    """Re-read earn.asp into the earn catalogue on the bot thread's next loop
+    (waits while the character is in jail or hospital)."""
+    if not bot.is_running() or bot.state is None:
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    bot.state.earn_catalog_refresh_pending = True
+    return jsonify({"ok": True, "message": "Refreshing the earns list…"})
+
+
 @app.route("/drugs/players")
 def drugs_players():
     """Customer and customs-official lists for the Drugs tab (living players, not us)."""
@@ -1595,6 +1616,8 @@ def drugs_players():
         # Dealing ranks a drug-house rank can take on as contacts, minus existing contacts.
         "dealers": names(lambda p: norm_rank(p.get("rank")) in MIDDLING_RANKS
                          and p["username"].lower() not in contacts),
+        # Shown beside names in the Smuggling and Add Drug Contact pickers.
+        "home_cities": {p["username"].lower(): p.get("homecity") or "" for p in alive if p.get("homecity")},
     })
 
 
@@ -1727,7 +1750,30 @@ def drugs_house_prices():
     link = ((request.get_json(silent=True) or {}).get("link") or "").strip()
     if not _CONTACT_PRICES_LINK_RE.fullmatch(link):
         return jsonify({"ok": False, "message": "Unknown contact — reload contacts."}), 400
-    return _drug_task("load_contact_prices", link=link)
+    return _drug_task_saving_ranges("load_contact_prices", link=link)
+
+
+def _drug_task_saving_ranges(kind: str, **params):
+    """A contact-prices drug task whose reply lists each drug's allowed range:
+    keep the ranges so Default Prices can show them."""
+    if not bot.is_running():
+        return jsonify({"ok": False, "message": "Bot must be running."}), 400
+    try:
+        res = bot.request_drug_task(kind, **params)
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e) or "The request failed — see the log."}), 500
+    try:
+        ranges = {r["key"]: [int(r["min"]), int(r["max"])] for r in (res.get("prices") or [])
+                  if r.get("key") and r.get("max")}
+        if ranges:
+            c = cfg.load()
+            dh = c.setdefault("drug_house", {})
+            if dh.get("price_ranges") != {**dh.get("price_ranges", {}), **ranges}:
+                dh["price_ranges"] = {**dh.get("price_ranges", {}), **ranges}
+                cfg.save(c)
+    except Exception:
+        pass
+    return jsonify(res)
 
 
 @app.route("/drugs/house/set-prices", methods=["POST"])
@@ -2718,24 +2764,6 @@ def api_players_by_group(group_name):
     return jsonify({"players": _db.get_players_by_group(group_name)})
 
 
-@app.route("/players/whitelist_bolds", methods=["POST"])
-def players_whitelist_bolds():
-    locked = _hub_locked_response()
-    if locked:
-        return locked
-    import player_db as _db
-    BOLD_RANKS = {"Boss", "Don", "Godfather", "Capo di tutti capi"}
-    all_players = _db.get_all_players()
-    targets = [p["username"] for p in all_players if p.get("rank", "") in BOLD_RANKS]
-    already = {p["username"] for p in all_players if p.get("agg_crimes") == "whitelist"}
-    newly = [u for u in targets if u not in already]
-    if targets:
-        _db.bulk_set_assignment(targets, "agg_crimes", "whitelist")
-    if newly:
-        bot.state.add_log(f"Whitelist bolds: {len(newly)} new — {', '.join(newly)}")
-    return jsonify({"ok": True, "count": len(targets), "newly": len(newly), "players": targets})
-
-
 @app.route("/players/set_group", methods=["POST"])
 def players_set_group():
     locked = _hub_locked_response()
@@ -2812,6 +2840,7 @@ def restart():
     import sys
     import threading as _threading
     reason = f"Restart {_who()}"
+    was_running = bot.is_running()
 
     def _do_restart():
         import time as _time
@@ -2822,7 +2851,9 @@ def restart():
             print("[restart] Bot thread did not stop within 60s — restarting anyway.")
         _time.sleep(0.5)
         # --noui: the open tab reloads itself once the server is back.
-        argv = [sys.executable] + [a for a in sys.argv if a != "--noui"] + ["--noui"]
+        # --start-bot: the bot was running, so the restarted one starts it again.
+        argv = ([sys.executable] + [a for a in sys.argv if a not in ("--noui", "--start-bot")]
+                + ["--noui"] + (["--start-bot"] if was_running else []))
         if sys.platform == "win32":
             import subprocess as _sp
             _sp.Popen(argv)
@@ -2862,8 +2893,8 @@ def check_update():
 def apply_update():
     if not _is_git_repo():
         return jsonify({"error": "Not a git repository."}), 400
-    if bot.is_running():
-        return jsonify({"error": "Stop the bot before applying an update."}), 400
+    # Pulling while the bot runs is fine: the running code is already loaded.
+    # The new code takes over at the restart, which starts the bot again.
     # Older versions wrote the tracked available_earns.json at runtime; once
     # its contents live in earn_catalog.json, restore the seed so the dirty
     # file doesn't block the pull.
@@ -2916,9 +2947,28 @@ def load_plugins():
     return loaded
 
 
+def _start_after_restart():
+    try:
+        if not bot.is_running() and _cfg_credentials_ok():
+            bot.start()
+    except Exception as e:
+        print(f"[restart] Could not start the bot again: {e}")
+
+
+def _cfg_credentials_ok() -> bool:
+    try:
+        return cfg.credentials_present()
+    except Exception:
+        return True
+
+
 def run():
     import config as _cfg
     port = int(_cfg.get_env_var("UI_PORT", "8080"))
     load_plugins()
     remote_control.start()
+    if "--start-bot" in sys.argv:
+        # Restarted (e.g. after an update) while the bot was running: start it again.
+        import threading as _threading
+        _threading.Timer(2.0, _start_after_restart).start()
     app.run(host="0.0.0.0", port=port, debug=False)

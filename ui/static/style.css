@@ -94,6 +94,7 @@ header h1 {
 /* Status card title: "STATUS · Name" — the section name matches the other
    cards, the character name keeps its own capitalisation. */
 #stat-name { text-transform: none; letter-spacing: normal; }
+.header-char-name { font-weight: 400; opacity: 0.75; }
 
 .card h3 {
   font-size: 12px;
@@ -2339,3 +2340,7 @@ body.setup-open { overflow: hidden; }
 /* Run Middle Command: runner/buyer autocomplete (same look as Transfer Money) */
 .mid-name { position: relative; flex: 1 1 200px; max-width: 320px; }
 .mid-name .sell-ac { top: calc(100% + 2px); }
+
+/* Drugs tab: contact stock / contact prices open inline under their contact list */
+.drug-inline-panel { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface2); }
+.drug-inline-panel h4 { margin-top: 0; }

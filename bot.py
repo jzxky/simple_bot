@@ -750,7 +750,7 @@ def _run(c: dict):
                 if (state.earn_catalog_refresh_pending and state.logged_in
                         and not state.in_jail and not state.in_hospital):
                     state.earn_catalog_refresh_pending = False
-                    state.add_log("Promotion detected — refreshing earns list.")
+                    state.add_log("Refreshing the earns list.")
                     executor.execute(Action("refresh_earn_catalog"), state)
 
                 if browser.should_restart_for_nav_failures():
