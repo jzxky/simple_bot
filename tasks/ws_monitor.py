@@ -9,6 +9,7 @@ value marks the character as whacked (handled in war_mode.record_ws).
 import time
 
 import config as cfg
+import war_hub_tasks
 import war_mode
 from tasks.base import Task, Action
 from state import GameState
@@ -43,6 +44,8 @@ class WSMonitorTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         wm = cfg.load().get("war_mode", {})
+        if war_hub_tasks.server_mode() and war_hub_tasks.hub_drives():
+            return False  # the hub hands out these checks (tasks/war_hub_checks.py)
         if not wm.get("enabled", False):
             return False
         if not wm.get("checking_enabled", False):

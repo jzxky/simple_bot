@@ -186,3 +186,32 @@ def fetch_black_market(city: str = "", max_age_seconds: "int | None" = None) -> 
     except Exception as e:
         log.warning("war_hub: fetch_black_market failed: %s", e)
         return None
+
+
+class HubTooOld(Exception):
+    """The hub doesn't hand out war checks yet (no /api/sync/war/tasks)."""
+
+
+def poll_tasks(city: str) -> dict:
+    """Ask the hub which war checks to do now.
+
+    Returns {"poll_seconds": int, "tasks": [{"type": ..., ...}]}. Raises
+    HubTooOld when the hub predates hub-driven checks, and other exceptions
+    on network errors."""
+    try:
+        return _post("/api/sync/war/tasks", {"city": city or ""})
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 405):
+            raise HubTooOld() from e
+        raise
+
+
+def send_task_result(result: dict) -> bool:
+    """Send one war check's readings back to the hub."""
+    if not is_configured() or not result:
+        return False
+    try:
+        return bool(_post("/api/sync/war/tasks/result", result).get("ok", False))
+    except Exception as e:
+        log.warning("war_hub: send_task_result (%s) failed: %s", result.get("type"), e)
+        return False

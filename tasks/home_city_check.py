@@ -10,6 +10,7 @@ populated by the scrape_players flow.
 import time
 
 import config as cfg
+import war_hub_tasks
 from tasks.base import Task
 from state import GameState
 
@@ -34,6 +35,8 @@ class HomeCityCheckTask(Task):
 
     def can_run(self, state: GameState) -> bool:
         wm = cfg.load().get("war_mode", {})
+        if war_hub_tasks.hub_drives():
+            return False  # the hub hands out these checks (tasks/war_hub_checks.py)
         if not wm.get("enabled", False):
             return False
         if not wm.get("checking_enabled", False):
