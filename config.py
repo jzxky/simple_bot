@@ -344,6 +344,7 @@ DEFAULT_CONFIG = {
         "mhs_protected":       True,
         "warrants_outstanding": True,
         "agg_not_available":   True,
+        "agg_missing_item":    True,
         "dog_trains_unavailable": False,
         "new_message":         False,
         "no_available_earns":  True,

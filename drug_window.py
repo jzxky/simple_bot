@@ -27,6 +27,7 @@ cookies). The job runs on the lane's worker thread and only touches its own tab.
 
 import copy
 import threading
+import time
 import browser
 import side_browser
 import config as cfg
@@ -51,6 +52,11 @@ _TIMER_FIELDS = ("timers", "action_timer_ready", "action_timer_end", "agg_pro_ac
 
 _lock = threading.Lock()
 _in_flight = 0
+# When a job last found the drug window logged out. Jobs queued before then
+# carry the same (stale) cookies and would only fail the same way, one
+# "Session expired" line each — they're skipped instead. Jobs submitted
+# later bring fresh cookies from the main browser.
+_logged_out_at = 0.0
 
 
 class _Reply:
@@ -99,11 +105,12 @@ def submit(state, action, reply_q=None) -> "side_browser.Job":
         reply = _Reply(reply_q)
         action.params["result_queue"] = reply
     _set_flags(state, +1)
+    submitted_at = time.time()
     headless = cfg.load().get("misc", {}).get("headless", False)
     try:
         return side_browser.submit(
             LANE, action.kind,
-            lambda side, job: _run_job(side, job, state, action, reply),
+            lambda side, job: _run_job(side, job, state, action, reply, submitted_at),
             cookies=browser.export_cookies(), headless=headless,
         )
     except Exception:
@@ -129,10 +136,18 @@ def _merge_back(state, shadow, before: dict):
             setattr(state, f, getattr(shadow, f))
 
 
-def _run_job(side, job, state, action, reply):
+def _run_job(side, job, state, action, reply, submitted_at=None):
     """Worker thread."""
+    global _logged_out_at
     import executor
     label = _label(action.kind)
+    if submitted_at is not None and submitted_at <= _logged_out_at:
+        try:
+            if reply is not None:
+                reply.put({"ok": False, "message": "The drug window was logged out — try again."})
+        finally:
+            _set_flags(state, -1)
+        return
     shadow = _shadow_state(state)
     before = {f: getattr(shadow, f) for f in _MERGE_FIELDS + _TIMER_FIELDS}
     pg = None
@@ -152,6 +167,12 @@ def _run_job(side, job, state, action, reply):
     finally:
         if pg is not None:
             side.close_page(pg)
+        if not shadow.logged_in and state.logged_in:
+            _logged_out_at = time.time()
+            queued = side_browser.queued(LANE)
+            if queued:
+                state.add_log(f"[Drug window] Logged out — skipping the {queued} drug "
+                              f"job(s) queued behind this one.")
         try:
             _merge_back(state, shadow, before)
         finally:

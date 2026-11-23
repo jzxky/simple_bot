@@ -33,6 +33,14 @@ from state import GameState
 HACK_CRIME = "hack"
 COOLDOWN_SECONDS = 180
 
+# A crime the character lacks the item for ("You need a Pistol to commit a
+# Mugging!") is swapped for pickpocket, then tried again after this long.
+FALLBACK_CRIME = "pickpocket"
+MISSING_ITEM_RETRY_SECONDS = 3600
+# Module level so a scheduler rebuild (config save) doesn't forget it.
+_missing_item_until: "dict[str, float]" = {}   # crime -> monotonic retry time
+_missing_item_notified: "set[str]" = set()     # crimes already notified about
+
 
 class AggCrimeTask(Task):
     priority = 50
@@ -80,6 +88,13 @@ class AggCrimeTask(Task):
         return False
 
     def _pick_crime(self, state: GameState):
+        crime, threshold = self._pick_configured_crime(state)
+        if (crime and crime != FALLBACK_CRIME
+                and time.monotonic() < _missing_item_until.get(crime, 0)):
+            return FALLBACK_CRIME, threshold
+        return crime, threshold
+
+    def _pick_configured_crime(self, state: GameState):
         if self.primary_crime == HACK_CRIME:
             if not state.in_home_city():
                 if self.away_crime and state.energy >= self.away_threshold:
@@ -180,13 +195,14 @@ class AggCrimeTask(Task):
         else:
             executor.execute(Action("do_crime", crime=crime, threshold=threshold), state)
 
-        self._handle_post_run(state)
+        self._handle_post_run(state, crime)
 
-    def _handle_post_run(self, state: GameState):
+    def _handle_post_run(self, state: GameState, crime: str = ""):
         """Shared by both the inline path (called right after the crime action
         completes) and the separate-tab path (called once its generator ends) —
         applies the exhaustion cooldown / hack-fallback bookkeeping identically
         either way."""
+        self._handle_missing_item(state, crime)
         if getattr(state, "_agg_targets_exhausted", False):
             state._agg_targets_exhausted = False
 
@@ -210,6 +226,30 @@ class AggCrimeTask(Task):
                     state.push_notification("targets_exhausted", msg)
         elif self._hack_exhausted:
             self._hack_exhausted = False
+
+    def _handle_missing_item(self, state: GameState, ran_crime: str = ""):
+        """The run stopped on "You need a <item> to commit a <crime>!": run
+        pickpocket instead for MISSING_ITEM_RETRY_SECONDS, and notify once."""
+        missing = getattr(state, "_agg_missing_item", None)
+        state._agg_missing_item = None
+        if not missing:
+            if ran_crime:
+                # Ran without the error — the item turned up; notify again next time.
+                _missing_item_notified.discard(ran_crime)
+            return
+        crime, msg = missing
+        if crime == FALLBACK_CRIME:
+            return
+        _missing_item_until[crime] = time.monotonic() + MISSING_ITEM_RETRY_SECONDS
+        mins = MISSING_ITEM_RETRY_SECONDS // 60
+        state.add_log(f"Agg Crimes: {msg} — doing {FALLBACK_CRIME} instead, "
+                      f"trying {crime} again in {mins} min.")
+        if crime not in _missing_item_notified:
+            _missing_item_notified.add(crime)
+            import executor
+            executor._notify(state, "agg_missing_item",
+                             f"Can't do {crime}: \"{msg}\" Switched to {FALLBACK_CRIME} "
+                             f"and will try {crime} again every {mins} min.")
 
     # ------------------------------------------------------------------
     # Separate-tab mode
@@ -288,7 +328,8 @@ class AggCrimeTask(Task):
         shadow.add_log = lambda msg: state.add_log(f"[Side] {msg}")
         shadow.push_notification = state.push_notification
         for attr in ("_last_crime_victim", "_last_crime_amount",
-                     "_last_crime_payback_mode", "_agg_targets_exhausted"):
+                     "_last_crime_payback_mode", "_agg_targets_exhausted",
+                     "_agg_missing_item"):
             shadow.__dict__.pop(attr, None)
         return shadow
 
@@ -309,6 +350,8 @@ class AggCrimeTask(Task):
             state.agg_pro_end = shadow.agg_pro_end
         if getattr(shadow, "_agg_targets_exhausted", False):
             state._agg_targets_exhausted = True
+        if getattr(shadow, "_agg_missing_item", None):
+            state._agg_missing_item = shadow._agg_missing_item
         if getattr(shadow, "_last_crime_victim", None):
             # The main loop pays back as soon as it sees _last_crime_victim, so
             # set the amount (and mode) first.
@@ -363,7 +406,7 @@ class AggCrimeTask(Task):
             try:
                 self._merge_back(state, shadow, fails_before)
                 if finished:
-                    self._handle_post_run(state)
+                    self._handle_post_run(state, crime)
             finally:
                 # Last, so the scheduler can't relaunch before the cooldown is set.
                 state.agg_tab_active = False

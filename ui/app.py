@@ -47,6 +47,7 @@ NOTIFICATION_EVENTS = [
     ("warrants_outstanding", "Outstanding warrants (travel blocked)"),
     ("drug_stock_travel_block", "Carrying drug house stock (travel blocked)"),
     ("agg_not_available",   "Agg crime not available"),
+    ("agg_missing_item",    "Agg crime needs an item (switched to pickpocket)"),
     ("dog_trains_unavailable", "Dog trains unavailable"),
     ("no_available_earns",  "No available earns (earn planner)"),
     ("earn_crime_blocked",  "Earns blocked by high city crime"),
@@ -59,7 +60,7 @@ NOTIFICATION_STORE_KINDS = [("In stock", "in_stock"), ("Bought", "purchased"), (
 NOTIFICATION_GROUPS = [
     ("Career",         ["promotion_success", "auto_promo", "promo_forum_post"]),
     ("Account & jail", ["session_expired", "jailed", "warrants_outstanding", "mhs_protected"]),
-    ("Crimes & earns", ["targets_exhausted", "agg_not_available", "dog_trains_unavailable", "no_available_earns", "earn_crime_blocked"]),
+    ("Crimes & earns", ["targets_exhausted", "agg_not_available", "agg_missing_item", "dog_trains_unavailable", "no_available_earns", "earn_crime_blocked"]),
 ]
 
 
@@ -1568,6 +1569,17 @@ def _drug_task(kind: str, **params):
         return jsonify(bot.request_drug_task(kind, **params))
     except Exception as e:
         return jsonify({"ok": False, "message": str(e) or "The request failed — see the log."}), 500
+
+
+@app.route("/agg/hack-blacklist/remove", methods=["POST"])
+def hack_blacklist_remove():
+    name = ((request.get_json(silent=True) or {}).get("name") or "").strip().lower()
+    c = cfg.load()
+    agg = c.setdefault("aggravated_crimes", {})
+    bl = [n for n in agg.get("hack_blacklist", []) if n.lower() != name]
+    agg["hack_blacklist"] = bl
+    cfg.save(c)
+    return jsonify({"ok": True, "count": len(bl)})
 
 
 @app.route("/drugs/players")

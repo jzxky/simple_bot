@@ -197,6 +197,8 @@ _JAIL_RADIO_VALUE = {
 }
 
 ONLINE_CRIMES = {"pickpocket", "mugging"}
+# Fail text when the character lacks the item a crime needs ("You need a Pistol to commit a Mugging!").
+_MISSING_ITEM_RE = re.compile(r"\byou need an? .+? to commit\b", re.I)
 RESIDENT_CRIMES = {"hack", "breaking"}
 
 # Typeahead writable input (not the readonly tt-hint shadow field)
@@ -1153,6 +1155,27 @@ def _young_target_limit(crime: str) -> float:
     return hours * 60 if hours > 0 else 0
 
 
+def _hack_blacklist() -> set:
+    """Players never hacked again: their account had no money (lower-case names)."""
+    return {n.lower() for n in cfg.load().get("aggravated_crimes", {}).get("hack_blacklist", [])}
+
+
+def _hack_blacklist_add(name: str):
+    c = cfg.load()
+    bl = c.setdefault("aggravated_crimes", {}).setdefault("hack_blacklist", [])
+    if name.lower() not in {n.lower() for n in bl}:
+        bl.append(name)
+        cfg.save(c)
+
+
+def _filter_hack_blacklist(names: list, state: GameState) -> list:
+    blacklist = _hack_blacklist()
+    kept = [n for n in names if n.lower() not in blacklist]
+    if len(kept) != len(names):
+        state.add_log(f"Hack blacklist: skipped {len(names) - len(kept)} target(s).")
+    return kept
+
+
 def _filter_young_targets(crime: str, names: list, state: GameState) -> list:
     """Drop known players whose character age exceeds the configured threshold.
 
@@ -2044,6 +2067,8 @@ def _do_crime_steps(action: Action, state: GameState):
         state.add_log(f"City resident targets: {len(targets)}")
 
     targets = _filter_young_targets(crime, targets, state)
+    if crime == "hack":
+        targets = _filter_hack_blacklist(targets, state)
 
     if not targets:
         state.add_log(f"No targets found for {crime}, skipping.")
@@ -2061,7 +2086,6 @@ def _do_crime_steps(action: Action, state: GameState):
         return
     state.add_log(f"Selected crime: {crime}")
 
-    failed_transfers: set = set()
     fail_counts: dict = {}
 
     def _flush_fails():
@@ -2073,10 +2097,6 @@ def _do_crime_steps(action: Action, state: GameState):
         fail_counts.clear()
 
     for player in targets:
-        if player in failed_transfers:
-            yield
-            continue
-
         if threshold and state.energy < threshold:
             _flush_fails()
             state.add_log(f"Energy {state.energy}% dropped below threshold {threshold}% — stopping.")
@@ -2124,49 +2144,9 @@ def _do_crime_steps(action: Action, state: GameState):
                 yield
                 continue
             if crime == "hack" and "no money in their account" in fail_msg.lower():
-                state.add_log(f"No money in {player}'s account — sending $1 to unlock, then retrying.")
-                if not _back_to_target_input(crime, state):
-                    _flush_fails()
-                    state.add_log("Lost target input after no-money fail. Aborting.")
-                    return
-                ok = _do_transfer(player, 1, state)
-                if not ok:
-                    state.add_log(f"Transfer to {player} failed — skipping for this run.")
-                    failed_transfers.add(player)
-                    if not _nav_to_target_input(crime, state):
-                        _flush_fails()
-                        state.add_log("Could not return to crime page. Aborting.")
-                        return
-                    yield
-                    continue
-                if not _nav_to_target_input(crime, state):
-                    _flush_fails()
-                    state.add_log("Could not return to crime page after transfer. Aborting.")
-                    return
-                page.fill(_TARGET_INPUT, player)
-                with _game_action_lock:
-                    page.click("input[type='submit'][name='B1']")
-                    page.wait_for_load_state("domcontentloaded")
-                _refresh_state(state)
-                retry_soup = BeautifulSoup(page.content(), "html.parser")
-                success_div = retry_soup.find("div", id="success")
-                if success_div:
-                    msg = success_div.get_text(strip=True)
-                    _flush_fails()
-                    state.add_log(f"Crime success vs {player} (retry): {msg}")
-                    amounts = re.findall(r"\$([\d,]+)", msg)
-                    stolen = int(amounts[0].replace(",", "")) if amounts else 0
-                    _log_agg(state, crime, "success", player, msg, stolen or None, retry=True)
-                    if stolen > 0:
-                        state._last_crime_victim = player
-                        state._last_crime_amount = stolen
-                        state.add_log(f"Stolen: ${stolen:,} from {player}")
-                    return
-                retry_fail = retry_soup.find("div", id="fail")
-                if retry_fail:
-                    retry_msg = retry_fail.get_text(strip=True)
-                    fail_counts[retry_msg] = fail_counts.get(retry_msg, 0) + 1
-                    _log_agg(state, crime, _agg_fail_result(retry_msg), player, retry_msg, retry=True)
+                _hack_blacklist_add(player)
+                state.add_log(f"No money in {player}'s account — added to the hack blacklist, "
+                              f"moving on.")
                 yield
                 continue
             if crime in ("pickpocket", "mugging", "breaking") and "recently survived" in fail_msg.lower():
@@ -2175,6 +2155,10 @@ def _do_crime_steps(action: Action, state: GameState):
             if "doesn't exist" in fail_msg.lower() or "does not exist" in fail_msg.lower():
                 yield
                 continue
+            if _MISSING_ITEM_RE.search(fail_msg):
+                # e.g. "You need a Pistol to commit a Mugging!" — every target will
+                # say the same; the task falls back to another crime (agg_crimes.py).
+                state._agg_missing_item = (crime, fail_msg)
             _flush_fails()
             _nav(_u("/loggedin.asp?display=play"), state)
             return

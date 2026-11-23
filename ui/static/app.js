@@ -7145,3 +7145,20 @@ function setTheme(name) {
   _markThemeOpts();
 }
 document.addEventListener('DOMContentLoaded', _markThemeOpts);
+
+// Aggravated crimes: hack blacklist (players with no money in their account).
+function hackBlacklistRemove(btn) {
+  const li = btn.closest("li");
+  const name = li ? li.dataset.name : "";
+  if (!name) return;
+  btn.disabled = true;
+  fetch("/agg/hack-blacklist/remove", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({name}),
+  }).then(r => r.json()).then(d => {
+    if (!d.ok) { btn.disabled = false; return; }
+    li.remove();
+    const c = document.getElementById("hack_blacklist_count");
+    if (c) c.textContent = d.count;
+  }).catch(() => { btn.disabled = false; });
+}

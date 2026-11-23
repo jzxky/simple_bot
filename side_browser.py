@@ -257,6 +257,11 @@ def submit(lane: str, kind: str, fn, cookies: list, headless: bool = False) -> J
     return job
 
 
+def queued(lane: str) -> int:
+    """How many jobs are waiting on `lane` (not counting the one running)."""
+    return _lane(lane).jobs.qsize()
+
+
 def cancel_current(lane: str, reason: str, kind: str = "") -> "Job | None":
     """Ask the job running on `lane` (optionally only if it is of `kind`) to stop."""
     return _lane(lane).cancel_current(reason, kind)

@@ -452,6 +452,15 @@
                   value="{{ config.aggravated_crimes.get('young_age_threshold_hours', 24) }}"
                   oninput="markNumDirty(this)">
               </div>
+              {% set _hack_bl = config.aggravated_crimes.get('hack_blacklist', []) %}
+              <details class="setting-row" id="hack_blacklist" title="Players whose account had no money to hack. They are left out of hacking target lists.">
+                <summary>Hack blacklist (<span id="hack_blacklist_count">{{ _hack_bl|length }}</span>)</summary>
+                <ul id="hack_blacklist_list" style="margin:4px 0;padding-left:18px">
+                  {% for n in _hack_bl %}
+                  <li data-name="{{ n }}">{{ n }} <button type="button" class="btn btn-sm" onclick="hackBlacklistRemove(this)">Remove</button></li>
+                  {% endfor %}
+                </ul>
+              </details>
             </div>
             <div class="settings-group">
               <h3>PvB</h3>
