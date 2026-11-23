@@ -449,7 +449,7 @@ function showTab(id, btn) {
 
 function _buildPayload() {
   return {
-    // Absent when credentials are hidden (Settings › Misc › Developer) — the
+    // Absent when credentials are hidden (Settings › General › Developer) — the
     // keys are then dropped from the payload and the server leaves .env alone.
     email: document.getElementById("email")?.value,
     password: document.getElementById("password")?.value,
@@ -551,7 +551,6 @@ function _buildPayload() {
     fire_tasks: _serializePriorityTable("fire-priority-body"),
     player_list_enabled: document.getElementById("player_list_enabled").checked,
     player_refresh_interval: parseInt(document.getElementById("player_refresh_interval").value) || 30,
-    player_whitelist_bolds: (document.getElementById("pl-bolds-toggle")||{checked:true}).checked,
     consume_timer_limit: document.getElementById("consume_timer_limit").value || "00:00",
     auto_consume: document.getElementById("auto_consume").checked,
     auto_consumable: document.getElementById("auto_consumable").value,
@@ -636,7 +635,7 @@ function _buildPayload() {
     sync_server_url:    (document.getElementById("sync_server_url")||{value:""}).value.trim(),
     sync_api_key:       (document.getElementById("sync_api_key")||{value:""}).value.trim(),
     sync_client_id:     (document.getElementById("sync_client_id")||{value:""}).value.trim(),
-    sync_interval:      parseInt((document.getElementById("sync_interval")||{value:"2"}).value)||2,
+    sync_interval:      parseInt((document.getElementById("player_refresh_interval")||{value:"30"}).value)||30,
     sync_online_time:   (document.getElementById("sync_online_time")||{checked:true}).checked,
     sync_lists:         (document.getElementById("sync_lists")||{checked:true}).checked,
     sync_groups:        (document.getElementById("sync_groups")||{checked:true}).checked,
@@ -921,10 +920,13 @@ function _drugResult(id, d) {
   _setSellHint(id, d.message || (d.ok ? "Done." : "Failed."), d.ok ? "good" : "bad");
 }
 
-function _drugFillSelect(id, names, emptyText) {
+function _drugFillSelect(id, names, emptyText, label, pickPrompt) {
   const sel = document.getElementById(id);
+  if (!sel) return;
   const keep = sel.value;
-  sel.replaceChildren(...(names.length ? names.map(n => new Option(n, n)) : [new Option(emptyText, "")]));
+  const opts = names.map(n => new Option(label ? label(n) : n, n));
+  if (pickPrompt && names.length) opts.unshift(new Option("Pick a player…", ""));
+  sel.replaceChildren(...(opts.length ? opts : [new Option(emptyText, "")]));
   if (names.includes(keep)) sel.value = keep;
 }
 
@@ -952,13 +954,14 @@ function updateDrugsTab(d) {
 function drugsLoadPlayers() {
   _drugPlayersAt = Date.now();
   fetch("/drugs/players").then(r => r.json()).then(d => {
-    _drugFillSelect("smuggle_official", d.customs || [], "No customs officials in the player database");
+    _drugFillSelect("smuggle_official", d.customs || [], "No customs officials in the player database",
+      n => (d.home_cities || {})[n.toLowerCase()] ? `${n} (${d.home_cities[n.toLowerCase()]})` : n);
     _drugFillSelect("deal_customer_local", d.local_online || [], "No local players online");
     document.getElementById("deal-customers").replaceChildren(
       ...(d.all_alive || []).map(n => Object.assign(document.createElement("option"), {value: n})));
     _midContacts = new Set((d.contacts || []).map(n => n.toLowerCase()));
-    document.getElementById("house-dealers").replaceChildren(
-      ...(d.dealers || []).map(n => Object.assign(document.createElement("option"), {value: n})));
+    _drugFillSelect("house_new_contact", d.dealers || [], "No dealers in the player database",
+      n => (d.home_cities || {})[n.toLowerCase()] ? `${n} (${d.home_cities[n.toLowerCase()]})` : n, true);
   }).catch(() => { _drugPlayersAt = 0; });
 }
 
@@ -1044,7 +1047,7 @@ function drugsLoadStock(btn) {
     }));
     drugsStockCost();
     _setSellHint("drug-stock-result", "", "");
-    document.getElementById("drug-stock-overlay").classList.add("active");
+    document.getElementById("drug-stock-panel").hidden = false;
   });
 }
 
@@ -1059,7 +1062,7 @@ function drugsStockCost() {
 }
 
 function drugsCloseStock() {
-  document.getElementById("drug-stock-overlay").classList.remove("active");
+  document.getElementById("drug-stock-panel").hidden = true;
 }
 
 function drugsBuy(btn) {
@@ -1138,11 +1141,11 @@ function drugsHouseBuy(btn) {
 function drugsHouseAddContact(btn) {
   const input = document.getElementById("house_new_contact");
   const name = input.value.trim();
-  if (!name) return _setSellHint("drug-house-contact-result", "Enter a player name.", "bad");
+  if (!name) return _setSellHint("drug-house-contact-result", "Pick a dealer.", "bad");
   _setSellHint("drug-house-contact-result", `Asking ${name} to partner…`, "");
   _drugPost("/drugs/house/contact", {name}, btn).then(d => {
     _drugResult("drug-house-contact-result", d);
-    if (d.ok) { input.value = ""; _drugPlayersAt = 0; }
+    if (d.ok) { input.value = ""; drugsLoadPlayers(); }
     if (d.contacts) _drugHouseRenderContacts(d.contacts);
   });
 }
@@ -1198,6 +1201,7 @@ function _drugHouseRenderPrices(rows) {
       type: "number", min: r.min, max: r.max || 99999, step: 1, value: r.price,
       className: "input-narrow", oninput: _drugHousePriceCheck,
     });
+    inp.style.width = "100px";
     const priceTd = document.createElement("td");
     priceTd.append(inp);
     const range = Object.assign(document.createElement("td"), {
@@ -1233,13 +1237,37 @@ function drugsHouseOpenPrices(btn) {
     _dealerPricesLink = li.dataset.link;
     document.getElementById("contact-prices-title").textContent = `Drug prices for ${name}`;
     _drugHouseRenderPrices(d.prices || []);
+    _drugDefaultRanges(d.prices || []);
     _setSellHint("contact-prices-result", "", "");
-    document.getElementById("contact-prices-overlay").classList.add("active");
+    document.getElementById("contact-prices-panel").hidden = false;
   });
 }
 
 function drugsHouseClosePrices() {
-  document.getElementById("contact-prices-overlay").classList.remove("active");
+  document.getElementById("contact-prices-panel").hidden = true;
+}
+
+// Default Prices: show each drug's allowed range (from a contact's price page) and
+// flag defaults outside it.
+function _drugDefaultRanges(rows) {
+  rows.forEach(r => {
+    if (!r.max) return;
+    const tr = document.querySelector(`.dh-default-price[data-drug="${r.key}"]`)?.closest("tr");
+    if (!tr) return;
+    tr.dataset.min = r.min;
+    tr.dataset.max = r.max;
+    tr.querySelector(".dh-range").textContent = `${_drugMoney(r.min)} – ${_drugMoney(r.max)}`;
+  });
+  drugsDefaultPriceCheck();
+}
+
+function drugsDefaultPriceCheck() {
+  document.querySelectorAll(".dh-default-price").forEach(inp => {
+    const tr = inp.closest("tr");
+    const min = parseInt(tr.dataset.min, 10) || 0, max = parseInt(tr.dataset.max, 10) || 0;
+    const v = _drugInt(inp);
+    inp.style.color = max && v && (v < min || v > max) ? "#f08c8c" : "";
+  });
 }
 
 function drugsHouseUseDefaults() {
@@ -2659,6 +2687,7 @@ function pollStatus() {
       document.getElementById("stat-name").textContent = d.own_name || "";
       document.getElementById("stat-name-wrap").style.display = d.own_name ? "" : "none";
       _commsOwnName = d.own_name || "";
+      _updateDocTitle();
       document.getElementById("stat-next-rank").textContent = d.next_rank || "--";
       // Until the character page has been read (no name yet), energy, health
       // and rank progress are just State defaults (0 / 100 / 0): show them as
@@ -2702,7 +2731,6 @@ function pollStatus() {
       document.getElementById("stat-bank").textContent = d.bank_balance ? fmt(d.bank_balance) : "--";
 
       // Move the jail General controls into the income "Jail" tab while in jail.
-      _syncJailTab(!!d.in_jail);
 
       // Jail badge and status card tint
       const jailBadge = document.getElementById("stat-jail-badge");
@@ -2908,7 +2936,6 @@ function pollStatus() {
       if ((d.char_history_updated_at || 0) > _chLastUpdated) {
         _chLastUpdated = d.char_history_updated_at;
         loadPlayers();
-        if (document.getElementById("pl-bolds-toggle")?.checked) _plRunWhitelistBolds();
         if (document.getElementById("status-history")?.classList.contains("active")) {
           loadCharHistory();
         }
@@ -3383,7 +3410,7 @@ function applyUpdate() {
     .then(d => {
       document.getElementById("update-modal").style.display = "none";
       if (d.error) { alert("Update failed: " + d.error); return; }
-      if (confirm("Update applied. Restart now?\n\n" + (d.output || ""))) {
+      if (confirm("Update applied. Restart now? A running bot starts again after the restart.\n\n" + (d.output || ""))) {
         restartBot();
       }
     })
@@ -5760,7 +5787,8 @@ function plBDSort(col) {
 function plRenderBirthsDeaths() {
   const tbody = document.getElementById("pl-bd-tbody");
   if (!tbody) return;
-  const cutoff = Date.now() - 3 * 24 * 3600 * 1000;
+  const periodDays = parseInt(document.getElementById("pl-bd-filter-period")?.value || "0", 10);
+  const cutoff = periodDays > 0 ? Date.now() - periodDays * 24 * 3600 * 1000 : 0;
 
   const search = (document.getElementById("pl-bd-search")?.value || "").toLowerCase();
   const rankF  = document.getElementById("pl-bd-filter-rank")?.value || "";
@@ -5803,7 +5831,7 @@ function plRenderBirthsDeaths() {
   if (icon) { icon.textContent = asc ? "▲" : "▼"; icon.classList.add("pl-th-sorted"); }
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">No births or deaths in the last 3 days.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:12px;color:var(--text-muted);text-align:center">No births or deaths${periodDays > 0 ? ` in the last ${periodDays} days` : ""}.</td></tr>`;
     return;
   }
 
@@ -5984,32 +6012,7 @@ function plSetGroup(username, group, el) {
   }).catch(() => {});
 }
 
-function plBoldsToggleChanged() {
-  const on = document.getElementById("pl-bolds-toggle")?.checked;
-  if (on) _plRunWhitelistBolds();
-}
-
-function _plRunWhitelistBolds() {
-  if (_plHubManaged) return;  // whitelists are set on Player Hub
-  fetch("/players/whitelist_bolds", {method: "POST"})
-    .then(r => r.json())
-    .then(d => { if (d.newly > 0) loadPlayers(); })
-    .catch(() => {});
-}
-
 // ── Refresh & import ──────────────────────────────────────────────────────────
-
-// Relocate the jail General controls between the Settings→Jail tab and the
-// Income→Jail tab depending on whether the character is in jail.
-function _syncJailTab(inJail) {
-  // Jail tab is always available under Income; the jail General controls live there.
-  const btn = document.getElementById("income-tab-jail-btn");
-  const group = document.getElementById("jail-general-group");
-  const mount = document.getElementById("income-jail-mount");
-  if (!btn || !group || !mount) return;
-  if (group.parentElement !== mount) mount.appendChild(group);
-  btn.style.display = "";
-}
 
 function loadAutoJailPartners() {
   const sel = document.getElementById("auto_jail_partner");
@@ -6054,7 +6057,6 @@ function plRefresh() {
       if (btn) { btn.disabled = false; btn.textContent = "Refresh"; }
       if (d.error) { if (status) status.textContent = d.error; return; }
       loadPlayers();
-      if (document.getElementById("pl-bolds-toggle")?.checked) _plRunWhitelistBolds();
     })
     .catch(() => {
       if (btn) { btn.disabled = false; btn.textContent = "Refresh"; }
@@ -6168,13 +6170,6 @@ function _plApplyGroupsLock() {
   const note = document.getElementById("pl-groups-locked-note");
   if (toolbar) toolbar.style.display = _plHubManaged ? "none" : "";
   if (note) note.style.display = _plHubManaged ? "" : "none";
-  const bolds = document.getElementById("pl-bolds-toggle");
-  if (bolds) {
-    bolds.disabled = _plHubManaged;
-    bolds.closest("label.inline-toggle")?.setAttribute("title", _plHubManaged
-      ? "Managed on Player Hub — set whitelists in the hub"
-      : "Auto-whitelist Boss / Don / Godfather / Capo di tutti capi on every list update");
-  }
 }
 
 function plToggleGroup(name) {
@@ -6496,7 +6491,15 @@ function _updateNotifIndicators(count) {
     mobileBadge.textContent = count > 4 ? "5+" : String(count);
     mobileBadge.classList.toggle("has-count", count > 0);
   }
-  document.title = count > 0 ? `(${count}) OpenBot` : "OpenBot";
+  _notifTitleCount = count;
+  _updateDocTitle();
+}
+
+// Browser title: "(unread) Character · OpenBot".
+let _notifTitleCount = 0;
+function _updateDocTitle() {
+  const base = _commsOwnName ? `${_commsOwnName} · OpenBot` : "OpenBot";
+  document.title = _notifTitleCount > 0 ? `(${_notifTitleCount}) ${base}` : base;
 }
 
 // Notification settings: folding groups with an "N of M on" count and an
@@ -7125,7 +7128,7 @@ function gsDoQuit() {
     .catch(e => _gsSetMsg("gs-quit-result", e.message, "err"));
 }
 
-// ── Theme picker (Settings → Misc → Appearance) ─────────────────────────────
+// ── Theme picker (Settings → General → Appearance) ─────────────────────────────
 // The <head> of every page applies the saved theme before first paint.
 function _currentTheme() {
   try { return localStorage.getItem('ob-theme') || 'refined'; } catch (e) { return 'refined'; }
@@ -7161,4 +7164,70 @@ function hackBlacklistRemove(btn) {
     const c = document.getElementById("hack_blacklist_count");
     if (c) c.textContent = d.count;
   }).catch(() => { btn.disabled = false; });
+}
+
+// Settings → Players & Hub: the hub and remote control groups only show in server mode.
+function togglePlayerHubFields() {
+  const on = !!document.getElementById("sync_enabled")?.checked;
+  document.querySelectorAll("#player-lists .player-hub-only").forEach(el => { el.style.display = on ? "" : "none"; });
+}
+
+// Earns tab: re-read the game's earns page into the catalogue.
+function refreshEarnCatalog() {
+  const btn = document.getElementById("refresh-earn-catalog-btn");
+  if (!btn) return;
+  const label = "Refresh Earns List";
+  btn.disabled = true;
+  fetch("/earns/refresh-catalog", {method: "POST"})
+    .then(r => r.json())
+    .then(d => { btn.textContent = d.ok ? "Refreshing…" : (d.message || "Failed"); })
+    .catch(() => { btn.textContent = "Failed"; })
+    .finally(() => { setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 4000); });
+}
+
+// Comms → New Message: "To" autocomplete over living players (same as the Sell dialog).
+let _commsToAcIdx = -1;
+
+function _renderCommsToAc() {
+  const ac = document.getElementById("comms-compose-to-ac");
+  const v = document.getElementById("comms-compose-to").value.trim().toLowerCase();
+  const hits = v ? _sellPlayers.filter(p => p.username.toLowerCase().startsWith(v)).slice(0, 8) : [];
+  if (!hits.length || (hits.length === 1 && hits[0].username.toLowerCase() === v)) { ac.hidden = true; _commsToAcIdx = -1; return; }
+  if (_commsToAcIdx >= hits.length) _commsToAcIdx = hits.length - 1;
+  ac.innerHTML = hits.map((p, i) =>
+    `<div class="sell-ac-item${i === _commsToAcIdx ? " sel" : ""}" data-name="${escHtml(p.username)}" onmousedown="event.preventDefault();commsPickTo(this.dataset.name)">` +
+    `<span>${escHtml(p.username)}</span><small>${escHtml([p.rank, p.homecity].filter(Boolean).join(" · "))}</small></div>`
+  ).join("");
+  ac.hidden = false;
+}
+
+function commsToInput() {
+  _commsToAcIdx = -1;
+  _renderCommsToAc();
+  _loadSellPlayers().then(() => {
+    if (document.activeElement && document.activeElement.id === "comms-compose-to") _renderCommsToAc();
+  });
+}
+
+function commsPickTo(name) {
+  document.getElementById("comms-compose-to").value = name;
+  commsHideToAc();
+  commsValidatePlayer();
+  document.getElementById("comms-compose-subject").focus();
+}
+
+function commsToKey(e) {
+  const ac = document.getElementById("comms-compose-to-ac");
+  const items = ac.hidden ? [] : ac.querySelectorAll(".sell-ac-item");
+  if (!items.length) return;
+  if (e.key === "ArrowDown") { _commsToAcIdx = (_commsToAcIdx + 1) % items.length; _renderCommsToAc(); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { _commsToAcIdx = (_commsToAcIdx - 1 + items.length) % items.length; _renderCommsToAc(); e.preventDefault(); }
+  else if ((e.key === "Enter" || e.key === "Tab") && _commsToAcIdx >= 0) { commsPickTo(items[_commsToAcIdx].dataset.name); e.preventDefault(); }
+  else if (e.key === "Escape") { commsHideToAc(); e.stopPropagation(); }
+}
+
+function commsHideToAc() {
+  const ac = document.getElementById("comms-compose-to-ac");
+  if (ac) ac.hidden = true;
+  _commsToAcIdx = -1;
 }

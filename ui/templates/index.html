@@ -19,7 +19,7 @@
 </svg>
 <div class="container">
   <header>
-    <h1>OpenBot</h1>
+    <h1>OpenBot<span id="stat-name-wrap" class="header-char-name" style="display:none"> · <span id="stat-name"></span></span></h1>
     {% if not remote_session %}<button type="button" id="close-bot-btn" class="close-bot-btn" onclick="openCloseBotModal()" title="Shut down the bot and this control panel">Close Bot</button>{% endif %}
     <div class="status-row">
     <div class="status-bar">
@@ -101,7 +101,7 @@
     <!-- Status -->
     <section class="card tabs-card main-section main-active" id="s-character">
       <h2>
-        <span>Status<span id="stat-name-wrap" style="display:none"> · <span id="stat-name"></span></span></span><span id="stat-jail-badge" style="display:none"> <span class="jail-badge">JAIL</span></span>
+        <span>Status</span><span id="stat-jail-badge" style="display:none"> <span class="jail-badge">JAIL</span></span>
       </h2>
       <div class="card-body">
         <div class="tab-bar">
@@ -309,9 +309,94 @@
           <button class="tab-btn" onclick="showTab('income-drugs', this)">Drugs</button>
           <button class="tab-btn" onclick="showTab('income-blackmarket', this)">Black Market</button>
         </div>
-        <!-- Jail tab (shown only while in jail; jail General controls are moved here) -->
+        <!-- Jail tab -->
         <div id="income-jail" class="tab-panel">
-          <div class="settings-groups" id="income-jail-mount"></div>
+          {% set jail = config.get('jail', {}) %}
+          <div class="settings-groups">
+            <div class="settings-group" id="jail-general-group" style="grid-column: 1 / -1">
+              <h3>
+                General
+                <label class="toggle-label">
+                  <input type="checkbox" id="jail_enabled" {% if jail.get('enabled') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </h3>
+              <div class="setting-row">
+                <label for="jail_duty">Jail Duties</label>
+                <select id="jail_duty" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('laundry','Laundry'),('kitchen','Kitchen'),('workshop','Workshop'),('makeshank','Make Shank'),('digtunnel','Dig Tunnel')] %}
+                  <option value="{{ v }}" {% if jail.get('duty','laundry') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row">
+                <label for="jail_duty_mode" title="Auto queues duties; Manual does one Work at a time so every result shows in the activity log">Duty Mode</label>
+                <select id="jail_duty_mode" style="width:160px" onchange="autoSave()">
+                  <option value="auto" {% if jail.get('duty_mode','auto') != 'manual' %}selected{% endif %}>Auto</option>
+                  <option value="manual" {% if jail.get('duty_mode') == 'manual' %}selected{% endif %}>Manual</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <label></label>
+                <button id="jail-clear-queue-btn" class="action-btn" style="justify-self:start" onclick="clearJailDutyQueue(event)" disabled>Clear Queue</button>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="jail_action">Jail Action</label>
+                <select id="jail_action" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('gym','Gym'),('stuffing','Stuffing')] %}
+                  <option value="{{ v }}" {% if jail.get('action','gym') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <label class="inline-toggle setting-row" style="margin-top:8px">
+                Use Consumables
+                <label class="toggle-label">
+                  <input type="checkbox" id="jail_use_consumables" {% if jail.get('use_consumables') %}checked{% endif %} onchange="autoSave()">
+                  <span class="toggle"></span>
+                </label>
+              </label>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Warrants</h3>
+              <div class="setting-row">
+                <label for="auto_warrant_handling">Auto Handling</label>
+                <select id="auto_warrant_handling" style="width:200px" onchange="autoSave()">
+                  {% for v, l in [('none','None'),('failed_no_jail','Failed – No Jail'),('failed_incl_jail','Failed – Incl. Jail'),('all','All')] %}
+                  <option value="{{ v }}" {% if jail.get('auto_warrant_handling','none') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Auto Jail Time</h3>
+              <div class="setting-row">
+                <label for="auto_jail_time">Mode</label>
+                <select id="auto_jail_time" style="width:160px" onchange="autoSave()">
+                  {% for v, l in [('off','Off'),('respect_change','Respect Change'),('always','Always')] %}
+                  <option value="{{ v }}" {% if jail.get('auto_jail_time','off') == v %}selected{% endif %}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="use_warrants">Use Warrants</label>
+                <select id="use_warrants" style="width:160px" onchange="autoSave()">
+                  <option value="true" {% if jail.get('use_warrants') %}selected{% endif %}>Yes</option>
+                  <option value="false" {% if not jail.get('use_warrants') %}selected{% endif %}>No</option>
+                </select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label for="auto_jail_partner">Partner</label>
+                <select id="auto_jail_partner" data-current="{{ jail.get('auto_jail_partner','') }}" style="width:200px" onchange="autoSave()"></select>
+              </div>
+              <div class="setting-row" style="margin-top:8px">
+                <label></label>
+                <div>
+                  <button type="button" id="auto-jail-check-btn" class="action-btn" style="justify-self:start" onclick="triggerAutoJailCheck()">Run Check Now</button>
+                  <span id="auto-jail-check-status" style="font-size:0.8rem;color:var(--muted);margin-left:8px"></span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Earns tab -->
@@ -339,6 +424,7 @@
           <div class="setting-btn-row" style="padding:6px 0">
             <button type="button" id="clear-earn-btn" class="btn-secondary" onclick="clearEarnQueue()">Clear Queue</button>
             <button type="button" class="btn-secondary" onclick="openEarnCatalog()">Manage Categories</button>
+            <button type="button" id="refresh-earn-catalog-btn" class="btn-secondary" onclick="refreshEarnCatalog()" title="Re-read the game's earns page for the earns your character can do now">Refresh Earns List</button>
           </div>
 
           <!-- Earn Planner -->
@@ -1078,8 +1164,7 @@
               <div class="setting-row">
                 <label for="house_new_contact">Dealer</label>
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                  <input type="text" id="house_new_contact" class="name-picker" list="house-dealers" placeholder="Start typing a player name" autocomplete="off">
-                  <datalist id="house-dealers"></datalist>
+                  <select id="house_new_contact" class="name-picker"><option value="">No dealers in the player database</option></select>
                   <button class="btn btn-sm" onclick="drugsHouseAddContact(this)">Create Partnership</button>
                 </div>
               </div>
@@ -1100,16 +1185,39 @@
               </ul>
               <div id="dealer-contacts-result" class="sell-hint"></div>
 
+              <div id="contact-prices-panel" class="drug-inline-panel" hidden>
+                <h4 id="contact-prices-title">Contact prices</h4>
+                <div class="apt-table-wrap">
+                  <table class="apt-drugs" style="max-width:640px">
+                    <thead><tr><th>Drug</th><th>Owned</th><th>Price</th><th>Allowed</th></tr></thead>
+                    <tbody id="contact-prices-rows"></tbody>
+                  </table>
+                </div>
+                <div class="setting-btn-row" style="padding:6px 0">
+                  <button type="button" class="btn btn-sm" onclick="drugsHouseSavePrices(this)">Update Prices</button>
+                  <button type="button" class="btn-secondary" onclick="drugsHouseUseDefaults()">Use Defaults</button>
+                  <button type="button" class="btn-secondary" onclick="drugsHouseClosePrices()">Close</button>
+                </div>
+                <div id="contact-prices-result" class="sell-hint"></div>
+              </div>
+
               <h4 style="margin-top:12px">Default Prices</h4>
               {% set dh_defaults = config.get('drug_house', {}).get('default_prices', {}) %}
-              <table class="priority-table" style="max-width:360px">
-                <thead><tr><th>Drug</th><th>Price</th></tr></thead>
+              {% set dh_ranges = config.get('drug_house', {}).get('price_ranges', {}) %}
+              <table class="priority-table" style="max-width:480px">
+                <thead><tr><th>Drug</th><th>Price</th><th>Allowed</th></tr></thead>
                 <tbody>
                   {% for key, label in [('marijuana', 'Marijuana'), ('ecstasy', 'Ecstasy'), ('acid', 'Acid'), ('speed', 'Speed'), ('ice', 'P / ICE'), ('heroin', 'Heroin'), ('cocaine', 'Cocaine')] %}
-                  <tr><td>{{ label }}</td><td><input type="number" class="dh-default-price" data-drug="{{ key }}" min="0" max="99999" step="1" style="width:100px" value="{{ dh_defaults.get(key, '') }}" oninput="markNumDirty(this)"></td></tr>
+                  {% set rg = dh_ranges.get(key) %}
+                  <tr data-drug="{{ key }}" {% if rg %}data-min="{{ rg[0] }}" data-max="{{ rg[1] }}"{% endif %}>
+                    <td>{{ label }}</td>
+                    <td><input type="number" class="dh-default-price" data-drug="{{ key }}" min="0" max="99999" step="1" style="width:100px" value="{{ dh_defaults.get(key, '') }}" oninput="markNumDirty(this); drugsDefaultPriceCheck()"></td>
+                    <td class="muted dh-range">{% if rg %}${{ "{:,}".format(rg[0]) }} – ${{ "{:,}".format(rg[1]) }}{% else %}—{% endif %}</td>
+                  </tr>
                   {% endfor %}
                 </tbody>
               </table>
+              <p class="placeholder">Allowed ranges come from the game's contact price page; they fill in the first time you open a contact's prices.</p>
               <button class="btn btn-sm" style="margin-top:6px" onclick="drugsHouseUpdateAll(this)">Update All Contacts</button>
               <div id="dealer-update-all-result" class="sell-hint"></div>
             </div>
@@ -1207,6 +1315,22 @@
                 {% endfor %}
               </ul>
               <div id="drug-contacts-result" class="sell-hint"></div>
+
+              <div id="drug-stock-panel" class="drug-inline-panel" hidden>
+                <h4 id="drug-stock-title">Contact stock</h4>
+                <div class="apt-table-wrap">
+                  <table class="apt-drugs" style="max-width:640px">
+                    <thead><tr><th>Drug</th><th>Price</th><th>On sale</th><th>You own</th><th>Qty to buy</th></tr></thead>
+                    <tbody id="drug-stock-rows"></tbody>
+                  </table>
+                </div>
+                <div id="drug-stock-cost" class="sell-hint"></div>
+                <div class="setting-btn-row" style="padding:6px 0">
+                  <button type="button" class="btn btn-sm" id="drug-stock-buy" onclick="drugsBuy(this)">Buy</button>
+                  <button type="button" class="btn-secondary" onclick="drugsCloseStock()">Close</button>
+                </div>
+                <div id="drug-stock-result" class="sell-hint"></div>
+              </div>
 
               <hr class="stat-divider" style="margin:16px 0">
 
@@ -1766,15 +1890,14 @@
       </h2>
       <div class="card-body">
         <div class="tab-bar">
-          <button class="tab-btn active" onclick="showTab('promotion', this)">Careers</button>
-          <button class="tab-btn" onclick="showTab('jail', this)">Jail</button>
-          <button class="tab-btn" onclick="showTab('misc', this)">Misc</button>
-          <button class="tab-btn" onclick="showTab('player-lists', this)">Player Lists</button>
+          <button class="tab-btn active" onclick="showTab('misc', this)">General</button>
+          <button class="tab-btn" onclick="showTab('promotion', this)">Careers</button>
+          <button class="tab-btn" onclick="showTab('player-lists', this)">Players &amp; Hub</button>
           <button class="tab-btn" onclick="showTab('war-mode', this)">War Mode</button>
           <button class="tab-btn" onclick="showTab('credentials', this)">Credentials</button>
         </div>
 
-        <div id="promotion" class="tab-panel active">
+        <div id="promotion" class="tab-panel">
           {% set promo = config.get('promo', {}) %}
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
@@ -1922,157 +2045,56 @@
           </div>
         </div>
 
-        <div id="jail" class="tab-panel">
-          {% set jail = config.get('jail', {}) %}
-          <div class="settings-groups">
-            <div id="jail-general-anchor"></div>
-            <div class="settings-group" id="jail-general-group" style="grid-column: 1 / -1">
-              <h3>
-                General
-                <label class="toggle-label">
-                  <input type="checkbox" id="jail_enabled" {% if jail.get('enabled') %}checked{% endif %} onchange="autoSave()">
-                  <span class="toggle"></span>
-                </label>
-              </h3>
-              <div class="setting-row">
-                <label for="jail_duty">Jail Duties</label>
-                <select id="jail_duty" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('laundry','Laundry'),('kitchen','Kitchen'),('workshop','Workshop'),('makeshank','Make Shank'),('digtunnel','Dig Tunnel')] %}
-                  <option value="{{ v }}" {% if jail.get('duty','laundry') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="setting-row">
-                <label for="jail_duty_mode" title="Auto queues duties; Manual does one Work at a time so every result shows in the activity log">Duty Mode</label>
-                <select id="jail_duty_mode" style="width:160px" onchange="autoSave()">
-                  <option value="auto" {% if jail.get('duty_mode','auto') != 'manual' %}selected{% endif %}>Auto</option>
-                  <option value="manual" {% if jail.get('duty_mode') == 'manual' %}selected{% endif %}>Manual</option>
-                </select>
-              </div>
-              <div class="setting-row">
-                <label></label>
-                <button id="jail-clear-queue-btn" class="action-btn" style="justify-self:start" onclick="clearJailDutyQueue(event)" disabled>Clear Queue</button>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
-                <label for="jail_action">Jail Action</label>
-                <select id="jail_action" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('gym','Gym'),('stuffing','Stuffing')] %}
-                  <option value="{{ v }}" {% if jail.get('action','gym') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <label class="inline-toggle setting-row" style="margin-top:8px">
-                Use Consumables
-                <label class="toggle-label">
-                  <input type="checkbox" id="jail_use_consumables" {% if jail.get('use_consumables') %}checked{% endif %} onchange="autoSave()">
-                  <span class="toggle"></span>
-                </label>
-              </label>
-            </div>
-            <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>Warrants</h3>
-              <div class="setting-row">
-                <label for="auto_warrant_handling">Auto Handling</label>
-                <select id="auto_warrant_handling" style="width:200px" onchange="autoSave()">
-                  {% for v, l in [('none','None'),('failed_no_jail','Failed – No Jail'),('failed_incl_jail','Failed – Incl. Jail'),('all','All')] %}
-                  <option value="{{ v }}" {% if jail.get('auto_warrant_handling','none') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-            <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>Auto Jail Time</h3>
-              <div class="setting-row">
-                <label for="auto_jail_time">Mode</label>
-                <select id="auto_jail_time" style="width:160px" onchange="autoSave()">
-                  {% for v, l in [('off','Off'),('respect_change','Respect Change'),('always','Always')] %}
-                  <option value="{{ v }}" {% if jail.get('auto_jail_time','off') == v %}selected{% endif %}>{{ l }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
-                <label for="use_warrants">Use Warrants</label>
-                <select id="use_warrants" style="width:160px" onchange="autoSave()">
-                  <option value="true" {% if jail.get('use_warrants') %}selected{% endif %}>Yes</option>
-                  <option value="false" {% if not jail.get('use_warrants') %}selected{% endif %}>No</option>
-                </select>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
-                <label for="auto_jail_partner">Partner</label>
-                <select id="auto_jail_partner" data-current="{{ jail.get('auto_jail_partner','') }}" style="width:200px" onchange="autoSave()"></select>
-              </div>
-              <div class="setting-row" style="margin-top:8px">
-                <label></label>
-                <div>
-                  <button type="button" id="auto-jail-check-btn" class="action-btn" style="justify-self:start" onclick="triggerAutoJailCheck()">Run Check Now</button>
-                  <span id="auto-jail-check-status" style="font-size:0.8rem;color:var(--muted);margin-left:8px"></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
         <div id="player-lists" class="tab-panel">
+          {% set _sync = config.get('sync', {}) %}
+          {% set _server = _sync.get('enabled', False) %}
+          {% set _every = (_sync.get('interval_minutes', 2) if _server else config.get('players', {}).get('refresh_interval_minutes', 30)) %}
           <div class="settings-groups">
-            <div class="settings-group">
-              <h3>General</h3>
+            <div class="settings-group" style="grid-column: 1 / -1">
+              <h3>Players</h3>
+              <label class="inline-toggle setting-row">Server mode (Player Hub)
+                <label class="toggle-label"><input type="checkbox" id="sync_enabled" {% if _server %}checked{% endif %} onchange="togglePlayerHubFields(); autoSave()"><span class="toggle"></span></label>
+              </label>
+              <p class="setting-note">Local mode keeps player data on this computer only. Server mode also syncs it with Player Hub and shows the hub and remote control settings.</p>
               <label class="inline-toggle setting-row">Enable player list updates
                 <label class="toggle-label"><input type="checkbox" id="player_list_enabled" {% if config.get('players', {}).get('enabled', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
               <div class="setting-row">
-                <label for="player_refresh_interval">Refresh interval (minutes)</label>
-                <input type="number" id="player_refresh_interval" min="1" max="1440"
-                  value="{{ config.get('players', {}).get('refresh_interval_minutes', 30) }}"
-                  style="width:70px" oninput="markNumDirty(this)">
+                <label for="player_refresh_interval">Update every</label>
+                <select id="player_refresh_interval" style="width:120px" onchange="autoSave()">
+                  {% for m in [1, 2, 5, 10, 15, 30, 60] %}
+                  <option value="{{ m }}" {% if _every == m %}selected{% endif %}>{{ m }} min</option>
+                  {% endfor %}
+                  {% if _every not in [1, 2, 5, 10, 15, 30, 60] %}<option value="{{ _every }}" selected>{{ _every }} min</option>{% endif %}
+                </select>
               </div>
-              <label class="inline-toggle setting-row" title="Auto-whitelist Boss / Don / Godfather / Capo di tutti capi on every list update">Whitelist bolds
-                <label class="toggle-label">
-                  <input type="checkbox" id="pl-bolds-toggle"
-                    {% if config.get('players', {}).get('whitelist_bolds', True) %}checked{% endif %}
-                    onchange="plBoldsToggleChanged(); autoSave()">
-                  <span class="toggle"></span>
-                </label>
-              </label>
+              <p class="setting-note">How often the player list is refreshed, and in server mode how often it syncs with the hub.</p>
             </div>
-            <div class="settings-group">
-              <h3>
-                Sync
-                <label class="toggle-label">
-                  <input type="checkbox" id="sync_enabled" {% if config.get('sync', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave()">
-                  <span class="toggle"></span>
-                </label>
-              </h3>
-              <p class="setting-note">Sync player data across devices via a shared sync server.</p>
+            <div class="settings-group player-hub-only" style="grid-column: 1 / -1{% if not _server %};display:none{% endif %}">
+              <h3>Player Hub</h3>
               <div class="setting-row">
                 <label for="sync_server_url">Server URL</label>
-                <input type="text" id="sync_server_url" value="{{ config.get('sync', {}).get('server_url', '') }}" placeholder="http://192.168.1.x:9090" style="width:180px" onchange="autoSave()">
+                <input type="text" id="sync_server_url" value="{{ _sync.get('server_url', '') }}" placeholder="https://hub.example.com" style="width:240px" onchange="autoSave()">
               </div>
               <div class="setting-row">
                 <label for="sync_api_key">API Key</label>
-                <input type="password" id="sync_api_key" value="{{ config.get('sync', {}).get('api_key', '') }}" placeholder="From Player Hub admin" style="width:180px" onchange="autoSave()">
+                <input type="password" id="sync_api_key" value="{{ _sync.get('api_key', '') }}" placeholder="From Player Hub admin" style="width:240px" onchange="autoSave()">
               </div>
               <div class="setting-row">
                 <label for="sync_client_id">Client ID</label>
-                <input type="text" id="sync_client_id" value="{{ config.get('sync', {}).get('client_id', '') }}" placeholder="e.g. bot-1" style="width:180px" onchange="autoSave()">
+                <input type="text" id="sync_client_id" value="{{ _sync.get('client_id', '') }}" placeholder="e.g. bot-1" style="width:240px" onchange="autoSave()">
               </div>
-              <div class="setting-row">
-                <label for="sync_interval">Sync every</label>
-                <select id="sync_interval" onchange="autoSave()">
-                  {% for m in [1, 2, 5, 10, 15, 30] %}
-                  <option value="{{ m }}" {% if config.get('sync', {}).get('interval_minutes', 2) == m %}selected{% endif %}>{{ m }} min</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <label class="inline-toggle setting-row">Online time
-                <label class="toggle-label"><input type="checkbox" id="sync_online_time" {% if config.get('sync', {}).get('sync_online_time', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              <label class="inline-toggle setting-row">Sync online time
+                <label class="toggle-label"><input type="checkbox" id="sync_online_time" {% if _sync.get('sync_online_time', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
-              <label class="inline-toggle setting-row">Whitelist &amp; Blacklists
-                <label class="toggle-label"><input type="checkbox" id="sync_lists" {% if config.get('sync', {}).get('sync_lists', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              <label class="inline-toggle setting-row">Sync whitelists &amp; blacklists
+                <label class="toggle-label"><input type="checkbox" id="sync_lists" {% if _sync.get('sync_lists', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
-              <label class="inline-toggle setting-row">Groups
-                <label class="toggle-label"><input type="checkbox" id="sync_groups" {% if config.get('sync', {}).get('sync_groups', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              <label class="inline-toggle setting-row">Sync groups
+                <label class="toggle-label"><input type="checkbox" id="sync_groups" {% if _sync.get('sync_groups', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
             </div>
-            <div class="settings-group">
+            <div class="settings-group player-hub-only" style="grid-column: 1 / -1{% if not _server %};display:none{% endif %}">
               <h3>
                 Remote control
                 <label class="toggle-label">
@@ -2080,14 +2102,14 @@
                   <span class="toggle"></span>
                 </label>
               </h3>
-              <p class="setting-note">Open this control panel from anywhere through Player Hub, with no port forwarding. Uses the Sync server URL and API key above. Only you and the hub users you share it with can open it; hub admins can't. Your game email, password and PIN are never sent to the hub.</p>
+              <p class="setting-note">Open this control panel from anywhere through Player Hub, with no port forwarding. Uses the Player Hub server URL and API key above. Only you and the hub users you share it with can open it; hub admins can't. Your game email, password and PIN are never sent to the hub.</p>
               {% if remote_session %}
               <p class="setting-note">You're using this bot through Player Hub. Remote control, the remote password, the Sync connection, credentials and the PIN can only be changed on the bot's own computer.</p>
               {% endif %}
               {% if not remote_session %}
               <div class="setting-row">
                 <label for="remote_password">Remote password</label>
-                <div class="input-with-btn">
+                <div class="input-with-btn" style="justify-self:start;width:280px;max-width:100%">
                   <input type="password" id="remote_password" value="{{ remote_password }}" placeholder="Optional" autocomplete="new-password" style="width:160px" onchange="autoSave()">
                   <button type="button" class="input-btn eye-btn" title="Show / Hide" onclick="toggleFieldVisibility('remote_password', this)"><svg class="eye-icon" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 1C5.5 1 1.7 4 0 7c1.7 3 5.5 6 10 6s8.3-3 10-6c-1.7-3-5.5-6-10-6z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/><line class="eye-slash" x1="2" y1="1" x2="18" y2="13" stroke="currentColor" stroke-width="1.5"/></svg></button>
                 </div>
@@ -2129,9 +2151,9 @@
               <label class="inline-toggle setting-row">Enable War Mode
                 <label class="toggle-label"><input type="checkbox" id="war_mode_enabled" {% if config.get('war_mode', {}).get('enabled', False) %}checked{% endif %} onchange="toggleWarModeLink(); autoSaveAndReload()"><span class="toggle"></span></label>
               </label>
-              <div class="setting-row" style="display:flex;align-items:center;gap:8px">
-                <label for="war_mode_mode" style="flex:none">Mode</label>
-                <select id="war_mode_mode" onchange="toggleWarModeFields(); autoSave()" style="flex:0 0 auto">
+              <div class="setting-row">
+                <label for="war_mode_mode">Mode</label>
+                <select id="war_mode_mode" onchange="toggleWarModeFields(); autoSave()" style="width:160px">
                   <option value="local" {% if config.get('war_mode', {}).get('mode', 'local') == 'local' %}selected{% endif %}>Local</option>
                   <option value="server" {% if config.get('war_mode', {}).get('mode', 'local') == 'server' %}selected{% endif %}
                     {% if not (config.get('sync', {}).get('enabled') and config.get('sync', {}).get('server_url') and config.get('sync', {}).get('api_key')) %}disabled{% endif %}>Server</option>
@@ -2155,10 +2177,12 @@
                 <label class="inline-toggle setting-row">Skip PIN for War Mode page
                   <label class="toggle-label"><input type="checkbox" id="war_mode_skip_pin" {% if config.get('war_mode', {}).get('skip_pin', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
                 </label>
-                <div class="setting-row" style="display:flex;align-items:center;gap:8px">
-                  <label for="war_mode_discord_webhook_url" style="flex:none">Discord Webhook URL</label>
-                  <input type="text" id="war_mode_discord_webhook_url" value="{{ config.get('war_mode', {}).get('discord_webhook_url', '') }}" placeholder="https://discord.com/api/webhooks/..." onchange="autoSave()" style="flex:1">
-                  <button type="button" class="btn-secondary" onclick="warTestWebhook()" style="flex:none">Test</button>
+                <div class="setting-row">
+                  <label for="war_mode_discord_webhook_url">Discord Webhook URL</label>
+                  <div style="display:flex;gap:8px;align-items:center;justify-self:start;max-width:100%">
+                    <input type="text" id="war_mode_discord_webhook_url" value="{{ config.get('war_mode', {}).get('discord_webhook_url', '') }}" placeholder="https://discord.com/api/webhooks/..." onchange="autoSave()" style="width:320px;max-width:100%">
+                    <button type="button" class="btn-secondary" onclick="warTestWebhook()">Test</button>
+                  </div>
                 </div>
                 <p class="setting-note" id="war-webhook-msg">Sends a Discord alert when a whack is detected. Leave empty to disable.</p>
               </div>
@@ -2169,7 +2193,7 @@
             </div>
           </div>
         </div>
-        <div id="misc" class="tab-panel">
+        <div id="misc" class="tab-panel active">
           <div class="settings-groups">
             <div class="settings-group" style="grid-column: 1 / -1">
               <h3>Appearance</h3>
@@ -2184,7 +2208,7 @@
               <p class="setting-note">Saved in this browser only, so your phone and desktop can use different themes.</p>
             </div>
             <div class="settings-group" style="grid-column: 1 / -1">
-              <h3>General</h3>
+              <h3>Bot</h3>
               <label class="inline-toggle setting-row">Communications
                 <label class="toggle-label"><input type="checkbox" id="comms_enabled" {% if config.get('communications', {}).get('enabled', False) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
               </label>
@@ -2494,7 +2518,11 @@
               </div>
               <div class="task-row" style="margin-bottom:8px">
                 <label class="task-label">To:</label>
-                <input type="text" id="comms-compose-to" class="task-select" placeholder="Player name" style="flex:1" onblur="commsValidatePlayer()">
+                <div class="mid-name" style="max-width:none">
+                  <input type="text" id="comms-compose-to" class="task-select" placeholder="Start typing a player name" autocomplete="off" style="width:100%"
+                    oninput="commsToInput()" onkeydown="commsToKey(event)" onblur="setTimeout(commsHideToAc, 120); commsValidatePlayer()">
+                  <div id="comms-compose-to-ac" class="sell-ac" hidden></div>
+                </div>
                 <span id="comms-compose-to-status" style="font-size:0.8em;margin-left:6px"></span>
               </div>
               <div class="task-row" style="margin-bottom:8px">
@@ -2782,6 +2810,13 @@
                     <option value="">All</option>
                     <option value="birth">Births</option>
                     <option value="death">Deaths</option>
+                  </select>
+                  <select id="pl-bd-filter-period" class="pl-filter-input" title="How far back to look" onchange="plRenderBirthsDeaths()">
+                    <option value="3">Last 3 days</option>
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="0" selected>All time</option>
                   </select></th>
                 </tr>
               </thead>
@@ -2879,42 +2914,6 @@
 </div>
 
 <!-- Weapon / vehicle sale dialog -->
-<div id="drug-stock-overlay" class="pl-modal-overlay" onclick="if(event.target===this)drugsCloseStock()">
-  <div class="pl-modal-box" style="max-width:560px;flex-direction:column;align-items:stretch;gap:10px">
-    <h3 id="drug-stock-title" style="margin:0">Contact stock</h3>
-    <div class="apt-table-wrap">
-      <table class="apt-drugs">
-        <thead><tr><th>Drug</th><th>Price</th><th>On sale</th><th>You own</th><th>Qty to buy</th></tr></thead>
-        <tbody id="drug-stock-rows"></tbody>
-      </table>
-    </div>
-    <div id="drug-stock-cost" class="sell-hint"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button type="button" class="btn-secondary" onclick="drugsCloseStock()">Close</button>
-      <button type="button" class="action-btn" id="drug-stock-buy" onclick="drugsBuy(this)">Buy</button>
-    </div>
-    <div id="drug-stock-result" class="sell-hint"></div>
-  </div>
-</div>
-
-<div id="contact-prices-overlay" class="pl-modal-overlay" onclick="if(event.target===this)drugsHouseClosePrices()">
-  <div class="pl-modal-box" style="max-width:560px;flex-direction:column;align-items:stretch;gap:10px">
-    <h3 id="contact-prices-title" style="margin:0">Contact prices</h3>
-    <div class="apt-table-wrap">
-      <table class="apt-drugs">
-        <thead><tr><th>Drug</th><th>Owned</th><th>Price</th><th>Allowed</th></tr></thead>
-        <tbody id="contact-prices-rows"></tbody>
-      </table>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
-      <button type="button" class="btn-secondary" onclick="drugsHouseUseDefaults()">Use Defaults</button>
-      <button type="button" class="btn-secondary" onclick="drugsHouseClosePrices()">Close</button>
-      <button type="button" class="action-btn" onclick="drugsHouseSavePrices(this)">Update Prices</button>
-    </div>
-    <div id="contact-prices-result" class="sell-hint"></div>
-  </div>
-</div>
-
 <div id="sell-overlay" class="pl-modal-overlay" onclick="if(event.target===this)closeSellOverlay()">
   <form class="pl-modal-box sell-modal" onsubmit="submitSell(event)" autocomplete="off">
     <h3 id="sell-overlay-title"></h3>

@@ -33,12 +33,6 @@
             <span title="Dead characters in the last 3 days">Deaths (3d): <strong id="pl-summary-dead" style="color:#f87171">--</strong></span>
           </div>
           <div class="pl-toolbar">
-            <label class="inline-toggle" title="Auto-whitelist Boss / Don / Godfather / Capo di tutti capi on every list update">Whitelist Bolds
-              <label class="toggle-label">
-                <input type="checkbox" id="pl-bolds-toggle" onchange="plBoldsToggleChanged()">
-                <span class="toggle"></span>
-              </label>
-            </label>
             <label class="inline-toggle" style="white-space:nowrap;margin-left:auto">Active only
               <label class="toggle-label">
                 <input type="checkbox" id="pl-filter-active" checked onchange="plFilter()">
@@ -118,6 +112,13 @@
                     <option value="">All</option>
                     <option value="birth">Births</option>
                     <option value="death">Deaths</option>
+                  </select>
+                  <select id="pl-bd-filter-period" class="pl-filter-input" title="How far back to look" onchange="plRenderBirthsDeaths()">
+                    <option value="3">Last 3 days</option>
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="0" selected>All time</option>
                   </select></th>
                 </tr>
               </thead>
