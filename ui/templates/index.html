@@ -2373,6 +2373,7 @@
         <div class="tab-bar log-tabs">
           <button class="tab-btn active" data-log-tab="text" onclick="ahLogTab('text')">Text Log</button>
           <button class="tab-btn" data-log-tab="db" onclick="ahLogTab('db')">Database</button>
+          <button class="tab-btn" data-log-tab="history" onclick="ahLogTab('history')">Bot History</button>
         </div>
 
         <div data-log-panel="text">
@@ -2389,10 +2390,6 @@
             <div class="ah-top">
               <label for="ah-char">Character</label>
               <select id="ah-char" onchange="ahOnCharChange()"></select>
-            </div>
-            <div class="tab-bar ah-subtabs">
-              <button class="tab-btn active" onclick="ahTab('actions', 'table', this)">Table</button>
-              <button class="tab-btn" onclick="ahTab('actions', 'summary', this)">Character history</button>
             </div>
           </div>
 

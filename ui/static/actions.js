@@ -37,15 +37,20 @@
     if (name === "summary") loadSummary();
   }
 
-  // Top-level Activity Log tabs: Text Log | Database.
+  // Top-level Activity Log tabs: Text Log | Database (table) | Bot History (character
+  // history layout). Database and Bot History share the character picker and import.
   function logTab(name) {
     const sec = document.getElementById("s-log");
+    const ah = name === "db" || name === "history";
     sec.querySelectorAll("[data-log-panel]").forEach(p =>
-      p.classList.toggle("ah-panel-hidden", p.dataset.logPanel !== name));
+      p.classList.toggle("ah-panel-hidden", ah ? p.dataset.logPanel !== "db" : p.dataset.logPanel !== name));
     sec.querySelectorAll("[data-log-tab]").forEach(b =>
       b.classList.toggle("active", b.dataset.logTab === name));
     try { localStorage.setItem("ob-log-tab", name); } catch (e) { /* private mode */ }
-    if (name === "db") init();
+    if (!ah) return;
+    document.querySelectorAll('#action-history [data-ah-group="actions"]').forEach(p =>
+      p.classList.toggle("ah-panel-hidden", p.dataset.ahPanel !== (name === "db" ? "table" : "summary")));
+    init().then(() => { if (name === "history") loadSummary(); });
   }
 
   // ── Characters ────────────────────────────────────────────────────────────
@@ -519,6 +524,6 @@
   document.addEventListener("DOMContentLoaded", () => {
     let tab = "text";
     try { tab = localStorage.getItem("ob-log-tab") || "text"; } catch (e) { /* private mode */ }
-    if (tab === "db") logTab("db");
+    if (tab === "db" || tab === "history") logTab(tab);
   });
 })();
