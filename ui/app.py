@@ -2845,10 +2845,15 @@ def tasks_travel():
 
 @app.route("/restart", methods=["POST"])
 def restart():
-    import sys
+    _restart_process(f"Restart {_who()}", bot.is_running())
+    return jsonify({"ok": True})
+
+
+def _restart_process(reason: str, start_bot: bool):
+    """Stop the bot and relaunch this process in a background thread.
+    start_bot: the relaunched process starts the bot again (pass whether it
+    was running before, so a stopped bot stays stopped)."""
     import threading as _threading
-    reason = f"Restart {_who()}"
-    was_running = bot.is_running()
 
     def _do_restart():
         import time as _time
@@ -2861,7 +2866,7 @@ def restart():
         # --noui: the open tab reloads itself once the server is back.
         # --start-bot: the bot was running, so the restarted one starts it again.
         argv = ([sys.executable] + [a for a in sys.argv if a not in ("--noui", "--start-bot")]
-                + ["--noui"] + (["--start-bot"] if was_running else []))
+                + ["--noui"] + (["--start-bot"] if start_bot else []))
         if sys.platform == "win32":
             import subprocess as _sp
             _sp.Popen(argv)
@@ -2877,7 +2882,6 @@ def restart():
                     pass
             os.execv(sys.executable, argv)
     _threading.Thread(target=_do_restart, daemon=True).start()
-    return jsonify({"ok": True})
 
 
 @app.route("/check_update")
@@ -2901,8 +2905,25 @@ def check_update():
 def apply_update():
     if not _is_git_repo():
         return jsonify({"error": "Not a git repository."}), 400
-    # Pulling while the bot runs is fine: the running code is already loaded.
-    # The new code takes over at the restart, which starts the bot again.
+    # Stop the bot first so nothing runs mid-update (and pip can replace
+    # files a running browser would hold open). After a good update the
+    # process restarts, starting the bot again only if it was running.
+    was_running = bot.is_running()
+    if was_running:
+        bot.stop(f"Update {_who()}")
+        if not bot.wait_stopped(60):
+            print("[update] Bot thread did not stop within 60s — updating anyway.")
+
+    def _fail(msg):
+        # Nothing changed on disk that the old code can't run with: put the
+        # bot back the way it was.
+        if was_running and not bot.is_running():
+            try:
+                bot.start()
+            except Exception as e:
+                print(f"[update] Could not start the bot again: {e}")
+        return jsonify({"error": msg, "restarted_bot": was_running}), 500
+
     # Older versions wrote the tracked available_earns.json at runtime; once
     # its contents live in earn_catalog.json, restore the seed so the dirty
     # file doesn't block the pull.
@@ -2911,7 +2932,7 @@ def apply_update():
     _, old_head = _git_run("rev-parse", "HEAD")
     rc, out = _git_run("pull", "--ff-only", "origin", "main")
     if rc != 0:
-        return jsonify({"error": f"git pull failed: {out}"}), 500
+        return _fail(f"git pull failed: {out}")
     rc, changed = _git_run("diff", "--name-only", old_head, "HEAD")
     if rc != 0 or "requirements.txt" in changed.splitlines():
         r = subprocess.run(
@@ -2920,9 +2941,10 @@ def apply_update():
         )
         pip_out = (r.stdout + r.stderr).strip()
         if r.returncode != 0:
-            return jsonify({"error": f"Update pulled, but installing dependencies failed:\n{pip_out[-2000:]}"}), 500
+            return _fail(f"Update pulled, but installing dependencies failed:\n{pip_out[-2000:]}")
         out += "\n\nDependencies updated."
-    return jsonify({"ok": True, "output": out})
+    _restart_process(f"Update {_who()}", was_running)
+    return jsonify({"ok": True, "output": out, "was_running": was_running})
 
 
 def load_plugins():

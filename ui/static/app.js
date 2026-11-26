@@ -3397,6 +3397,9 @@ function checkForUpdates() {
       document.getElementById("update-modal-title").textContent =
         `Update Available (${d.commits_behind} commit${d.commits_behind !== 1 ? "s" : ""} behind)`;
       document.getElementById("update-modal-body").textContent = d.log || "";
+      document.getElementById("update-modal-note").textContent = _botRunning
+        ? "Installing stops the bot, updates, restarts and starts the bot again."
+        : "Installing updates and restarts. The bot stays stopped.";
       modal.style.display = "flex";
     })
     .catch(() => alert("Could not reach server."))
@@ -3406,18 +3409,30 @@ function checkForUpdates() {
 function applyUpdate() {
   const applyBtn = document.getElementById("apply-update-btn");
   applyBtn.disabled = true;
-  applyBtn.textContent = "Installing…";
+  // The server stops a running bot, updates, then restarts (starting the bot
+  // again only if it was running).
+  applyBtn.textContent = _botRunning ? "Stopping bot and installing…" : "Installing…";
+  let restarting = false;
   fetch("/apply_update", {method: "POST"})
     .then(r => r.json())
     .then(d => {
-      document.getElementById("update-modal").style.display = "none";
-      if (d.error) { alert("Update failed: " + d.error); return; }
-      if (confirm("Update applied. Restart now? A running bot starts again after the restart.\n\n" + (d.output || ""))) {
-        restartBot();
+      if (d.error) {
+        document.getElementById("update-modal").style.display = "none";
+        alert("Update failed: " + d.error + (d.restarted_bot ? "\n\nThe bot was started again." : ""));
+        return;
       }
+      restarting = true;
+      applyBtn.textContent = d.was_running ? "Restarting (bot starts again)…" : "Restarting…";
+      const rb = document.getElementById("restart-btn");
+      if (rb) { rb.disabled = true; rb.textContent = "Restarting…"; }
+      // Give the old server a moment to go down so the first poll doesn't
+      // catch it still answering.
+      setTimeout(_pollUntilBack, 1500);
     })
     .catch(() => alert("Could not reach server."))
-    .finally(() => { applyBtn.disabled = false; applyBtn.textContent = "Install Update"; });
+    .finally(() => {
+      if (!restarting) { applyBtn.disabled = false; applyBtn.textContent = "Install Update"; }
+    });
 }
 
 function restartBot() {
