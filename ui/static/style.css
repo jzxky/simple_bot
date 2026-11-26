@@ -2344,3 +2344,20 @@ body.setup-open { overflow: hidden; }
 /* Drugs tab: contact stock / contact prices open inline under their contact list */
 .drug-inline-panel { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface2); }
 .drug-inline-panel h4 { margin-top: 0; }
+
+/* Version label, bottom-left corner */
+.app-version {
+  position: fixed;
+  left: 10px;
+  bottom: 8px;
+  z-index: 900;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.7;
+  pointer-events: none;
+  user-select: none;
+}
+/* Phones have no side margin to sit in: put it at the end of the page instead. */
+@media (max-width: 720px) {
+  .app-version { position: static; padding: 4px 12px 12px; }
+}
