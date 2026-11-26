@@ -1912,6 +1912,13 @@
                   <button type="button" class="btn-secondary" onclick="findThreadId()">Find ID</button>
                 </div>
               </div>
+              <label class="inline-toggle setting-row" title="Runs the top job sniper in its own browser tab so other tasks keep running while it snipes. Off: it snipes in the main tab and every other task waits until the snipe ends.">Run sniper in its own tab
+                <label class="toggle-label"><input type="checkbox" id="snipe_own_tab" {% if promo.get('snipe_own_tab', True) %}checked{% endif %} onchange="autoSave()"><span class="toggle"></span></label>
+              </label>
+              <div class="setting-row" title="Seconds between the starts of the sniper's main.asp checks. 0 = start the next check as soon as the last one finishes. A check can't go faster than the page loads. Changes apply to a running snipe within a few seconds.">
+                <label for="snipe_interval">Snipe refresh interval (seconds)</label>
+                <input type="text" inputmode="decimal" id="snipe_interval" value="{{ promo.get('snipe_interval', 1.0) }}" placeholder="1" style="width:80px;" onchange="autoSave()">
+              </div>
               <div class="setting-row">
                 <span>Manual Snipe</span>
                 <button type="button" class="btn-secondary" onclick="startSnipe()">Start Snipe</button>

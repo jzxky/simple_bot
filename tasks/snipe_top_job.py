@@ -3,11 +3,17 @@ Hammers main.asp until the promotion page for the target top job appears,
 then submits it and makes the forum announcement (promo_post.py) if a thread
 ID is configured; whatever isn't confirmed is retried by PromoForumPostTask.
 
-Runs in the side browser (side_browser.py) — a separate patchright instance on
-its own thread — so the refresh loop is never held up by the main bot loop: it
-starts a main.asp load every SNIPE_INTERVAL seconds (or immediately after the
-previous load if that took longer). The scheduler only launches it; the main
-loop keeps running every other task on the main browser meanwhile.
+Two modes (config: promo.snipe_own_tab, default on):
+  - Own tab: runs in the side browser (side_browser.py) — a separate patchright
+    instance on its own thread — so the refresh loop is never held up by the
+    main bot loop. The scheduler only launches it; the main loop keeps running
+    every other task on the main browser meanwhile.
+  - Main tab: runs inline on the main browser tab. Every other task waits until
+    the snipe ends (promotion, timeout, cancel or Stop).
+
+Either way it starts a main.asp load every promo.snipe_interval seconds
+(default 1, re-read every few seconds so a change applies mid-snipe), or
+immediately after the previous load if that took longer.
 """
 
 import re
@@ -23,8 +29,27 @@ from promotions import PROMO_BY_RANK, get_choice
 import promo_post
 
 SNIPE_TIMEOUT = 30 * 60  # seconds
-SNIPE_INTERVAL = 1.0     # seconds between the starts of consecutive main.asp loads
+SNIPE_INTERVAL = 1.0     # default seconds between the starts of consecutive main.asp loads
+MIN_SNIPE_INTERVAL = 0.0  # 0 = back-to-back loads
+_INTERVAL_RELOAD_EVERY = 5.0  # seconds between config re-reads of the interval
 _NAV_ERROR_LOG_EVERY = 30  # log 1st, 31st, 61st... consecutive nav error
+
+
+def snipe_interval(c: dict = None) -> float:
+    """Seconds between the starts of consecutive main.asp loads (promo.snipe_interval)."""
+    c = c if c is not None else cfg.load()
+    try:
+        v = float(c.get("promo", {}).get("snipe_interval", SNIPE_INTERVAL))
+    except (TypeError, ValueError):
+        return SNIPE_INTERVAL
+    if v != v:  # NaN
+        return SNIPE_INTERVAL
+    return max(MIN_SNIPE_INTERVAL, v)
+
+
+def own_tab_enabled(c: dict = None) -> bool:
+    c = c if c is not None else cfg.load()
+    return bool(c.get("promo", {}).get("snipe_own_tab", True))
 
 
 class SnipeTopJobTask(Task):
@@ -66,10 +91,18 @@ class SnipeTopJobTask(Task):
         promo_url = state.snipe_top_job_promo_url
         top_job = state.next_rank or "Unknown"
         _bot._cancel_snipe_event.clear()
+        c = cfg.load()
+        interval = snipe_interval(c)
         state.snipe_active = True
-        state.add_log(f"SnipeTopJob: starting in side browser — targeting {top_job}, "
-                      f"refreshing main.asp every {SNIPE_INTERVAL:g}s for up to 30 minutes.")
-        headless = cfg.load().get("misc", {}).get("headless", False)
+        if not own_tab_enabled(c):
+            state.add_log(f"SnipeTopJob: starting in the main tab — targeting {top_job}, "
+                          f"refreshing main.asp every {interval:g}s for up to 30 minutes. "
+                          f"Other tasks wait until the snipe ends.")
+            self._main_tab_snipe(state, promo_url, top_job)
+            return
+        state.add_log(f"SnipeTopJob: starting in its own tab — targeting {top_job}, "
+                      f"refreshing main.asp every {interval:g}s for up to 30 minutes.")
+        headless = c.get("misc", {}).get("headless", False)
         # Runs in its own side-browser lane, alongside any crime run. An armed
         # robbery run (which can hospitalise the character) sees snipe_active
         # and stops at its next attempt.
@@ -78,6 +111,37 @@ class SnipeTopJobTask(Task):
             lambda side, job: self._snipe_job(side, job, state, promo_url, top_job),
             cookies=browser.export_cookies(), headless=headless,
         )
+
+    # ------------------------------------------------------------------
+    # Main-tab mode
+    # ------------------------------------------------------------------
+
+    def _main_tab_snipe(self, state: GameState, promo_url: str, top_job: str):
+        """Main thread: run the refresh loop on the main browser tab, blocking
+        the bot loop until it ends. Stop and the Cancel Snipe button both set
+        _cancel_snipe_event, which the loop checks between loads."""
+        import bot as _bot
+        promoted = False
+        pg = None
+        try:
+            pg = browser.page()
+            if not state.in_home_city():
+                state.add_log(f"SnipeTopJob: not in home city ({state.home_city}), travelling from {state.current_city}.")
+                self._inline_travel(pg, state.home_city, state)
+            promoted = self._snipe_loop(
+                pg, state, promo_url, top_job,
+                stop_reason=lambda: None,
+                wait=_bot._cancel_snipe_event.wait,
+                on_session_lost=lambda: (state.add_log(
+                    "SnipeTopJob: main tab logged out — stopping; the bot will log back in."), False)[1],
+            )
+        except Exception as e:
+            if browser.is_lost_error(e):
+                state.add_log(f"SnipeTopJob: main browser lost — {e}")
+            else:
+                state.add_log(f"SnipeTopJob: error: {e}")
+        finally:
+            self._finish(state, top_job, pg, promoted, side=None)
 
     # ------------------------------------------------------------------
     # Worker thread
@@ -98,98 +162,132 @@ class SnipeTopJobTask(Task):
                 state.add_log(f"SnipeTopJob: not in home city ({state.home_city}), travelling from {state.current_city}.")
                 self._inline_travel(pg, state.home_city, state)
 
-            deadline = time.monotonic() + SNIPE_TIMEOUT
-            next_at = time.monotonic()
-            nav_errors = 0
-            cf_warned = False
-            while True:
-                if _bot._cancel_snipe_event.is_set():
-                    _bot._cancel_snipe_event.clear()
-                    state.add_log("SnipeTopJob: cancelled by user.")
-                    return
-                if job.cancel.is_set():
-                    state.add_log(f"SnipeTopJob: stopped — {job.cancel_reason or 'cancelled'}.")
-                    return
-                if time.monotonic() >= deadline:
-                    state.add_log("SnipeTopJob: timed out after 30 minutes without promotion.")
-                    return
-                wait = next_at - time.monotonic()
-                if wait > 0:
-                    # Short slices so a cancel is noticed promptly.
-                    job.cancel.wait(min(wait, 0.25))
-                    continue
-                next_at = time.monotonic() + SNIPE_INTERVAL
-
-                try:
-                    html = browser.navigate_page(pg, urls.BASE_URL + "/main.asp")
-                except Exception as e:
-                    if browser.is_lost_error(e):
-                        state.add_log(f"SnipeTopJob: side browser lost — {e}")
-                        return
-                    if nav_errors % _NAV_ERROR_LOG_EVERY == 0:
-                        state.add_log(f"SnipeTopJob: nav error: {e}")
-                    nav_errors += 1
-                    continue
-                nav_errors = 0
-
-                if "Just a moment" in (pg.title() or ""):
-                    if not cf_warned:
-                        state.add_log("SnipeTopJob: Cloudflare challenge in the side browser — "
-                                      "complete it in that window; still retrying.")
-                        cf_warned = True
-                    continue
-                cf_warned = False
-
-                if pg.url.rstrip("/") == urls.BASE_URL + "/default.asp":
-                    state.add_log("SnipeTopJob: side browser session lost — fetching fresh cookies.")
-                    if not side.refresh_cookies(job):
-                        state.add_log("SnipeTopJob: no fresh session available — stopping.")
-                        return
-                    continue
-
-                temp = GameState()
-                parse_state(html, pg.url, temp)
-
-                if temp.server_time:
-                    state.server_time = temp.server_time
-                    state.server_time_monotonic = temp.server_time_monotonic
-
-                if temp.occupation == top_job:
-                    state.occupation = temp.occupation
-                    state.add_log(f"SnipeTopJob: occupation updated to {top_job} via state parse.")
-                    promoted = True
-                    return
-
-                if pg.url.rstrip("/") == promo_url.rstrip("/"):
-                    state.add_log("SnipeTopJob: promotion page detected — submitting.")
-                    if self._submit_promo(state, top_job, pg):
-                        promoted = True
-                        return
+            promoted = self._snipe_loop(
+                pg, state, promo_url, top_job,
+                stop_reason=lambda: (job.cancel_reason or "cancelled") if job.cancel.is_set() else None,
+                wait=job.cancel.wait,
+                on_session_lost=lambda: self._side_session_lost(side, job, state),
+            )
         finally:
-            if promoted:
-                # Recorded before anything else can fail: the main loop's
-                # PromoForumPostTask retries the post until it's confirmed.
-                try:
-                    promo_post.mark_pending(state, top_job)
-                except Exception as e:
-                    state.add_log(f"SnipeTopJob: couldn't record the pending forum post: {e}")
+            self._finish(state, top_job, pg, promoted, side=side)
+
+    def _side_session_lost(self, side, job, state: GameState) -> bool:
+        state.add_log("SnipeTopJob: side browser session lost — fetching fresh cookies.")
+        if not side.refresh_cookies(job):
+            state.add_log("SnipeTopJob: no fresh session available — stopping.")
+            return False
+        return True
+
+    def _snipe_loop(self, pg, state: GameState, promo_url: str, top_job: str,
+                    stop_reason, wait, on_session_lost) -> bool:
+        """Refresh main.asp until promoted (True) or stopped / timed out (False).
+
+        stop_reason() -> str | None: a reason to stop now (besides the Cancel
+        Snipe button). wait(seconds): sleeps, waking early on a cancel.
+        on_session_lost() -> bool: called on a logged-out page; True to carry on.
+        """
+        import bot as _bot
+        deadline = time.monotonic() + SNIPE_TIMEOUT
+        interval = snipe_interval()
+        interval_read_at = time.monotonic()
+        next_at = time.monotonic()
+        nav_errors = 0
+        cf_warned = False
+        while True:
+            if _bot._cancel_snipe_event.is_set():
+                _bot._cancel_snipe_event.clear()
+                state.add_log("SnipeTopJob: cancelled by user.")
+                return False
+            reason = stop_reason()
+            if reason:
+                state.add_log(f"SnipeTopJob: stopped — {reason}.")
+                return False
+            now = time.monotonic()
+            if now >= deadline:
+                state.add_log("SnipeTopJob: timed out after 30 minutes without promotion.")
+                return False
+            wait_s = next_at - now
+            if wait_s > 0:
+                # Short slices so a cancel is noticed promptly.
+                wait(min(wait_s, 0.25))
+                continue
+            if now - interval_read_at >= _INTERVAL_RELOAD_EVERY:
+                interval_read_at = now
+                new_interval = snipe_interval()
+                if new_interval != interval:
+                    state.add_log(f"SnipeTopJob: refresh interval changed to {new_interval:g}s.")
+                    interval = new_interval
+            next_at = now + interval
+
             try:
-                if promoted and pg is not None:
-                    if not state.in_home_city():
-                        state.add_log(f"SnipeTopJob: retrying travel to home city ({state.home_city}) after promotion.")
-                        self._inline_travel(pg, state.home_city, state)
-                    self._post_forum(state, top_job, pg)
+                html = browser.navigate_page(pg, urls.BASE_URL + "/main.asp")
             except Exception as e:
-                state.add_log(f"SnipeTopJob: post-promotion error: {e}")
-            if pg is not None:
-                side.close_page(pg)
-            if promoted:
-                # New rank → the available earns often change; the main bot
-                # loop refreshes the list (this thread can't use the main browser).
-                state.earn_catalog_refresh_pending = True
-            state.snipe_top_job_pending = False
-            state.snipe_top_job_promo_url = ""
-            state.snipe_active = False
+                if browser.is_lost_error(e):
+                    state.add_log(f"SnipeTopJob: browser lost — {e}")
+                    return False
+                if nav_errors % _NAV_ERROR_LOG_EVERY == 0:
+                    state.add_log(f"SnipeTopJob: nav error: {e}")
+                nav_errors += 1
+                continue
+            nav_errors = 0
+
+            if "Just a moment" in (pg.title() or ""):
+                if not cf_warned:
+                    state.add_log("SnipeTopJob: Cloudflare challenge in the snipe tab — "
+                                  "complete it in that window; still retrying.")
+                    cf_warned = True
+                continue
+            cf_warned = False
+
+            if pg.url.rstrip("/") == urls.BASE_URL + "/default.asp":
+                if not on_session_lost():
+                    return False
+                continue
+
+            temp = GameState()
+            parse_state(html, pg.url, temp)
+
+            if temp.server_time:
+                state.server_time = temp.server_time
+                state.server_time_monotonic = temp.server_time_monotonic
+
+            if temp.occupation == top_job:
+                state.occupation = temp.occupation
+                state.add_log(f"SnipeTopJob: occupation updated to {top_job} via state parse.")
+                return True
+
+            if pg.url.rstrip("/") == promo_url.rstrip("/"):
+                state.add_log("SnipeTopJob: promotion page detected — submitting.")
+                if self._submit_promo(state, top_job, pg):
+                    return True
+
+    def _finish(self, state: GameState, top_job: str, pg, promoted: bool, side=None):
+        """Shared clean-up for both modes. side is None in main-tab mode (the
+        main tab is left open)."""
+        if promoted:
+            # Recorded before anything else can fail: the main loop's
+            # PromoForumPostTask retries the post until it's confirmed.
+            try:
+                promo_post.mark_pending(state, top_job)
+            except Exception as e:
+                state.add_log(f"SnipeTopJob: couldn't record the pending forum post: {e}")
+        try:
+            if promoted and pg is not None:
+                if not state.in_home_city():
+                    state.add_log(f"SnipeTopJob: retrying travel to home city ({state.home_city}) after promotion.")
+                    self._inline_travel(pg, state.home_city, state)
+                self._post_forum(state, top_job, pg)
+        except Exception as e:
+            state.add_log(f"SnipeTopJob: post-promotion error: {e}")
+        if pg is not None and side is not None:
+            side.close_page(pg)
+        if promoted:
+            # New rank → the available earns often change; the main bot
+            # loop refreshes the list.
+            state.earn_catalog_refresh_pending = True
+        state.snipe_top_job_pending = False
+        state.snipe_top_job_promo_url = ""
+        state.snipe_active = False
 
     def stop(self, reason: str = "stopped"):
         """Main thread: ask a running snipe to stop."""

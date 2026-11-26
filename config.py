@@ -165,6 +165,8 @@ DEFAULT_CONFIG = {
     "promo": {
         "monitor_top_job": False,
         "top_job_thread_id": "",
+        "snipe_own_tab": True,             # run the top job sniper in its own (side browser) tab
+        "snipe_interval": 1.0,             # seconds between the sniper's main.asp loads (0 = back-to-back)
         "auto_promo": {"enabled": False},
         "choices": {
             "schooled": "A", "mule": "A", "hardrock": "A", "lifer": "A",

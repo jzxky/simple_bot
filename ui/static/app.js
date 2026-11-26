@@ -501,6 +501,8 @@ function _buildPayload() {
     payback_mode: document.getElementById("payback_mode").value,
     monitor_top_job: document.getElementById("monitor_top_job").checked,
     promo_thread_id: (document.getElementById("promo_thread_id") || {value:""}).value.trim(),
+    snipe_own_tab: (document.getElementById("snipe_own_tab") || {checked:true}).checked,
+    snipe_interval: (document.getElementById("snipe_interval") || {value:"1"}).value.trim(),
     auto_promo_enabled: document.getElementById("auto_promo_enabled")?.checked ?? false,
     promo_choices: _collectPromoChoices(),
     crossroads_enabled: (document.getElementById("crossroads_enabled")||{checked:false}).checked,

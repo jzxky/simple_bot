@@ -485,6 +485,14 @@ def _apply_payload(c: dict, data: dict) -> dict:
     c.setdefault("promo", {})
     c["promo"]["monitor_top_job"] = data.get("monitor_top_job", False)
     c["promo"]["top_job_thread_id"] = data.get("promo_thread_id", "")
+    c["promo"]["snipe_own_tab"] = bool(data.get("snipe_own_tab", c["promo"].get("snipe_own_tab", True)))
+    if "snipe_interval" in data:
+        try:
+            v = float(str(data.get("snipe_interval")).strip())
+            if v == v and v >= 0:  # not NaN, not negative
+                c["promo"]["snipe_interval"] = round(v, 3)
+        except (TypeError, ValueError):
+            pass  # keep the previous value on bad input
     c["promo"].setdefault("auto_promo", {})
     c["promo"]["auto_promo"]["enabled"] = data.get("auto_promo_enabled", False)
     if "promo_choices" in data and isinstance(data.get("promo_choices"), dict):
