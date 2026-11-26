@@ -61,6 +61,9 @@ class SmartTravelTask(Task):
             return False
         if no_vehicle_cooldown_active():
             return False
+        from executor import vehicle_repair_pending
+        if vehicle_repair_pending():
+            return False
         from executor import drug_stock_travel_block_active
         if drug_stock_travel_block_active():
             return False
@@ -95,6 +98,9 @@ class SmartTravelTask(Task):
             reasons.append("Warrant travel cooldown")
         if no_vehicle_cooldown_active():
             reasons.append("No vehicle cooldown")
+        from executor import vehicle_repair_pending, vehicle_repair_remaining
+        if vehicle_repair_pending():
+            reasons.append(f"Vehicle in for repairs ({vehicle_repair_remaining() // 60 + 1}m max)")
         from executor import drug_stock_travel_block_active
         if drug_stock_travel_block_active():
             reasons.append("Carrying drug house stock")

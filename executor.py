@@ -96,6 +96,30 @@ def no_vehicle_cooldown_active() -> bool:
     return time.monotonic() < _no_vehicle_cooldown_until
 
 
+# Vehicle booked in for repairs: own-vehicle travel waits for the "repairs
+# completed" journal, or this fallback time if the journal never shows up.
+_vehicle_repair_until: float = 0.0
+_VEHICLE_REPAIR_FALLBACK = 1800
+
+
+def vehicle_repair_pending() -> bool:
+    return time.monotonic() < _vehicle_repair_until
+
+
+def vehicle_repair_remaining() -> int:
+    return max(0, int(_vehicle_repair_until - time.monotonic()))
+
+
+def _mark_vehicle_in_repair():
+    global _vehicle_repair_until
+    _vehicle_repair_until = time.monotonic() + _VEHICLE_REPAIR_FALLBACK
+
+
+def clear_vehicle_repair_pending():
+    global _vehicle_repair_until
+    _vehicle_repair_until = 0.0
+
+
 _gym_travel_cooldown_until: float = 0.0
 
 
@@ -134,6 +158,7 @@ def reset_all_cooldowns():
     _drug_stock_travel_block_until = 0.0
     _drug_manufacture_cooldown_until = 0.0
     _no_vehicle_cooldown_until = 0.0
+    clear_vehicle_repair_pending()
     _gym_travel_cooldown_until = 0.0
     _launder_cooldown_until = 0.0
     _launder_cooldown_city = ""
@@ -6454,6 +6479,18 @@ def handle_repair_vehicle(action: Action, state: GameState) -> bool:
     if _NO_VEHICLE_TEXT in state.page_html.lower():
         state.add_log("Repair vehicle: no vehicle to repair.")
         return False
+    repair_soup = BeautifulSoup(state.page_html, "html.parser")
+    no_repairs = repair_soup.find("div", id="fail")
+    if no_repairs and "doesn't need any repairs" in no_repairs.get_text():
+        state.add_log("Repair vehicle: vehicle doesn't need any repairs.")
+        return False
+    if repair_soup.find("select", attrs={"name": "display"}) is None:
+        # No booking form: the vehicle is already booked in for repairs. Clicking
+        # the missing form would just time out, so wait for the repair instead.
+        _mark_vehicle_in_repair()
+        state.add_log("Repair vehicle: vehicle is already booked in for repairs — "
+                      f"waiting for the repairs journal (max {_VEHICLE_REPAIR_FALLBACK // 60}m).")
+        return True
     cost = _parse_repair_cost(state.page_html)
     if cost is None:
         state.add_log("Repair vehicle: could not parse repair cost — attempting repair anyway.")
@@ -6476,6 +6513,7 @@ def handle_repair_vehicle(action: Action, state: GameState) -> bool:
     if _NO_VEHICLE_TEXT in state.page_html.lower():
         state.add_log("Repair vehicle: booking failed.")
         return False
+    _mark_vehicle_in_repair()
     state.add_log("Repair vehicle: repair booked successfully.")
     return True
 
@@ -6660,6 +6698,10 @@ def handle_travel(action: Action, state: GameState) -> int:
         global _no_vehicle_cooldown_until
         if time.monotonic() < _no_vehicle_cooldown_until:
             state.add_log("Travel: no-vehicle cooldown active — skipping travel.")
+            return 0
+        if vehicle_repair_pending():
+            state.add_log(f"Travel: vehicle is in for repairs — skipping travel to {target} "
+                          f"(up to {vehicle_repair_remaining() // 60 + 1}m left).")
             return 0
         pct = handle_check_vehicle(Action("check_vehicle"), state)
         if pct == -1:
