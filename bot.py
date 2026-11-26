@@ -660,7 +660,9 @@ def _run(c: dict):
                 if not _repair_complete_queue.empty():
                     try:
                         _repair_complete_queue.get_nowait()
-                        from executor import get_pending_vehicle_travel_target, clear_pending_vehicle_travel_target
+                        from executor import (get_pending_vehicle_travel_target, clear_pending_vehicle_travel_target,
+                                              clear_vehicle_repair_pending)
+                        clear_vehicle_repair_pending()
                         pending = get_pending_vehicle_travel_target()
                         clear_pending_vehicle_travel_target()
                         if pending:
