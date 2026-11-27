@@ -50,6 +50,16 @@ class Scheduler:
         except Exception:
             pass
 
+    def inherit_errors(self, old: "Scheduler"):
+        """Carry error cooldowns over from the scheduler this one replaces
+        (matched by task type), so a config save doesn't retry a failing task
+        at once."""
+        by_type = {type(t): old._errors[id(t)] for t in old._tasks if id(t) in old._errors}
+        for task in self._tasks:
+            err = by_type.get(type(task))
+            if err is not None:
+                self._errors[id(task)] = err
+
     def add(self, task: Task):
         self._tasks.append(task)
         self._tasks.sort(key=lambda t: t.priority, reverse=True)
