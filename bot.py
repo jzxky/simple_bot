@@ -6,6 +6,7 @@ import threading
 import time
 import queue
 import os
+import re
 from datetime import datetime
 import config as cfg
 import paths
@@ -163,19 +164,38 @@ _drug_task_request: queue.Queue = queue.Queue()
 state = GameState()
 
 
+# Private task attributes that hold run-time state (timers, backoffs, one-shot
+# flags) rather than settings. They survive a config save; anything else is
+# rebuilt from the new config. Name new run-time state to match.
+_RUNTIME_ATTR_RE = re.compile(r"^_(last|next)|_(until|at|exhausted|fired|cooldown)$")
+_RUNTIME_ATTRS = {"_done", "_discovered", "_warned_unknown", "_pending_profiles",
+                  "_profile_requests", "_covered_sig"}
+
+
+def _is_runtime_attr(name: str) -> bool:
+    return name in _RUNTIME_ATTRS or bool(_RUNTIME_ATTR_RE.search(name))
+
+
 def _transfer_state(old_sched: Scheduler, new_sched: Scheduler):
-    """Copy timer/state fields from old tasks to matching new tasks by type."""
+    """Copy run-time state (see _is_runtime_attr) from old tasks to the new
+    tasks of the same type, and carry over error cooldowns, so saving settings
+    doesn't make backed-off tasks fire again at once."""
     if old_sched is None:
         return
     old_by_type = {type(t): t for t in old_sched._tasks}
     for new_task in new_sched._tasks:
         old = old_by_type.get(type(new_task))
-        if old is None:
+        if old is None or old is new_task:
             continue
-        for attr in ("_last_run", "_last_fired", "_last_checked", "_cooldown_until", "_hack_exhausted",
-                     "_last_wait_check"):
-            if hasattr(old, attr):
-                setattr(new_task, attr, getattr(old, attr))
+        for attr, value in vars(old).items():
+            if _is_runtime_attr(attr):
+                setattr(new_task, attr, value)
+    new_sched.inherit_errors(old_sched)
+
+
+def _agg_settings(task) -> dict:
+    """The settings an AggCrimeTask was built with (its public attributes)."""
+    return {k: v for k, v in vars(task).items() if not k.startswith("_") and k != "scheduler"}
 
 
 def _restart_browser(state: GameState, c: dict = None) -> bool:
@@ -231,8 +251,9 @@ def _scheduled_restart_due(state: GameState, c: dict) -> bool:
     return not (state.snipe_active or state.agg_tab_active or state.drug_tab_active)
 
 
-def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
+def _build_scheduler(c: dict, old_sched: Scheduler = None, state: GameState = None) -> Scheduler:
     sched = Scheduler()
+    old_agg = next((t for t in old_sched._tasks if isinstance(t, AggCrimeTask)), None) if old_sched else None
 
     creds = c.get("credentials", {})
     sched.add(LoginTask(creds.get("email", ""), creds.get("password", "")))
@@ -272,6 +293,10 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
             torch_payback_private=torch.get("torch_payback_private", "everyone"),
             separate_tab=ac.get("separate_tab", False),
         )
+        if old_agg is not None and _agg_settings(old_agg) == _agg_settings(agg_task):
+            # Crime settings unchanged: keep the same task so a crime-tab run
+            # in progress carries on through the save.
+            agg_task = old_agg
         agg_task.scheduler = sched
         sched.add(agg_task)
         sched.add(CSPunishmentTask())
@@ -413,6 +438,11 @@ def _build_scheduler(c: dict, old_sched: Scheduler = None) -> Scheduler:
     sched.add(JailDutiesTask())
     sched.add(JailActionTask())
     sched.add(JailConsumeTask())
+
+    if old_agg is not None and old_agg is not _agg_task and state is not None and state.agg_tab_active:
+        # Crime settings changed (or crimes turned off): finish the old run so
+        # its tab isn't left running against settings that no longer apply.
+        old_agg.stop_tab(state)
 
     _transfer_state(old_sched, sched)
     return sched
@@ -704,14 +734,12 @@ def _run(c: dict):
                     break
 
                 # Reload config and rebuild scheduler if Save was pressed (debounced).
-                # Rebuilding replaces the AggCrimeTask instance, so finish any tab run
-                # first — otherwise its page/generator would be orphaned.
+                # A crime-tab run keeps going unless its own settings changed
+                # (_build_scheduler stops it then).
                 if _reload_event.is_set() and time.monotonic() - _reload_requested_at >= _RELOAD_DEBOUNCE:
                     _reload_event.clear()
-                    if state.agg_tab_active and _agg_task is not None:
-                        _agg_task.stop_tab(state)
                     c = cfg.load()
-                    sched = _build_scheduler(c, old_sched=sched)
+                    sched = _build_scheduler(c, old_sched=sched, state=state)
                     _sched = sched
                     state.add_log("Config reloaded.")
 
