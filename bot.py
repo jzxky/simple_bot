@@ -478,6 +478,19 @@ def _should_payback(target: str, c: dict, mode: str = None) -> bool:
     return False
 
 
+def _execute_for_reply(executor, state: GameState, kind: str, **params):
+    """Run a UI-requested action on the bot thread and return its reply.
+    Actions run synchronously, so the reply (or the error, see
+    ActionExecutor.execute) is already queued when execute() returns —
+    nothing is gained by waiting, and waiting would stall every task."""
+    result_q = queue.Queue()
+    executor.execute(Action(kind, result_queue=result_q, **params), state)
+    try:
+        return result_q.get_nowait()
+    except queue.Empty:
+        return RuntimeError("The request failed — see the log.")
+
+
 def _run(c: dict):
     global state
     headless = c.get("misc", {}).get("headless", False)
@@ -577,9 +590,7 @@ def _run(c: dict):
                 if not _interact_request.empty():
                     try:
                         params = _interact_request.get_nowait()
-                        result_q = queue.Queue()
-                        executor.execute(Action("interact", result_queue=result_q, **params), state)
-                        _interact_result.put(result_q.get(timeout=90))
+                        _interact_result.put(_execute_for_reply(executor, state, "interact", **params))
                     except Exception as e:
                         _interact_result.put(e)
 
@@ -587,12 +598,7 @@ def _run(c: dict):
                 if not _profile_task_request.empty():
                     try:
                         kind, params = _profile_task_request.get_nowait()
-                        result_q = queue.Queue()
-                        executor.execute(Action(kind, result_queue=result_q, **params), state)
-                        try:
-                            _profile_task_result.put(result_q.get(timeout=60))
-                        except queue.Empty:
-                            _profile_task_result.put(RuntimeError("The request failed — see the log."))
+                        _profile_task_result.put(_execute_for_reply(executor, state, kind, **params))
                     except Exception as e:
                         _profile_task_result.put(e)
 
@@ -620,9 +626,7 @@ def _run(c: dict):
                 if not _warrants_request.empty():
                     try:
                         _warrants_request.get_nowait()
-                        result_q = queue.Queue()
-                        executor.execute(Action("check_warrants", result_queue=result_q), state)
-                        _warrants_result.put(result_q.get(timeout=30))
+                        _warrants_result.put(_execute_for_reply(executor, state, "check_warrants"))
                     except Exception as e:
                         _warrants_result.put(e)
 
@@ -790,9 +794,7 @@ def _run(c: dict):
                 if not _profile_request.empty():
                     try:
                         _profile_request.get_nowait()
-                        result_q = queue.Queue()
-                        executor.execute(Action("fetch_profile", result_queue=result_q), state)
-                        _profile_result.put(result_q.get(timeout=30))
+                        _profile_result.put(_execute_for_reply(executor, state, "fetch_profile"))
                     except Exception as e:
                         _profile_result.put(e)
 
@@ -800,9 +802,7 @@ def _run(c: dict):
                 if not _game_settings_request.empty():
                     try:
                         kind, params = _game_settings_request.get_nowait()
-                        result_q = queue.Queue()
-                        executor.execute(Action(kind, result_queue=result_q, **params), state)
-                        _game_settings_result.put(result_q.get(timeout=30))
+                        _game_settings_result.put(_execute_for_reply(executor, state, kind, **params))
                     except Exception as e:
                         _game_settings_result.put(e)
 
@@ -925,12 +925,32 @@ def start():
     _pause_event.clear()
     _cancel_snipe_event.clear()
     _cancel_agg_event.clear()
+    _drop_stale_requests()
     c = cfg.load()
     _thread = threading.Thread(target=_run, args=(c,), daemon=True)
     _thread.start()
 
 
 _stop_reason = ""
+
+# Game events found in journals (drug trades, illness, finished repairs) are
+# still worth acting on after a restart; everything else in a queue is a UI
+# click from the previous run.
+_KEEP_ON_START = ("_drug_trade_queue", "_illness_queue", "_repair_complete_queue")
+
+
+def _drop_stale_requests():
+    """Forget UI requests left from the previous run, so a travel, withdraw
+    or skill clicked just before Stop doesn't run hours later on Start."""
+    for name, obj in list(globals().items()):
+        if isinstance(obj, queue.Queue) and name.startswith("_") and name not in _KEEP_ON_START:
+            while True:
+                try:
+                    obj.get_nowait()
+                except queue.Empty:
+                    break
+    for ev in (_reload_event, _clear_earn_event, _clear_jail_duty_queue_event, _run_jail_duties_event):
+        ev.clear()
 
 
 def stop(reason: str = ""):

@@ -16,14 +16,13 @@ Either way it starts a main.asp load every promo.snipe_interval seconds
 immediately after the previous load if that took longer.
 """
 
-import re
 import time
 import config as cfg
 import browser
 import side_browser
 import urls
 from state import GameState, parse_state
-from tasks.base import Task, Action
+from tasks.base import Task
 from tasks.check_top_job import TOP_JOB_MAP as _TOP_JOB_MAP
 from promotions import PROMO_BY_RANK, get_choice
 import promo_post
@@ -148,7 +147,6 @@ class SnipeTopJobTask(Task):
     # ------------------------------------------------------------------
 
     def _snipe_job(self, side, job, state: GameState, promo_url: str, top_job: str):
-        import bot as _bot
         pg = None
         promoted = False
         try:

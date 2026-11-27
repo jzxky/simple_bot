@@ -47,7 +47,6 @@ class CheckTopJobTask(Task):
             return False
         if state.next_rank not in _TOP_JOB_PATHS:
             return False
-        top_job = state.next_rank
         if state.rank_progress < 100:
             return False
         return time.monotonic() - self._last_run >= _CHECK_INTERVAL

@@ -8,7 +8,6 @@ ArchiveJournalsTask — explicit, triggered from UI via a queue.
 import json
 import queue
 import re
-from datetime import datetime
 from pathlib import Path
 
 from tasks.base import Task, Action
