@@ -130,9 +130,12 @@ class GameState:
 
     @property
     def ingame_mins(self) -> "int | None":
-        if self.server_time is None:
+        # Estimated from the last page load, so it keeps moving while the bot
+        # waits without loading a page.
+        now = self._estimated_server_time()
+        if now is None:
             return None
-        return self.server_time.hour * 60 + self.server_time.minute
+        return now.hour * 60 + now.minute
 
 
     def agg_fail_count(self) -> int:
@@ -171,7 +174,8 @@ class GameState:
         return False
 
     def add_log(self, message: str):
-        ts = self.server_time.strftime("%H:%M:%S") if self.server_time else "?"
+        now = self._estimated_server_time()
+        ts = now.strftime("%H:%M:%S") if now else "?"
         entry = f"[{ts}] {message}"
         self.log.append(entry)
         if len(self.log) > 200:
@@ -183,7 +187,8 @@ class GameState:
         print(entry)
 
     def push_notification(self, event_type: str, message: str):
-        ts = self.server_time.strftime("%H:%M:%S") if self.server_time else "?"
+        now = self._estimated_server_time()
+        ts = now.strftime("%H:%M:%S") if now else "?"
         entry = notifications_store.add(event_type, message, ts)
         self.notifications.append(entry)
 

@@ -106,15 +106,26 @@ def _poll(city: str):
         return
     with _lock:
         try:
-            _poll_seconds = max(5, int(resp.get("poll_seconds") or _DEFAULT_POLL))
-        except (TypeError, ValueError):
-            _poll_seconds = _DEFAULT_POLL
-        _tasks[:] = [t for t in (resp.get("tasks") or []) if isinstance(t, dict) and t.get("type")]
-        _supported = True
-        _last_ok = time.monotonic()
-        _last_error = ""
-        _next_poll = _last_ok + _poll_seconds
-        _in_flight = False
+            if not isinstance(resp, dict):
+                # Not a war-task reply (a proxy page, `null`): treat it like a
+                # network error. Raising here with _in_flight still set used to
+                # stop polling until the bot restarted.
+                _last_error = "Unexpected reply from the hub"
+                _next_poll = time.monotonic() + max(_ERROR_RETRY_MIN, _poll_seconds)
+                return
+            try:
+                _poll_seconds = max(5, int(resp.get("poll_seconds") or _DEFAULT_POLL))
+            except (TypeError, ValueError):
+                _poll_seconds = _DEFAULT_POLL
+            tasks = resp.get("tasks")
+            _tasks[:] = [t for t in (tasks if isinstance(tasks, list) else [])
+                         if isinstance(t, dict) and t.get("type")]
+            _supported = True
+            _last_ok = time.monotonic()
+            _last_error = ""
+            _next_poll = _last_ok + _poll_seconds
+        finally:
+            _in_flight = False
 
 
 def send_result(result: dict):

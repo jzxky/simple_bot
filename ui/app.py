@@ -857,7 +857,7 @@ def earn_catalog_get():
 
 @app.route("/earn_catalog", methods=["POST"])
 def earn_catalog_post():
-    import json, os
+    import json
     data = request.get_json() or []
     path = paths.earn_catalog_path()
     try:
@@ -1055,9 +1055,8 @@ def _get_bionics_next_check_at(state) -> "float | None":
                     and ingame is not None and not store_windows.in_window(b, ingame))
         if _outside:
             # Outside window — next check is at window start
-            ingame_secs_now = (state.server_time.hour * 3600
-                               + state.server_time.minute * 60
-                               + state.server_time.second)
+            now = state._estimated_server_time()
+            ingame_secs_now = now.hour * 3600 + now.minute * 60 + now.second
             secs_until_start = start_mins * 60 - ingame_secs_now
             if secs_until_start <= 0:
                 secs_until_start += 86400  # rolls over to tomorrow
@@ -1085,9 +1084,8 @@ def _get_weapon_store_next_check_at(state) -> "float | None":
         _outside = (start_mins is not None and end_mins is not None
                     and ingame is not None and not store_windows.in_window(w, ingame))
         if _outside:
-            ingame_secs_now = (state.server_time.hour * 3600
-                               + state.server_time.minute * 60
-                               + state.server_time.second)
+            now = state._estimated_server_time()
+            ingame_secs_now = now.hour * 3600 + now.minute * 60 + now.second
             secs_until_start = start_mins * 60 - ingame_secs_now
             if secs_until_start <= 0:
                 secs_until_start += 86400
@@ -1459,7 +1457,6 @@ def communications_send():
     body = data.get("body", "").strip()
     if not to_name or not body:
         return jsonify({"error": "Recipient and message body are required."}), 400
-    import player_db
     valid, reason = _validate_player(to_name)
     if not valid:
         return jsonify({"error": reason}), 400
@@ -2897,7 +2894,7 @@ def check_update():
     count = int(behind.strip() or "0")
     if count == 0:
         return jsonify({"up_to_date": True, "commits_behind": 0})
-    rc, log = _git_run("log", "--oneline", f"HEAD..origin/main")
+    rc, log = _git_run("log", "--oneline", "HEAD..origin/main")
     return jsonify({"up_to_date": False, "commits_behind": count, "log": log})
 
 

@@ -3,7 +3,6 @@ Banking task — auto-invests money in the bank when the investment has matured.
 """
 
 import json
-import time
 from pathlib import Path
 from tasks.base import Task, Action
 from state import GameState

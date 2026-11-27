@@ -444,7 +444,7 @@ def _parse_earn_queue_rows(soup) -> list:
 def _save_earn_queue_cache(rows, character: str = ""):
     """Persist parsed queue rows (and whose queue it is) so the planner can
     count what's still queued."""
-    import os, json, paths
+    import json, paths
     from datetime import datetime
     cache = {
         "cached_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -903,7 +903,7 @@ def handle_clear_earn_queue(action: Action, state: GameState):
 
 
 def _load_earn_catalog():
-    import paths, os, json as _json
+    import paths, json as _json
     path = paths.earn_catalog_path()
     if not os.path.exists(path):
         return list(_EARN_SEED)
@@ -1045,7 +1045,7 @@ def _ensure_manual_earn_mode(page, state: GameState):
 
 def _map_lastearn_to_catalog(lastearn_text: str, schedule_value: str):
     """Update the earn catalog so the lastearn display name maps to the schedule_value."""
-    import paths, os, json as _json
+    import paths, json as _json
     path = paths.earn_catalog_path()
     if not os.path.exists(path):
         return
@@ -2976,7 +2976,6 @@ def handle_university(action: Action, state: GameState):
 
 def handle_training_centre(action: Action, state: GameState):
     from tasks.training_centre import TRAINING_COSTS
-    import re as _re
     discipline = action.params["discipline"]
     url = action.params["url"]
     cost = TRAINING_COSTS.get(discipline, 0)
@@ -3503,7 +3502,7 @@ def _hospital_injury_to_type(injury_text: str) -> str:
 
 
 def _save_casework_snapshot(label: str, html: str):
-    import paths, os
+    import paths
     path = os.path.join(paths.data_dir(), f"casework_{label}.html")
     with open(path, "w", encoding="utf-8") as f:
         f.write(html)
@@ -3578,7 +3577,7 @@ def _merge_renamed_earns(entries: list, auto_opts) -> list:
 
 def _upsert_earn_catalog(auto_opts, manual_opts):
     """Merge scraped earn options into the persistent catalog JSON."""
-    import paths, os, json as _json
+    import paths, json as _json
 
     path = paths.earn_catalog_path()
     if not os.path.exists(path):
@@ -4132,7 +4131,7 @@ def _disable_bank_invest(state: GameState, msg: str):
 def handle_bank_invest(action: Action, state: GameState):
     import re
     from datetime import datetime
-    from tasks.banking import save_mature_date, load_mature_date
+    from tasks.banking import save_mature_date
     import config as cfg
 
     bank_cfg = cfg.load().get("banking", {})
@@ -6108,7 +6107,7 @@ def handle_check_comms(action: Action, state: GameState):
                                         _middling_queue.put(parsed)
                                         state.add_log(f"Middling command queued from {m_sender}: {cmd_txt}")
                             else:
-                                state.add_log(f"Middling parser: no !middle command found in message")
+                                state.add_log("Middling parser: no !middle command found in message")
                             conv["_middling_parsed_count"] = len(msgs)
 
                     # Banking careers: a new message saying "add" asks to be
@@ -6148,7 +6147,6 @@ def handle_check_comms(action: Action, state: GameState):
 
 
 def handle_send_comms(action: Action, state: GameState):
-    from tasks.communications import _load_comms, _save_comms
     to_name = action.params.get("to", "")
     subject = action.params.get("subject", "")
     body = action.params.get("body", "")
@@ -6572,7 +6570,6 @@ def _drug_stock_travel_check(state: GameState) -> bool:
 
 
 def handle_travel(action: Action, state: GameState) -> int:
-    from datetime import datetime
     global _travel_warrant_cooldown_until, _deferred_travel
     target = action.params.get("target_city", "")
     method = action.params.get("method", "airport")
@@ -6762,7 +6759,7 @@ def handle_travel(action: Action, state: GameState) -> int:
     if not _check_session(state):
         return 0
     if "local.asp" in browser.current_url():
-        state.add_log(f"Travel: airport not available (redirected to local).")
+        state.add_log("Travel: airport not available (redirected to local).")
         return 0
 
     soup = BeautifulSoup(state.page_html, "html.parser")
@@ -6770,7 +6767,7 @@ def handle_travel(action: Action, state: GameState) -> int:
     # Check if already booked
     for td in soup.find_all("td"):
         if state.own_name and state.own_name.lower() in td.get_text(strip=True).lower():
-            state.add_log(f"Travel: flight already booked.")
+            state.add_log("Travel: flight already booked.")
             _set_flight_timer(soup, state)
             return 1
 
@@ -8800,14 +8797,10 @@ def handle_use_skill(action: Action, state: GameState):
     if not form:
         state.add_log(f"{skill_name}: skill form not found on page.")
         return
-    rank_input = form.find("input", attrs={"name": "rank", "type": "hidden"})
-    rank = rank_input["value"] if rank_input else "1"
     target_input = form.find("input", attrs={"name": "target"})
     if not target_input:
         state.add_log(f"{skill_name}: no target input found.")
         return
-    form_idx = [f for f in soup.find_all("form", action=True)
-                if "charskills.asp" in f.get("action", "")].index(form)
     selector = f"form:has(input[name='skill'][value='{skill_id}'])"
     page.fill(f"{selector} input[name='target']", target)
     page.click(f"{selector} input[name='doskill']")
@@ -8824,7 +8817,6 @@ def handle_use_skill(action: Action, state: GameState):
         if claim_id is not None:
             _report_respect_to_hub(target, claim_id, msg, state)
         elif update_respect:
-            import re
             import player_db
             player_db.update_respect(target, msg)
         return
@@ -9294,6 +9286,14 @@ class ActionExecutor:
                 handler(action, state)
             except Exception as e:
                 err = str(e)
+                # A UI request waits on this queue; answer it now instead of
+                # leaving the bot thread to wait out the request's timeout.
+                rq = action.params.get("result_queue")
+                if rq is not None:
+                    try:
+                        rq.put_nowait(e)
+                    except Exception:
+                        pass
                 import re as _re
 
                 # Build a human-readable log message
@@ -9339,7 +9339,7 @@ class ActionExecutor:
                     browser.record_nav_failure()
                     if browser.should_restart_for_nav_failures():
                         state.add_log(
-                            f"Too many consecutive navigation failures — restarting browser."
+                            "Too many consecutive navigation failures — restarting browser."
                         )
                         _restart_main_browser(state)
                     else:
