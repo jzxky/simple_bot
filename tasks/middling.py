@@ -129,6 +129,42 @@ def describe_command(item: dict) -> str:
     return text
 
 
+def reply_label(item: dict) -> str:
+    """The command as named in the bot's replies. Never starts with "!": a reply that
+    began with "!middle" would be read as a new command by another bot (or by this one in
+    a shared conversation), which then answered "unknown drug(s): done." and looped."""
+    return describe_command(item).lstrip("!")
+
+
+# Status words the bot's own replies use right after the command ("... done.",
+# "... failed: ...", "... stopped: ..."). A message whose first line has one of them is
+# a bot reply someone quoted or forwarded, not a command.
+_BOT_REPLY_RE = re.compile(r"\b(?:done\.|failed:|stopped:)", re.IGNORECASE)
+
+MAX_REPLY_CHARS = 1500
+
+
+def looks_like_bot_reply(text: str) -> bool:
+    first_line = (text or "").split("\n", 1)[0]
+    return bool(_BOT_REPLY_RE.search(first_line))
+
+
+# Conversations the bot last sent a rejection to, and when: at most one rejection per
+# conversation per window, so two bots can never ping-pong error replies.
+_REJECT_WINDOW_SECS = 600
+_last_reject: dict = {}
+
+
+def may_send_rejection(conv_id: str) -> bool:
+    now = time.time()
+    with _state_lock:
+        last = _last_reject.get(conv_id)
+        if last is not None and now - last < _REJECT_WINDOW_SECS:
+            return False
+        _last_reject[conv_id] = now
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Open drug trade offers and the --all run waiting on its buyer
 # ---------------------------------------------------------------------------
@@ -253,7 +289,7 @@ def finish_run(run: dict) -> str:
     """End a run; returns the message for whoever sent the command."""
     end_run(run)
     reason = run.get("stop_reason")
-    cmd = describe_command(run)
+    cmd = reply_label(run)
     if reason and not run.get("rounds"):
         body = f"{cmd} failed: {reason}."
     elif reason:
@@ -267,6 +303,9 @@ def notify_sender(state, item: dict, body: str):
     """Reply to the !middle sender in the conversation the command came from (bot thread:
     queued to the drug window, which does the sending)."""
     state.add_log(f"Middling: {body.splitlines()[0]}")
+    body = body.lstrip("!")
+    if len(body) > MAX_REPLY_CHARS:
+        body = body[:MAX_REPLY_CHARS - 1] + "…"
     if not item.get("sender"):
         return
     try:

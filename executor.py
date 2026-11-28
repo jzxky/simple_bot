@@ -5775,7 +5775,7 @@ def handle_middle_notify(action: Action, state: GameState):
     if not _check_session(state):
         return
     page.fill("input[name='toname']", to_name)
-    page.fill("input[name='msgsubject']", "!middle")
+    page.fill("input[name='msgsubject']", "middle")
     page.fill("textarea[name='messagebody']", body)
     page.select_option("select[name='msgtype']", "character")
     ok, msg = _submit_and_read_result(state, "input[name='B1']")
@@ -6090,9 +6090,13 @@ def handle_check_comms(action: Action, state: GameState):
                             body_text = latest_msg.get("body", "")
                             first_line = body_text.split("\n", 1)[0].strip() if body_text else ""
                             state.add_log(f"Middling parser: new msg from {m_sender} — first line: {first_line!r}")
+                            from tasks.middling import looks_like_bot_reply
                             parsed = parse_middle_command(body_text)
-                            if parsed:
-                                from tasks.middling import describe_command, notify_sender
+                            if parsed and looks_like_bot_reply(body_text):
+                                state.add_log("Middling parser: ignored — looks like a bot reply, not a command")
+                                parsed = None
+                            elif parsed:
+                                from tasks.middling import describe_command, notify_sender, may_send_rejection, reply_label
                                 parsed.update(sender=m_sender, conv_id=cid)
                                 cmd_txt = describe_command(parsed)
                                 state.add_log(f"Middling parser: matched {cmd_txt}")
@@ -6102,13 +6106,18 @@ def handle_check_comms(action: Action, state: GameState):
                                         err = f"unknown drug(s): {', '.join(parsed['unknown'])}"
                                     if err:
                                         state.add_log(f"Middling command from {m_sender} rejected: {err}")
-                                        notify_sender(state, parsed, f"{first_line} failed: {err}.")
+                                        if may_send_rejection(cid):
+                                            notify_sender(state, parsed, f"{reply_label(parsed)} failed: {err}.")
+                                        else:
+                                            state.add_log("Middling: rejection reply skipped (already replied to this conversation recently)")
                                     else:
                                         _middling_queue.put(parsed)
                                         state.add_log(f"Middling command queued from {m_sender}: {cmd_txt}")
-                            else:
+                            elif not parsed:
                                 state.add_log("Middling parser: no !middle command found in message")
                             conv["_middling_parsed_count"] = len(msgs)
+                        elif "_middling_parsed_count" in existing:
+                            conv["_middling_parsed_count"] = existing["_middling_parsed_count"]
 
                     # Banking careers: a new message saying "add" asks to be
                     # added as a laundering contact — establish a deal with
